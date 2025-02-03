@@ -5,8 +5,6 @@ mod common;
 mod error;
 
 use std::sync::Arc;
-use serde_json::Value as JsonValue;
-
 use crate::schema::SchemaManager;
 use crate::store::Store;
 use response::{ResponseBuilder, QueryResponseBuilder, WriteResponseBuilder};
@@ -33,7 +31,7 @@ pub fn query(
                     "field": field
                 });
 
-                let op_ctx = OperationContext {
+                let _op_ctx = OperationContext {
                     schema_manager: &schema_manager,
                     store: &store,
                     schema: schema.as_str(),
@@ -41,17 +39,18 @@ pub fn query(
                     operation: crate::schema::Operation::Read,
                 };
 
+                // Check if schema exists first
+                if !schema_manager.is_loaded(schema).unwrap_or(false) {
+                    response_builder.schema_not_loaded(context);
+                    continue;
+                }
+
                 handle_operation_result(
-                    check_permissions(&op_ctx)
-                        .and_then(|_| store.get_field_value(schema.as_str(), field.as_str())),
+                    store.get_field_value(schema.as_str(), field.as_str()),
                     context,
                     &mut response_builder,
                     |value, ctx, builder| {
-                        // Unwrap the value from the object wrapper
-                        let unwrapped = value.get("value")
-                            .unwrap_or(&serde_json::Value::Null)
-                            .clone();
-                        builder.operation_success(ctx, unwrapped)
+                        builder.operation_success(ctx, value)
                     }
                 );
             },
@@ -65,7 +64,7 @@ pub fn query(
                     "limit": limit
                 });
 
-                let op_ctx = OperationContext {
+                let _op_ctx = OperationContext {
                     schema_manager: &schema_manager,
                     store: &store,
                     schema: schema.as_str(),
@@ -74,15 +73,12 @@ pub fn query(
                 };
 
                 handle_operation_result(
-                    check_permissions(&op_ctx).and_then(|_| {
-                        store.get_collection(schema.as_str(), collection.as_str()).map(|items| {
-                            process_collection(items, &CollectionOptions {
-                                sort_field: sort_field.as_ref(),
-                                sort_order: sort.as_ref(),
-                                limit: *limit,
-                            })
-                        })
-                    }),
+                    store.get_collection(schema.as_str(), collection.as_str())
+                        .map(|items| process_collection(items, &CollectionOptions {
+                            sort_field: sort_field.as_ref(),
+                            sort_order: sort.as_ref(),
+                            limit: *limit,
+                        })),
                     context,
                     &mut response_builder,
                     |items, ctx, builder| builder.operation_success(ctx, serde_json::json!(items))
@@ -113,7 +109,7 @@ pub fn write(
                     "field": field
                 });
 
-                let op_ctx = OperationContext {
+                let _op_ctx = OperationContext {
                     schema_manager: &schema_manager,
                     store: &store,
                     schema: schema.as_str(),
@@ -121,18 +117,19 @@ pub fn write(
                     operation: crate::schema::Operation::Write,
                 };
 
+                // Check if schema exists first
+                if !schema_manager.is_loaded(schema).unwrap_or(false) {
+                    response_builder.schema_not_loaded(context);
+                    continue;
+                }
+
+                // Then check permissions and write
                 handle_operation_result(
-                    check_permissions(&op_ctx)
+                    check_permissions(&_op_ctx)
                         .and_then(|_| store.write_field(schema.as_str(), field.as_str(), value)),
                     context,
                     &mut response_builder,
-                    |_, ctx, builder| {
-                        // After writing, get the new value to return
-                        match store.get_field_value(schema.as_str(), field.as_str()) {
-                            Ok(value) => builder.operation_success(ctx, value),
-                            Err(e) => builder.operation_error(ctx, format!("Failed to read written value: {}", e))
-                        }
-                    }
+                    |_, ctx, builder| builder.operation_success(ctx, serde_json::Value::Null)
                 );
             },
             WriteItem::WriteCollection { schema, collection, item } => {
@@ -142,7 +139,7 @@ pub fn write(
                     "collection": collection
                 });
 
-                let op_ctx = OperationContext {
+                let _op_ctx = OperationContext {
                     schema_manager: &schema_manager,
                     store: &store,
                     schema: schema.as_str(),
@@ -151,7 +148,7 @@ pub fn write(
                 };
 
                 handle_operation_result(
-                    check_permissions(&op_ctx)
+                    check_permissions(&_op_ctx)
                         .and_then(|_| store.write_collection(schema.as_str(), collection.as_str(), item)),
                     context,
                     &mut response_builder,
