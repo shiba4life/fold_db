@@ -20,6 +20,8 @@ pub enum QueryItem {
 #[derive(Deserialize, Serialize)]
 pub struct QueryPayload {
     pub queries: Vec<QueryItem>,
+    pub public_key: String,
+    pub distance: Option<u32>,
 }
 
 #[derive(Serialize)]
@@ -51,6 +53,8 @@ pub enum WriteItem {
 #[derive(Deserialize, Serialize)]
 pub struct WritePayload {
     pub writes: Vec<WriteItem>,
+    pub public_key: String,
+    pub distance: Option<u32>,
 }
 
 #[derive(Serialize)]

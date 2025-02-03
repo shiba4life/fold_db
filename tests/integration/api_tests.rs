@@ -35,6 +35,8 @@ fn test_query_field() {
                 field: "test_field".to_string(),
             }
         ],
+        public_key: "test_key".to_string(),
+        distance: Some(0),
     };
 
     let response = query(schema_manager, store, payload);
@@ -55,6 +57,8 @@ fn test_query_nonexistent_schema() {
                 field: "test_field".to_string(),
             }
         ],
+        public_key: "test_key".to_string(),
+        distance: Some(0),
     };
 
     let response = query(schema_manager, store, payload);
@@ -76,6 +80,8 @@ fn test_write_field() {
                 value: json!("new value"),
             }
         ],
+        public_key: "test_key".to_string(),
+        distance: Some(0),
     };
 
     let response = write(schema_manager.clone(), store.clone(), payload);
@@ -90,6 +96,8 @@ fn test_write_field() {
                 field: "test_field".to_string(),
             }
         ],
+        public_key: "test_key".to_string(),
+        distance: Some(0),
     };
 
     let query_response = query(schema_manager, store, query_payload);
@@ -111,6 +119,8 @@ fn test_write_collection() {
                 item: item.clone(),
             }
         ],
+        public_key: "test_key".to_string(),
+        distance: Some(0),
     };
 
     let response = write(schema_manager.clone(), store.clone(), payload);
@@ -128,6 +138,8 @@ fn test_write_collection() {
                 limit: None,
             }
         ],
+        public_key: "test_key".to_string(),
+        distance: Some(0),
     };
 
     let query_response = query(schema_manager, store, query_payload);
@@ -148,15 +160,17 @@ fn test_sorted_collection() {
     ];
 
     for item in &items {
-        let payload = WritePayload {
-            writes: vec![
-                WriteItem::WriteCollection {
-                    schema: "test".to_string(),
-                    collection: "test_collection".to_string(),
-                    item: item.clone(),
-                }
-            ],
-        };
+            let payload = WritePayload {
+                writes: vec![
+                    WriteItem::WriteCollection {
+                        schema: "test".to_string(),
+                        collection: "test_collection".to_string(),
+                        item: item.clone(),
+                    }
+                ],
+                public_key: "test_key".to_string(),
+                distance: Some(0),
+            };
         let response = write(schema_manager.clone(), store.clone(), payload);
         assert_eq!(response.results[0].status, "ok");
     }
@@ -174,6 +188,8 @@ fn test_sorted_collection() {
                 limit: None,
             }
         ],
+        public_key: "test_key".to_string(),
+        distance: Some(0),
     };
 
     let query_response = query(schema_manager.clone(), store.clone(), query_payload);
@@ -194,6 +210,8 @@ fn test_sorted_collection() {
                 limit: None,
             }
         ],
+        public_key: "test_key".to_string(),
+        distance: Some(0),
     };
 
     let query_response = query(schema_manager, store, query_payload);

@@ -37,6 +37,8 @@ pub fn query(
                     schema: schema.as_str(),
                     target: field.as_str(),
                     operation: crate::schema::Operation::Read,
+                    public_key: &payload.public_key,
+                    distance: payload.distance.unwrap_or(0),
                 };
 
                 // Check if schema exists first
@@ -45,14 +47,23 @@ pub fn query(
                     continue;
                 }
 
-                handle_operation_result(
-                    store.get_field_value(schema.as_str(), field.as_str()),
-                    context,
-                    &mut response_builder,
-                    |value, ctx, builder| {
-                        builder.operation_success(ctx, value)
+                // First check permissions
+                match check_permissions(&_op_ctx) {
+                    Ok(_) => {
+                        // Then get the value if permissions ok
+                        handle_operation_result(
+                            store.get_field_value(schema.as_str(), field.as_str()),
+                            context,
+                            &mut response_builder,
+                            |value, ctx, builder| {
+                                builder.operation_success(ctx, value)
+                            }
+                        );
+                    },
+                    Err(e) => {
+                        response_builder.operation_error(context, e);
                     }
-                );
+                }
             },
             QueryItem::Collection { schema, collection, sort, sort_field, limit } => {
                 let context = serde_json::json!({
@@ -70,19 +81,30 @@ pub fn query(
                     schema: schema.as_str(),
                     target: collection.as_str(),
                     operation: crate::schema::Operation::Read,
+                    public_key: &payload.public_key,
+                    distance: payload.distance.unwrap_or(0),
                 };
 
-                handle_operation_result(
-                    store.get_collection(schema.as_str(), collection.as_str())
-                        .map(|items| process_collection(items, &CollectionOptions {
-                            sort_field: sort_field.as_ref(),
-                            sort_order: sort.as_ref(),
-                            limit: *limit,
-                        })),
-                    context,
-                    &mut response_builder,
-                    |items, ctx, builder| builder.operation_success(ctx, serde_json::json!(items))
-                );
+                // First check permissions
+                match check_permissions(&_op_ctx) {
+                    Ok(_) => {
+                        // Then get the collection if permissions ok
+                        handle_operation_result(
+                            store.get_collection(schema.as_str(), collection.as_str())
+                                .map(|items| process_collection(items, &CollectionOptions {
+                                    sort_field: sort_field.as_ref(),
+                                    sort_order: sort.as_ref(),
+                                    limit: *limit,
+                                })),
+                            context,
+                            &mut response_builder,
+                            |items, ctx, builder| builder.operation_success(ctx, serde_json::json!(items))
+                        );
+                    },
+                    Err(e) => {
+                        response_builder.operation_error(context, e);
+                    }
+                }
             },
         }
     }
@@ -115,6 +137,8 @@ pub fn write(
                     schema: schema.as_str(),
                     target: field.as_str(),
                     operation: crate::schema::Operation::Write,
+                    public_key: &payload.public_key,
+                    distance: payload.distance.unwrap_or(0),
                 };
 
                 // Check if schema exists first
@@ -145,6 +169,8 @@ pub fn write(
                     schema: schema.as_str(),
                     target: collection.as_str(),
                     operation: crate::schema::Operation::Write,
+                    public_key: &payload.public_key,
+                    distance: payload.distance.unwrap_or(0),
                 };
 
                 handle_operation_result(

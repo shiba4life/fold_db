@@ -98,7 +98,6 @@ pub struct SecurityManager;
 impl SecurityManager {
     /// Checks permission for a field based on its policy.
     /// Parameters:
-    /// - `user_role`: Role of the requester.
     /// - `schema`: The internal schema.
     /// - `field`: The field name.
     /// - `operation`: Operation::Read or Operation::Write.
@@ -106,7 +105,6 @@ impl SecurityManager {
     /// - `explicit_permissions`: Indicates if the operation is to be checked against explicit permissions.
     /// - `public_key`: The public key of the requester.
     pub fn check_permission(
-        user_role: &str,
         schema: &InternalSchema,
         field: &str,
         operation: Operation,
@@ -156,7 +154,6 @@ impl SecurityManager {
 
     /// Convenience function that checks a field's permission from the schema.
     pub fn check_field_permission(
-        user_role: &str,
         schema: &InternalSchema,
         field: &str,
         operation: Operation,
@@ -164,7 +161,7 @@ impl SecurityManager {
         explicit_permissions: bool,
         public_key: &str,
     ) -> bool {
-        Self::check_permission(user_role, schema, field, operation, distance, explicit_permissions, public_key)
+        Self::check_permission(schema, field, operation, distance, explicit_permissions, public_key)
     }
 }
 
@@ -210,7 +207,6 @@ mod tests {
 
         // Check permission: should allow read once.
         let allowed = SecurityManager::check_field_permission(
-            "any_role",
             &schema,
             "username",
             Operation::Read,
@@ -222,7 +218,6 @@ mod tests {
 
         // Next read should fail.
         let allowed_again = SecurityManager::check_field_permission(
-            "any_role",
             &schema,
             "username",
             Operation::Read,
@@ -262,7 +257,6 @@ mod tests {
         // Consume all 5 allowed reads.
         for _ in 0..5 {
             assert!(SecurityManager::check_field_permission(
-                "any_role",
                 &schema,
                 "username",
                 Operation::Read,

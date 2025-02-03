@@ -1,6 +1,7 @@
 pub mod profile_tests;
 pub mod posts_tests;
 pub mod api_tests;
+pub mod permissions_tests;
 
 use fold_db::setup;
 use std::time::{SystemTime, UNIX_EPOCH};
