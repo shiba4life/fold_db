@@ -22,12 +22,12 @@ impl FoldDB {
 
     /// Loads a schema into the schema manager
     pub fn load_schema(&self, schema_name: &str, schema: InternalSchema) -> Result<(), String> {
-        self.schema_manager.load_schema(schema_name, schema)
+        self.schema_manager.load_schema(schema_name, schema).map_err(String::from)
     }
 
     /// Unloads a schema from the schema manager
     pub fn unload_schema(&self, schema_name: &str) -> Result<bool, String> {
-        self.schema_manager.unload_schema(schema_name)
+        self.schema_manager.unload_schema(schema_name).map_err(String::from)
     }
 
     pub fn create_atom(&self, content: String, type_field: String, source: String, prev: Option<String>) -> Result<Atom, Box<dyn std::error::Error>> {

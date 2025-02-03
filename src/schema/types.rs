@@ -1,4 +1,36 @@
 use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::error::Error;
+
+#[derive(Debug)]
+pub enum SchemaError {
+    InvalidData(String),
+    InvalidDSL(String),
+    MappingError(String),
+}
+
+impl fmt::Display for SchemaError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SchemaError::InvalidData(msg) => write!(f, "Invalid data: {}", msg),
+            SchemaError::InvalidDSL(msg) => write!(f, "Invalid DSL: {}", msg),
+            SchemaError::MappingError(msg) => write!(f, "Mapping error: {}", msg),
+        }
+    }
+}
+
+impl Error for SchemaError {}
+
+impl From<SchemaError> for String {
+    fn from(error: SchemaError) -> String {
+        match error {
+            SchemaError::InvalidData(msg) => format!("Invalid data: {}", msg),
+            SchemaError::InvalidDSL(msg) => format!("Invalid DSL: {}", msg),
+            SchemaError::MappingError(msg) => format!("Mapping error: {}", msg),
+        }
+    }
+}
+
 
 /// Represents either a limited number of operations or unlimited.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
