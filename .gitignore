@@ -19,4 +19,4 @@ Cargo.lock
 *.pdb
 
 # Memory-only database
-:memory:
+:memory:*

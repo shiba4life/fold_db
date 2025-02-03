@@ -1,40 +1,33 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::Utc;
 use serde_json::Value;
 use sled;
-use std::collections::HashMap;
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Atom {
-    pub uuid: String,
-    pub content: String,
-    #[serde(rename = "type")]
-    pub type_field: String,
-    pub source: String,
-    pub created_at: DateTime<Utc>,
-    pub prev: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AtomRef {
-    pub latest_atom: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct InternalSchema {
-    pub fields: HashMap<String, String>,
-}
+use crate::atom::{Atom, AtomRef};
+use crate::schema::{SchemaManager, InternalSchema};
 
 pub struct FoldDB {
     pub db: sled::Db,
-    pub internal_schemas: HashMap<String, InternalSchema>,
+    pub schema_manager: SchemaManager,
 }
 
 impl FoldDB {
-    pub fn new(path: &str, internal_schemas: HashMap<String, InternalSchema>) -> sled::Result<Self> {
+    pub fn new(path: &str) -> sled::Result<Self> {
         let db = sled::open(path)?;
-        Ok(Self { db, internal_schemas })
+        Ok(Self {
+            db,
+            schema_manager: SchemaManager::new(),
+        })
+    }
+
+    /// Loads a schema into the schema manager
+    pub fn load_schema(&self, schema_name: &str, schema: InternalSchema) -> Result<(), String> {
+        self.schema_manager.load_schema(schema_name, schema)
+    }
+
+    /// Unloads a schema from the schema manager
+    pub fn unload_schema(&self, schema_name: &str) -> Result<bool, String> {
+        self.schema_manager.unload_schema(schema_name)
     }
 
     pub fn create_atom(&self, content: String, type_field: String, source: String, prev: Option<String>) -> Result<Atom, Box<dyn std::error::Error>> {
@@ -106,8 +99,9 @@ impl FoldDB {
     }
 
     pub fn get_field_value(&self, schema_name: &str, field: &str) -> Result<Value, Box<dyn std::error::Error>> {
-        let internal_schema = self.internal_schemas
-            .get(schema_name)
+        let internal_schema = self.schema_manager
+            .get_schema(schema_name)
+            .map_err(|e| e.to_string())?
             .ok_or("Internal schema not found")?;
         let aref_uuid = internal_schema.fields
             .get(field)
@@ -118,8 +112,9 @@ impl FoldDB {
     }
 
     pub fn update_field_value(&self, schema_name: &str, field: &str, value: Value, source: String) -> Result<(), Box<dyn std::error::Error>> {
-        let internal_schema = self.internal_schemas
-            .get(schema_name)
+        let internal_schema = self.schema_manager
+            .get_schema(schema_name)
+            .map_err(|e| e.to_string())?
             .ok_or("Internal schema not found")?;
         let aref_uuid = internal_schema.fields
             .get(field)
