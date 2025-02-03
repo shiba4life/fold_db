@@ -1,10 +1,8 @@
 use std::sync::Arc;
 use crate::schema::{SchemaManager, Operation};
-use crate::store::Store;
 
 pub struct OperationContext<'a> {
     pub schema_manager: &'a Arc<SchemaManager>,
-    pub store: &'a Arc<Store>,
     pub schema: &'a str,
     pub target: &'a str,
     pub operation: Operation,

@@ -33,7 +33,6 @@ pub fn query(
 
                 let _op_ctx = OperationContext {
                     schema_manager: &schema_manager,
-                    store: &store,
                     schema: schema.as_str(),
                     target: field.as_str(),
                     operation: crate::schema::Operation::Read,
@@ -77,7 +76,6 @@ pub fn query(
 
                 let _op_ctx = OperationContext {
                     schema_manager: &schema_manager,
-                    store: &store,
                     schema: schema.as_str(),
                     target: collection.as_str(),
                     operation: crate::schema::Operation::Read,
@@ -133,7 +131,6 @@ pub fn write(
 
                 let _op_ctx = OperationContext {
                     schema_manager: &schema_manager,
-                    store: &store,
                     schema: schema.as_str(),
                     target: field.as_str(),
                     operation: crate::schema::Operation::Write,
@@ -165,7 +162,6 @@ pub fn write(
 
                 let _op_ctx = OperationContext {
                     schema_manager: &schema_manager,
-                    store: &store,
                     schema: schema.as_str(),
                     target: collection.as_str(),
                     operation: crate::schema::Operation::Write,
