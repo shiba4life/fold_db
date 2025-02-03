@@ -42,12 +42,9 @@ pub fn create_test_posts(fold_db: &FoldDB) -> Result<Vec<String>, Box<dyn std::e
         posts_fields.insert(format!("post_{}", i + 1), aref.clone());
     }
 
-    fold_db.load_schema(
-        "user_posts",
-        InternalSchema {
-            fields: posts_fields,
-        },
-    ).map_err(|e| e.to_string())?;
+    let mut schema = InternalSchema::new();
+    schema.fields = posts_fields;
+    fold_db.load_schema("user_posts", schema).map_err(|e| e.to_string())?;
 
     Ok(arefs)
 }

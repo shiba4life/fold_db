@@ -26,12 +26,9 @@ pub fn create_test_profile(fold_db: &FoldDB) -> Result<(String, String), Box<dyn
     user_profile_fields.insert("username".to_string(), username_aref.clone());
     user_profile_fields.insert("bio".to_string(), bio_aref.clone());
     
-    fold_db.load_schema(
-        "user_profile",
-        InternalSchema {
-            fields: user_profile_fields,
-        },
-    ).map_err(|e| e.to_string())?;
+    let mut schema = InternalSchema::new();
+    schema.fields = user_profile_fields;
+    fold_db.load_schema("user_profile", schema).map_err(|e| e.to_string())?;
 
     Ok((username_aref, bio_aref))
 }
