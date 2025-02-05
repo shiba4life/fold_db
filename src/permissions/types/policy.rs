@@ -9,14 +9,14 @@ pub struct ExplicitCounts {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PermissionsPolicy {
-    pub read_policy: u8,
-    pub write_policy: u8,
+    pub read_policy: u32,
+    pub write_policy: u32,
     pub explicit_write_policy: Option<ExplicitCounts>,
     pub explicit_read_policy: Option<ExplicitCounts>,
 }
 
 impl PermissionsPolicy {
-    pub fn new(read_policy: u8, write_policy: u8) -> Self {
+    pub fn new(read_policy: u32, write_policy: u32) -> Self {
         Self {
             read_policy,
             write_policy,

@@ -6,6 +6,7 @@ use crate::atom::{Atom, AtomRef};
 use crate::schema::{Schema, SchemaError};  // Updated to use re-exported types
 use crate::schema::schema_manager::SchemaManager;
 use crate::schema::types::{Query, Mutation};    
+use crate::permissions::types::policy::PermissionsPolicy;
 
 pub struct FoldDB {
     pub db: sled::Db,
@@ -44,7 +45,7 @@ impl FoldDB {
         // get all the field names from the query
         let field_names = query.fields;
         let field_results = field_names.iter().map(|field_name| {
-            self.get_field_value(&query.schema_name, field_name)
+            self.get_field_value(&query.schema_name, field_name, &query.pub_key, query.trust_distance)
         });
         let field_values = field_results.collect::<Vec<_>>();
 
@@ -95,7 +96,27 @@ impl FoldDB {
         Ok(history)
     }
 
-    pub fn get_field_value(&self, schema_name: &str, field: &str) -> Result<Value, SchemaError> {
+    fn check_read_permission(&self, policy: &PermissionsPolicy, pub_key: &str, trust_distance: u32) -> bool {
+        // Check explicit read policy first
+        if let Some(explicit_policy) = &policy.explicit_read_policy {
+            if explicit_policy.counts_by_pub_key.contains_key(pub_key) {
+                return true;
+            }
+        }
+        // Then check trust distance - lower trust_distance means higher trust
+        trust_distance <= policy.read_policy
+    }
+
+    fn check_write_permission(&self, policy: &PermissionsPolicy, pub_key: &str) -> bool {
+        // Check explicit write policy
+        if let Some(explicit_policy) = &policy.explicit_write_policy {
+            explicit_policy.counts_by_pub_key.contains_key(pub_key)
+        } else {
+            false // No explicit write permission means no write access
+        }
+    }
+
+    pub fn get_field_value(&self, schema_name: &str, field: &str, pub_key: &str, trust_distance: u32) -> Result<Value, SchemaError> {
         let schema = self.schema_manager.get_schema(schema_name)?
             .ok_or_else(|| SchemaError::NotFound(format!("Schema {} not found", schema_name)))?;
         
@@ -105,9 +126,12 @@ impl FoldDB {
         // Try getting the atom
         match self.get_latest_atom(&field.ref_atom_uuid) {
             Ok(atom) => {
-                let content: Value = serde_json::from_str(atom.content().as_str().unwrap_or_default())
-                    .map_err(|e| SchemaError::InvalidData(format!("Invalid JSON content: {}", e)))?;
-                Ok(content)
+                // Check if the reader has permission based on trust distance
+                if !self.check_read_permission(&field.permission_policy, &pub_key, trust_distance) {
+                    Err(SchemaError::InvalidPermission("Read access denied".to_string()))
+                } else {
+                    Ok(atom.content().clone())
+                }
             },
             Err(_) => Ok(Value::Null)
         }
@@ -119,6 +143,11 @@ impl FoldDB {
         
         let field = schema.fields.get(field)
             .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
+
+        // Check write permission
+        if !self.check_write_permission(&field.permission_policy, &source_pub_key) {
+            return Err(SchemaError::InvalidPermission("Write access denied".to_string()));
+        }
         
         let aref_uuid = field.ref_atom_uuid.clone();
         let prev_atom_uuid = self.ref_atoms.get(&aref_uuid)
@@ -133,17 +162,20 @@ impl FoldDB {
             content,
         );
 
-        // Store value
+        // Store value and update in-memory cache
         let atom_bytes = serde_json::to_vec(&atom)
             .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize atom: {}", e)))?;
         self.db.insert(atom.uuid().as_bytes(), atom_bytes)
             .map_err(|e| SchemaError::InvalidData(format!("Failed to store atom: {}", e)))?;
+        self.atoms.insert(atom.uuid().to_string(), atom.clone());
 
-        // Update atom ref
-        let aref = self.ref_atoms.get(&aref_uuid).clone()
+        // Update atom ref with new atom UUID
+        let mut aref = self.ref_atoms.get(&aref_uuid)
             .map(|aref| aref.clone())
             .unwrap_or_else(|| AtomRef::new(atom.uuid().to_string()));
-
+        
+        // Set the new atom UUID
+        aref.set_atom_uuid(atom.uuid().to_string());
         self.ref_atoms.insert(aref_uuid.clone(), aref.clone());
 
         // Store atom ref

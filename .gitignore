@@ -1,23 +1,5 @@
-# Rust build artifacts
-/target/
+target/
 tmp/
 **/*.rs.bk
 Cargo.lock
-
-# Database files
-/tmp/
-*.db
-*.db-*
-
-# Editor and OS files
-.vscode/
-.idea/
-*.swp
-*~
-.DS_Store
-
-# Debug files
-*.pdb
-
-# Memory-only database
-:memory:*
+ 
