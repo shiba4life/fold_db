@@ -1,11 +1,8 @@
 pub mod errors;
-pub mod operations;
-pub mod policy;
 pub mod fields;
 pub mod schema;
-
+pub mod operations;
 pub use errors::SchemaError;
-pub use operations::Operation;
-pub use policy::{PolicyLevel, Count, ExplicitCounts, PermissionsPolicy};
-pub use fields::{FieldType, SchemaField, AccessCounts};
+pub use fields::SchemaField;
 pub use schema::Schema;
+pub use operations::{Query, Mutation};

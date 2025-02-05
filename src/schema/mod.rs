@@ -1,21 +1,13 @@
 pub mod types;
 pub mod mapper;
-pub mod manager;
-pub mod internal_schema;
-pub mod security;
+pub mod schema_manager;
 
-pub use manager::SchemaManager;
+pub use schema_manager::SchemaManager;
+pub use types::{Query, Mutation};
 
 // Re-export all types at the schema module level
 pub use types::{
     Schema,
     SchemaField,
     SchemaError,
-    Operation,
-    PolicyLevel,
-    Count,
-    ExplicitCounts,
-    PermissionsPolicy,
-    FieldType,
-    AccessCounts,
 };

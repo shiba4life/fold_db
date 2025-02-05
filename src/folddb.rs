@@ -4,7 +4,8 @@ use sled;
 
 use crate::atom::{Atom, AtomRef};
 use crate::schema::{Schema, SchemaError};  // Updated to use re-exported types
-use crate::schema::manager::SchemaManager;
+use crate::schema::schema_manager::SchemaManager;
+use crate::schema::types::{Query, Mutation};    
 
 pub struct FoldDB {
     pub db: sled::Db,
@@ -39,26 +40,29 @@ impl FoldDB {
     }
 
     /// Executes a query against a schema
-    pub fn query_schema(&self, schema_name: &str, query: Value) -> Result<Value, SchemaError> {
-        let schema = self.schema_manager.get_schema(schema_name)?
-            .ok_or_else(|| SchemaError::NotFound(format!("Schema {} not found", schema_name)))?;
-        // TODO: Implement query execution
-        Ok(Value::Null)
+    pub fn query_schema(&self, query: Query) -> Vec<Result<Value, SchemaError>> {
+        // get all the field names from the query
+        let field_names = query.fields;
+        let field_results = field_names.iter().map(|field_name| {
+            self.get_field_value(&query.schema_name, field_name)
+        });
+        let field_values = field_results.collect::<Vec<_>>();
+
+        field_values
     }
 
     /// Writes data to a schema
-    pub fn write_schema(&mut self, schema_name: &str, data: Value) -> Result<(), SchemaError> {
-        let schema = self.schema_manager.get_schema(schema_name)?
-            .ok_or_else(|| SchemaError::NotFound(format!("Schema {} not found", schema_name)))?;
-        
-        // TODO: Implement schema writing
-        Ok(())
+    pub fn write_schema(&mut self, mutation: Mutation) -> Result<(), SchemaError> {
+        for (field, value) in mutation.fields_and_values {
+            self.set_field_value(&mutation.schema_name, &field, value, mutation.pub_key.clone())?;
+        }
+        Ok(())  
     }
 
     fn get_latest_atom(&self, aref_uuid: &str) -> Result<Atom, Box<dyn std::error::Error>> {
         // Try in-memory cache first
         if let Some(aref) = self.ref_atoms.get(aref_uuid) {
-            if let Some(atom) = self.atoms.get(aref.atom_uuid()) {
+            if let Some(atom) = self.atoms.get(aref.get_atom_uuid().unwrap()) {
                 return Ok(atom.clone());
             }
         }
@@ -68,7 +72,7 @@ impl FoldDB {
             .ok_or("AtomRef not found")?;
         let aref: AtomRef = serde_json::from_slice(&aref_bytes)?;
         
-        let atom_bytes = self.db.get(aref.atom_uuid().as_bytes())?
+        let atom_bytes = self.db.get(aref.get_atom_uuid().unwrap().as_bytes())?
             .ok_or("Atom not found")?;
         let atom: Atom = serde_json::from_slice(&atom_bytes)?;
         
@@ -81,7 +85,7 @@ impl FoldDB {
         
         history.push(current_atom.clone());
         
-        while let Some(prev_uuid) = current_atom.prev_atom() {
+        while let Some(prev_uuid) = current_atom.prev_atom_uuid() {
             let atom_bytes = self.db.get(prev_uuid.as_bytes())?
                 .ok_or("Previous atom not found")?;
             current_atom = serde_json::from_slice(&atom_bytes)?;
@@ -101,7 +105,7 @@ impl FoldDB {
         // Try getting the atom
         match self.get_latest_atom(&field.ref_atom_uuid) {
             Ok(atom) => {
-                let content: Value = serde_json::from_str(atom.content())
+                let content: Value = serde_json::from_str(atom.content().as_str().unwrap_or_default())
                     .map_err(|e| SchemaError::InvalidData(format!("Invalid JSON content: {}", e)))?;
                 Ok(content)
             },
@@ -109,43 +113,39 @@ impl FoldDB {
         }
     }
 
-    pub fn set_field_value(&mut self, schema_name: &str, field: &str, value: Value, source: String) -> Result<(), SchemaError> {
+    pub fn set_field_value(&mut self, schema_name: &str, field: &str, content: Value, source_pub_key: String) -> Result<(), SchemaError> {
         let schema = self.schema_manager.get_schema(schema_name)?
             .ok_or_else(|| SchemaError::NotFound(format!("Schema {} not found", schema_name)))?;
         
         let field = schema.fields.get(field)
             .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
         
-        // Get the current atom to set as prev if it exists
-        let prev_uuid = match self.get_latest_atom(&field.ref_atom_uuid) {
-            Ok(current_atom) => Some(current_atom.uuid().to_string()),
-            Err(_) => None,
-        };
+        let aref_uuid = field.ref_atom_uuid.clone();
+        let prev_atom_uuid = self.ref_atoms.get(&aref_uuid)
+            .map(|aref| aref.get_atom_uuid().unwrap().clone());
+
         
         // Create new atom
         let atom = Atom::new(
-            value.to_string(),
-            source.clone(),
-            prev_uuid,
+            schema_name.to_string(),
+            source_pub_key,
+            prev_atom_uuid,
+            content,
         );
-        
-        // Store the atom
-        let atom_uuid = atom.uuid().to_string();
+
+        // Store value
         let atom_bytes = serde_json::to_vec(&atom)
             .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize atom: {}", e)))?;
-        self.db.insert(atom_uuid.as_bytes(), atom_bytes)
+        self.db.insert(atom.uuid().as_bytes(), atom_bytes)
             .map_err(|e| SchemaError::InvalidData(format!("Failed to store atom: {}", e)))?;
         
-        // Update or create the atom ref
-        let aref = AtomRef::new(atom_uuid.clone(), source);
-        let aref_bytes = serde_json::to_vec(&aref)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize atom ref: {}", e)))?;
-        self.db.insert(field.ref_atom_uuid.as_bytes(), aref_bytes)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to store atom ref: {}", e)))?;
-        
-        // Update in-memory caches
-        self.atoms.insert(atom_uuid, atom);
-        self.ref_atoms.insert(field.ref_atom_uuid.clone(), aref);
+        // Update atom ref
+        let mut aref = self.ref_atoms.get(&aref_uuid)
+            .map(|aref| aref.clone())
+            .unwrap_or_else(|| AtomRef::new(atom.uuid().to_string()));
+        aref.set_atom_uuid(atom.uuid().to_string());
+
+        self.ref_atoms.insert(aref_uuid, aref);
         
         Ok(())
     }

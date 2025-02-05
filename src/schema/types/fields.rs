@@ -1,37 +1,19 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use crate::permissions::types::policy::PermissionsPolicy;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum FieldType {
-    Single,    // Regular field with a single value
-    Collection // Field containing multiple values
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SchemaField {
-    pub permission_setting: String, // X:0, W1, etc
+    pub permission_policy: PermissionsPolicy,
     pub ref_atom_uuid: String,
-    pub field_type: FieldType,
-    pub explicit_access: HashMap<String, AccessCounts>, // pub_key -> access counts
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AccessCounts {
-    pub w: u32,
-    pub r: u32,
+    // field value is fetched through the ref_atom_uuid
 }
 
 impl SchemaField {
-    pub fn new(permission_setting: String, ref_atom_uuid: String, field_type: FieldType) -> Self {
+    pub fn new(permission_policy: PermissionsPolicy, ref_atom_uuid: String) -> Self {
         Self {
-            permission_setting,
+            permission_policy,
             ref_atom_uuid,
-            field_type,
-            explicit_access: HashMap::new(),
         }
-    }
-
-    pub fn add_explicit_access(&mut self, pub_key: String, w: u32, r: u32) {
-        self.explicit_access.insert(pub_key, AccessCounts { w, r });
     }
 }
