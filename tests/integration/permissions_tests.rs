@@ -1,6 +1,5 @@
-use std::sync::Arc;
 use fold_db::folddb::FoldDB;
-use fold_db::schema::types::{Schema, SchemaField, PolicyLevel, PermissionsPolicy};
+use fold_db::schema::types::{Schema, SchemaField, FieldType};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -15,6 +14,7 @@ fn test_field_permissions() {
     let mut field = SchemaField::new(
         "W1".to_string(),
         Uuid::new_v4().to_string(),
+        FieldType::Single,
     );
 
     // Set explicit access for test users
@@ -54,6 +54,7 @@ fn test_schema_transforms() {
     let field = SchemaField::new(
         "W1".to_string(),
         Uuid::new_v4().to_string(),
+        FieldType::Single,
     );
     schema.add_field("test_field".to_string(), field);
 

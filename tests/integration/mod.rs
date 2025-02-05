@@ -1,4 +1,8 @@
 pub mod schema_tests;
+pub mod mapper_tests;
+pub mod permissions_tests;
+pub mod posts_tests;
+pub mod profile_tests;
 
 use std::sync::Arc;
 use fold_db::folddb::FoldDB;

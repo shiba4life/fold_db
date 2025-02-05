@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use fold_db::folddb::FoldDB;
 use serde_json::{json, Value};
+use chrono;
 
 #[test]
 fn test_posts_setup() {

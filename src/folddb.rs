@@ -3,7 +3,7 @@ use serde_json::Value;
 use sled;
 
 use crate::atom::{Atom, AtomRef};
-use crate::schema::types::{Schema, SchemaField, SchemaError};
+use crate::schema::{Schema, SchemaError};  // Updated to use re-exported types
 use crate::schema::manager::SchemaManager;
 
 pub struct FoldDB {
@@ -42,7 +42,6 @@ impl FoldDB {
     pub fn query_schema(&self, schema_name: &str, query: Value) -> Result<Value, SchemaError> {
         let schema = self.schema_manager.get_schema(schema_name)?
             .ok_or_else(|| SchemaError::NotFound(format!("Schema {} not found", schema_name)))?;
-        
         // TODO: Implement query execution
         Ok(Value::Null)
     }

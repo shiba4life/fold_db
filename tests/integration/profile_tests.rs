@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use fold_db::folddb::FoldDB;
 use serde_json::json;
 
