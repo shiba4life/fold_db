@@ -138,14 +138,19 @@ impl FoldDB {
             .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize atom: {}", e)))?;
         self.db.insert(atom.uuid().as_bytes(), atom_bytes)
             .map_err(|e| SchemaError::InvalidData(format!("Failed to store atom: {}", e)))?;
-        
+
         // Update atom ref
-        let mut aref = self.ref_atoms.get(&aref_uuid)
+        let aref = self.ref_atoms.get(&aref_uuid).clone()
             .map(|aref| aref.clone())
             .unwrap_or_else(|| AtomRef::new(atom.uuid().to_string()));
-        aref.set_atom_uuid(atom.uuid().to_string());
 
-        self.ref_atoms.insert(aref_uuid, aref);
+        self.ref_atoms.insert(aref_uuid.clone(), aref.clone());
+
+        // Store atom ref
+        let aref_bytes = serde_json::to_vec(&aref)
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize atom ref: {}", e)))?;
+        self.db.insert(aref_uuid.as_bytes(), aref_bytes)
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to store atom ref: {}", e)))?;
         
         Ok(())
     }
