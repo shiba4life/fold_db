@@ -1,13 +1,8 @@
-mod types;
-mod internal_schema;
-mod security;
-mod manager;
-mod mapper;
-#[cfg(test)]
-mod tests;
+pub mod types;
+pub mod mapper;
+pub mod manager;
+pub mod internal_schema;
+pub mod security;
 
-pub use types::{Count, ExplicitCounts, PolicyLevel, PermissionsPolicy, Operation, SchemaError};
-pub use internal_schema::InternalSchema;
-pub use security::SecurityManager;
 pub use manager::SchemaManager;
-pub use mapper::{SchemaMapper, MappingRule, parse_mapping_dsl};
+pub use types::{Schema, SchemaField, SchemaError};

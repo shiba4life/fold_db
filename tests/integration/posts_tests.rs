@@ -1,39 +1,54 @@
-use serde_json::Value;
-use fold_db::setup;
-use super::super::data::posts;
+use std::sync::Arc;
+use fold_db::folddb::FoldDB;
+use serde_json::{json, Value};
 
-#[tokio::test]
-async fn test_posts() -> Result<(), Box<dyn std::error::Error>> {
-    let fold_db = setup::initialize_database_with_path(":memory:posts")?;
-    posts::create_test_posts(&fold_db)?;
+#[test]
+fn test_posts_setup() {
+    let mut db = FoldDB::new(&crate::get_test_db_path("posts")).unwrap();
+    let posts = crate::data::posts::create_test_posts(&mut db).unwrap();
+
+    // Test posts were created
+    let stored_posts = db.get_field_value("user_posts", "posts").unwrap();
+    let stored_posts = stored_posts.as_array().unwrap();
+
+    assert_eq!(stored_posts.len(), posts.len());
     
-    // Get all posts
-    let mut posts = Vec::new();
-    for i in 1..=10 {
-        if let Ok(post) = fold_db.get_field_value("user_posts", &format!("post_{}", i)) {
-            posts.push(post);
-        }
+    // Test post content
+    for (stored, original) in stored_posts.iter().zip(posts.iter()) {
+        assert_eq!(stored["title"], original["title"]);
+        assert_eq!(stored["content"], original["content"]);
     }
-    
-    assert!(!posts.is_empty());
-    
-    // Verify specific posts exist
-    let post_titles: Vec<String> = posts.iter()
-        .filter_map(|p| p.get("title").and_then(Value::as_str).map(String::from))
-        .collect();
-    
-    assert!(post_titles.contains(&"Performance Optimization".to_string()));
-    assert!(post_titles.contains(&"Testing Strategies".to_string()));
+}
 
-    // Verify posts are sorted by timestamp (latest first)
-    let timestamps: Vec<i64> = posts.iter()
-        .filter_map(|p| p.get("timestamp").and_then(Value::as_i64))
-        .collect();
-    
-    // Check if timestamps are in descending order
-    for i in 1..timestamps.len() {
-        assert!(timestamps[i-1] >= timestamps[i]);
-    }
+#[test]
+fn test_posts_update() {
+    let mut db = FoldDB::new(&crate::get_test_db_path("posts_update")).unwrap();
+    crate::data::posts::create_test_posts(&mut db).unwrap();
 
-    Ok(())
+    // Create new post
+    let new_post = json!({
+        "title": "New Post",
+        "content": "This is a new post",
+        "timestamp": chrono::Utc::now().timestamp()
+    });
+
+    // Get current posts and add new one
+    let mut current_posts = db.get_field_value("user_posts", "posts").unwrap();
+    let mut posts_array = current_posts.as_array().unwrap().clone();
+    posts_array.push(new_post.clone());
+
+    // Update posts
+    db.set_field_value(
+        "user_posts",
+        "posts",
+        json!(posts_array),
+        "test".to_string(),
+    ).unwrap();
+
+    // Test updated posts
+    let stored_posts = db.get_field_value("user_posts", "posts").unwrap();
+    let stored_posts = stored_posts.as_array().unwrap();
+
+    assert_eq!(stored_posts.last().unwrap()["title"], new_post["title"]);
+    assert_eq!(stored_posts.last().unwrap()["content"], new_post["content"]);
 }

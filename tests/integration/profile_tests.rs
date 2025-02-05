@@ -1,40 +1,44 @@
-use serde_json::Value;
-use fold_db::setup;
-use super::super::data::profile;
+use std::sync::Arc;
+use fold_db::folddb::FoldDB;
+use serde_json::json;
 
-#[tokio::test]
-async fn test_profile_operations() -> Result<(), Box<dyn std::error::Error>> {
-    let fold_db = setup::initialize_database_with_path(":memory:profile")?;
-    profile::create_test_profile(&fold_db)?;
+#[test]
+fn test_profile_setup() {
+    let mut db = FoldDB::new(&crate::get_test_db_path("profile")).unwrap();
+    crate::data::profile::setup_profile_schema(&mut db).unwrap();
 
-    // Test initial profile
-    let username = fold_db.get_field_value("user_profile", "username")?;
-    let bio = fold_db.get_field_value("user_profile", "bio")?;
+    // Test initial values
+    let name = db.get_field_value("profile", "name").unwrap();
+    let bio = db.get_field_value("profile", "bio").unwrap();
     
-    assert_eq!(username.as_str().unwrap(), "john_doe");
-    assert_eq!(bio.as_str().unwrap(), "Software engineer and Rust enthusiast");
+    assert_eq!(name, json!("John Doe"));
+    assert_eq!(bio, json!("A software engineer"));
+}
 
-    // Test profile updates
-    fold_db.update_field_value(
-        "user_profile",
-        "username",
-        Value::String("new_username".to_string()),
+#[test]
+fn test_profile_update() {
+    let mut db = FoldDB::new(&crate::get_test_db_path("profile_update")).unwrap();
+    crate::data::profile::setup_profile_schema(&mut db).unwrap();
+
+    // Update values
+    db.set_field_value(
+        "profile",
+        "name",
+        json!("Jane Doe"),
         "test".to_string(),
-    )?;
-    
-    fold_db.update_field_value(
-        "user_profile",
+    ).unwrap();
+
+    db.set_field_value(
+        "profile",
         "bio",
-        Value::String("Full-stack developer with a passion for Rust".to_string()),
+        json!("A data scientist"),
         "test".to_string(),
-    )?;
+    ).unwrap();
 
-    // Verify updates
-    let updated_username = fold_db.get_field_value("user_profile", "username")?;
-    let updated_bio = fold_db.get_field_value("user_profile", "bio")?;
+    // Test updated values
+    let name = db.get_field_value("profile", "name").unwrap();
+    let bio = db.get_field_value("profile", "bio").unwrap();
     
-    assert_eq!(updated_username.as_str().unwrap(), "new_username");
-    assert_eq!(updated_bio.as_str().unwrap(), "Full-stack developer with a passion for Rust");
-
-    Ok(())
+    assert_eq!(name, json!("Jane Doe"));
+    assert_eq!(bio, json!("A data scientist"));
 }

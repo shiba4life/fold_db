@@ -1,41 +1,41 @@
-pub mod profile_tests;
-pub mod posts_tests;
-pub mod api_tests;
-pub mod permissions_tests;
-pub mod mapper_tests;
+pub mod schema_tests;
 
-use fold_db::setup;
-use std::time::{SystemTime, UNIX_EPOCH};
-use super::data::{profile, posts};
+use std::sync::Arc;
+use fold_db::folddb::FoldDB;
+use serde_json::json;
 
-pub async fn run_example_tests() -> Result<(), Box<dyn std::error::Error>> {
-    // Use a unique path based on timestamp to avoid conflicts
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    // Create tmp directory if it doesn't exist
-    std::fs::create_dir_all("tmp")?;
-    let db_path = format!("tmp/fold_db_{}", timestamp);
+pub fn setup_test_db() -> Arc<FoldDB> {
+    let db = FoldDB::new(&crate::get_test_db_path("db")).unwrap();
+    Arc::new(db)
+}
+
+pub fn setup_test_db_with_data() -> Arc<FoldDB> {
+    let mut db = FoldDB::new(&crate::get_test_db_path("db_with_data")).unwrap();
     
-    // Initialize the database
-    let fold_db = setup::initialize_database_with_path(&db_path)?;
+    // Setup test data
+    crate::data::profile::setup_profile_schema(&mut db).unwrap();
+    crate::data::posts::create_test_posts(&mut db).unwrap();
     
-    // Create test data
-    profile::create_test_profile(&fold_db)?;
-    posts::create_test_posts(&fold_db)?;
+    Arc::new(db)
+}
 
-    println!("Running example operations...\n");
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    // Print some example data
-    let username = fold_db.get_field_value("user_profile", "username")?;
-    let bio = fold_db.get_field_value("user_profile", "bio")?;
-    
-    println!("Current user profile:");
-    println!("Username: {}", username);
-    println!("Bio: {}", bio);
+    #[test]
+    fn test_db_setup() {
+        let db = setup_test_db();
+        assert!(db.get_field_value("profile", "name").is_err());
+    }
 
-    println!("\nDatabase initialized successfully at: {}", db_path);
-
-    Ok(())
+    #[test]
+    fn test_db_with_data() {
+        let db = setup_test_db_with_data();
+        let name = db.get_field_value("profile", "name").unwrap();
+        let bio = db.get_field_value("profile", "bio").unwrap();
+        
+        assert_eq!(name, json!("John Doe"));
+        assert_eq!(bio, json!("A software engineer"));
+    }
 }

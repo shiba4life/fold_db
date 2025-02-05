@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use serde_json::json;
-use fold_db::schema::InternalSchema;
+use serde_json::{json, Value};
+use fold_db::schema::types::{Schema, FieldType};
 use fold_db::folddb::FoldDB;
+use uuid::Uuid;
 
-pub fn create_test_posts(fold_db: &FoldDB) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+pub fn create_test_posts(fold_db: &mut FoldDB) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
     let posts = vec![
         ("Performance Optimization", "Some tips for optimizing Rust code without sacrificing safety..."),
         ("Testing Strategies", "Here's how I structure tests in my Rust projects..."),
@@ -17,7 +17,19 @@ pub fn create_test_posts(fold_db: &FoldDB) -> Result<Vec<String>, Box<dyn std::e
         ("Exploring Rust's Memory Safety", "Just discovered how Rust's ownership system prevents common bugs...")
     ];
 
-    let mut arefs = Vec::new();
+    // Create schema
+    let mut schema = Schema::new("user_posts".to_string());
+    
+    // Add posts field with default permissions
+    let posts_field = fold_db::schema::types::SchemaField::new(
+        "W1".to_string(),
+        Uuid::new_v4().to_string(),
+        FieldType::Collection,
+    );
+    schema.add_field("posts".to_string(), posts_field);
+
+    // Create JSON posts
+    let mut json_posts = Vec::new();
     for (i, (title, content)) in posts.into_iter().enumerate() {
         let timestamp = (chrono::Utc::now() - chrono::Duration::hours(i as i64)).timestamp();
         let post = json!({
@@ -25,26 +37,12 @@ pub fn create_test_posts(fold_db: &FoldDB) -> Result<Vec<String>, Box<dyn std::e
             "content": content,
             "timestamp": timestamp
         });
-
-        let atom = fold_db.create_atom(
-            post.to_string(),
-            "post".to_string(),
-            "system_init".to_string(),
-            None,
-        )?;
-        let aref = fold_db.create_atom_ref(&atom)?;
-        arefs.push(aref);
+        json_posts.push(post);
     }
 
-    // Create and load schema
-    let mut posts_fields = HashMap::new();
-    for (i, aref) in arefs.iter().enumerate() {
-        posts_fields.insert(format!("post_{}", i + 1), aref.clone());
-    }
-
-    let mut schema = InternalSchema::new();
-    schema.fields = posts_fields;
-    fold_db.load_schema("user_posts", schema).map_err(|e| e.to_string())?;
-
-    Ok(arefs)
+    // Load schema and set field value
+    fold_db.load_schema(schema)?;
+    fold_db.set_field_value("user_posts", "posts", json!(json_posts), "system_init".to_string())?;
+    
+    Ok(json_posts)
 }

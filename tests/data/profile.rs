@@ -1,34 +1,31 @@
-use fold_db::schema::InternalSchema;
+use serde_json::json;
+use fold_db::schema::types::{Schema, FieldType};
 use fold_db::folddb::FoldDB;
-use std::collections::HashMap;
+use uuid::Uuid;
 
-pub fn create_test_profile(fold_db: &FoldDB) -> Result<(String, String), Box<dyn std::error::Error>> {
-    // Create profile atoms
-    let username_atom = fold_db.create_atom(
-        r#""john_doe""#.to_string(),
-        "initial_value".to_string(),
-        "system_init".to_string(),
-        None,
-    )?;
-    let bio_atom = fold_db.create_atom(
-        r#""Software engineer and Rust enthusiast""#.to_string(),
-        "initial_value".to_string(),
-        "system_init".to_string(),
-        None,
-    )?;
-
-    // Create atom refs for profile
-    let username_aref = fold_db.create_atom_ref(&username_atom)?;
-    let bio_aref = fold_db.create_atom_ref(&bio_atom)?;
-
-    // Create and load schema
-    let mut user_profile_fields = HashMap::new();
-    user_profile_fields.insert("username".to_string(), username_aref.clone());
-    user_profile_fields.insert("bio".to_string(), bio_aref.clone());
+pub fn setup_profile_schema(db: &mut FoldDB) -> Result<(), Box<dyn std::error::Error>> {
+    // Create schema
+    let mut schema = Schema::new("profile".to_string());
     
-    let mut schema = InternalSchema::new();
-    schema.fields = user_profile_fields;
-    fold_db.load_schema("user_profile", schema).map_err(|e| e.to_string())?;
+    // Add fields with default permissions
+    let name_field = fold_db::schema::types::SchemaField::new(
+        "W1".to_string(),
+        Uuid::new_v4().to_string(),
+        FieldType::Single,
+    );
+    schema.add_field("name".to_string(), name_field);
 
-    Ok((username_aref, bio_aref))
+    let bio_field = fold_db::schema::types::SchemaField::new(
+        "W1".to_string(),
+        Uuid::new_v4().to_string(),
+        FieldType::Single,
+    );
+    schema.add_field("bio".to_string(), bio_field);
+
+    // Load schema and set initial values
+    db.load_schema(schema)?;
+    db.set_field_value("profile", "name", json!("John Doe"), "system_init".to_string())?;
+    db.set_field_value("profile", "bio", json!("A software engineer"), "system_init".to_string())?;
+
+    Ok(())
 }

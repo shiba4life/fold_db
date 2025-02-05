@@ -1,66 +1,66 @@
-use super::internal_schema::InternalSchema;
-use super::types::{Operation, PolicyLevel};
+use std::collections::HashMap;
+use super::types::{PolicyLevel, Count, ExplicitCounts, PermissionsPolicy, Operation, SchemaError};
 
-/// The SecurityManager checks permission for operations.
-pub struct SecurityManager;
+pub struct SecurityManager {
+    pub_keys: HashMap<String, Vec<String>>, // user -> pub_keys
+}
 
 impl SecurityManager {
-    /// Checks permission for a field based on its policy.
-    pub fn check_permission(
-        schema: &mut InternalSchema,
-        field: &str,
-        operation: Operation,
-        distance: u32,
-        explicit_permissions: bool,
-        public_key: &str,
-    ) -> bool {
-        let policy = if let Some(policies) = &schema.policies {
-            policies.get(field)
-        } else {
-            None
-        };
-
-        // Default: if no policy exists, allow the operation.
-        if policy.is_none() {
-            return true;
+    pub fn new() -> Self {
+        Self {
+            pub_keys: HashMap::new(),
         }
-        let policy = policy.unwrap();
+    }
 
-        let level = match operation {
+    pub fn register_pub_key(&mut self, user: String, pub_key: String) {
+        self.pub_keys.entry(user).or_default().push(pub_key);
+    }
+
+    pub fn check_permission(&self, policy: &PermissionsPolicy, pub_key: &str, op: Operation) -> Result<bool, SchemaError> {
+        let policy_level = match op {
             Operation::Read => &policy.read_policy,
             Operation::Write => &policy.write_policy,
         };
 
-        match level {
-            PolicyLevel::Distance(max) => distance <= *max,
-            PolicyLevel::Anyone => true,
-            PolicyLevel::ExplicitOnce | PolicyLevel::ExplicitMany => {
-                if explicit_permissions {
-                    // Look up explicit permission by public key.
-                    if let Some(counts) = schema.get_explicit_permissions_mut(public_key) {
-                        match operation {
-                            Operation::Read => counts.r.consume(),
-                            Operation::Write => counts.w.consume(),
+        match policy_level {
+            PolicyLevel::Public => Ok(true),
+            PolicyLevel::Private => Ok(false),
+            PolicyLevel::Explicit | PolicyLevel::ExplicitOnce | PolicyLevel::ExplicitMany => {
+                if let Some(counts) = &policy.explicit_counts {
+                    if let Some(count) = counts.counts.get(pub_key) {
+                        match op {
+                            Operation::Read => Ok(count.read > 0),
+                            Operation::Write => Ok(count.write > 0),
                         }
                     } else {
-                        false
+                        Ok(false)
                     }
                 } else {
-                    false
+                    Ok(false)
                 }
-            },
+            }
         }
     }
 
-    /// Convenience function that checks a field's permission from the schema.
-    pub fn check_field_permission(
-        schema: &mut InternalSchema,
-        field: &str,
-        operation: Operation,
-        distance: u32,
-        explicit_permissions: bool,
-        public_key: &str,
-    ) -> bool {
-        Self::check_permission(schema, field, operation, distance, explicit_permissions, public_key)
+    pub fn update_counts(&mut self, counts: &mut ExplicitCounts, pub_key: &str, op: Operation) -> Result<(), SchemaError> {
+        if let Some(count) = counts.counts.get_mut(pub_key) {
+            match op {
+                Operation::Read => {
+                    if count.read > 0 {
+                        count.read -= 1;
+                    }
+                }
+                Operation::Write => {
+                    if count.write > 0 {
+                        count.write -= 1;
+                    }
+                }
+            }
+            Ok(())
+        } else {
+            Err(SchemaError::InvalidPermission(format!(
+                "No explicit access for pub_key: {}", pub_key
+            )))
+        }
     }
 }
