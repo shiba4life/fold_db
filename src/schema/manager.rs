@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
-use super::types::{Schema, SchemaError};
+use super::{Schema, SchemaError};  // Updated to use re-exported types
 
 pub struct SchemaManager {
     schemas: Mutex<HashMap<String, Schema>>,

@@ -1,5 +1,5 @@
 use fold_db::folddb::FoldDB;
-use serde_json::{json, Value};
+use serde_json::json;
 use chrono;
 
 #[test]
@@ -33,7 +33,7 @@ fn test_posts_update() {
     });
 
     // Get current posts and add new one
-    let mut current_posts = db.get_field_value("user_posts", "posts").unwrap();
+    let current_posts = db.get_field_value("user_posts", "posts").unwrap();
     let mut posts_array = current_posts.as_array().unwrap().clone();
     posts_array.push(new_post.clone());
 

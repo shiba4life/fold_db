@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;
-use crate::schema::types::SchemaError;
+use crate::schema::SchemaError;  // Updated to use re-exported type
 use super::types::MappingRule;
 
 /// SchemaMapper supports mapping data from multiple source schemas to a target schema

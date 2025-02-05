@@ -1,5 +1,7 @@
 use std::collections::HashMap;
-use super::types::{PolicyLevel, Count, ExplicitCounts, PermissionsPolicy, Operation, SchemaError};
+use super::types::policy::{PolicyLevel, Count, ExplicitCounts, PermissionsPolicy};
+use super::types::operations::Operation;
+use super::types::errors::SchemaError;
 
 pub struct SecurityManager {
     pub_keys: HashMap<String, Vec<String>>, // user -> pub_keys

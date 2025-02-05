@@ -1,7 +1,7 @@
 use fold_db::folddb::FoldDB;
 use fold_db::schema::types::{Schema, SchemaField, FieldType};
 use fold_db::schema::mapper::{SchemaMapper, MappingRule};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
 

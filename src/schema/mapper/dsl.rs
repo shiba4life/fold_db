@@ -1,5 +1,5 @@
 use serde_json::json;
-use crate::schema::types::SchemaError;
+use crate::schema::SchemaError;  // Updated to use re-exported type
 use super::types::MappingRule;
 
 /// Parse DSL string into mapping rules
