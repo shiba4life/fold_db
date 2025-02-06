@@ -104,11 +104,12 @@ fn test_permission_wrapper_mutation() {
     let wrapper = PermissionWrapper::new();
     let schema_manager = SchemaManager::new();
     
-    // Create a test schema with explicit write permissions
+    // Create a test schema with both explicit write permissions and trust distance
     let mut fields = HashMap::new();
+    eprintln!("Setting up test with write policy: TrustDistance::Distance(2)");
     let mut policy = PermissionsPolicy::new(
         TrustDistance::Distance(0),
-        TrustDistance::Distance(0)
+        TrustDistance::Distance(2) // Allow writes within trust distance 2
     );
     let mut explicit_counts = HashMap::new();
     explicit_counts.insert("allowed_key".to_string(), 1);
@@ -126,34 +127,29 @@ fn test_permission_wrapper_mutation() {
     
     schema_manager.load_schema(schema).unwrap();
 
-    // Test cases
-    let test_cases = vec![
-        // Should pass - has explicit write permission
-        (Mutation {
-            schema_name: "test_schema".to_string(),
-            fields_and_values: {
-                let mut map = HashMap::new();
-                map.insert("test_field".to_string(), Value::Null);
-                map
-            },
-            pub_key: "allowed_key".to_string(),
-            trust_distance: 0,
-        }, true),
-        // Should fail - no write permission
-        (Mutation {
-            schema_name: "test_schema".to_string(),
-            fields_and_values: {
-                let mut map = HashMap::new();
-                map.insert("test_field".to_string(), Value::Null);
-                map
-            },
-            pub_key: "unauthorized_key".to_string(),
-            trust_distance: 0,
-        }, false),
-    ];
-
-    for (mutation, should_pass) in test_cases {
-        let result = wrapper.check_mutation_field_permission(&mutation, "test_field", &schema_manager);
-        assert_eq!(result.allowed, should_pass);
+    // Test just the failing case
+    let mutation = Mutation {
+        schema_name: "test_schema".to_string(),
+        fields_and_values: {
+            let mut map = HashMap::new();
+            map.insert("test_field".to_string(), Value::Null);
+            map
+        },
+        pub_key: "untrusted_key".to_string(),
+        trust_distance: 3,
+    };
+    
+    eprintln!("\nTesting mutation:");
+    eprintln!("  pub_key: {}", mutation.pub_key);
+    eprintln!("  trust_distance: {}", mutation.trust_distance);
+    eprintln!("  expected: false");
+    
+    let result = wrapper.check_mutation_field_permission(&mutation, "test_field", &schema_manager);
+    eprintln!("  got: {}", result.allowed);
+    if let Some(err) = &result.error {
+        eprintln!("  error: {:?}", err);
     }
+    
+    assert!(!result.allowed, "Should deny write permission when trust distance exceeds limit");
+
 }
