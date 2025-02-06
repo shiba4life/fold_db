@@ -3,16 +3,17 @@ use serde_json::Value;
 use sled;
 
 use crate::atom::{Atom, AtomRef};
-use crate::schema::{Schema, SchemaError};  // Updated to use re-exported types
+use crate::schema::{Schema, SchemaError};
 use crate::schema::schema_manager::SchemaManager;
 use crate::schema::types::{Query, Mutation};    
-use crate::permissions::types::policy::PermissionsPolicy;
+use crate::permissions::PermissionWrapper;
 
 pub struct FoldDB {
     pub db: sled::Db,
     pub atoms: HashMap<String, Atom>,
     pub ref_atoms: HashMap<String, AtomRef>,
     pub schema_manager: SchemaManager,
+    permission_wrapper: PermissionWrapper,
 }
 
 impl FoldDB {
@@ -23,6 +24,7 @@ impl FoldDB {
             atoms: HashMap::new(),
             ref_atoms: HashMap::new(),
             schema_manager: SchemaManager::new(),
+            permission_wrapper: PermissionWrapper::new(),
         })
     }
 
@@ -42,22 +44,47 @@ impl FoldDB {
 
     /// Executes a query against a schema
     pub fn query_schema(&self, query: Query) -> Vec<Result<Value, SchemaError>> {
-        // get all the field names from the query
-        let field_names = query.fields;
-        let field_results = field_names.iter().map(|field_name| {
-            self.get_field_value(&query.schema_name, field_name, &query.pub_key, query.trust_distance)
-        });
-        let field_values = field_results.collect::<Vec<_>>();
-
-        field_values
+        // Check permissions for each field
+        let permission_results = self.permission_wrapper.check_query_permissions(&query, &self.schema_manager);
+        
+        // Process each field based on its permission result
+        permission_results.into_iter().map(|perm_result| {
+            if !perm_result.allowed {
+                return Err(perm_result.error.unwrap_or(
+                    SchemaError::InvalidPermission("Unknown permission error".to_string())
+                ));
+            }
+            
+            self.get_field_value(
+                &query.schema_name,
+                &perm_result.field_name,
+                &query.pub_key,
+                query.trust_distance
+            )
+        }).collect()
     }
 
     /// Writes data to a schema
     pub fn write_schema(&mut self, mutation: Mutation) -> Result<(), SchemaError> {
-        for (field, value) in mutation.fields_and_values {
-            self.set_field_value(&mutation.schema_name, &field, value, mutation.pub_key.clone())?;
+        // Check permissions for each field
+        let permission_results = self.permission_wrapper.check_mutation_permissions(&mutation, &self.schema_manager);
+        
+        // Process fields that have permission
+        for (field_name, value) in mutation.fields_and_values {
+            // Find permission result for this field
+            let perm_result = permission_results.iter()
+                .find(|r| r.field_name == field_name)
+                .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field_name)))?;
+            
+            if !perm_result.allowed {
+                return Err(perm_result.error.clone().unwrap_or(
+                    SchemaError::InvalidPermission("Unknown permission error".to_string())
+                ));
+            }
+            
+            self.set_field_value(&mutation.schema_name, &field_name, value, mutation.pub_key.clone())?;
         }
-        Ok(())  
+        Ok(())
     }
 
     fn get_latest_atom(&self, aref_uuid: &str) -> Result<Atom, Box<dyn std::error::Error>> {
@@ -96,27 +123,7 @@ impl FoldDB {
         Ok(history)
     }
 
-    fn check_read_permission(&self, policy: &PermissionsPolicy, pub_key: &str, trust_distance: u32) -> bool {
-        // Check explicit read policy first
-        if let Some(explicit_policy) = &policy.explicit_read_policy {
-            if explicit_policy.counts_by_pub_key.contains_key(pub_key) {
-                return true;
-            }
-        }
-        // Then check trust distance - lower trust_distance means higher trust
-        trust_distance <= policy.read_policy
-    }
-
-    fn check_write_permission(&self, policy: &PermissionsPolicy, pub_key: &str) -> bool {
-        // Check explicit write policy
-        if let Some(explicit_policy) = &policy.explicit_write_policy {
-            explicit_policy.counts_by_pub_key.contains_key(pub_key)
-        } else {
-            false // No explicit write permission means no write access
-        }
-    }
-
-    pub fn get_field_value(&self, schema_name: &str, field: &str, pub_key: &str, trust_distance: u32) -> Result<Value, SchemaError> {
+    pub fn get_field_value(&self, schema_name: &str, field: &str, _pub_key: &str, _trust_distance: u32) -> Result<Value, SchemaError> {
         let schema = self.schema_manager.get_schema(schema_name)?
             .ok_or_else(|| SchemaError::NotFound(format!("Schema {} not found", schema_name)))?;
         
@@ -125,14 +132,7 @@ impl FoldDB {
 
         // Try getting the atom
         match self.get_latest_atom(&field.ref_atom_uuid) {
-            Ok(atom) => {
-                // Check if the reader has permission based on trust distance
-                if !self.check_read_permission(&field.permission_policy, &pub_key, trust_distance) {
-                    Err(SchemaError::InvalidPermission("Read access denied".to_string()))
-                } else {
-                    Ok(atom.content().clone())
-                }
-            },
+            Ok(atom) => Ok(atom.content().clone()),
             Err(_) => Ok(Value::Null)
         }
     }
@@ -143,17 +143,11 @@ impl FoldDB {
         
         let field = schema.fields.get(field)
             .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
-
-        // Check write permission
-        if !self.check_write_permission(&field.permission_policy, &source_pub_key) {
-            return Err(SchemaError::InvalidPermission("Write access denied".to_string()));
-        }
         
         let aref_uuid = field.ref_atom_uuid.clone();
         let prev_atom_uuid = self.ref_atoms.get(&aref_uuid)
             .map(|aref| aref.get_atom_uuid().unwrap().clone());
 
-        
         // Create new atom
         let atom = Atom::new(
             schema_name.to_string(),

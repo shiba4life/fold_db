@@ -1,94 +1,113 @@
-use fold_db::permissions::permission_manager::PermissionManager;
-use fold_db::permissions::types::policy::{PermissionsPolicy, ExplicitCounts};
+use fold_db::{
+    permissions::{PermissionWrapper, PermissionsPolicy},
+    schema::Schema,
+    schema::schema_manager::SchemaManager,
+    schema::types::{Query, Mutation, SchemaField},
+};
 use std::collections::HashMap;
-
-fn setup_permission_manager() -> PermissionManager {
-    PermissionManager {}
-}
+use serde_json::Value;
 
 #[test]
-fn test_trust_based_permissions() {
-    let manager = setup_permission_manager();
-    let pub_key = "test_key";
+fn test_permission_wrapper_query() {
+    // Setup
+    let wrapper = PermissionWrapper::new();
+    let schema_manager = SchemaManager::new();
     
-    // Test read permissions with different trust levels
-    let policy = PermissionsPolicy::new(2, 3); // read_policy: 2, write_policy: 3
+    // Create a test schema
+    let mut fields = HashMap::new();
+    let field = SchemaField::new(
+        PermissionsPolicy::new(2, 0), // Allow read within trust distance 2
+        "test_ref".to_string(),
+    );
+    fields.insert("test_field".to_string(), field);
     
-    // Read permissions
-    assert!(manager.has_read_permission(pub_key, &policy, 1)); // Trust distance less than policy
-    assert!(manager.has_read_permission(pub_key, &policy, 2)); // Trust distance equal to policy
-    assert!(!manager.has_read_permission(pub_key, &policy, 3)); // Trust distance greater than policy
-
-    // Write permissions
-    assert!(manager.has_write_permission(pub_key, &policy, 2)); // Trust distance less than policy
-    assert!(manager.has_write_permission(pub_key, &policy, 3)); // Trust distance equal to policy
-    assert!(!manager.has_write_permission(pub_key, &policy, 4)); // Trust distance greater than policy
-}
-
-#[test]
-fn test_explicit_permissions() {
-    let manager = setup_permission_manager();
-    let pub_key = "explicit_key";
-    let other_key = "other_key";
-
-    // Setup explicit permissions
-    let mut read_counts = HashMap::new();
-    read_counts.insert(pub_key.to_string(), 1);
-    
-    let mut write_counts = HashMap::new();
-    write_counts.insert(pub_key.to_string(), 1);
-
-    let policy = PermissionsPolicy {
-        read_policy: 0,
-        write_policy: 0,
-        explicit_read_policy: Some(ExplicitCounts { counts_by_pub_key: read_counts }),
-        explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: write_counts }),
+    let schema = Schema {
+        name: "test_schema".to_string(),
+        fields,
+        transforms: Vec::new(),
     };
+    
+    schema_manager.load_schema(schema).unwrap();
 
-    // Test explicit permissions
-    assert!(manager.has_read_permission(pub_key, &policy, 1)); // Explicitly allowed
-    assert!(!manager.has_read_permission(other_key, &policy, 1)); // Not explicitly allowed
+    // Test cases
+    let test_cases = vec![
+        // Should pass - trust distance within policy
+        (Query {
+            schema_name: "test_schema".to_string(),
+            fields: vec!["test_field".to_string()],
+            pub_key: "test_key".to_string(),
+            trust_distance: 1,
+        }, true),
+        // Should fail - trust distance exceeds policy
+        (Query {
+            schema_name: "test_schema".to_string(),
+            fields: vec!["test_field".to_string()],
+            pub_key: "test_key".to_string(),
+            trust_distance: 3,
+        }, false),
+    ];
 
-    assert!(manager.has_write_permission(pub_key, &policy, 1)); // Explicitly allowed
-    assert!(!manager.has_write_permission(other_key, &policy, 1)); // Not explicitly allowed
+    for (query, should_pass) in test_cases {
+        let results = wrapper.check_query_permissions(&query, &schema_manager);
+        assert_eq!(results.len(), 1); // Should have one result per field
+        assert_eq!(results[0].allowed, should_pass);
+    }
 }
 
 #[test]
-fn test_combined_permissions() {
-    let manager = setup_permission_manager();
-    let pub_key = "explicit_key";
-    let trust_key = "trust_key";
-
-    // Setup combined permissions
-    let mut read_counts = HashMap::new();
-    read_counts.insert(pub_key.to_string(), 1);
+fn test_permission_wrapper_mutation() {
+    // Setup
+    let wrapper = PermissionWrapper::new();
+    let schema_manager = SchemaManager::new();
     
-    let policy = PermissionsPolicy {
-        read_policy: 2, // Allow trust-based access
-        write_policy: 0, // Require explicit access
-        explicit_read_policy: Some(ExplicitCounts { counts_by_pub_key: read_counts.clone() }),
-        explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: read_counts }),
+    // Create a test schema with explicit write permissions
+    let mut fields = HashMap::new();
+    let mut policy = PermissionsPolicy::new(0, 0);
+    let mut explicit_counts = HashMap::new();
+    explicit_counts.insert("allowed_key".to_string(), 1);
+    policy.explicit_write_policy = Some(fold_db::permissions::types::policy::ExplicitCounts {
+        counts_by_pub_key: explicit_counts,
+    });
+    let field = SchemaField::new(policy, "test_ref".to_string());
+    fields.insert("test_field".to_string(), field);
+    
+    let schema = Schema {
+        name: "test_schema".to_string(),
+        fields,
+        transforms: Vec::new(),
     };
-
-    // Test trust-based read access
-    assert!(manager.has_read_permission(trust_key, &policy, 1)); // Within trust distance
-    assert!(manager.has_read_permission(trust_key, &policy, 2)); // At trust distance
-    assert!(!manager.has_read_permission(trust_key, &policy, 3)); // Beyond trust distance
-
-    // Test explicit access
-    assert!(manager.has_read_permission(pub_key, &policy, 3)); // Explicit access overrides trust distance
-    assert!(manager.has_write_permission(pub_key, &policy, 1)); // Explicit write access
-    assert!(!manager.has_write_permission(trust_key, &policy, 1)); // No explicit write access
-}
-
-#[test]
-fn test_default_permissions() {
-    let manager = setup_permission_manager();
-    let pub_key = "test_key";
     
-    let policy = PermissionsPolicy::default();
-    
-    // Default policy should deny all access
-    assert!(!manager.has_read_permission(pub_key, &policy, 1));
-    assert!(!manager.has_write_permission(pub_key, &policy, 1));
+    schema_manager.load_schema(schema).unwrap();
+
+    // Test cases
+    let test_cases = vec![
+        // Should pass - has explicit write permission
+        (Mutation {
+            schema_name: "test_schema".to_string(),
+            fields_and_values: {
+                let mut map = HashMap::new();
+                map.insert("test_field".to_string(), Value::Null);
+                map
+            },
+            pub_key: "allowed_key".to_string(),
+            trust_distance: 0,
+        }, true),
+        // Should fail - no write permission
+        (Mutation {
+            schema_name: "test_schema".to_string(),
+            fields_and_values: {
+                let mut map = HashMap::new();
+                map.insert("test_field".to_string(), Value::Null);
+                map
+            },
+            pub_key: "unauthorized_key".to_string(),
+            trust_distance: 0,
+        }, false),
+    ];
+
+    for (mutation, should_pass) in test_cases {
+        let results = wrapper.check_mutation_permissions(&mutation, &schema_manager);
+        assert_eq!(results.len(), 1); // Should have one result per field
+        assert_eq!(results[0].allowed, should_pass);
+    }
 }

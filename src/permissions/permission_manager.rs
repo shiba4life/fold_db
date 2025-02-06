@@ -5,15 +5,27 @@ pub struct PermissionManager {
 }
 
 impl PermissionManager {
-    pub fn has_read_permission(&self, pub_key: &str, permissions_policy: &PermissionsPolicy, trust_distance: u32) -> bool {
-        permissions_policy.read_policy >= trust_distance || 
-        permissions_policy.explicit_read_policy.as_ref()
-            .map_or(false, |counts| counts.counts_by_pub_key.get(pub_key).is_some())
+    pub fn new() -> Self {
+        Self {}
     }
 
-    pub fn has_write_permission(&self, pub_key: &str, permissions_policy: &PermissionsPolicy, trust_distance: u32) -> bool {
-        permissions_policy.write_policy >= trust_distance || 
-        permissions_policy.explicit_write_policy.as_ref()
-            .map_or(false, |counts| counts.counts_by_pub_key.get(pub_key).is_some())
+    pub fn has_read_permission(&self, pub_key: &str, permissions_policy: &PermissionsPolicy, trust_distance: u32) -> bool {
+        // Check explicit read policy first
+        if let Some(explicit_policy) = &permissions_policy.explicit_read_policy {
+            if explicit_policy.counts_by_pub_key.contains_key(pub_key) {
+                return true;
+            }
+        }
+        // Then check trust distance - lower trust_distance means higher trust
+        trust_distance <= permissions_policy.read_policy
+    }
+
+    pub fn has_write_permission(&self, pub_key: &str, permissions_policy: &PermissionsPolicy, _trust_distance: u32) -> bool {
+        // Write permissions only use explicit policy
+        if let Some(explicit_policy) = &permissions_policy.explicit_write_policy {
+            explicit_policy.counts_by_pub_key.contains_key(pub_key)
+        } else {
+            false // No explicit write permission means no write access
+        }
     }
 }
