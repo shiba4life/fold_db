@@ -105,9 +105,13 @@ fn test_permission_based_access() {
         pub_key: reader_key.clone(),
         trust_distance: 3,
     };
-    let reader_results = db.query_schema(reader_query);
-    assert!(reader_results[0].is_ok()); // Can read public field
-    assert!(reader_results[1].is_ok()); // Can read protected field due to explicit permission
+    let reader_results = db.query_schema(reader_query.clone());
+    let reader_results: HashMap<String, _> = reader_query.fields.iter().cloned()
+        .zip(reader_results.into_iter())
+        .collect();
+    
+    assert!(reader_results.get("public_field").unwrap().is_ok()); // Can read public field
+    assert!(reader_results.get("protected_field").unwrap().is_ok()); // Can read protected field due to explicit permission
 
     // Unauthorized user can read public field but not protected field
     let unauth_query = Query {
@@ -116,9 +120,13 @@ fn test_permission_based_access() {
         pub_key: unauthorized_key.clone(),
         trust_distance: 3,
     };
-    let unauth_results = db.query_schema(unauth_query);
-    assert!(unauth_results[0].is_ok()); // Can read public field
-    assert!(unauth_results[1].is_err()); // Cannot read protected field
+    let unauth_results = db.query_schema(unauth_query.clone());
+    let unauth_results: HashMap<String, _> = unauth_query.fields.iter().cloned()
+        .zip(unauth_results.into_iter())
+        .collect();
+    
+    assert!(unauth_results.get("public_field").unwrap().is_ok()); // Can read public field
+    assert!(unauth_results.get("protected_field").unwrap().is_err()); // Cannot read protected field
 
     // Test unauthorized write attempt
     let unauth_mutation = Mutation {
@@ -196,9 +204,14 @@ fn test_schema_versioning_with_permissions() {
         pub_key: reader_key.clone(),
         trust_distance: 1, // Within trust distance
     };
-    let trusted_results = db.query_schema(trusted_query);
-    assert!(trusted_results[0].is_ok());
-    assert_eq!(trusted_results[0].as_ref().unwrap(), &json!("version 3"));
+    let trusted_results = db.query_schema(trusted_query.clone());
+    let trusted_results: HashMap<String, _> = trusted_query.fields.iter().cloned()
+        .zip(trusted_results.into_iter())
+        .collect();
+    
+    let versioned_result = trusted_results.get("versioned_field").unwrap();
+    assert!(versioned_result.is_ok());
+    assert_eq!(versioned_result.as_ref().unwrap(), &json!("version 3"));
 
     let untrusted_query = Query {
         schema_name: "test_schema".to_string(),
@@ -206,8 +219,12 @@ fn test_schema_versioning_with_permissions() {
         pub_key: reader_key,
         trust_distance: 3, // Beyond trust distance
     };
-    let untrusted_results = db.query_schema(untrusted_query);
-    assert!(untrusted_results[0].is_err());
+    let untrusted_results = db.query_schema(untrusted_query.clone());
+    let untrusted_results: HashMap<String, _> = untrusted_query.fields.iter().cloned()
+        .zip(untrusted_results.into_iter())
+        .collect();
+    
+    assert!(untrusted_results.get("versioned_field").unwrap().is_err());
 
     cleanup_test_db(&db_path);
 }

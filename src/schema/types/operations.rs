@@ -21,6 +21,7 @@ impl Query {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Mutation {
     pub schema_name: String,
     pub fields_and_values: HashMap<String, Value>,

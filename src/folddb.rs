@@ -44,11 +44,14 @@ impl FoldDB {
 
     /// Executes a query against a schema
     pub fn query_schema(&self, query: Query) -> Vec<Result<Value, SchemaError>> {
-        // Check permissions for each field
-        let permission_results = self.permission_wrapper.check_query_permissions(&query, &self.schema_manager);
-        
-        // Process each field based on its permission result
-        permission_results.into_iter().map(|perm_result| {
+        // Process each field, checking permissions individually
+        query.fields.iter().map(|field_name| {
+            let perm_result = self.permission_wrapper.check_query_field_permission(
+                &query,
+                field_name,
+                &self.schema_manager
+            );
+            
             if !perm_result.allowed {
                 return Err(perm_result.error.unwrap_or(
                     SchemaError::InvalidPermission("Unknown permission error".to_string())
@@ -57,7 +60,7 @@ impl FoldDB {
             
             self.get_field_value(
                 &query.schema_name,
-                &perm_result.field_name,
+                field_name,
                 &query.pub_key,
                 query.trust_distance
             )
@@ -66,23 +69,21 @@ impl FoldDB {
 
     /// Writes data to a schema
     pub fn write_schema(&mut self, mutation: Mutation) -> Result<(), SchemaError> {
-        // Check permissions for each field
-        let permission_results = self.permission_wrapper.check_mutation_permissions(&mutation, &self.schema_manager);
-        
-        // Process fields that have permission
-        for (field_name, value) in mutation.fields_and_values {
-            // Find permission result for this field
-            let perm_result = permission_results.iter()
-                .find(|r| r.field_name == field_name)
-                .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field_name)))?;
+        // Process each field, checking permissions individually
+        for (field_name, value) in mutation.fields_and_values.iter() {
+            let perm_result = self.permission_wrapper.check_mutation_field_permission(
+                &mutation,
+                field_name,
+                &self.schema_manager
+            );
             
             if !perm_result.allowed {
-                return Err(perm_result.error.clone().unwrap_or(
+                return Err(perm_result.error.unwrap_or(
                     SchemaError::InvalidPermission("Unknown permission error".to_string())
                 ));
             }
             
-            self.set_field_value(&mutation.schema_name, &field_name, value, mutation.pub_key.clone())?;
+            self.set_field_value(&mutation.schema_name, field_name, value.clone(), mutation.pub_key.clone())?;
         }
         Ok(())
     }

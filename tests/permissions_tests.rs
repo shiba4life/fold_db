@@ -48,9 +48,8 @@ fn test_permission_wrapper_query() {
     ];
 
     for (query, should_pass) in test_cases {
-        let results = wrapper.check_query_permissions(&query, &schema_manager);
-        assert_eq!(results.len(), 1); // Should have one result per field
-        assert_eq!(results[0].allowed, should_pass);
+        let result = wrapper.check_query_field_permission(&query, "test_field", &schema_manager);
+        assert_eq!(result.allowed, should_pass);
     }
 }
 
@@ -106,8 +105,7 @@ fn test_permission_wrapper_mutation() {
     ];
 
     for (mutation, should_pass) in test_cases {
-        let results = wrapper.check_mutation_permissions(&mutation, &schema_manager);
-        assert_eq!(results.len(), 1); // Should have one result per field
-        assert_eq!(results[0].allowed, should_pass);
+        let result = wrapper.check_mutation_field_permission(&mutation, "test_field", &schema_manager);
+        assert_eq!(result.allowed, should_pass);
     }
 }
