@@ -1,6 +1,12 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TrustDistance {
+    Distance(u32),
+    NoRequirement,
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExplicitCounts {
@@ -9,14 +15,14 @@ pub struct ExplicitCounts {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PermissionsPolicy {
-    pub read_policy: u32,
-    pub write_policy: u32,
+    pub read_policy: TrustDistance,
+    pub write_policy: TrustDistance,
     pub explicit_write_policy: Option<ExplicitCounts>,
     pub explicit_read_policy: Option<ExplicitCounts>,
 }
 
 impl PermissionsPolicy {
-    pub fn new(read_policy: u32, write_policy: u32) -> Self {
+    pub fn new(read_policy: TrustDistance, write_policy: TrustDistance) -> Self {
         Self {
             read_policy,
             write_policy,
@@ -29,8 +35,8 @@ impl PermissionsPolicy {
 impl Default for PermissionsPolicy {
     fn default() -> Self {
         Self {
-            read_policy: 0,
-            write_policy: 0,
+            read_policy: TrustDistance::Distance(0),
+            write_policy: TrustDistance::Distance(0),
             explicit_write_policy: None,
             explicit_read_policy: None,
         }

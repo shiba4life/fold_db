@@ -2,7 +2,7 @@ use fold_db::FoldDB;
 use fold_db::schema::Schema;
 use fold_db::schema::types::{Query, Mutation};
 use fold_db::schema::types::fields::SchemaField;
-use fold_db::permissions::types::policy::{PermissionsPolicy, ExplicitCounts};
+use fold_db::permissions::types::policy::{PermissionsPolicy, ExplicitCounts, TrustDistance};
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -41,8 +41,8 @@ fn test_schema_operations() {
         SchemaField {
             ref_atom_uuid: Uuid::new_v4().to_string(),
             permission_policy: PermissionsPolicy {
-                read_policy: 5,
-                write_policy: 0,
+                read_policy: TrustDistance::Distance(5),
+                write_policy: TrustDistance::Distance(0),
                 explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: write_counts }),
                 explicit_read_policy: None,
             },
@@ -80,8 +80,8 @@ fn test_write_and_query() {
         SchemaField {
             ref_atom_uuid: field_uuid.clone(),
             permission_policy: PermissionsPolicy {
-                read_policy: 5,  // Allow reads with trust distance up to 5
-                write_policy: 0,
+                read_policy: TrustDistance::Distance(5),  // Allow reads with trust distance up to 5
+                write_policy: TrustDistance::Distance(0),
                 explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: write_counts }),
                 explicit_read_policy: None,
             },
@@ -144,8 +144,8 @@ fn test_atom_history() {
         SchemaField {
             ref_atom_uuid: field_uuid.clone(),
             permission_policy: PermissionsPolicy {
-                read_policy: 5,
-                write_policy: 0,
+                read_policy: TrustDistance::Distance(5),
+                write_policy: TrustDistance::Distance(0),
                 explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: write_counts }),
                 explicit_read_policy: None,
             },

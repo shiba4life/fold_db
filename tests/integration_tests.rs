@@ -2,7 +2,7 @@ use fold_db::FoldDB;
 use fold_db::schema::Schema;
 use fold_db::schema::types::{Query, Mutation};
 use fold_db::schema::types::fields::SchemaField;
-use fold_db::permissions::types::policy::{PermissionsPolicy, ExplicitCounts};
+use fold_db::permissions::types::policy::{PermissionsPolicy, ExplicitCounts, TrustDistance};
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -46,8 +46,8 @@ fn test_permission_based_access() {
         SchemaField {
             ref_atom_uuid: Uuid::new_v4().to_string(),
             permission_policy: PermissionsPolicy {
-                read_policy: 5, // Very permissive read
-                write_policy: 0, // Restrictive write
+                read_policy: TrustDistance::Distance(5), // Very permissive read
+                write_policy: TrustDistance::Distance(0), // Restrictive write
                 explicit_read_policy: None,
                 explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: public_write_counts }),
             },
@@ -64,8 +64,8 @@ fn test_permission_based_access() {
         SchemaField {
             ref_atom_uuid: Uuid::new_v4().to_string(),
             permission_policy: PermissionsPolicy {
-                read_policy: 2,
-                write_policy: 0,
+                read_policy: TrustDistance::Distance(2),
+                write_policy: TrustDistance::Distance(0),
                 explicit_read_policy: Some(ExplicitCounts { counts_by_pub_key: protected_read_counts }),
                 explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: protected_write_counts }),
             },
@@ -161,8 +161,8 @@ fn test_schema_versioning_with_permissions() {
         SchemaField {
             ref_atom_uuid: field_uuid.clone(),
             permission_policy: PermissionsPolicy {
-                read_policy: 2, // Moderate read restriction
-                write_policy: 0, // Only explicit writers
+                read_policy: TrustDistance::Distance(2), // Moderate read restriction
+                write_policy: TrustDistance::Distance(0), // Only explicit writers
                 explicit_read_policy: None,
                 explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: write_counts }),
             },

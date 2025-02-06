@@ -1,5 +1,6 @@
 use fold_db::{
     permissions::{PermissionWrapper, PermissionsPolicy},
+    permissions::types::policy::TrustDistance,
     schema::Schema,
     schema::schema_manager::SchemaManager,
     schema::types::{Query, Mutation, SchemaField},
@@ -16,7 +17,10 @@ fn test_permission_wrapper_query() {
     // Create a test schema
     let mut fields = HashMap::new();
     let field = SchemaField::new(
-        PermissionsPolicy::new(2, 0), // Allow read within trust distance 2
+        PermissionsPolicy::new(
+            TrustDistance::Distance(2), // Allow read within trust distance 2
+            TrustDistance::Distance(0)
+        ),
         "test_ref".to_string(),
     );
     fields.insert("test_field".to_string(), field);
@@ -54,6 +58,47 @@ fn test_permission_wrapper_query() {
 }
 
 #[test]
+fn test_permission_wrapper_no_requirement() {
+    // Setup
+    let wrapper = PermissionWrapper::new();
+    let schema_manager = SchemaManager::new();
+    
+    // Create a test schema with no distance requirement
+    let mut fields = HashMap::new();
+    let field = SchemaField::new(
+        PermissionsPolicy::new(
+            TrustDistance::NoRequirement, // No distance requirement for reads
+            TrustDistance::Distance(0)
+        ),
+        "test_ref".to_string(),
+    );
+    fields.insert("test_field".to_string(), field);
+    
+    let schema = Schema {
+        name: "test_schema".to_string(),
+        fields,
+        transforms: Vec::new(),
+    };
+    
+    schema_manager.load_schema(schema).unwrap();
+
+    // Test cases with varying trust distances - all should pass due to NoRequirement
+    let test_distances = vec![0, 1, 5, 10, 100];
+    
+    for distance in test_distances {
+        let query = Query {
+            schema_name: "test_schema".to_string(),
+            fields: vec!["test_field".to_string()],
+            pub_key: "test_key".to_string(),
+            trust_distance: distance,
+        };
+        
+        let result = wrapper.check_query_field_permission(&query, "test_field", &schema_manager);
+        assert!(result.allowed, "Query with distance {} should be allowed with NoRequirement", distance);
+    }
+}
+
+#[test]
 fn test_permission_wrapper_mutation() {
     // Setup
     let wrapper = PermissionWrapper::new();
@@ -61,7 +106,10 @@ fn test_permission_wrapper_mutation() {
     
     // Create a test schema with explicit write permissions
     let mut fields = HashMap::new();
-    let mut policy = PermissionsPolicy::new(0, 0);
+    let mut policy = PermissionsPolicy::new(
+        TrustDistance::Distance(0),
+        TrustDistance::Distance(0)
+    );
     let mut explicit_counts = HashMap::new();
     explicit_counts.insert("allowed_key".to_string(), 1);
     policy.explicit_write_policy = Some(fold_db::permissions::types::policy::ExplicitCounts {

@@ -1,4 +1,4 @@
-use crate::permissions::types::policy::PermissionsPolicy;
+use crate::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 
 pub struct PermissionManager {
 
@@ -17,10 +17,13 @@ impl PermissionManager {
             }
         }
         // Then check trust distance - lower trust_distance means higher trust
-        trust_distance <= permissions_policy.read_policy
+        match permissions_policy.read_policy {
+            TrustDistance::NoRequirement => true,
+            TrustDistance::Distance(required_distance) => trust_distance <= required_distance
+        }
     }
 
-    pub fn has_write_permission(&self, pub_key: &str, permissions_policy: &PermissionsPolicy, _trust_distance: u32) -> bool {
+    pub fn has_write_permission(&self, pub_key: &str, permissions_policy: &PermissionsPolicy, trust_distance: u32) -> bool {
         // Write permissions only use explicit policy
         if let Some(explicit_policy) = &permissions_policy.explicit_write_policy {
             explicit_policy.counts_by_pub_key.contains_key(pub_key)

@@ -1,6 +1,6 @@
 use fold_db::schema::Schema;
 use fold_db::schema::types::fields::SchemaField;
-use fold_db::permissions::types::policy::PermissionsPolicy;
+use fold_db::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 use uuid::Uuid;
 
 #[test]
@@ -51,15 +51,24 @@ fn test_schema_field_permissions() {
     // Create field with custom permissions
     let field = SchemaField {
         ref_atom_uuid: Uuid::new_v4().to_string(),
-        permission_policy: PermissionsPolicy::new(2, 3), // read_policy: 2, write_policy: 3
+        permission_policy: PermissionsPolicy::new(
+            TrustDistance::Distance(2),
+            TrustDistance::Distance(3)
+        ),
     };
 
     schema.add_field(field_name.clone(), field.clone());
     
     // Verify permissions
     let stored_field = schema.fields.get(&field_name).unwrap();
-    assert_eq!(stored_field.permission_policy.read_policy, 2);
-    assert_eq!(stored_field.permission_policy.write_policy, 3);
+    match stored_field.permission_policy.read_policy {
+        TrustDistance::Distance(d) => assert_eq!(d, 2),
+        _ => panic!("Expected Distance variant"),
+    }
+    match stored_field.permission_policy.write_policy {
+        TrustDistance::Distance(d) => assert_eq!(d, 3),
+        _ => panic!("Expected Distance variant"),
+    }
 }
 
 #[test]
@@ -69,8 +78,14 @@ fn test_schema_with_multiple_fields() {
     // Add multiple fields with different permissions
     let fields = vec![
         ("public_field", PermissionsPolicy::default()),
-        ("protected_field", PermissionsPolicy::new(1, 2)),
-        ("private_field", PermissionsPolicy::new(3, 3)),
+        ("protected_field", PermissionsPolicy::new(
+            TrustDistance::Distance(1),
+            TrustDistance::Distance(2)
+        )),
+        ("private_field", PermissionsPolicy::new(
+            TrustDistance::Distance(3),
+            TrustDistance::Distance(3)
+        )),
     ];
 
     for (name, policy) in fields {
@@ -85,7 +100,16 @@ fn test_schema_with_multiple_fields() {
 
     // Verify all fields were added with correct permissions
     assert_eq!(schema.fields.len(), 3);
-    assert_eq!(schema.fields.get("public_field").unwrap().permission_policy.read_policy, 0);
-    assert_eq!(schema.fields.get("protected_field").unwrap().permission_policy.read_policy, 1);
-    assert_eq!(schema.fields.get("private_field").unwrap().permission_policy.read_policy, 3);
+    match &schema.fields.get("public_field").unwrap().permission_policy.read_policy {
+        TrustDistance::Distance(d) => assert_eq!(*d, 0),
+        _ => panic!("Expected Distance variant"),
+    }
+    match &schema.fields.get("protected_field").unwrap().permission_policy.read_policy {
+        TrustDistance::Distance(d) => assert_eq!(*d, 1),
+        _ => panic!("Expected Distance variant"),
+    }
+    match &schema.fields.get("private_field").unwrap().permission_policy.read_policy {
+        TrustDistance::Distance(d) => assert_eq!(*d, 3),
+        _ => panic!("Expected Distance variant"),
+    }
 }
