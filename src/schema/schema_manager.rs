@@ -17,10 +17,10 @@ impl SchemaManager {
         let mut schemas = self.schemas.lock().map_err(|_| 
             SchemaError::MappingError("Failed to acquire schema lock".to_string()))?;
         
-        // Run schema transforms
-        for transform in &schema.transforms {
-            // TODO: Implement transform execution
-            println!("Running transform: {}", transform);
+        // Process schema mappers
+        for mapper in &schema.schema_mappers {
+            // TODO: Implement schema mapper execution
+            println!("Processing schema mapper from {:?} to {}", mapper.source_schemas, mapper.target_schema);
         }
         
         schemas.insert(schema.name.clone(), schema);

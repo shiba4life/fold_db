@@ -2,6 +2,7 @@ use fold_db::schema::Schema;
 use fold_db::schema::types::fields::SchemaField;
 use fold_db::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
+use fold_db::schema::mapper::{SchemaMapper, MappingRule};
 use uuid::Uuid;
 
 fn create_default_payment_config() -> FieldPaymentConfig {
@@ -19,7 +20,7 @@ fn test_schema_creation() {
     
     assert_eq!(schema.name, schema_name);
     assert!(schema.fields.is_empty());
-    assert!(schema.transforms.is_empty());
+    assert!(schema.schema_mappers.is_empty());
 }
 
 #[test]
@@ -41,16 +42,24 @@ fn test_schema_field_management() {
 }
 
 #[test]
-fn test_schema_transform_management() {
+fn test_schema_mapper_management() {
     let mut schema = Schema::new("test_schema".to_string());
-    let transform = "test_transform".to_string();
+    let mapper = SchemaMapper::new(
+        vec!["source_schema".to_string()],
+        "target_schema".to_string(),
+        vec![MappingRule::Rename {
+            source_field: "old_name".to_string(),
+            target_field: "new_name".to_string(),
+        }]
+    );
 
-    // Add transform
-    schema.add_transform(transform.clone());
+    // Add mapper
+    schema.add_schema_mapper(mapper.clone());
     
-    // Verify transform was added
-    assert!(schema.transforms.contains(&transform));
-    assert_eq!(schema.transforms.len(), 1);
+    // Verify mapper was added
+    assert_eq!(schema.schema_mappers.len(), 1);
+    assert_eq!(schema.schema_mappers[0].source_schemas[0], "source_schema");
+    assert_eq!(schema.schema_mappers[0].target_schema, "target_schema");
 }
 
 #[test]

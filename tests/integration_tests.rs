@@ -87,7 +87,7 @@ fn test_permission_based_access() {
     let schema = Schema {
         name: "test_schema".to_string(),
         fields,
-        transforms: Vec::new(),
+        schema_mappers: Vec::new(),
         payment_config: SchemaPaymentConfig::default(),
     };
 
@@ -186,7 +186,7 @@ fn test_schema_versioning_with_permissions() {
     let schema = Schema {
         name: "test_schema".to_string(),
         fields,
-        transforms: Vec::new(),
+        schema_mappers: Vec::new(),
         payment_config: SchemaPaymentConfig::default(),
     };
 
