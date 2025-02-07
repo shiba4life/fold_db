@@ -1,4 +1,3 @@
-use serde_json::json;
 use crate::schema::SchemaError;  // Updated to use re-exported type
 use super::types::MappingRule;
 
@@ -33,26 +32,12 @@ pub fn parse_mapping_dsl(dsl: &str) -> Result<Vec<MappingRule>, SchemaError> {
                             field: tokens[1].to_string(),
                         });
                     },
-                    "ADD" => {
-                        if tokens.len() < 3 {
-                            return Err(SchemaError::InvalidDSL(format!("Invalid ADD syntax on line {}", i + 1)));
-                        }
-                        let target_field = tokens[1].to_string();
-                        let value_str = tokens[2..].join(" ");
-                        let value_trimmed = value_str.trim_matches('"');
-                        rules.push(MappingRule::Add {
-                            target_field,
-                            value: json!(value_trimmed),
-                        });
-                    },
                     "MAP" => {
-                        if tokens.len() != 6 || tokens[2].to_uppercase() != "TO" || tokens[4].to_uppercase() != "USING" {
+                        if tokens.len() != 2 {
                             return Err(SchemaError::InvalidDSL(format!("Invalid MAP syntax on line {}", i + 1)));
                         }
                         rules.push(MappingRule::Map {
-                            source_field: tokens[1].to_string(),
-                            target_field: tokens[3].to_string(),
-                            function: tokens[5].to_string(),
+                            field_name: tokens[1].to_string(),
                         });
                     },
                     _ => return Err(SchemaError::InvalidDSL(format!("Unknown command on line {}", i + 1))),
@@ -75,12 +60,11 @@ mod tests {
             # Comment line
             RENAME username TO displayName
             DROP privateEmail
-            ADD status "active"
-            MAP name TO upperName USING to_uppercase
+            MAP publicName
         "#;
 
         let rules = parse_mapping_dsl(dsl).unwrap();
-        assert_eq!(rules.len(), 4);
+        assert_eq!(rules.len(), 3);
 
         match &rules[0] {
             MappingRule::Rename { source_field, target_field } => {
@@ -88,6 +72,20 @@ mod tests {
                 assert_eq!(target_field, "displayName");
             },
             _ => panic!("Expected Rename rule"),
+        }
+
+        match &rules[1] {
+            MappingRule::Drop { field } => {
+                assert_eq!(field, "privateEmail");
+            },
+            _ => panic!("Expected Drop rule"),
+        }
+
+        match &rules[2] {
+            MappingRule::Map { field_name } => {
+                assert_eq!(field_name, "publicName");
+            },
+            _ => panic!("Expected Map rule"),
         }
     }
 }

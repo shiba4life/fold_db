@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 use super::{Schema, SchemaError};  // Updated to use re-exported types
-
+use super::mapper::MappingRule;
 pub struct SchemaManager {
     schemas: Mutex<HashMap<String, Schema>>,
 }
@@ -16,13 +16,6 @@ impl SchemaManager {
     pub fn load_schema(&self, schema: Schema) -> Result<(), SchemaError> {
         let mut schemas = self.schemas.lock().map_err(|_| 
             SchemaError::MappingError("Failed to acquire schema lock".to_string()))?;
-        
-        // Process schema mappers
-        for mapper in &schema.schema_mappers {
-            // TODO: Implement schema mapper execution
-            println!("Processing schema mapper from {:?} to {}", mapper.source_schemas, mapper.target_schema);
-        }
-        
         schemas.insert(schema.name.clone(), schema);
         Ok(())
     }
@@ -63,5 +56,72 @@ impl SchemaManager {
             )));
         }
         self.load_schema(schema)
+    }
+
+    pub fn apply_schema_mappers(&self, schema: &Schema) -> Result<(), SchemaError> {
+        let mut schemas = self.schemas.lock().map_err(|_| 
+            SchemaError::MappingError("Failed to acquire schema lock".to_string()))?;
+
+        for mapper in &schema.schema_mappers {
+            // Get source schema
+            let source_schema = schemas.get(&mapper.source_schema_name)
+                .ok_or_else(|| SchemaError::NotFound(format!(
+                    "Source schema not found: {}", mapper.source_schema_name
+                )))?.clone();
+            
+            // Get target schema
+            let mut target_schema = schemas.get(&mapper.target_schema_name)
+                .ok_or_else(|| SchemaError::NotFound(format!(
+                    "Target schema not found: {}", mapper.target_schema_name
+                )))?.clone();
+
+            // Apply mapping rules
+            for rule in &mapper.rules {
+                match rule {
+                    MappingRule::Rename { source_field, target_field } => {
+                        let source_field_value = source_schema.fields.get(source_field)
+                            .ok_or_else(|| SchemaError::InvalidField(format!(
+                                "Source field not found: {}", source_field
+                            )))?;
+                        
+                        if !target_schema.fields.contains_key(target_field) {
+                            return Err(SchemaError::InvalidField(format!(
+                                "Target field not found: {}", target_field
+                            )));
+                        }
+                        
+                        let field = source_field_value.clone();
+                        target_schema.fields.insert(target_field.clone(), field);
+                    }
+                    MappingRule::Drop { field } => {
+                        if !target_schema.fields.contains_key(field) {
+                            return Err(SchemaError::InvalidField(format!(
+                                "Field to drop not found: {}", field
+                            )));
+                        }
+                        target_schema.fields.remove(field);
+                    }
+                    MappingRule::Map { field_name } => {
+                        let source_field_value = source_schema.fields.get(field_name)
+                            .ok_or_else(|| SchemaError::InvalidField(format!(
+                                "Source field not found: {}", field_name
+                            )))?;
+                        
+                        if !target_schema.fields.contains_key(field_name) {
+                            return Err(SchemaError::InvalidField(format!(
+                                "Target field not found: {}", field_name
+                            )));
+                        }
+                        
+                        let field = source_field_value.clone();
+                        target_schema.fields.insert(field_name.clone(), field);
+                    }
+                }
+            }
+            
+            // Save the modified target schema back to the HashMap
+            schemas.insert(target_schema.name.clone(), target_schema);
+        }
+        Ok(())
     }
 }

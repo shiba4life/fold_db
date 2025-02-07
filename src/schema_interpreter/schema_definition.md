@@ -23,13 +23,93 @@ This document describes how to define FoldDB schemas using JSON. The JSON format
       }
     }
   },
-  "transforms": ["transform1", "transform2"],
+  "schema_mappers": [
+    {
+      "source_schemas": ["schema1", "schema2"],
+      "target_schema": "target_schema_name",
+      "rules": []
+    }
+  ],
   "payment_config": {
     "base_multiplier": 1.0,
     "min_payment_threshold": 0
   }
 }
 ```
+
+## Schema Mapper Configuration
+
+Schema mappers define how data from source schemas is transformed into the target schema format. Each schema can have multiple mappers.
+
+```json
+{
+  "source_schemas": ["schema1", "schema2"],
+  "target_schema": "target_schema_name",
+  "rules": [
+    {
+      "rule": "rename",
+      "source_field": "old_name",
+      "target_field": "new_name"
+    },
+    {
+      "rule": "drop",
+      "field": "unwanted_field"
+    },
+    {
+      "rule": "add",
+      "target_field": "new_field",
+      "value": "static value"
+    },
+    {
+      "rule": "map",
+      "source_field": "input_field",
+      "target_field": "output_field",
+      "function": "to_uppercase"
+    }
+  ]
+}
+```
+
+### Mapping Rules
+
+1. **Rename**: Move a field's value from source_field to target_field
+   ```json
+   {
+     "rule": "rename",
+     "source_field": "old_name",
+     "target_field": "new_name"
+   }
+   ```
+
+2. **Drop**: Remove a field from the output
+   ```json
+   {
+     "rule": "drop",
+     "field": "unwanted_field"
+   }
+   ```
+
+3. **Add**: Insert a new field with a static value
+   ```json
+   {
+     "rule": "add",
+     "target_field": "new_field",
+     "value": "any valid JSON value"
+   }
+   ```
+
+4. **Map**: Transform a field's value using a predefined function
+   ```json
+   {
+     "rule": "map",
+     "source_field": "input",
+     "target_field": "output",
+     "function": "to_uppercase"
+   }
+   ```
+   Available functions:
+   - `to_uppercase`: Convert string to uppercase
+   - `to_lowercase`: Convert string to lowercase
 
 ## Permission Policy Definition
 
@@ -178,7 +258,25 @@ Here's a complete example of a schema definition:
       }
     }
   },
-  "transforms": ["normalize_email", "validate_username"],
+  "schema_mappers": [
+    {
+      "source_schemas": ["LegacyUser"],
+      "target_schema": "UserProfile",
+      "rules": [
+        {
+          "rule": "rename",
+          "source_field": "user_name",
+          "target_field": "username"
+        },
+        {
+          "rule": "map",
+          "source_field": "email_address",
+          "target_field": "email",
+          "function": "to_lowercase"
+        }
+      ]
+    }
+  ],
   "payment_config": {
     "base_multiplier": 1.5,
     "min_payment_threshold": 500

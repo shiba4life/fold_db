@@ -1,4 +1,4 @@
-use fold_db::schema::Schema;
+use fold_db::schema::{Schema, SchemaManager};
 use fold_db::schema::types::fields::SchemaField;
 use fold_db::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
@@ -11,6 +11,187 @@ fn create_default_payment_config() -> FieldPaymentConfig {
         TrustDistanceScaling::None,
         None,
     ).unwrap()
+}
+
+#[test]
+fn test_schema_manager_apply_mapping_rename() {
+    let manager = SchemaManager::new();
+    
+    // Create source schema
+    let mut source_schema = Schema::new("source_schema".to_string());
+    let source_field = SchemaField {
+        ref_atom_uuid: "test-uuid-1".to_string(),
+        permission_policy: PermissionsPolicy::default(),
+        payment_config: create_default_payment_config(),
+    };
+    source_schema.add_field("old_name".to_string(), source_field);
+    
+    // Create target schema
+    let mut target_schema = Schema::new("target_schema".to_string());
+    let target_field = SchemaField {
+        ref_atom_uuid: "test-uuid-2".to_string(),
+        permission_policy: PermissionsPolicy::default(),
+        payment_config: create_default_payment_config(),
+    };
+    target_schema.add_field("new_name".to_string(), target_field);
+    
+    // Add mapper to source schema
+    let mapper = SchemaMapper::new(
+        "source_schema".to_string(),
+        "target_schema".to_string(),
+        vec![MappingRule::Rename {
+            source_field: "old_name".to_string(),
+            target_field: "new_name".to_string(),
+        }]
+    );
+    source_schema.add_schema_mapper(mapper);
+    
+    // Load schemas
+    manager.load_schema(source_schema.clone()).unwrap();
+    manager.load_schema(target_schema.clone()).unwrap();
+    
+    // Apply mapping
+    manager.apply_schema_mappers(&source_schema).unwrap();
+    
+    // Verify mapping
+    let updated_target = manager.get_schema("target_schema").unwrap().unwrap();
+    assert_eq!(
+        updated_target.fields.get("new_name").unwrap().ref_atom_uuid,
+        "test-uuid-1"
+    );
+}
+
+#[test]
+fn test_schema_manager_apply_mapping_drop() {
+    let manager = SchemaManager::new();
+    
+    // Create source schema with mapper
+    let mut source_schema = Schema::new("source_schema".to_string());
+    let mapper = SchemaMapper::new(
+        "source_schema".to_string(),
+        "target_schema".to_string(),
+        vec![MappingRule::Drop {
+            field: "to_drop".to_string(),
+        }]
+    );
+    source_schema.add_schema_mapper(mapper);
+    
+    // Create target schema with field to drop
+    let mut target_schema = Schema::new("target_schema".to_string());
+    let field = SchemaField {
+        ref_atom_uuid: "test-uuid".to_string(),
+        permission_policy: PermissionsPolicy::default(),
+        payment_config: create_default_payment_config(),
+    };
+    target_schema.add_field("to_drop".to_string(), field);
+    
+    // Load schemas
+    manager.load_schema(source_schema.clone()).unwrap();
+    manager.load_schema(target_schema).unwrap();
+    
+    // Apply mapping
+    manager.apply_schema_mappers(&source_schema).unwrap();
+    
+    // Verify field was dropped
+    let updated_target = manager.get_schema("target_schema").unwrap().unwrap();
+    assert!(!updated_target.fields.contains_key("to_drop"));
+}
+
+#[test]
+fn test_schema_manager_apply_mapping_map() {
+    let manager = SchemaManager::new();
+    
+    // Create source schema
+    let mut source_schema = Schema::new("source_schema".to_string());
+    let source_field = SchemaField {
+        ref_atom_uuid: "test-uuid-1".to_string(),
+        permission_policy: PermissionsPolicy::default(),
+        payment_config: create_default_payment_config(),
+    };
+    source_schema.add_field("field_name".to_string(), source_field);
+    
+    // Create target schema
+    let mut target_schema = Schema::new("target_schema".to_string());
+    let target_field = SchemaField {
+        ref_atom_uuid: "test-uuid-2".to_string(),
+        permission_policy: PermissionsPolicy::default(),
+        payment_config: create_default_payment_config(),
+    };
+    target_schema.add_field("field_name".to_string(), target_field);
+    
+    // Add mapper to source schema
+    let mapper = SchemaMapper::new(
+        "source_schema".to_string(),
+        "target_schema".to_string(),
+        vec![MappingRule::Map {
+            field_name: "field_name".to_string(),
+        }]
+    );
+    source_schema.add_schema_mapper(mapper);
+    
+    // Load schemas
+    manager.load_schema(source_schema.clone()).unwrap();
+    manager.load_schema(target_schema).unwrap();
+    
+    // Apply mapping
+    manager.apply_schema_mappers(&source_schema).unwrap();
+    
+    // Verify mapping
+    let updated_target = manager.get_schema("target_schema").unwrap().unwrap();
+    assert_eq!(
+        updated_target.fields.get("field_name").unwrap().ref_atom_uuid,
+        "test-uuid-1"
+    );
+}
+
+#[test]
+fn test_schema_manager_apply_mapping_missing_schema() {
+    let manager = SchemaManager::new();
+    
+    // Create source schema with mapper to non-existent target
+    let mut source_schema = Schema::new("source_schema".to_string());
+    let mapper = SchemaMapper::new(
+        "source_schema".to_string(),
+        "non_existent_schema".to_string(),
+        vec![MappingRule::Map {
+            field_name: "field_name".to_string(),
+        }]
+    );
+    source_schema.add_schema_mapper(mapper);
+    
+    // Load only source schema
+    manager.load_schema(source_schema.clone()).unwrap();
+    
+    // Attempt to apply mapping should fail
+    let result = manager.apply_schema_mappers(&source_schema);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_schema_manager_apply_mapping_invalid_field() {
+    let manager = SchemaManager::new();
+    
+    // Create source schema with mapper referencing non-existent field
+    let mut source_schema = Schema::new("source_schema".to_string());
+    let mapper = SchemaMapper::new(
+        "source_schema".to_string(),
+        "target_schema".to_string(),
+        vec![MappingRule::Map {
+            field_name: "non_existent_field".to_string(),
+        }]
+    );
+    source_schema.add_schema_mapper(mapper);
+    
+    // Create target schema
+    let target_schema = Schema::new("target_schema".to_string());
+    
+    // Load schemas
+    manager.load_schema(source_schema.clone()).unwrap();
+    manager.load_schema(target_schema).unwrap();
+    
+    // Attempt to apply mapping should fail due to missing field
+    let result = manager.apply_schema_mappers(&source_schema);
+    assert!(result.is_err());
 }
 
 #[test]
@@ -45,11 +226,10 @@ fn test_schema_field_management() {
 fn test_schema_mapper_management() {
     let mut schema = Schema::new("test_schema".to_string());
     let mapper = SchemaMapper::new(
-        vec!["source_schema".to_string()],
+        "source_schema".to_string(),
         "target_schema".to_string(),
-        vec![MappingRule::Rename {
-            source_field: "old_name".to_string(),
-            target_field: "new_name".to_string(),
+        vec![MappingRule::Map {
+            field_name: "old_name".to_string(),
         }]
     );
 
@@ -58,8 +238,8 @@ fn test_schema_mapper_management() {
     
     // Verify mapper was added
     assert_eq!(schema.schema_mappers.len(), 1);
-    assert_eq!(schema.schema_mappers[0].source_schemas[0], "source_schema");
-    assert_eq!(schema.schema_mappers[0].target_schema, "target_schema");
+    assert_eq!(schema.schema_mappers[0].source_schema_name, "source_schema");
+    assert_eq!(schema.schema_mappers[0].target_schema_name, "target_schema");
 }
 
 #[test]
