@@ -1,7 +1,16 @@
 use fold_db::schema::Schema;
 use fold_db::schema::types::fields::SchemaField;
 use fold_db::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
 use uuid::Uuid;
+
+fn create_default_payment_config() -> FieldPaymentConfig {
+    FieldPaymentConfig::new(
+        1.0,
+        TrustDistanceScaling::None,
+        None,
+    ).unwrap()
+}
 
 #[test]
 fn test_schema_creation() {
@@ -20,6 +29,7 @@ fn test_schema_field_management() {
     let field = SchemaField {
         ref_atom_uuid: Uuid::new_v4().to_string(),
         permission_policy: PermissionsPolicy::default(),
+        payment_config: create_default_payment_config(),
     };
 
     // Add field
@@ -55,6 +65,7 @@ fn test_schema_field_permissions() {
             TrustDistance::Distance(2),
             TrustDistance::Distance(3)
         ),
+        payment_config: create_default_payment_config(),
     };
 
     schema.add_field(field_name.clone(), field.clone());
@@ -94,6 +105,7 @@ fn test_schema_with_multiple_fields() {
             SchemaField {
                 ref_atom_uuid: Uuid::new_v4().to_string(),
                 permission_policy: policy,
+                payment_config: create_default_payment_config(),
             }
         );
     }

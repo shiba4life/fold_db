@@ -1,12 +1,14 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use super::fields::SchemaField;
+use crate::fees::SchemaPaymentConfig;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Schema {
     pub name: String,
     pub fields: HashMap<String, SchemaField>,
     pub transforms: Vec<String>, // Transform names/identifiers
+    pub payment_config: SchemaPaymentConfig,
 }
 
 impl Schema {
@@ -15,6 +17,7 @@ impl Schema {
             name,
             fields: HashMap::new(),
             transforms: Vec::new(),
+            payment_config: SchemaPaymentConfig::default(),
         }
     }
 

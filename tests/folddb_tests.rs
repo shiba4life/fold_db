@@ -3,9 +3,20 @@ use fold_db::schema::Schema;
 use fold_db::schema::types::{Query, Mutation};
 use fold_db::schema::types::fields::SchemaField;
 use fold_db::permissions::types::policy::{PermissionsPolicy, ExplicitCounts, TrustDistance};
+use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
+use fold_db::fees::payment_config::SchemaPaymentConfig;
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
+
+fn create_default_payment_config() -> FieldPaymentConfig {
+    FieldPaymentConfig::new(
+        1.0,
+        TrustDistanceScaling::None,
+        None,
+    ).unwrap()
+}
+
 #[path = "test_utils/mod.rs"]
 mod test_utils;
 use test_utils::{cleanup_test_db, get_test_db_path, cleanup_tmp_dir};
@@ -46,6 +57,7 @@ fn test_schema_operations() {
                 explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: write_counts }),
                 explicit_read_policy: None,
             },
+            payment_config: create_default_payment_config(),
         }
     );
 
@@ -53,6 +65,7 @@ fn test_schema_operations() {
         name: "test_schema".to_string(),
         fields,
         transforms: Vec::new(),
+        payment_config: SchemaPaymentConfig::default(),
     };
 
     // Test schema loading
@@ -85,6 +98,7 @@ fn test_write_and_query() {
                 explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: write_counts }),
                 explicit_read_policy: None,
             },
+            payment_config: create_default_payment_config(),
         }
     );
 
@@ -92,6 +106,7 @@ fn test_write_and_query() {
         name: "test_schema".to_string(),
         fields,
         transforms: Vec::new(),
+        payment_config: SchemaPaymentConfig::default(),
     };
 
     db.load_schema(schema).expect("Failed to load schema");
@@ -149,6 +164,7 @@ fn test_atom_history() {
                 explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: write_counts }),
                 explicit_read_policy: None,
             },
+            payment_config: create_default_payment_config(),
         }
     );
 
@@ -156,6 +172,7 @@ fn test_atom_history() {
         name: "test_schema".to_string(),
         fields,
         transforms: Vec::new(),
+        payment_config: SchemaPaymentConfig::default(),
     };
 
     db.load_schema(schema).expect("Failed to load schema");

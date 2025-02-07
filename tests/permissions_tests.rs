@@ -4,9 +4,19 @@ use fold_db::{
     schema::Schema,
     schema::schema_manager::SchemaManager,
     schema::types::{Query, Mutation, SchemaField},
+    fees::types::{FieldPaymentConfig, TrustDistanceScaling},
+    fees::payment_config::SchemaPaymentConfig,
 };
 use std::collections::HashMap;
 use serde_json::Value;
+
+fn create_default_payment_config() -> FieldPaymentConfig {
+    FieldPaymentConfig::new(
+        1.0,
+        TrustDistanceScaling::None,
+        None,
+    ).unwrap()
+}
 
 #[test]
 fn test_permission_wrapper_query() {
@@ -22,6 +32,7 @@ fn test_permission_wrapper_query() {
             TrustDistance::Distance(0)
         ),
         "test_ref".to_string(),
+        create_default_payment_config(),
     );
     fields.insert("test_field".to_string(), field);
     
@@ -29,6 +40,7 @@ fn test_permission_wrapper_query() {
         name: "test_schema".to_string(),
         fields,
         transforms: Vec::new(),
+        payment_config: SchemaPaymentConfig::default(),
     };
     
     schema_manager.load_schema(schema).unwrap();
@@ -71,6 +83,7 @@ fn test_permission_wrapper_no_requirement() {
             TrustDistance::Distance(0)
         ),
         "test_ref".to_string(),
+        create_default_payment_config(),
     );
     fields.insert("test_field".to_string(), field);
     
@@ -78,6 +91,7 @@ fn test_permission_wrapper_no_requirement() {
         name: "test_schema".to_string(),
         fields,
         transforms: Vec::new(),
+        payment_config: SchemaPaymentConfig::default(),
     };
     
     schema_manager.load_schema(schema).unwrap();
@@ -116,40 +130,61 @@ fn test_permission_wrapper_mutation() {
     policy.explicit_write_policy = Some(fold_db::permissions::types::policy::ExplicitCounts {
         counts_by_pub_key: explicit_counts,
     });
-    let field = SchemaField::new(policy, "test_ref".to_string());
+    let field = SchemaField::new(policy, "test_ref".to_string(), create_default_payment_config());
     fields.insert("test_field".to_string(), field);
     
     let schema = Schema {
         name: "test_schema".to_string(),
         fields,
         transforms: Vec::new(),
+        payment_config: SchemaPaymentConfig::default(),
     };
     
     schema_manager.load_schema(schema).unwrap();
 
-    // Test just the failing case
-    let mutation = Mutation {
-        schema_name: "test_schema".to_string(),
-        fields_and_values: {
-            let mut map = HashMap::new();
-            map.insert("test_field".to_string(), Value::Null);
-            map
-        },
-        pub_key: "untrusted_key".to_string(),
-        trust_distance: 3,
-    };
-    
-    eprintln!("\nTesting mutation:");
-    eprintln!("  pub_key: {}", mutation.pub_key);
-    eprintln!("  trust_distance: {}", mutation.trust_distance);
-    eprintln!("  expected: false");
-    
-    let result = wrapper.check_mutation_field_permission(&mutation, "test_field", &schema_manager);
-    eprintln!("  got: {}", result.allowed);
-    if let Some(err) = &result.error {
-        eprintln!("  error: {:?}", err);
+    // Test cases for both success and failure scenarios
+    let test_cases = vec![
+        // Should pass - has explicit permission and within trust distance
+        (Mutation {
+            schema_name: "test_schema".to_string(),
+            fields_and_values: {
+                let mut map = HashMap::new();
+                map.insert("test_field".to_string(), Value::Null);
+                map
+            },
+            pub_key: "allowed_key".to_string(),
+            trust_distance: 1,
+        }, true),
+        // Should fail - untrusted key and exceeds trust distance
+        (Mutation {
+            schema_name: "test_schema".to_string(),
+            fields_and_values: {
+                let mut map = HashMap::new();
+                map.insert("test_field".to_string(), Value::Null);
+                map
+            },
+            pub_key: "untrusted_key".to_string(),
+            trust_distance: 3,
+        }, false),
+    ];
+
+    for (mutation, should_pass) in test_cases {
+        eprintln!("\nTesting mutation:");
+        eprintln!("  pub_key: {}", mutation.pub_key);
+        eprintln!("  trust_distance: {}", mutation.trust_distance);
+        eprintln!("  expected: {}", should_pass);
+        
+        let result = wrapper.check_mutation_field_permission(&mutation, "test_field", &schema_manager);
+        eprintln!("  got: {}", result.allowed);
+        if let Some(err) = &result.error {
+            eprintln!("  error: {:?}", err);
+        }
+        
+        assert_eq!(result.allowed, should_pass, 
+            "Mutation permission check failed for pub_key: {}, trust_distance: {}", 
+            mutation.pub_key, 
+            mutation.trust_distance
+        );
     }
-    
-    assert!(!result.allowed, "Should deny write permission when trust distance exceeds limit");
 
 }

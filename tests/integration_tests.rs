@@ -3,9 +3,19 @@ use fold_db::schema::Schema;
 use fold_db::schema::types::{Query, Mutation};
 use fold_db::schema::types::fields::SchemaField;
 use fold_db::permissions::types::policy::{PermissionsPolicy, ExplicitCounts, TrustDistance};
+use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
+use fold_db::fees::payment_config::SchemaPaymentConfig;
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
+
+fn create_default_payment_config() -> FieldPaymentConfig {
+    FieldPaymentConfig::new(
+        1.0,
+        TrustDistanceScaling::None,
+        None,
+    ).unwrap()
+}
 
 #[path = "test_utils/mod.rs"]
 mod test_utils;
@@ -51,6 +61,7 @@ fn test_permission_based_access() {
                 explicit_read_policy: None,
                 explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: public_write_counts }),
             },
+            payment_config: create_default_payment_config(),
         }
     );
 
@@ -69,6 +80,7 @@ fn test_permission_based_access() {
                 explicit_read_policy: Some(ExplicitCounts { counts_by_pub_key: protected_read_counts }),
                 explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: protected_write_counts }),
             },
+            payment_config: create_default_payment_config(),
         }
     );
 
@@ -76,6 +88,7 @@ fn test_permission_based_access() {
         name: "test_schema".to_string(),
         fields,
         transforms: Vec::new(),
+        payment_config: SchemaPaymentConfig::default(),
     };
 
     // Load and allow schema
@@ -166,6 +179,7 @@ fn test_schema_versioning_with_permissions() {
                 explicit_read_policy: None,
                 explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: write_counts }),
             },
+            payment_config: create_default_payment_config(),
         }
     );
 
@@ -173,6 +187,7 @@ fn test_schema_versioning_with_permissions() {
         name: "test_schema".to_string(),
         fields,
         transforms: Vec::new(),
+        payment_config: SchemaPaymentConfig::default(),
     };
 
     db.load_schema(schema).expect("Failed to load schema");
