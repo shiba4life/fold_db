@@ -25,26 +25,26 @@ This document describes how to define FoldDB schemas using JSON. The JSON format
   },
   "schema_mappers": [
     {
-      "source_schemas": ["schema1", "schema2"],
-      "target_schema": "target_schema_name",
+      "source_schema_name": "source_schema",
+      "target_schema_name": "target_schema_name",
       "rules": []
     }
   ],
   "payment_config": {
     "base_multiplier": 1.0,
-    "min_payment_threshold": 0
+    "min_payment": 0
   }
 }
 ```
 
 ## Schema Mapper Configuration
 
-Schema mappers define how data from source schemas is transformed into the target schema format. Each schema can have multiple mappers.
+Schema mappers define how data from a source schema is transformed into the target schema format. Each schema can have multiple mappers, but each mapper operates on a single source schema.
 
 ```json
 {
-  "source_schemas": ["schema1", "schema2"],
-  "target_schema": "target_schema_name",
+  "source_schema_name": "source_schema",
+  "target_schema_name": "target_schema_name",
   "rules": [
     {
       "rule": "rename",
@@ -56,15 +56,8 @@ Schema mappers define how data from source schemas is transformed into the targe
       "field": "unwanted_field"
     },
     {
-      "rule": "add",
-      "target_field": "new_field",
-      "value": "static value"
-    },
-    {
       "rule": "map",
-      "source_field": "input_field",
-      "target_field": "output_field",
-      "function": "to_uppercase"
+      "field_name": "field_to_map"
     }
   ]
 }
@@ -89,27 +82,13 @@ Schema mappers define how data from source schemas is transformed into the targe
    }
    ```
 
-3. **Add**: Insert a new field with a static value
-   ```json
-   {
-     "rule": "add",
-     "target_field": "new_field",
-     "value": "any valid JSON value"
-   }
-   ```
-
-4. **Map**: Transform a field's value using a predefined function
+3. **Map**: Apply default mapping for a field
    ```json
    {
      "rule": "map",
-     "source_field": "input",
-     "target_field": "output",
-     "function": "to_uppercase"
+     "field_name": "field_to_map"
    }
    ```
-   Available functions:
-   - `to_uppercase`: Convert string to uppercase
-   - `to_lowercase`: Convert string to lowercase
 
 ## Permission Policy Definition
 
@@ -260,8 +239,8 @@ Here's a complete example of a schema definition:
   },
   "schema_mappers": [
     {
-      "source_schemas": ["LegacyUser"],
-      "target_schema": "UserProfile",
+      "source_schema_name": "LegacyUser",
+      "target_schema_name": "UserProfile",
       "rules": [
         {
           "rule": "rename",
@@ -270,9 +249,7 @@ Here's a complete example of a schema definition:
         },
         {
           "rule": "map",
-          "source_field": "email_address",
-          "target_field": "email",
-          "function": "to_lowercase"
+          "field_name": "email_address"
         }
       ]
     }

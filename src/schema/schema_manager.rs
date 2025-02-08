@@ -58,11 +58,37 @@ impl SchemaManager {
         self.load_schema(schema)
     }
 
+    fn validate_mapping_rules(rules: &[MappingRule]) -> Result<(), SchemaError> {
+        let mut field_operations: HashMap<String, &MappingRule> = HashMap::new();
+        
+        for rule in rules {
+            let field_name = match rule {
+                MappingRule::Map { field_name } => field_name,
+                MappingRule::Drop { field } => field,
+                MappingRule::Rename { source_field, .. } => source_field,
+            };
+            
+            if let Some(existing_rule) = field_operations.get(field_name) {
+                return Err(SchemaError::MappingError(format!(
+                    "Conflicting rules for field {}: Cannot apply {:?} after {:?}",
+                    field_name, rule, existing_rule
+                )));
+            }
+            
+            field_operations.insert(field_name.clone(), rule);
+        }
+        
+        Ok(())
+    }
+
     pub fn apply_schema_mappers(&self, schema: &Schema) -> Result<(), SchemaError> {
         let mut schemas = self.schemas.lock().map_err(|_| 
             SchemaError::MappingError("Failed to acquire schema lock".to_string()))?;
 
         for mapper in &schema.schema_mappers {
+            // Validate rules before applying
+            Self::validate_mapping_rules(&mapper.rules)?;
+
             // Get source schema
             let source_schema = schemas.get(&mapper.source_schema_name)
                 .ok_or_else(|| SchemaError::NotFound(format!(

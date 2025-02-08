@@ -23,6 +23,28 @@ pub struct MarketRate {
     pub last_updated: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FieldPaymentConfig {
+    pub base_multiplier: f64,
+    pub trust_distance_scaling: TrustDistanceScaling,
+    pub min_payment: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TrustDistanceScaling {
+    Linear {
+        slope: f64,
+        intercept: f64,
+        min_factor: f64,
+    },
+    Exponential {
+        base: f64,
+        scale: f64,
+        min_factor: f64,
+    },
+    None,
+}
+
 impl GlobalPaymentConfig {
     pub fn new(
         system_base_rate: u64,
@@ -102,9 +124,63 @@ impl MarketRate {
     }
 }
 
+impl FieldPaymentConfig {
+    pub fn new(
+        base_multiplier: f64,
+        trust_distance_scaling: TrustDistanceScaling,
+        min_payment: Option<u64>,
+    ) -> Result<Self, Error> {
+        if base_multiplier <= 0.0 {
+            return Err(Error::InvalidAmount(
+                "Base multiplier must be positive".to_string(),
+            ));
+        }
+
+        // Validate trust distance scaling parameters
+        match &trust_distance_scaling {
+            TrustDistanceScaling::Linear { slope: _, intercept: _, min_factor } => {
+                if *min_factor < 1.0 {
+                    return Err(Error::InvalidAmount(
+                        "Minimum scaling factor must be >= 1.0".to_string(),
+                    ));
+                }
+            }
+            TrustDistanceScaling::Exponential { base, scale: _, min_factor } => {
+                if *base <= 0.0 {
+                    return Err(Error::InvalidAmount(
+                        "Exponential base must be positive".to_string(),
+                    ));
+                }
+                if *min_factor < 1.0 {
+                    return Err(Error::InvalidAmount(
+                        "Minimum scaling factor must be >= 1.0".to_string(),
+                    ));
+                }
+            }
+            TrustDistanceScaling::None => {}
+        }
+
+        Ok(Self {
+            base_multiplier,
+            trust_distance_scaling,
+            min_payment,
+        })
+    }
+}
+
 impl Default for SchemaPaymentConfig {
     fn default() -> Self {
         Self::new(1.0, 0).expect("Default schema payment config should be valid")
+    }
+}
+
+impl Default for FieldPaymentConfig {
+    fn default() -> Self {
+        Self::new(
+            1.0,
+            TrustDistanceScaling::None,
+            None,
+        ).expect("Default payment config should be valid")
     }
 }
 

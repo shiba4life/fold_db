@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::permissions::types::policy::PermissionsPolicy;
-use crate::fees::types::FieldPaymentConfig;
+use crate::fees::types::config::FieldPaymentConfig;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SchemaField {
