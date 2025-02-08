@@ -108,7 +108,7 @@ fn test_schema_manager_apply_mapping_map() {
         permission_policy: PermissionsPolicy::default(),
         payment_config: create_default_payment_config(),
     };
-    source_schema.add_field("field_name".to_string(), source_field);
+    source_schema.add_field("source_field".to_string(), source_field);
     
     // Create target schema
     let mut target_schema = Schema::new("target_schema".to_string());
@@ -117,14 +117,16 @@ fn test_schema_manager_apply_mapping_map() {
         permission_policy: PermissionsPolicy::default(),
         payment_config: create_default_payment_config(),
     };
-    target_schema.add_field("field_name".to_string(), target_field);
+    target_schema.add_field("target_field".to_string(), target_field);
     
     // Add mapper to source schema
     let mapper = SchemaMapper::new(
         "source_schema".to_string(),
         "target_schema".to_string(),
         vec![MappingRule::Map {
-            field_name: "field_name".to_string(),
+            source_field: "source_field".to_string(),
+            target_field: "target_field".to_string(),
+            function: Some("to_lowercase".to_string()),
         }]
     );
     source_schema.add_schema_mapper(mapper);
@@ -139,7 +141,7 @@ fn test_schema_manager_apply_mapping_map() {
     // Verify mapping
     let updated_target = manager.get_schema("target_schema").unwrap().unwrap();
     assert_eq!(
-        updated_target.fields.get("field_name").unwrap().ref_atom_uuid,
+        updated_target.fields.get("target_field").unwrap().ref_atom_uuid,
         "test-uuid-1"
     );
 }
@@ -154,7 +156,9 @@ fn test_schema_manager_apply_mapping_missing_schema() {
         "source_schema".to_string(),
         "non_existent_schema".to_string(),
         vec![MappingRule::Map {
-            field_name: "field_name".to_string(),
+            source_field: "source_field".to_string(),
+            target_field: "target_field".to_string(),
+            function: None,
         }]
     );
     source_schema.add_schema_mapper(mapper);
@@ -177,7 +181,9 @@ fn test_schema_manager_apply_mapping_invalid_field() {
         "source_schema".to_string(),
         "target_schema".to_string(),
         vec![MappingRule::Map {
-            field_name: "non_existent_field".to_string(),
+            source_field: "non_existent_field".to_string(),
+            target_field: "target_field".to_string(),
+            function: None,
         }]
     );
     source_schema.add_schema_mapper(mapper);
@@ -238,10 +244,14 @@ fn test_schema_mapper_validation() {
         "target".to_string(),
         vec![
             MappingRule::Map {
-                field_name: "field1".to_string(),
+                source_field: "field1".to_string(),
+                target_field: "field1".to_string(),
+                function: None,
             },
             MappingRule::Map {
-                field_name: "field1".to_string(),
+                source_field: "field1".to_string(),
+                target_field: "field1".to_string(),
+                function: None,
             }
         ]
     );
@@ -288,7 +298,9 @@ fn test_schema_mapper_multiple_rules() {
         "target_schema".to_string(),
         vec![
             MappingRule::Map {
-                field_name: "field1".to_string(),
+                source_field: "field1".to_string(),
+                target_field: "field1".to_string(),
+                function: None,
             },
             MappingRule::Rename {
                 source_field: "old_name".to_string(),
@@ -336,7 +348,9 @@ fn test_schema_mapper_conflicting_rules() {
         "target_schema".to_string(),
         vec![
             MappingRule::Map {
-                field_name: "field1".to_string(),
+                source_field: "field1".to_string(),
+                target_field: "field1".to_string(),
+                function: None,
             },
             MappingRule::Drop {
                 field: "field1".to_string(),
@@ -370,7 +384,9 @@ fn test_schema_mapper_management() {
         "source_schema".to_string(),
         "target_schema".to_string(),
         vec![MappingRule::Map {
-            field_name: "old_name".to_string(),
+            source_field: "old_name".to_string(),
+            target_field: "new_name".to_string(),
+            function: None,
         }]
     );
 

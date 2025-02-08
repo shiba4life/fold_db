@@ -5,5 +5,9 @@ use serde::{Deserialize, Serialize};
 pub enum MappingRule {
     Rename { source_field: String, target_field: String },
     Drop { field: String },
-    Map { field_name: String },
+    Map { 
+        source_field: String,
+        target_field: String,
+        function: Option<String>
+    },
 }

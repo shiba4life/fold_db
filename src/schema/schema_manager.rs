@@ -63,7 +63,7 @@ impl SchemaManager {
         
         for rule in rules {
             let field_name = match rule {
-                MappingRule::Map { field_name } => field_name,
+                MappingRule::Map { source_field, .. } => source_field,
                 MappingRule::Drop { field } => field,
                 MappingRule::Rename { source_field, .. } => source_field,
             };
@@ -127,20 +127,21 @@ impl SchemaManager {
                         }
                         target_schema.fields.remove(field);
                     }
-                    MappingRule::Map { field_name } => {
-                        let source_field_value = source_schema.fields.get(field_name)
+                    MappingRule::Map { source_field, target_field, function } => {
+                        let source_field_value = source_schema.fields.get(source_field)
                             .ok_or_else(|| SchemaError::InvalidField(format!(
-                                "Source field not found: {}", field_name
+                                "Source field not found: {}", source_field
                             )))?;
                         
-                        if !target_schema.fields.contains_key(field_name) {
+                        if !target_schema.fields.contains_key(target_field) {
                             return Err(SchemaError::InvalidField(format!(
-                                "Target field not found: {}", field_name
+                                "Target field not found: {}", target_field
                             )));
                         }
                         
+                        // TODO: Apply function transformation when implemented
                         let field = source_field_value.clone();
-                        target_schema.fields.insert(field_name.clone(), field);
+                        target_schema.fields.insert(target_field.clone(), field);
                     }
                 }
             }
