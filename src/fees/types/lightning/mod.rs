@@ -44,7 +44,8 @@ pub struct RoutingFees {
 }
 
 impl NodeConfig {
-    pub fn new(
+    #[must_use]
+    pub const fn new(
         host: String,
         port: u16,
         macaroon_path: String,
@@ -60,6 +61,7 @@ impl NodeConfig {
         }
     }
 
+    #[must_use]
     pub fn get_connection_string(&self) -> String {
         format!("{}:{}", self.host, self.port)
     }
@@ -68,9 +70,9 @@ impl NodeConfig {
 impl std::fmt::Display for Network {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Network::Mainnet => write!(f, "mainnet"),
-            Network::Testnet => write!(f, "testnet"),
-            Network::Regtest => write!(f, "regtest"),
+            Self::Mainnet => write!(f, "mainnet"),
+            Self::Testnet => write!(f, "testnet"),
+            Self::Regtest => write!(f, "regtest"),
         }
     }
 }

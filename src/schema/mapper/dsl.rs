@@ -2,6 +2,14 @@ use crate::schema::SchemaError;  // Updated to use re-exported type
 use super::types::MappingRule;
 
 /// Parse DSL string into mapping rules
+/// Parse a mapping DSL string into a vector of mapping rules
+///
+/// # Errors
+/// 
+/// Returns a `SchemaError` if:
+/// - The DSL syntax is invalid
+/// - A mapping rule is malformed
+/// - Required fields are missing
 pub fn parse_mapping_dsl(dsl: &str) -> Result<Vec<MappingRule>, SchemaError> {
     let mut rules = Vec::new();
     

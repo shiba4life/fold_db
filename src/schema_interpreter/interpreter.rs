@@ -4,18 +4,24 @@ use crate::schema_interpreter::types::{JsonSchemaDefinition, JsonSchemaField};
 use crate::schema_interpreter::validator::SchemaValidator;
 use crate::schema::mapper::{SchemaMapper, MappingRule};
 
-
-/// Interprets JSON schema definitions and converts them to FoldDB schemas
+/// Interprets JSON schema definitions and converts them to `FoldDB` schemas.
 #[derive(Default)]
 pub struct SchemaInterpreter;
 
 impl SchemaInterpreter {
-    /// Creates a new schema interpreter
-    pub fn new() -> Self {
+    /// Creates a new schema interpreter.
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 
-    /// Interprets a JSON schema definition and converts it to a FoldDB schema
+    /// Interprets a JSON schema definition and converts it to a `FoldDB` schema.
+    /// 
+    /// # Errors
+    /// Returns a `SchemaError` if:
+    /// - The schema validation fails
+    /// - Any required fields are missing
+    /// - Field configurations are invalid
     pub fn interpret(&self, json_schema: JsonSchemaDefinition) -> crate::schema_interpreter::Result<Schema> {
         // First validate the JSON schema
         SchemaValidator::validate(&json_schema)?;
@@ -23,7 +29,7 @@ impl SchemaInterpreter {
         // Convert fields
         let mut fields = HashMap::new();
         for (field_name, json_field) in json_schema.fields {
-            fields.insert(field_name, self.convert_field(json_field)?);
+            fields.insert(field_name, Self::convert_field(json_field));
         }
 
         // Convert schema mappers
@@ -48,26 +54,41 @@ impl SchemaInterpreter {
         })
     }
 
-    /// Converts a JSON schema field to a FoldDB schema field
-    fn convert_field(&self, json_field: JsonSchemaField) -> Result<SchemaField, SchemaError> {
-        Ok(SchemaField {
+    /// Converts a JSON schema field to a `FoldDB` schema field.
+    fn convert_field(json_field: JsonSchemaField) -> SchemaField {
+        SchemaField {
             permission_policy: json_field.permission_policy.into(),
             ref_atom_uuid: json_field.ref_atom_uuid,
             payment_config: json_field.payment_config.into(),
-        })
+        }
     }
 
-    /// Interprets a JSON schema definition from a string
+    /// Interprets a JSON schema from a string.
+    /// 
+    /// # Errors
+    /// Returns a `SchemaError` if:
+    /// - The JSON string is invalid
+    /// - The schema validation fails
+    /// - Any required fields are missing
+    /// - Field configurations are invalid
     pub fn interpret_str(&self, json_str: &str) -> crate::schema_interpreter::Result<Schema> {
         let json_schema: JsonSchemaDefinition = serde_json::from_str(json_str)
-            .map_err(|e| SchemaError::InvalidField(format!("Invalid JSON schema: {}", e)))?;
+            .map_err(|e| SchemaError::InvalidField(format!("Invalid JSON schema: {e}")))?;
         self.interpret(json_schema)
     }
 
-    /// Interprets a JSON schema definition from a file
+    /// Interprets a JSON schema from a file.
+    /// 
+    /// # Errors
+    /// Returns a `SchemaError` if:
+    /// - The file cannot be read
+    /// - The file contains invalid JSON
+    /// - The schema validation fails
+    /// - Any required fields are missing
+    /// - Field configurations are invalid
     pub fn interpret_file(&self, path: &str) -> crate::schema_interpreter::Result<Schema> {
         let json_str = std::fs::read_to_string(path)
-            .map_err(|e| SchemaError::InvalidField(format!("Failed to read schema file: {}", e)))?;
+            .map_err(|e| SchemaError::InvalidField(format!("Failed to read schema file: {e}")))?;
         self.interpret_str(&json_str)
     }
 }
@@ -85,10 +106,10 @@ mod tests {
             "test_field".to_string(),
             JsonSchemaField {
                 permission_policy: JsonPermissionPolicy {
-                    read_policy: TrustDistance::NoRequirement,
-                    write_policy: TrustDistance::Distance(0),
-                    explicit_read_policy: None,
-                    explicit_write_policy: None,
+                    read: TrustDistance::NoRequirement,
+                    write: TrustDistance::Distance(1),
+                    explicit_read: None,
+                    explicit_write: None,
                 },
                 ref_atom_uuid: "test_uuid".to_string(),
                 payment_config: JsonFieldPaymentConfig {
@@ -104,10 +125,10 @@ mod tests {
             "old_field".to_string(),
             JsonSchemaField {
                 permission_policy: JsonPermissionPolicy {
-                    read_policy: TrustDistance::NoRequirement,
-                    write_policy: TrustDistance::Distance(0),
-                    explicit_read_policy: None,
-                    explicit_write_policy: None,
+                    read: TrustDistance::NoRequirement,
+                    write: TrustDistance::Distance(1),
+                    explicit_read: None,
+                    explicit_write: None,
                 },
                 ref_atom_uuid: "test_uuid_2".to_string(),
                 payment_config: JsonFieldPaymentConfig {
@@ -122,10 +143,10 @@ mod tests {
             "new_field".to_string(),
             JsonSchemaField {
                 permission_policy: JsonPermissionPolicy {
-                    read_policy: TrustDistance::NoRequirement,
-                    write_policy: TrustDistance::Distance(0),
-                    explicit_read_policy: None,
-                    explicit_write_policy: None,
+                    read: TrustDistance::NoRequirement,
+                    write: TrustDistance::Distance(1),
+                    explicit_read: None,
+                    explicit_write: None,
                 },
                 ref_atom_uuid: "test_uuid".to_string(),
                 payment_config: JsonFieldPaymentConfig {
@@ -188,10 +209,10 @@ mod tests {
         let interpreter = SchemaInterpreter::new();
         let json_field = JsonSchemaField {
             permission_policy: JsonPermissionPolicy {
-                read_policy: TrustDistance::NoRequirement,
-                write_policy: TrustDistance::Distance(0),
-                explicit_read_policy: None,
-                explicit_write_policy: None,
+                read: TrustDistance::NoRequirement,
+                write: TrustDistance::Distance(0),
+                explicit_read: None,
+                explicit_write: None,
             },
             ref_atom_uuid: "test_uuid".to_string(),
             payment_config: JsonFieldPaymentConfig {
@@ -201,10 +222,7 @@ mod tests {
             },
         };
 
-        let result = interpreter.convert_field(json_field);
-        assert!(result.is_ok());
-
-        let field = result.unwrap();
+        let field = SchemaInterpreter::convert_field(json_field);
         assert_eq!(field.ref_atom_uuid, "test_uuid");
     }
 

@@ -1,4 +1,4 @@
-//! Schema interpreter module for parsing JSON schema definitions into FoldDB schemas.
+//! Schema interpreter module for parsing JSON schema definitions into `FoldDB` schemas.
 
 mod types;
 mod validator;

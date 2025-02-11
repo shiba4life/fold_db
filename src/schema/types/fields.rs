@@ -11,7 +11,8 @@ pub struct SchemaField {
 }
 
 impl SchemaField {
-    pub fn new(permission_policy: PermissionsPolicy, ref_atom_uuid: String, payment_config: FieldPaymentConfig) -> Self {
+    #[must_use]
+    pub const fn new(permission_policy: PermissionsPolicy, ref_atom_uuid: String, payment_config: FieldPaymentConfig) -> Self {
         Self {
             permission_policy,
             ref_atom_uuid,

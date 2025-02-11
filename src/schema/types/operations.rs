@@ -11,7 +11,8 @@ pub struct Query {
 }
 
 impl Query {
-    pub fn new(schema_name: String, fields: Vec<String>, pub_key: String, trust_distance: u32) -> Self {
+    #[must_use]
+    pub const fn new(schema_name: String, fields: Vec<String>, pub_key: String, trust_distance: u32) -> Self {
         Self {
             schema_name,
             fields,
@@ -30,7 +31,8 @@ pub struct Mutation {
 }
 
 impl Mutation {
-    pub fn new(schema_name: String, fields_and_values: HashMap<String, Value>, pub_key: String, trust_distance: u32) -> Self {
+    #[must_use]
+    pub const fn new(schema_name: String, fields_and_values: HashMap<String, Value>, pub_key: String, trust_distance: u32) -> Self {
         Self {
             schema_name,
             fields_and_values,

@@ -15,6 +15,7 @@ pub struct FieldPermissionResult {
 }
 
 impl PermissionWrapper {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -39,34 +40,34 @@ impl PermissionWrapper {
             },
         };
 
-        match schema.fields.get(field_name) {
-            Some(field) => {
+        schema.fields.get(field_name).map_or_else(
+            || FieldPermissionResult {
+                field_name: field_name.to_string(),
+                allowed: false,
+                error: Some(SchemaError::InvalidField(
+                    format!("Field {field_name} not found")
+                ))
+            },
+            |field| {
                 let allowed = self.permission_manager.has_read_permission(
                     &query.pub_key,
                     &field.permission_policy,
                     query.trust_distance
                 );
-                
+
                 FieldPermissionResult {
                     field_name: field_name.to_string(),
                     allowed,
-                    error: if !allowed {
-                        Some(SchemaError::InvalidPermission(
-                            format!("Read access denied for field {}", field_name)
-                        ))
-                    } else {
+                    error: if allowed {
                         None
-                    },
+                    } else {
+                        Some(SchemaError::InvalidPermission(
+                            format!("Read access denied for field {field_name}")
+                        ))
+                    }
                 }
-            },
-            None => FieldPermissionResult {
-                field_name: field_name.to_string(),
-                allowed: false,
-                error: Some(SchemaError::InvalidField(
-                    format!("Field {} not found", field_name)
-                )),
-            },
-        }
+            }
+        )
     }
 
     pub fn check_mutation_field_permission(
@@ -89,33 +90,33 @@ impl PermissionWrapper {
             },
         };
 
-        match schema.fields.get(field_name) {
-            Some(field) => {
+        schema.fields.get(field_name).map_or_else(
+            || FieldPermissionResult {
+                field_name: field_name.to_string(),
+                allowed: false,
+                error: Some(SchemaError::InvalidField(
+                    format!("Field {field_name} not found")
+                ))
+            },
+            |field| {
                 let allowed = self.permission_manager.has_write_permission(
                     &mutation.pub_key,
                     &field.permission_policy,
                     mutation.trust_distance
                 );
-                
+
                 FieldPermissionResult {
                     field_name: field_name.to_string(),
                     allowed,
-                    error: if !allowed {
-                        Some(SchemaError::InvalidPermission(
-                            format!("Write access denied for field {}", field_name)
-                        ))
-                    } else {
+                    error: if allowed {
                         None
-                    },
+                    } else {
+                        Some(SchemaError::InvalidPermission(
+                            format!("Write access denied for field {field_name}")
+                        ))
+                    }
                 }
-            },
-            None => FieldPermissionResult {
-                field_name: field_name.to_string(),
-                allowed: false,
-                error: Some(SchemaError::InvalidField(
-                    format!("Field {} not found", field_name)
-                )),
-            },
-        }
+            }
+        )
     }
 }

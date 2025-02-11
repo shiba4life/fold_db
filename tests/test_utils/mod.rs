@@ -9,12 +9,17 @@ pub fn get_test_db_path() -> String {
     let current_dir = std::env::current_dir().expect("Failed to get current directory");
     let tmp_dir = current_dir.join("tmp");
     
-    // Try to create tmp directory, ignore if it already exists
-    let _ = fs::create_dir_all(&tmp_dir);
+    // Create tmp directory and ensure it exists
+    fs::create_dir_all(&tmp_dir).expect("Failed to create tmp directory");
     
     // Replace any potentially problematic characters in the UUID
     let safe_uuid = Uuid::new_v4().to_string().replace("-", "_");
-    tmp_dir.join(format!("test_db_{}", safe_uuid)).to_string_lossy().into_owned()
+    let db_path = tmp_dir.join(format!("test_db_{}", safe_uuid));
+    
+    // Create the database directory
+    fs::create_dir_all(&db_path).expect("Failed to create database directory");
+    
+    db_path.to_string_lossy().into_owned()
 }
 
 pub fn cleanup_test_db(path: &str) {

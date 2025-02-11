@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use super::types::MappingRule;
 
-/// SchemaMapper supports mapping data from multiple source schemas to a target schema
+/// `SchemaMapper` supports mapping data from multiple source schemas to a target schema
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SchemaMapper {
     /// List of source schema names
@@ -13,8 +13,9 @@ pub struct SchemaMapper {
 }
 
 impl SchemaMapper {
-    /// Create a new SchemaMapper
-    pub fn new(source_schema_name: String, target_schema_name: String, rules: Vec<MappingRule>) -> Self {
+    /// Create a new `SchemaMapper`
+    #[must_use]
+    pub const fn new(source_schema_name: String, target_schema_name: String, rules: Vec<MappingRule>) -> Self {
         Self {
             source_schema_name,
             target_schema_name,

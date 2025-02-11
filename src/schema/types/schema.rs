@@ -13,6 +13,7 @@ pub struct Schema {
 }
 
 impl Schema {
+    #[must_use]
     pub fn new(name: String) -> Self {
         Self {
             name,

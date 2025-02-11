@@ -14,6 +14,7 @@ pub struct Atom {
 }
 
 impl Atom {
+    #[must_use]
     pub fn new(source_schema_name: String, source_pub_key: String, prev_atom_uuid: Option<String>, content: Value) -> Self {
         Self {
             uuid: Uuid::new_v4().to_string(),
@@ -25,27 +26,33 @@ impl Atom {
         }
     }
 
-    pub fn content(&self) -> &Value {
+    #[must_use]
+    pub const fn content(&self) -> &Value {
         &self.content
     }
 
+    #[must_use]
     pub fn uuid(&self) -> &str {
         &self.uuid
     }
 
+    #[must_use]
     pub fn source_schema_name(&self) -> &str {
         &self.source_schema_name
     }
 
+    #[must_use]
     pub fn source_pub_key(&self) -> &str {
         &self.source_pub_key
     }
 
-    pub fn created_at(&self) -> DateTime<Utc> {
+    #[must_use]
+    pub const fn created_at(&self) -> DateTime<Utc> {
         self.created_at
     }
 
-    pub fn prev_atom_uuid(&self) -> Option<&String> {
+    #[must_use]
+    pub const fn prev_atom_uuid(&self) -> Option<&String> {
         self.prev_atom_uuid.as_ref()
     }
 }
@@ -59,6 +66,7 @@ pub struct AtomRef {
 }
 
 impl AtomRef {
+    #[must_use]
     pub fn new(atom_uuid: String) -> Self {
         Self {
             uuid: Uuid::new_v4().to_string(),
@@ -71,15 +79,18 @@ impl AtomRef {
         self.atom_uuid = Some(atom_uuid);
     }
 
-    pub fn get_atom_uuid(&self) -> Option<&String> {
+    #[must_use]
+    pub const fn get_atom_uuid(&self) -> Option<&String> {
         self.atom_uuid.as_ref()
     }
 
+    #[must_use]
     pub fn uuid(&self) -> &str {
         &self.uuid
     }
 
-    pub fn updated_at(&self) -> DateTime<Utc> {
+    #[must_use]
+    pub const fn updated_at(&self) -> DateTime<Utc> {
         self.updated_at
     }
 }

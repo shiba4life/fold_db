@@ -29,7 +29,7 @@ pub struct NodeInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Channel {
-    pub channel_id: String,
+    pub id: String,  // Renamed from channel_id to avoid struct name repetition
     pub capacity: u64,
     pub local_balance: u64,
     pub remote_balance: u64,
@@ -70,9 +70,9 @@ impl NodeConfig {
 impl std::fmt::Display for Network {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Network::Mainnet => write!(f, "mainnet"),
-            Network::Testnet => write!(f, "testnet"),
-            Network::Regtest => write!(f, "regtest"),
+            Self::Mainnet => write!(f, "mainnet"),
+            Self::Testnet => write!(f, "testnet"),
+            Self::Regtest => write!(f, "regtest"),
         }
     }
 }

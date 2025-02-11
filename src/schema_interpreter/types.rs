@@ -19,13 +19,13 @@ impl From<JsonMappingRule> for MappingRule {
     fn from(json: JsonMappingRule) -> Self {
         match json {
             JsonMappingRule::Rename { source_field, target_field } => {
-                MappingRule::Rename { source_field, target_field }
+                Self::Rename { source_field, target_field }
             }
             JsonMappingRule::Drop { field } => {
-                MappingRule::Drop { field }
+                Self::Drop { field }
             }
             JsonMappingRule::Map { source_field, target_field, function } => {
-                MappingRule::Map { 
+                Self::Map { 
                     source_field,
                     target_field,
                     function
@@ -46,10 +46,14 @@ pub struct JsonSchemaField {
 /// JSON representation of permission policy
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonPermissionPolicy {
-    pub read_policy: TrustDistance,
-    pub write_policy: TrustDistance,
-    pub explicit_read_policy: Option<ExplicitCounts>,
-    pub explicit_write_policy: Option<ExplicitCounts>,
+    #[serde(rename = "read_policy")]
+    pub read: TrustDistance,
+    #[serde(rename = "write_policy")]
+    pub write: TrustDistance,
+    #[serde(rename = "explicit_read_policy")]
+    pub explicit_read: Option<ExplicitCounts>,
+    #[serde(rename = "explicit_write_policy")]
+    pub explicit_write: Option<ExplicitCounts>,
 }
 
 /// JSON representation of field payment config
@@ -92,10 +96,10 @@ pub enum JsonMappingRule {
 impl From<JsonPermissionPolicy> for PermissionsPolicy {
     fn from(json: JsonPermissionPolicy) -> Self {
         Self {
-            read_policy: json.read_policy,
-            write_policy: json.write_policy,
-            explicit_read_policy: json.explicit_read_policy,
-            explicit_write_policy: json.explicit_write_policy,
+            read_policy: json.read,
+            write_policy: json.write,
+            explicit_read_policy: json.explicit_read,
+            explicit_write_policy: json.explicit_write,
         }
     }
 }
@@ -111,7 +115,17 @@ impl From<JsonFieldPaymentConfig> for FieldPaymentConfig {
 }
 
 impl JsonSchemaDefinition {
-    /// Validates the schema definition according to the rules
+    /// Validates the schema definition according to the rules.
+    /// 
+    /// # Errors
+    /// Returns a `SchemaError::InvalidField` if:
+    /// - The schema's base multiplier is not positive
+    /// - Any field's base multiplier is not positive
+    /// - Any field's min factor is less than 1.0
+    /// - Any field's min payment is zero when specified
+    /// - Any schema mapper has no source schemas
+    /// - Any schema mapper has duplicate source-target pairs
+    /// - Any schema mapper has fields mapped multiple times
     pub fn validate(&self) -> crate::schema_interpreter::Result<()> {
         // Base multiplier must be positive
         if self.payment_config.base_multiplier <= 0.0 {
@@ -125,7 +139,7 @@ impl JsonSchemaDefinition {
             // Validate payment config
             if field.payment_config.base_multiplier <= 0.0 {
                 return Err(crate::schema::types::SchemaError::InvalidField(
-                    format!("Field {} base_multiplier must be positive", field_name),
+                    format!("Field {field_name} base_multiplier must be positive")
                 ));
             }
 
@@ -135,7 +149,7 @@ impl JsonSchemaDefinition {
                 TrustDistanceScaling::Exponential { min_factor, .. } => {
                     if *min_factor < 1.0 {
                         return Err(crate::schema::types::SchemaError::InvalidField(
-                            format!("Field {} min_factor must be >= 1.0", field_name),
+                            format!("Field {field_name} min_factor must be >= 1.0")
                         ));
                     }
                 }

@@ -24,6 +24,15 @@ pub struct MarketRate {
 }
 
 impl GlobalPaymentConfig {
+    /// Creates a new `GlobalPaymentConfig`
+    ///
+    /// # Errors
+    ///
+    /// Returns an Error if:
+    /// - The system base rate is 0
+    /// - The payment timeout is 0
+    /// - The max invoice retries is 0
+    /// - The hold invoice timeout is 0
     pub fn new(
         system_base_rate: u64,
         payment_timeout: Duration,
@@ -54,6 +63,12 @@ impl GlobalPaymentConfig {
         })
     }
 
+    /// Validates a payment amount against configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an Error if:
+    /// - The payment amount is below the system base rate
     pub fn validate_payment(&self, amount: u64) -> Result<(), Error> {
         if amount < self.system_base_rate {
             return Err(Error::InvalidAmount(format!(
@@ -66,6 +81,13 @@ impl GlobalPaymentConfig {
 }
 
 impl SchemaPaymentConfig {
+    /// Creates a new `SchemaPaymentConfig`
+    ///
+    /// # Errors
+    ///
+    /// Returns an Error if:
+    /// - The base multiplier is not positive (must be greater than 0)
+    /// - The minimum payment threshold is invalid
     pub fn new(base_multiplier: f64, min_payment_threshold: u64) -> Result<Self, Error> {
         if base_multiplier <= 0.0 {
             return Err(Error::InvalidAmount(
@@ -81,6 +103,7 @@ impl SchemaPaymentConfig {
 }
 
 impl MarketRate {
+    #[must_use]
     pub fn new(base_rate: u64) -> Self {
         Self {
             base_rate,
@@ -93,6 +116,7 @@ impl MarketRate {
         self.last_updated = Utc::now();
     }
 
+    #[must_use]
     pub fn is_stale(&self, max_age: Duration) -> bool {
         let age = Utc::now()
             .signed_duration_since(self.last_updated)

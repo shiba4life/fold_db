@@ -17,7 +17,6 @@ fn create_default_payment_config() -> FieldPaymentConfig {
     ).unwrap()
 }
 
-#[path = "test_utils/mod.rs"]
 mod test_utils;
 use test_utils::{cleanup_test_db, get_test_db_path, cleanup_tmp_dir};
 

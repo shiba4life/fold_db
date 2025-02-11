@@ -3,6 +3,12 @@ use crate::fees::{
     TrustDistanceScaling, Error,
 };
 
+/// Calculates the payment amount for a field access.
+/// 
+/// # Errors
+/// Returns an Error if:
+/// - The base payment calculation overflows
+/// - The scaling factor calculation fails
 pub fn calculate_field_payment(
     global_config: &GlobalPaymentConfig,
     market_rate: &MarketRate,
@@ -56,6 +62,12 @@ pub fn calculate_field_payment(
     Ok(final_payment)
 }
 
+/// Calculates the total payment amount for a query.
+/// 
+/// # Errors
+/// Returns an Error if:
+/// - Any field payment calculation fails
+/// - The total payment amount overflows
 pub fn calculate_total_query_payment(
     global_config: &GlobalPaymentConfig,
     market_rate: &MarketRate,
