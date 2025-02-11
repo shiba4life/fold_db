@@ -12,7 +12,7 @@ pub fn parse_mapping_dsl(dsl: &str) -> Result<Vec<MappingRule>, SchemaError> {
         }
 
         let tokens: Vec<&str> = trimmed.split_whitespace().collect();
-        match tokens.get(0).map(|s| s.to_uppercase()) {
+        match tokens.first().map(|s| s.to_uppercase()) {
             Some(cmd) => {
                 match cmd.as_str() {
                     "RENAME" => {

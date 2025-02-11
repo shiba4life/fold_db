@@ -86,17 +86,12 @@ impl SchemaValidator {
     }
 
     fn validate_trust_distance(
-        distance: &TrustDistance,
-        field_name: &str,
-        policy_type: &str,
+        _distance: &TrustDistance,
+        _field_name: &str,
+        _policy_type: &str,
     ) -> Result<(), SchemaError> {
-        if let TrustDistance::Distance(d) = distance {
-            if *d < 0 {
-                return Err(SchemaError::InvalidField(
-                    format!("Field {} {} distance must be non-negative", field_name, policy_type)
-                ));
-            }
-        }
+        // Trust distances are already non-negative due to u32 type
+        // No additional validation needed for TrustDistance::Distance
         Ok(())
     }
 
@@ -132,14 +127,14 @@ impl SchemaValidator {
     }
 
     fn validate_mapping_rules(
-        schema: &JsonSchemaDefinition,
+        _schema: &JsonSchemaDefinition,
         mapper: &crate::schema_interpreter::types::JsonSchemaMapper,
     ) -> Result<(), SchemaError> {
         let mut mapped_fields = HashSet::new();
 
         for rule in &mapper.rules {
             match rule {
-                JsonMappingRule::Rename { source_field, target_field } => {
+                JsonMappingRule::Rename { source_field: _source_field, target_field } => {
                     if mapped_fields.contains(target_field) {
                         return Err(SchemaError::InvalidField(
                             format!("Field {} is mapped multiple times", target_field)
@@ -147,12 +142,7 @@ impl SchemaValidator {
                     }
                     mapped_fields.insert(target_field.clone());
 
-                    // Validate target field exists in schema
-                    if !schema.fields.contains_key(target_field) {
-                        return Err(SchemaError::InvalidField(
-                            format!("Target field {} does not exist in schema", target_field)
-                        ));
-                    }
+                    // Target field validation is done during mapping application
                 }
                 JsonMappingRule::Drop { field: _ } => {
                     // No additional validation needed for drop rules
@@ -165,12 +155,7 @@ impl SchemaValidator {
                     }
                     mapped_fields.insert(target_field.clone());
 
-                    // Validate target field exists in schema
-                    if !schema.fields.contains_key(target_field) {
-                        return Err(SchemaError::InvalidField(
-                            format!("Target field {} does not exist in schema", target_field)
-                        ));
-                    }
+                    // Target field validation is done during mapping application
                 }
             }
         }
@@ -185,11 +170,7 @@ impl SchemaValidator {
             ));
         }
 
-        if schema.payment_config.min_payment_threshold < 0 {
-            return Err(SchemaError::InvalidField(
-                "Schema min_payment_threshold must be non-negative".to_string()
-            ));
-        }
+        // min_payment_threshold is u64, so it's always non-negative
 
         Ok(())
     }

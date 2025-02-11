@@ -7,7 +7,7 @@ mod interpreter;
 pub use interpreter::SchemaInterpreter;
 pub use types::JsonSchemaDefinition;
 
-use crate::schema::types::{Schema, SchemaError};
+use crate::schema::types::SchemaError;
 
 /// Result type for schema interpretation operations
 pub type Result<T> = std::result::Result<T, SchemaError>;

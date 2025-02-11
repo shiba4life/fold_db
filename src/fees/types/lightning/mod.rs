@@ -9,8 +9,9 @@ pub struct NodeConfig {
     pub network: Network,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum Network {
+    #[default]
     Mainnet,
     Testnet,
     Regtest,
@@ -61,12 +62,6 @@ impl NodeConfig {
 
     pub fn get_connection_string(&self) -> String {
         format!("{}:{}", self.host, self.port)
-    }
-}
-
-impl Default for Network {
-    fn default() -> Self {
-        Network::Mainnet
     }
 }
 

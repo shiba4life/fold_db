@@ -6,11 +6,17 @@ pub struct SchemaManager {
     schemas: Mutex<HashMap<String, Schema>>,
 }
 
+impl Default for SchemaManager {
+    fn default() -> Self {
+        Self {
+            schemas: Mutex::new(HashMap::new())
+        }
+    }
+}
+
 impl SchemaManager {
     pub fn new() -> Self {
-        Self {
-            schemas: Mutex::new(HashMap::new()),
-        }
+        Self::default()
     }
 
     pub fn load_schema(&self, schema: Schema) -> Result<(), SchemaError> {
@@ -127,7 +133,7 @@ impl SchemaManager {
                         }
                         target_schema.fields.remove(field);
                     }
-                    MappingRule::Map { source_field, target_field, function } => {
+                    MappingRule::Map { source_field, target_field, function: _function } => {
                         let source_field_value = source_schema.fields.get(source_field)
                             .ok_or_else(|| SchemaError::InvalidField(format!(
                                 "Source field not found: {}", source_field

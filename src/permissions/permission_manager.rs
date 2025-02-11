@@ -1,12 +1,13 @@
 use crate::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 
+#[derive(Default)]
 pub struct PermissionManager {
 
 }
 
 impl PermissionManager {
     pub fn new() -> Self {
-        Self {}
+        Self::default()
     }
 
     pub fn has_read_permission(&self, pub_key: &str, permissions_policy: &PermissionsPolicy, trust_distance: u32) -> bool {

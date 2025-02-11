@@ -142,21 +142,9 @@ impl JsonSchemaDefinition {
                 TrustDistanceScaling::None => {}
             }
 
-            // Validate trust distances are non-negative
-            if let TrustDistance::Distance(d) = field.permission_policy.read_policy {
-                if d < 0 {
-                    return Err(crate::schema::types::SchemaError::InvalidField(
-                        format!("Field {} read_policy distance must be non-negative", field_name),
-                    ));
-                }
-            }
-            if let TrustDistance::Distance(d) = field.permission_policy.write_policy {
-                if d < 0 {
-                    return Err(crate::schema::types::SchemaError::InvalidField(
-                        format!("Field {} write_policy distance must be non-negative", field_name),
-                    ));
-                }
-            }
+            // Trust distances are already non-negative due to u32 type
+            // No additional validation needed for TrustDistance::Distance
+            // as the type system ensures it's always valid
         }
 
         Ok(())

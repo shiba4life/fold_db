@@ -166,7 +166,7 @@ impl FoldDB {
 
         // Update atom ref with new atom UUID
         let mut aref = self.ref_atoms.get(&aref_uuid)
-            .map(|aref| aref.clone())
+            .cloned()
             .unwrap_or_else(|| AtomRef::new(atom.uuid().to_string()));
         
         // Set the new atom UUID

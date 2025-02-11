@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use crate::schema::types::{Schema, SchemaError, SchemaField};
-use crate::schema_interpreter::types::{JsonSchemaDefinition, JsonSchemaField, JsonSchemaMapper};
+use crate::schema_interpreter::types::{JsonSchemaDefinition, JsonSchemaField};
 use crate::schema_interpreter::validator::SchemaValidator;
 use crate::schema::mapper::{SchemaMapper, MappingRule};
-use crate::fees::payment_config::SchemaPaymentConfig;
+
 
 /// Interprets JSON schema definitions and converts them to FoldDB schemas
+#[derive(Default)]
 pub struct SchemaInterpreter;
 
 impl SchemaInterpreter {
@@ -74,11 +75,11 @@ impl SchemaInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::permissions::types::policy::{TrustDistance, PermissionsPolicy};
-    use crate::fees::types::config::{FieldPaymentConfig, TrustDistanceScaling};
-    use crate::schema_interpreter::types::{JsonPermissionPolicy, JsonFieldPaymentConfig};
+    use crate::permissions::types::policy::TrustDistance;
+    use crate::fees::types::config::TrustDistanceScaling;
+    use crate::schema_interpreter::types::{JsonPermissionPolicy, JsonFieldPaymentConfig, JsonMappingRule, JsonSchemaMapper};
 
-    fn create_test_json_schema() -> JsonSchemaDefinition {
+    fn create_test_json_schema(with_mapper: bool) -> JsonSchemaDefinition {
         let mut fields = HashMap::new();
         fields.insert(
             "test_field".to_string(),
@@ -97,11 +98,64 @@ mod tests {
                 },
             },
         );
+        
+        // Add fields that will be mapped
+        fields.insert(
+            "old_field".to_string(),
+            JsonSchemaField {
+                permission_policy: JsonPermissionPolicy {
+                    read_policy: TrustDistance::NoRequirement,
+                    write_policy: TrustDistance::Distance(0),
+                    explicit_read_policy: None,
+                    explicit_write_policy: None,
+                },
+                ref_atom_uuid: "test_uuid_2".to_string(),
+                payment_config: JsonFieldPaymentConfig {
+                    base_multiplier: 1.0,
+                    trust_distance_scaling: TrustDistanceScaling::None,
+                    min_payment: None,
+                },
+            },
+        );
+        
+        fields.insert(
+            "new_field".to_string(),
+            JsonSchemaField {
+                permission_policy: JsonPermissionPolicy {
+                    read_policy: TrustDistance::NoRequirement,
+                    write_policy: TrustDistance::Distance(0),
+                    explicit_read_policy: None,
+                    explicit_write_policy: None,
+                },
+                ref_atom_uuid: "test_uuid".to_string(),
+                payment_config: JsonFieldPaymentConfig {
+                    base_multiplier: 1.0,
+                    trust_distance_scaling: TrustDistanceScaling::None,
+                    min_payment: None,
+                },
+            },
+        );
+
+        let schema_mappers = if with_mapper {
+            vec![JsonSchemaMapper {
+                source_schemas: vec!["source_schema".to_string()],
+                target_schema: "target_schema".to_string(),
+                rules: vec![
+                    JsonMappingRule::Map {
+                        source_field: "old_field".to_string(),
+                        target_field: "new_field".to_string(),
+                        function: Some("to_lowercase".to_string()),
+                    }
+                ],
+            }]
+        } else {
+            vec![]
+        };
 
         JsonSchemaDefinition {
             name: "test_schema".to_string(),
             fields,
-            schema_mappers: vec![],
+            schema_mappers,
             payment_config: crate::fees::payment_config::SchemaPaymentConfig {
                 base_multiplier: 1.0,
                 min_payment_threshold: 0,
@@ -112,7 +166,7 @@ mod tests {
     #[test]
     fn test_interpret_valid_schema() {
         let interpreter = SchemaInterpreter::new();
-        let json_schema = create_test_json_schema();
+        let json_schema = create_test_json_schema(false);
         let result = interpreter.interpret(json_schema);
         assert!(result.is_ok());
 
@@ -152,5 +206,30 @@ mod tests {
 
         let field = result.unwrap();
         assert_eq!(field.ref_atom_uuid, "test_uuid");
+    }
+
+    #[test]
+    fn test_interpret_schema_with_mapper() {
+        let interpreter = SchemaInterpreter::new();
+        let json_schema = create_test_json_schema(true);
+        let result = interpreter.interpret(json_schema);
+        assert!(result.is_ok());
+
+        let schema = result.unwrap();
+        assert_eq!(schema.schema_mappers.len(), 1);
+        
+        let mapper = &schema.schema_mappers[0];
+        assert_eq!(mapper.source_schema_name, "source_schema");
+        assert_eq!(mapper.target_schema_name, "target_schema");
+        assert_eq!(mapper.rules.len(), 1);
+
+        match &mapper.rules[0] {
+            MappingRule::Map { source_field, target_field, function } => {
+                assert_eq!(source_field, "old_field");
+                assert_eq!(target_field, "new_field");
+                assert_eq!(function, &Some("to_lowercase".to_string()));
+            },
+            _ => panic!("Expected Map rule"),
+        }
     }
 }

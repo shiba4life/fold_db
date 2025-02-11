@@ -2,6 +2,7 @@ use crate::schema::types::{Query, Mutation, SchemaError};
 use crate::permissions::permission_manager::PermissionManager;
 use crate::schema::schema_manager::SchemaManager;
 
+#[derive(Default)]
 pub struct PermissionWrapper {
     permission_manager: PermissionManager,
 }
@@ -15,9 +16,7 @@ pub struct FieldPermissionResult {
 
 impl PermissionWrapper {
     pub fn new() -> Self {
-        Self {
-            permission_manager: PermissionManager::new(),
-        }
+        Self::default()
     }
 
     pub fn check_query_field_permission(
