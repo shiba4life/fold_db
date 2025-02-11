@@ -6,6 +6,8 @@
 - Basic permissions system
 - Atom and AtomRef implementation
 - Version history tracking
+- DataFold Node implementation
+- Example workflow tests for DataFold Node
 
 ## In Progress
 - Permission check wrapper implementation
@@ -31,3 +33,4 @@
 - Permission System: In Progress
 - Testing: Partial
 - Documentation: In Progress
+- DataFold Node: Complete

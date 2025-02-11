@@ -17,8 +17,8 @@ fn create_default_payment_config() -> FieldPaymentConfig {
     ).unwrap()
 }
 
-mod test_utils;
-use test_utils::{cleanup_test_db, get_test_db_path, cleanup_tmp_dir};
+mod test_helpers;
+use test_helpers::{cleanup_test_db, get_test_db_path, cleanup_tmp_dir};
 
 fn setup_test_db() -> (FoldDB, String) {
     let db_path = get_test_db_path();

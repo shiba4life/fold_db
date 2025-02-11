@@ -1,5 +1,5 @@
-mod test_utils;
-use test_utils::cleanup_tmp_dir;
+mod test_helpers;
+use test_helpers::cleanup_tmp_dir;
 
 // Clean up tmp directory after all tests
 #[cfg(test)]

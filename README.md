@@ -1,75 +1,144 @@
-# FoldDB
+# DataFold Node - Container Manager
 
-FoldDB is a Rust-based database system that provides schema-based data storage with atomic operations, fine-grained permissions control, and version history tracking.
+DataFold Node is a containerized service that manages and runs Docker applications. It provides a simple API for deploying and managing containerized applications while controlling their network access and resource usage.
 
-## Features
+## Overview
 
-- Schema-based data storage and validation
-- Atomic operations with version history tracking
-- Field-level permissions control
-- Trust-based access control with explicit permissions and trust distance
-- Immutable data model with version history
+DataFold Node runs as a container that:
+- Uses the host's Docker daemon to manage other containers
+- Provides REST API for container management
+- Controls network access for managed containers
+- Monitors container health and resource usage
 
-## How It Works
+## Quick Start
 
-- Data is stored in Atoms (immutable units containing content and metadata)
-- AtomRefs provide references to the latest version of data
-- Schemas define the structure and permissions of data fields
-- Permissions are controlled through:
-  - Trust distance (lower means higher trust)
-  - Explicit read/write policies per field
-  - Public key based access control
+1. Prerequisites:
+   - Docker 20.10.0+
+   - Docker socket access (/var/run/docker.sock)
 
-## Installation
+2. Start DataFold Node:
+   ```bash
+   docker-compose up -d
+   ```
 
-Add this to your `Cargo.toml`:
+3. Deploy an application:
+   ```bash
+   curl -X POST http://localhost:8080/api/apps/deploy \
+     -H "Content-Type: application/json" \
+     -d '{
+       "image": "nginx:latest",
+       "name": "web-app",
+       "network_access": "restricted",
+       "ports": {"80": "8081"}
+     }'
+   ```
 
-```toml
-[dependencies]
-fold_db = "0.1.0"
+## API Reference
+
+### Application Management
+
+1. Deploy Application
+```bash
+POST /api/apps/deploy
+{
+  "image": "image:tag",
+  "name": "app-name",
+  "network_access": "restricted|internal|external",
+  "ports": {"container_port": "host_port"},
+  "resources": {
+    "cpu_limit": "0.5",
+    "memory_limit": "512m"
+  }
+}
 ```
 
-## Requirements
-
-- Rust toolchain (2021 edition)
-- No external database dependencies (uses embedded sled)
-
-## Technical Constraints
-
-- Trust distance must be a positive integer (lower = higher trust)
-- Permissions are enforced at field level
-- All operations require public key for authentication
-- Schema must be loaded before data operations
-- Write operations require explicit permissions
-- Read operations can use either trust distance or explicit permissions
-
-## Development
-
-### Building
-
+2. Control Applications
 ```bash
-cargo build
+# Start
+POST /api/apps/start/{name}
+
+# Stop
+POST /api/apps/stop/{name}
+
+# Remove
+DELETE /api/apps/remove/{name}
 ```
 
-### Testing
-
+3. Monitor Applications
 ```bash
-cargo test
+# List all apps
+GET /api/apps/list
+
+# Get app status
+GET /api/apps/status/{name}
+
+# Get app logs
+GET /api/apps/logs/{name}
 ```
 
-## Dependencies
+## Network Access Levels
 
-- serde (1.0) - Serialization/deserialization
-- sled (0.34) - Embedded database
-- uuid (1.0) - Unique identifiers
-- chrono (0.4) - Time handling
+- `restricted`: Only allowed ports exposed
+- `internal`: Communication between containers only
+- `external`: Full network access
 
-## License
+## Configuration
 
-This project is currently unlicensed.
+### docker-compose.yml
+```yaml
+services:
+  datafold_node:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+```
 
-## Contributing
+### Environment Variables
+- `NODE_CONFIG`: Path to config file
+- `DOCKER_HOST`: Docker socket path
 
-Please ensure all tests pass before submitting pull requests:
-```bash
-cargo test
+## Security
+
+- Applications run with restricted network access by default
+- Docker socket mounted read-only
+- Resource limits enforced for all containers
+- API authentication required
+
+## Monitoring
+
+- Container health checks
+- Resource usage monitoring
+- Application logs access
+- Status reporting
+
+## Best Practices
+
+1. Always specify:
+   - Network access level
+   - Resource limits
+   - Required ports only
+
+2. Use:
+   - Specific image tags
+   - Health checks
+   - Resource constraints
+
+## Troubleshooting
+
+1. Check logs:
+   ```bash
+   docker-compose logs datafold_node
+   ```
+
+2. Verify permissions:
+   ```bash
+   ls -l /var/run/docker.sock
+   ```
+
+3. Monitor containers:
+   ```bash
+   docker ps
+   docker stats
+   ```
