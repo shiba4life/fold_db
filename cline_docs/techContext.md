@@ -7,14 +7,25 @@
 - JSON for data representation
 - Bitcoin Lightning Network for payments
 - tokio for async runtime
+- Docker for application containerization
 
 ## Development Setup
 - Rust toolchain required
 - No external database dependencies (uses embedded sled)
 - Lightning Network node for payment processing
 - File-based storage system
+- Docker runtime for application containers
 
 ## Technical Constraints
+
+### Application Container Constraints
+- All application code must run in sandboxed containers
+- Containers must be stateless beyond runtime
+- Network access only through Node API
+- Data modifications are append-only
+- Container lifecycle managed by DataFold Node
+
+### Core System Constraints
 - Immutable data model (all changes create new versions)
 - Trust distance must be a positive integer (lower = higher trust)
 - Permissions are enforced at field level

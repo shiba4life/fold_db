@@ -7,10 +7,26 @@
   - Payment processing
   - Atom/AtomRef storage
   - Database operations
+  - Sandboxed application containers
+
+## Application Layer
+- Containerized application runtime (Docker)
+- Node-mediated network access
+- API-based data interaction
+- Stateless container design
+- Append-only data modifications
 
 ## Key Components
 
-1. FoldDB
+1. DataFold Node
+   - Application container management
+   - Network access gatekeeper
+   - API provider for applications
+   - Data transformation coordinator
+   - Trust and permission validator
+   - Micropayment negotiator
+
+2. FoldDB
    - Main entry point
    - Manages database operations
    - Coordinates between components
