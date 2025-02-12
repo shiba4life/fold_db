@@ -1,18 +1,20 @@
 use serde_json::Value;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::folddb::FoldDB;
 use crate::schema::types::{Mutation, Query};
 use crate::schema::{Schema, SchemaError};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NodeConfig {
     pub storage_path: PathBuf,
     pub default_trust_distance: u32,
 }
 
+#[derive(Clone)]
 pub struct DataFoldNode {
-    db: FoldDB,
+    db: Arc<FoldDB>,
     config: NodeConfig,
 }
 
@@ -23,6 +25,19 @@ pub enum NodeError {
     PermissionError(String),
     ConfigError(String),
 }
+
+impl std::fmt::Display for NodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DatabaseError(msg) => write!(f, "Database error: {}", msg),
+            Self::SchemaError(err) => write!(f, "Schema error: {}", err),
+            Self::PermissionError(msg) => write!(f, "Permission error: {}", msg),
+            Self::ConfigError(msg) => write!(f, "Configuration error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for NodeError {}
 
 impl From<SchemaError> for NodeError {
     fn from(error: SchemaError) -> Self {
@@ -41,12 +56,12 @@ pub type NodeResult<T> = Result<T, NodeError>;
 impl DataFoldNode {
     /// Initialize a new node with the given configuration
     pub fn new(config: NodeConfig) -> NodeResult<Self> {
-        let db = FoldDB::new(
+        let db = Arc::new(FoldDB::new(
             config
                 .storage_path
                 .to_str()
                 .ok_or_else(|| NodeError::ConfigError("Invalid storage path".to_string()))?,
-        )?;
+        )?);
 
         Ok(Self { db, config })
     }
@@ -59,7 +74,9 @@ impl DataFoldNode {
 
     /// Load a schema into the database
     pub fn load_schema(&mut self, schema: Schema) -> NodeResult<()> {
-        self.db.load_schema(schema)?;
+        Arc::get_mut(&mut self.db)
+            .ok_or_else(|| NodeError::ConfigError("Cannot get mutable reference to database".into()))?
+            .load_schema(schema)?;
         Ok(())
     }
 
@@ -81,7 +98,9 @@ impl DataFoldNode {
 
     /// Execute a mutation on the database
     pub fn mutate(&mut self, mutation: Mutation) -> NodeResult<()> {
-        self.db.write_schema(mutation)?;
+        Arc::get_mut(&mut self.db)
+            .ok_or_else(|| NodeError::ConfigError("Cannot get mutable reference to database".into()))?
+            .write_schema(mutation)?;
         Ok(())
     }
 
@@ -111,7 +130,9 @@ impl DataFoldNode {
 
     /// Allow operations on a schema
     pub fn allow_schema(&mut self, schema_name: &str) -> NodeResult<()> {
-        self.db.allow_schema(schema_name)?;
+        Arc::get_mut(&mut self.db)
+            .ok_or_else(|| NodeError::ConfigError("Cannot get mutable reference to database".into()))?
+            .allow_schema(schema_name)?;
         Ok(())
     }
 }
