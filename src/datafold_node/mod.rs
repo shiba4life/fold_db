@@ -6,7 +6,7 @@ use crate::folddb::FoldDB;
 use crate::schema::types::{Mutation, Query};
 use crate::schema::{Schema, SchemaError};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NodeConfig {
     pub storage_path: PathBuf,
     pub default_trust_distance: u32,
