@@ -1,10 +1,9 @@
-use std::path::PathBuf;
 use serde_json::Value;
+use std::path::PathBuf;
 
-use crate::schema::{Schema, SchemaError};
-use crate::schema::types::{Query, Mutation};
 use crate::folddb::FoldDB;
-use crate::permissions::PermissionWrapper;
+use crate::schema::types::{Mutation, Query};
+use crate::schema::{Schema, SchemaError};
 
 #[derive(Debug)]
 pub struct NodeConfig {
@@ -42,9 +41,12 @@ pub type NodeResult<T> = Result<T, NodeError>;
 impl DataFoldNode {
     /// Initialize a new node with the given configuration
     pub fn new(config: NodeConfig) -> NodeResult<Self> {
-        let db = FoldDB::new(config.storage_path.to_str().ok_or_else(|| {
-            NodeError::ConfigError("Invalid storage path".to_string())
-        })?)?;
+        let db = FoldDB::new(
+            config
+                .storage_path
+                .to_str()
+                .ok_or_else(|| NodeError::ConfigError("Invalid storage path".to_string()))?,
+        )?;
 
         Ok(Self { db, config })
     }
@@ -96,10 +98,15 @@ impl DataFoldNode {
 
     /// Get the version history for a specific atom reference
     pub fn get_history(&self, aref_uuid: &str) -> NodeResult<Vec<Value>> {
-        let history = self.db.get_atom_history(aref_uuid)
+        let history = self
+            .db
+            .get_atom_history(aref_uuid)
             .map_err(|e| NodeError::DatabaseError(e.to_string()))?;
-        
-        Ok(history.into_iter().map(|atom| atom.content().clone()).collect())
+
+        Ok(history
+            .into_iter()
+            .map(|atom| atom.content().clone())
+            .collect())
     }
 
     /// Allow operations on a schema
@@ -133,7 +140,7 @@ mod tests {
     fn test_trust_distance_validation() {
         let config = create_test_config();
         let mut node = DataFoldNode::new(config).unwrap();
-        
+
         assert!(node.set_trust_distance(0).is_err());
         assert!(node.set_trust_distance(1).is_ok());
     }

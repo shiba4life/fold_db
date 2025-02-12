@@ -1,17 +1,13 @@
-use fold_db::schema::Schema;
-use fold_db::schema::types::fields::SchemaField;
-use fold_db::permissions::types::policy::{PermissionsPolicy, ExplicitCounts, TrustDistance};
-use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
 use fold_db::fees::payment_config::SchemaPaymentConfig;
-use fold_db::schema::mapper::{SchemaMapper, MappingRule};
+use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
+use fold_db::permissions::types::policy::{ExplicitCounts, PermissionsPolicy, TrustDistance};
+use fold_db::schema::mapper::{MappingRule, SchemaMapper};
+use fold_db::schema::types::fields::SchemaField;
+use fold_db::schema::Schema;
 use std::collections::HashMap;
 
 pub fn create_default_payment_config() -> FieldPaymentConfig {
-    FieldPaymentConfig::new(
-        1.0,
-        TrustDistanceScaling::None,
-        None,
-    ).unwrap()
+    FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
 }
 
 pub fn create_field_with_permissions(
@@ -26,8 +22,12 @@ pub fn create_field_with_permissions(
         permission_policy: PermissionsPolicy {
             read_policy: TrustDistance::Distance(read_distance),
             write_policy: TrustDistance::Distance(write_distance),
-            explicit_read_policy: explicit_read_keys.map(|counts| ExplicitCounts { counts_by_pub_key: counts }),
-            explicit_write_policy: explicit_write_keys.map(|counts| ExplicitCounts { counts_by_pub_key: counts }),
+            explicit_read_policy: explicit_read_keys.map(|counts| ExplicitCounts {
+                counts_by_pub_key: counts,
+            }),
+            explicit_write_policy: explicit_write_keys.map(|counts| ExplicitCounts {
+                counts_by_pub_key: counts,
+            }),
         },
         payment_config: create_default_payment_config(),
     }

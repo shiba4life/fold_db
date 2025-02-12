@@ -1,10 +1,10 @@
 use crate::fees::{
-    GlobalPaymentConfig, MarketRate, SchemaPaymentConfig, FieldPaymentConfig,
-    TrustDistanceScaling, Error,
+    Error, FieldPaymentConfig, GlobalPaymentConfig, MarketRate, SchemaPaymentConfig,
+    TrustDistanceScaling,
 };
 
 /// Calculates the payment amount for a field access.
-/// 
+///
 /// # Errors
 /// Returns an Error if:
 /// - The base payment calculation overflows
@@ -33,21 +33,18 @@ pub fn calculate_field_payment(
             slope,
             intercept,
             min_factor,
-        } => {
-            (slope * trust_distance + intercept).max(*min_factor)
-        }
+        } => (slope * trust_distance + intercept).max(*min_factor),
         TrustDistanceScaling::Exponential {
             base: exp_base,
             scale,
             min_factor,
-        } => {
-            exp_base.powf(scale * trust_distance).max(*min_factor)
-        }
+        } => exp_base.powf(scale * trust_distance).max(*min_factor),
         TrustDistanceScaling::None => 1.0,
     };
 
     // Calculate payment with all multipliers
-    let payment = (base as f64 * schema_multiplier * field_multiplier * scale_factor).round() as u64;
+    let payment =
+        (base as f64 * schema_multiplier * field_multiplier * scale_factor).round() as u64;
 
     // Apply minimum thresholds
     let field_min = field_payment.min_payment.unwrap_or(0);
@@ -63,7 +60,7 @@ pub fn calculate_field_payment(
 }
 
 /// Calculates the total payment amount for a query.
-/// 
+///
 /// # Errors
 /// Returns an Error if:
 /// - Any field payment calculation fails
@@ -84,16 +81,16 @@ pub fn calculate_total_query_payment(
             field_payment,
             *trust_distance,
         )?;
-        
+
         // Check for overflow
-        total_payment = total_payment.checked_add(field_cost).ok_or_else(|| {
-            Error::Internal("Payment calculation overflow".to_string())
-        })?;
+        total_payment = total_payment
+            .checked_add(field_cost)
+            .ok_or_else(|| Error::Internal("Payment calculation overflow".to_string()))?;
     }
 
     // Ensure total payment meets system minimum
     let final_payment = total_payment.max(global_config.system_base_rate);
-    
+
     Ok(final_payment)
 }
 
@@ -104,14 +101,14 @@ mod tests {
 
     fn setup_test_configs() -> (GlobalPaymentConfig, MarketRate, SchemaPaymentConfig) {
         let global_config = GlobalPaymentConfig::new(
-            50,  // 50 sats minimum
+            50, // 50 sats minimum
             Duration::from_secs(3600),
             3,
             Duration::from_secs(7200),
         )
         .unwrap();
 
-        let market_rate = MarketRate::new(100);  // 100 sats base rate
+        let market_rate = MarketRate::new(100); // 100 sats base rate
 
         let schema_payment = SchemaPaymentConfig::new(1.5, 10).unwrap();
 
@@ -200,32 +197,15 @@ mod tests {
     fn test_total_query_payment() {
         let (global_config, market_rate, schema_payment) = setup_test_configs();
 
-        let field1 = FieldPaymentConfig::new(
-            2.0,
-            TrustDistanceScaling::None,
-            None,
-        )
-        .unwrap();
+        let field1 = FieldPaymentConfig::new(2.0, TrustDistanceScaling::None, None).unwrap();
 
-        let field2 = FieldPaymentConfig::new(
-            1.5,
-            TrustDistanceScaling::None,
-            None,
-        )
-        .unwrap();
+        let field2 = FieldPaymentConfig::new(1.5, TrustDistanceScaling::None, None).unwrap();
 
-        let fields = vec![
-            (field1, 1.0),
-            (field2, 1.0),
-        ];
+        let fields = vec![(field1, 1.0), (field2, 1.0)];
 
-        let total = calculate_total_query_payment(
-            &global_config,
-            &market_rate,
-            &schema_payment,
-            &fields,
-        )
-        .unwrap();
+        let total =
+            calculate_total_query_payment(&global_config, &market_rate, &schema_payment, &fields)
+                .unwrap();
 
         // Expected: (100 * 1.5 * 2.0) + (100 * 1.5 * 1.5) = 300 + 225 = 525
         assert_eq!(total, 525);
@@ -235,12 +215,7 @@ mod tests {
     fn test_negative_trust_distance() {
         let (global_config, market_rate, schema_payment) = setup_test_configs();
 
-        let field_payment = FieldPaymentConfig::new(
-            2.0,
-            TrustDistanceScaling::None,
-            None,
-        )
-        .unwrap();
+        let field_payment = FieldPaymentConfig::new(2.0, TrustDistanceScaling::None, None).unwrap();
 
         let result = calculate_field_payment(
             &global_config,

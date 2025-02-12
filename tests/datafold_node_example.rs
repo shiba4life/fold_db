@@ -1,9 +1,9 @@
-use fold_db::{DataFoldNode, NodeConfig};
-use fold_db::schema::{Schema, SchemaError};
-use fold_db::schema::types::{Query, Mutation};
-use fold_db::schema::types::fields::SchemaField;
-use fold_db::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
+use fold_db::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+use fold_db::schema::types::fields::SchemaField;
+use fold_db::schema::types::{Mutation, Query};
+use fold_db::schema::{Schema, SchemaError};
+use fold_db::{DataFoldNode, NodeConfig};
 use serde_json::json;
 use tempfile::tempdir;
 use uuid;
@@ -21,7 +21,7 @@ fn test_complete_node_workflow() {
 
     // 2. Create and load a schema
     let mut schema = Schema::new("blog_post".to_string());
-    
+
     // Add title field
     let title_field = SchemaField {
         ref_atom_uuid: uuid::Uuid::new_v4().to_string(),
@@ -32,7 +32,7 @@ fn test_complete_node_workflow() {
         payment_config: FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
     };
     schema.add_field("title".to_string(), title_field);
-    
+
     // Add content field
     let content_field = SchemaField {
         ref_atom_uuid: uuid::Uuid::new_v4().to_string(),
@@ -43,7 +43,7 @@ fn test_complete_node_workflow() {
         payment_config: FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
     };
     schema.add_field("content".to_string(), content_field);
-    
+
     // Load schema
     node.load_schema(schema).unwrap();
     node.allow_schema("blog_post").unwrap();
@@ -56,10 +56,15 @@ fn test_complete_node_workflow() {
         trust_distance: 1,
         fields_and_values: vec![
             ("title".to_string(), json!("My First Blog Post")),
-            ("content".to_string(), json!("This is the content of my first blog post.")),
-        ].into_iter().collect(),
+            (
+                "content".to_string(),
+                json!("This is the content of my first blog post."),
+            ),
+        ]
+        .into_iter()
+        .collect(),
     };
-    
+
     node.mutate(create_post).unwrap();
     println!("✓ Blog post created successfully");
 
@@ -70,7 +75,7 @@ fn test_complete_node_workflow() {
         fields: vec!["title".to_string(), "content".to_string()],
         trust_distance: 1,
     };
-    
+
     let results = node.query(query).unwrap();
     println!("✓ Blog post queried successfully");
 
@@ -90,11 +95,14 @@ fn test_complete_node_workflow() {
         schema_name: "blog_post".to_string(),
         pub_key: "author_key".to_string(),
         trust_distance: 1,
-        fields_and_values: vec![
-            ("content".to_string(), json!("This is the updated content of my first blog post.")),
-        ].into_iter().collect(),
+        fields_and_values: vec![(
+            "content".to_string(),
+            json!("This is the updated content of my first blog post."),
+        )]
+        .into_iter()
+        .collect(),
     };
-    
+
     node.mutate(update_post).unwrap();
     println!("✓ Blog post updated successfully");
 
@@ -105,7 +113,7 @@ fn test_complete_node_workflow() {
         fields: vec!["content".to_string()],
         trust_distance: 1,
     };
-    
+
     let results = node.query(query).unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(
@@ -121,7 +129,7 @@ fn test_complete_node_workflow() {
         fields: vec!["content".to_string()],
         trust_distance: 2, // Higher trust distance (less trusted)
     };
-    
+
     let results = node.query(unauthorized_query).unwrap();
     assert!(results[0].is_err()); // Should fail due to insufficient trust
     println!("✓ Permission handling verified");

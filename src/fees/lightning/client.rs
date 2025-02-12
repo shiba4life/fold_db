@@ -1,7 +1,7 @@
-use std::time::Duration;
-use std::fmt::Debug;
-use async_trait::async_trait;
 use crate::fees::{Error, LightningPaymentRequest, PaymentStatus};
+use async_trait::async_trait;
+use std::fmt::Debug;
+use std::time::Duration;
 
 #[async_trait]
 pub trait LightningClient: Send + Sync + Debug {

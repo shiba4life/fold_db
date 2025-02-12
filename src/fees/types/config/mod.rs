@@ -1,7 +1,7 @@
+use crate::fees::types::payment::Error;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use crate::fees::types::payment::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GlobalPaymentConfig {
@@ -59,7 +59,9 @@ impl GlobalPaymentConfig {
         }
 
         if payment_timeout.as_secs() == 0 || hold_invoice_timeout.as_secs() == 0 {
-            return Err(Error::InvalidAmount("Timeout durations must be greater than 0".to_string()));
+            return Err(Error::InvalidAmount(
+                "Timeout durations must be greater than 0".to_string(),
+            ));
         }
 
         if max_invoice_retries == 0 {
@@ -138,14 +140,22 @@ impl FieldPaymentConfig {
 
         // Validate trust distance scaling parameters
         match &trust_distance_scaling {
-            TrustDistanceScaling::Linear { slope: _, intercept: _, min_factor } => {
+            TrustDistanceScaling::Linear {
+                slope: _,
+                intercept: _,
+                min_factor,
+            } => {
                 if *min_factor < 1.0 {
                     return Err(Error::InvalidAmount(
                         "Minimum scaling factor must be >= 1.0".to_string(),
                     ));
                 }
             }
-            TrustDistanceScaling::Exponential { base, scale: _, min_factor } => {
+            TrustDistanceScaling::Exponential {
+                base,
+                scale: _,
+                min_factor,
+            } => {
                 if *base <= 0.0 {
                     return Err(Error::InvalidAmount(
                         "Exponential base must be positive".to_string(),
@@ -176,11 +186,8 @@ impl Default for SchemaPaymentConfig {
 
 impl Default for FieldPaymentConfig {
     fn default() -> Self {
-        Self::new(
-            1.0,
-            TrustDistanceScaling::None,
-            None,
-        ).expect("Default payment config should be valid")
+        Self::new(1.0, TrustDistanceScaling::None, None)
+            .expect("Default payment config should be valid")
     }
 }
 
@@ -191,39 +198,23 @@ mod tests {
     #[test]
     fn test_global_payment_config_validation() {
         // Valid config
-        let config = GlobalPaymentConfig::new(
-            100,
-            Duration::from_secs(3600),
-            3,
-            Duration::from_secs(7200),
-        );
+        let config =
+            GlobalPaymentConfig::new(100, Duration::from_secs(3600), 3, Duration::from_secs(7200));
         assert!(config.is_ok());
 
         // Invalid system base rate
-        let config = GlobalPaymentConfig::new(
-            0,
-            Duration::from_secs(3600),
-            3,
-            Duration::from_secs(7200),
-        );
+        let config =
+            GlobalPaymentConfig::new(0, Duration::from_secs(3600), 3, Duration::from_secs(7200));
         assert!(config.is_err());
 
         // Invalid payment timeout
-        let config = GlobalPaymentConfig::new(
-            100,
-            Duration::from_secs(0),
-            3,
-            Duration::from_secs(7200),
-        );
+        let config =
+            GlobalPaymentConfig::new(100, Duration::from_secs(0), 3, Duration::from_secs(7200));
         assert!(config.is_err());
 
         // Invalid max retries
-        let config = GlobalPaymentConfig::new(
-            100,
-            Duration::from_secs(3600),
-            0,
-            Duration::from_secs(7200),
-        );
+        let config =
+            GlobalPaymentConfig::new(100, Duration::from_secs(3600), 0, Duration::from_secs(7200));
         assert!(config.is_err());
     }
 
@@ -243,16 +234,16 @@ mod tests {
     #[test]
     fn test_market_rate_staleness() {
         let mut rate = MarketRate::new(100);
-        
+
         // Not stale immediately
         assert!(!rate.is_stale(Duration::from_secs(60)));
-        
+
         // Force last_updated to be in the past
         rate.last_updated = rate.last_updated - chrono::Duration::seconds(120);
-        
+
         // Should be stale now
         assert!(rate.is_stale(Duration::from_secs(60)));
-        
+
         // Update should reset staleness
         rate.update(150);
         assert!(!rate.is_stale(Duration::from_secs(60)));

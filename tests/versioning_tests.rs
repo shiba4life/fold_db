@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 mod test_helpers;
-use test_helpers::{setup_test_db, cleanup_test_db, setup_and_allow_schema};
-use test_helpers::schema_builder::{create_field_with_permissions, create_schema_with_fields};
 use test_helpers::operation_builder::{create_query, create_single_field_mutation};
+use test_helpers::schema_builder::{create_field_with_permissions, create_schema_with_fields};
+use test_helpers::{cleanup_test_db, setup_and_allow_schema, setup_test_db};
 
 #[test]
 fn test_schema_versioning_with_permissions() {
@@ -27,7 +27,7 @@ fn test_schema_versioning_with_permissions() {
             0, // Only explicit writers
             None,
             Some(write_keys),
-        )
+        ),
     );
 
     let schema = create_schema_with_fields(
@@ -53,7 +53,9 @@ fn test_schema_versioning_with_permissions() {
     }
 
     // Verify history access with appropriate trust distance
-    let history = db.get_atom_history(&field_uuid).expect("Failed to get history");
+    let history = db
+        .get_atom_history(&field_uuid)
+        .expect("Failed to get history");
     assert_eq!(history.len(), 3);
 
     // Test reading latest version with different trust distances
@@ -64,10 +66,13 @@ fn test_schema_versioning_with_permissions() {
         1, // Within trust distance
     );
     let trusted_results = db.query_schema(trusted_query.clone());
-    let trusted_results: HashMap<String, _> = trusted_query.fields.iter().cloned()
+    let trusted_results: HashMap<String, _> = trusted_query
+        .fields
+        .iter()
+        .cloned()
         .zip(trusted_results.into_iter())
         .collect();
-    
+
     let versioned_result = trusted_results.get("versioned_field").unwrap();
     assert!(versioned_result.is_ok());
     assert_eq!(versioned_result.as_ref().unwrap(), &json!("version 3"));
@@ -80,10 +85,13 @@ fn test_schema_versioning_with_permissions() {
         3, // Beyond trust distance
     );
     let untrusted_results = db.query_schema(untrusted_query.clone());
-    let untrusted_results: HashMap<String, _> = untrusted_query.fields.iter().cloned()
+    let untrusted_results: HashMap<String, _> = untrusted_query
+        .fields
+        .iter()
+        .cloned()
         .zip(untrusted_results.into_iter())
         .collect();
-    
+
     assert!(untrusted_results.get("versioned_field").unwrap().is_err());
 
     cleanup_test_db(&db_path);

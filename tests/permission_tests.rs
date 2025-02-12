@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 mod test_helpers;
-use test_helpers::{setup_test_db, cleanup_test_db, setup_and_allow_schema};
+use test_helpers::operation_builder::{create_mutation, create_query};
 use test_helpers::schema_builder::{create_field_with_permissions, create_schema_with_fields};
-use test_helpers::operation_builder::{create_query, create_mutation};
+use test_helpers::{cleanup_test_db, setup_and_allow_schema, setup_test_db};
 
 #[test]
 fn test_permission_based_access() {
@@ -16,7 +16,7 @@ fn test_permission_based_access() {
 
     // Create schema with different permission levels for fields
     let mut fields = HashMap::new();
-    
+
     // Public field - anyone can read, only owner can write
     let mut public_write_keys = HashMap::new();
     public_write_keys.insert(owner_key.clone(), 1u8);
@@ -28,7 +28,7 @@ fn test_permission_based_access() {
             0, // Restrictive write
             None,
             Some(public_write_keys),
-        )
+        ),
     );
 
     // Protected field - trusted users can read, explicit users can write
@@ -44,7 +44,7 @@ fn test_permission_based_access() {
             0, // Only explicit writers
             Some(protected_read_keys),
             Some(protected_write_keys),
-        )
+        ),
     );
 
     let schema = create_schema_with_fields(
@@ -70,7 +70,7 @@ fn test_permission_based_access() {
     assert!(db.write_schema(owner_mutation).is_ok());
 
     // Test reading with different keys and trust distances
-    
+
     // Reader with explicit permission can read protected field
     let reader_query = create_query(
         "test_schema".to_string(),
@@ -79,10 +79,13 @@ fn test_permission_based_access() {
         3,
     );
     let reader_results = db.query_schema(reader_query.clone());
-    let reader_results: HashMap<String, _> = reader_query.fields.iter().cloned()
+    let reader_results: HashMap<String, _> = reader_query
+        .fields
+        .iter()
+        .cloned()
         .zip(reader_results.into_iter())
         .collect();
-    
+
     assert!(reader_results.get("public_field").unwrap().is_ok()); // Can read public field
     assert!(reader_results.get("protected_field").unwrap().is_ok()); // Can read protected field due to explicit permission
 
@@ -94,10 +97,13 @@ fn test_permission_based_access() {
         3,
     );
     let unauth_results = db.query_schema(unauth_query.clone());
-    let unauth_results: HashMap<String, _> = unauth_query.fields.iter().cloned()
+    let unauth_results: HashMap<String, _> = unauth_query
+        .fields
+        .iter()
+        .cloned()
         .zip(unauth_results.into_iter())
         .collect();
-    
+
     assert!(unauth_results.get("public_field").unwrap().is_ok()); // Can read public field
     assert!(unauth_results.get("protected_field").unwrap().is_err()); // Cannot read protected field
 

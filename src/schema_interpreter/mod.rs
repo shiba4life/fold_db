@@ -1,8 +1,8 @@
 //! Schema interpreter module for parsing JSON schema definitions into `FoldDB` schemas.
 
+mod interpreter;
 mod types;
 mod validator;
-mod interpreter;
 
 pub use interpreter::SchemaInterpreter;
 pub use types::JsonSchemaDefinition;

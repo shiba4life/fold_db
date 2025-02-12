@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use serde_json::Value;
+use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 
 pub struct Atom {
@@ -15,7 +15,12 @@ pub struct Atom {
 
 impl Atom {
     #[must_use]
-    pub fn new(source_schema_name: String, source_pub_key: String, prev_atom_uuid: Option<String>, content: Value) -> Self {
+    pub fn new(
+        source_schema_name: String,
+        source_pub_key: String,
+        prev_atom_uuid: Option<String>,
+        content: Value,
+    ) -> Self {
         Self {
             uuid: Uuid::new_v4().to_string(),
             source_schema_name,
@@ -56,7 +61,6 @@ impl Atom {
         self.prev_atom_uuid.as_ref()
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AtomRef {

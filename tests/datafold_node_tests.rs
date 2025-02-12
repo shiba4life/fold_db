@@ -1,10 +1,10 @@
-use fold_db::{DataFoldNode, NodeConfig};
 use fold_db::atom::Atom;
-use fold_db::schema::{Schema, SchemaError};
-use fold_db::schema::types::{Query, Mutation};
-use fold_db::schema::types::fields::SchemaField;
-use fold_db::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
+use fold_db::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+use fold_db::schema::types::fields::SchemaField;
+use fold_db::schema::types::{Mutation, Query};
+use fold_db::schema::{Schema, SchemaError};
+use fold_db::{DataFoldNode, NodeConfig};
 use serde_json::json;
 use tempfile::tempdir;
 use uuid;
@@ -20,29 +20,29 @@ fn create_test_node() -> DataFoldNode {
 
 fn create_test_schema() -> Schema {
     let mut schema = Schema::new("user_profile".to_string());
-    
+
     // Add name field
     let name_field = SchemaField {
         ref_atom_uuid: uuid::Uuid::new_v4().to_string(),
         permission_policy: PermissionsPolicy::new(
             TrustDistance::Distance(1),
-            TrustDistance::Distance(1)
+            TrustDistance::Distance(1),
         ),
         payment_config: FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
     };
     schema.add_field("name".to_string(), name_field);
-    
+
     // Add email field
     let email_field = SchemaField {
         ref_atom_uuid: uuid::Uuid::new_v4().to_string(),
         permission_policy: PermissionsPolicy::new(
             TrustDistance::Distance(1),
-            TrustDistance::Distance(1)
+            TrustDistance::Distance(1),
         ),
         payment_config: FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
     };
     schema.add_field("email".to_string(), email_field);
-    
+
     schema
 }
 
@@ -50,10 +50,10 @@ fn create_test_schema() -> Schema {
 fn test_node_schema_operations() {
     let mut node = create_test_node();
     let schema = create_test_schema();
-    
+
     // Test schema loading
     assert!(node.load_schema(schema.clone()).is_ok());
-    
+
     // Test schema retrieval
     let retrieved_schema = node.get_schema("user_profile").unwrap();
     assert!(retrieved_schema.is_some());
@@ -64,11 +64,11 @@ fn test_node_schema_operations() {
 fn test_node_data_operations() {
     let mut node = create_test_node();
     let schema = create_test_schema();
-    
+
     // Load schema
     node.load_schema(schema).unwrap();
     node.allow_schema("user_profile").unwrap();
-    
+
     // Test mutation
     let mutation = Mutation {
         schema_name: "user_profile".to_string(),
@@ -77,11 +77,13 @@ fn test_node_data_operations() {
         fields_and_values: vec![
             ("name".to_string(), json!("John Doe")),
             ("email".to_string(), json!("john@example.com")),
-        ].into_iter().collect(),
+        ]
+        .into_iter()
+        .collect(),
     };
-    
+
     assert!(node.mutate(mutation).is_ok());
-    
+
     // Test query
     let query = Query {
         schema_name: "user_profile".to_string(),
@@ -89,10 +91,10 @@ fn test_node_data_operations() {
         fields: vec!["name".to_string(), "email".to_string()],
         trust_distance: 1,
     };
-    
+
     let results = node.query(query).unwrap();
     assert_eq!(results.len(), 2);
-    
+
     // Verify results
     for result in results {
         assert!(result.is_ok());
@@ -104,25 +106,25 @@ fn test_node_data_operations() {
 #[test]
 fn test_trust_distance_handling() {
     let mut node = create_test_node();
-    
+
     // Test invalid trust distance
     assert!(node.set_trust_distance(0).is_err());
-    
+
     // Test valid trust distance
     assert!(node.set_trust_distance(2).is_ok());
-    
+
     // Verify default trust distance is applied to queries
     let schema = create_test_schema();
     node.load_schema(schema).unwrap();
     node.allow_schema("user_profile").unwrap();
-    
+
     let query = Query {
         schema_name: "user_profile".to_string(),
         pub_key: "test_key".to_string(),
         fields: vec!["name".to_string()],
         trust_distance: 0, // Should be replaced with default
     };
-    
+
     let results = node.query(query).unwrap();
     assert_eq!(results.len(), 1);
 }
@@ -131,33 +133,33 @@ fn test_trust_distance_handling() {
 fn test_version_history() {
     let mut node = create_test_node();
     let schema = create_test_schema();
-    
+
     // Load schema
     node.load_schema(schema).unwrap();
     node.allow_schema("user_profile").unwrap();
-    
+
     // Create initial data
     let mutation1 = Mutation {
         schema_name: "user_profile".to_string(),
         pub_key: "test_key".to_string(),
         trust_distance: 1,
-        fields_and_values: vec![
-            ("name".to_string(), json!("John Doe")),
-        ].into_iter().collect(),
+        fields_and_values: vec![("name".to_string(), json!("John Doe"))]
+            .into_iter()
+            .collect(),
     };
     node.mutate(mutation1).unwrap();
-    
+
     // Update data
     let mutation2 = Mutation {
         schema_name: "user_profile".to_string(),
         pub_key: "test_key".to_string(),
         trust_distance: 1,
-        fields_and_values: vec![
-            ("name".to_string(), json!("Jane Doe")),
-        ].into_iter().collect(),
+        fields_and_values: vec![("name".to_string(), json!("Jane Doe"))]
+            .into_iter()
+            .collect(),
     };
     node.mutate(mutation2).unwrap();
-    
+
     // Query to get the atom reference
     let query = Query {
         schema_name: "user_profile".to_string(),
@@ -165,15 +167,15 @@ fn test_version_history() {
         fields: vec!["name".to_string()],
         trust_distance: 1,
     };
-    
+
     // Get the schema to find the field's ref_atom_uuid
     let schema = node.get_schema("user_profile").unwrap().unwrap();
     let name_field = schema.fields.get("name").unwrap();
-    
+
     // Get history using the actual ref_atom_uuid
     let history = node.get_history(&name_field.ref_atom_uuid);
     assert!(history.is_ok());
-    
+
     // Verify history contents
     let history = history.unwrap();
     assert_eq!(history.len(), 2);

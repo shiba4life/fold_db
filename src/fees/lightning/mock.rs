@@ -1,10 +1,10 @@
-use std::time::Duration;
 use async_trait::async_trait;
 use chrono::Utc;
+use std::time::Duration;
 use uuid::Uuid;
 
-use crate::fees::{Error, LightningPaymentRequest, PaymentStatus};
 use super::client::LightningClient;
+use crate::fees::{Error, LightningPaymentRequest, PaymentStatus};
 
 #[derive(Debug, Default)]
 pub struct MockLightningClient {
@@ -30,11 +30,12 @@ impl LightningClient for MockLightningClient {
     ) -> Result<LightningPaymentRequest, Error> {
         // Generate a mock payment hash
         let payment_hash = Uuid::new_v4().to_string();
-        
+
         Ok(LightningPaymentRequest {
             amount,
             invoice: format!("mock_invoice_{}", payment_hash),
-            expiry: Utc::now() + chrono::Duration::from_std(expiry).map_err(|e| Error::Internal(e.to_string()))?,
+            expiry: Utc::now()
+                + chrono::Duration::from_std(expiry).map_err(|e| Error::Internal(e.to_string()))?,
             payment_hash,
             hold_invoice,
         })

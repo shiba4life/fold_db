@@ -34,28 +34,28 @@ pub enum PaymentStatus {
 pub enum Error {
     #[error("Invalid payment amount: {0}")]
     InvalidAmount(String),
-    
+
     #[error("Invalid trust distance: {0}")]
     InvalidTrustDistance(String),
-    
+
     #[error("Lightning node error: {0}")]
     LightningNode(String),
-    
+
     #[error("Invalid invoice: {0}")]
     InvalidInvoice(String),
-    
+
     #[error("Payment timeout")]
     PaymentTimeout,
-    
+
     #[error("Payment verification failed: {0}")]
     PaymentVerification(String),
-    
+
     #[error("Payment expired")]
     PaymentExpired,
-    
+
     #[error("Database error: {0}")]
     Database(String),
-    
+
     #[error("Internal error: {0}")]
     Internal(String),
 }

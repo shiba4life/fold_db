@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use crate::permissions::types::policy::{TrustDistance, ExplicitCounts, PermissionsPolicy};
-use crate::fees::types::config::FieldPaymentConfig;
 use crate::fees::payment_config::SchemaPaymentConfig;
+use crate::fees::types::config::FieldPaymentConfig;
 use crate::fees::types::config::TrustDistanceScaling;
+use crate::permissions::types::policy::{ExplicitCounts, PermissionsPolicy, TrustDistance};
 use crate::schema::mapper::types::MappingRule;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Represents a complete JSON schema definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,19 +18,23 @@ pub struct JsonSchemaDefinition {
 impl From<JsonMappingRule> for MappingRule {
     fn from(json: JsonMappingRule) -> Self {
         match json {
-            JsonMappingRule::Rename { source_field, target_field } => {
-                Self::Rename { source_field, target_field }
-            }
-            JsonMappingRule::Drop { field } => {
-                Self::Drop { field }
-            }
-            JsonMappingRule::Map { source_field, target_field, function } => {
-                Self::Map { 
-                    source_field,
-                    target_field,
-                    function
-                }
-            }
+            JsonMappingRule::Rename {
+                source_field,
+                target_field,
+            } => Self::Rename {
+                source_field,
+                target_field,
+            },
+            JsonMappingRule::Drop { field } => Self::Drop { field },
+            JsonMappingRule::Map {
+                source_field,
+                target_field,
+                function,
+            } => Self::Map {
+                source_field,
+                target_field,
+                function,
+            },
         }
     }
 }
@@ -82,9 +86,7 @@ pub enum JsonMappingRule {
         target_field: String,
     },
     #[serde(rename = "drop")]
-    Drop {
-        field: String,
-    },
+    Drop { field: String },
     #[serde(rename = "map")]
     Map {
         source_field: String,
@@ -116,7 +118,7 @@ impl From<JsonFieldPaymentConfig> for FieldPaymentConfig {
 
 impl JsonSchemaDefinition {
     /// Validates the schema definition according to the rules.
-    /// 
+    ///
     /// # Errors
     /// Returns a `SchemaError::InvalidField` if:
     /// - The schema's base multiplier is not positive
@@ -138,19 +140,19 @@ impl JsonSchemaDefinition {
         for (field_name, field) in &self.fields {
             // Validate payment config
             if field.payment_config.base_multiplier <= 0.0 {
-                return Err(crate::schema::types::SchemaError::InvalidField(
-                    format!("Field {field_name} base_multiplier must be positive")
-                ));
+                return Err(crate::schema::types::SchemaError::InvalidField(format!(
+                    "Field {field_name} base_multiplier must be positive"
+                )));
             }
 
             // Validate trust distance scaling
             match &field.payment_config.trust_distance_scaling {
-                TrustDistanceScaling::Linear { min_factor, .. } |
-                TrustDistanceScaling::Exponential { min_factor, .. } => {
+                TrustDistanceScaling::Linear { min_factor, .. }
+                | TrustDistanceScaling::Exponential { min_factor, .. } => {
                     if *min_factor < 1.0 {
-                        return Err(crate::schema::types::SchemaError::InvalidField(
-                            format!("Field {field_name} min_factor must be >= 1.0")
-                        ));
+                        return Err(crate::schema::types::SchemaError::InvalidField(format!(
+                            "Field {field_name} min_factor must be >= 1.0"
+                        )));
                     }
                 }
                 TrustDistanceScaling::None => {}

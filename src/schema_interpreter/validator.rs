@@ -1,13 +1,13 @@
-use std::collections::HashSet;
-use crate::schema::types::SchemaError;
-use crate::schema_interpreter::types::{JsonSchemaDefinition, JsonPermissionPolicy};
 use crate::permissions::types::policy::TrustDistance;
+use crate::schema::types::SchemaError;
+use crate::schema_interpreter::types::{JsonPermissionPolicy, JsonSchemaDefinition};
+use std::collections::HashSet;
 
 pub struct SchemaValidator;
 
 impl SchemaValidator {
     /// Validates a JSON schema definition.
-    /// 
+    ///
     /// # Errors
     /// Returns a `SchemaError` if:
     /// - The schema name is empty
@@ -17,13 +17,17 @@ impl SchemaValidator {
     pub fn validate(schema: &JsonSchemaDefinition) -> crate::schema_interpreter::Result<()> {
         // Validate schema name
         if schema.name.is_empty() {
-            return Err(SchemaError::InvalidField("Schema name cannot be empty".to_string()));
+            return Err(SchemaError::InvalidField(
+                "Schema name cannot be empty".to_string(),
+            ));
         }
 
         // Validate fields
         for (field_name, field) in &schema.fields {
             if field_name.is_empty() {
-                return Err(SchemaError::InvalidField("Field name cannot be empty".to_string()));
+                return Err(SchemaError::InvalidField(
+                    "Field name cannot be empty".to_string(),
+                ));
             }
 
             // Validate permissions
@@ -31,16 +35,16 @@ impl SchemaValidator {
 
             // Validate payment config
             if field.payment_config.base_multiplier <= 0.0 {
-                return Err(SchemaError::InvalidField(
-                    format!("Field {field_name} base_multiplier must be positive")
-                ));
+                return Err(SchemaError::InvalidField(format!(
+                    "Field {field_name} base_multiplier must be positive"
+                )));
             }
 
             if let Some(min_payment) = field.payment_config.min_payment {
                 if min_payment == 0 {
-                    return Err(SchemaError::InvalidField(
-                        format!("Field {field_name} min_payment cannot be zero")
-                    ));
+                    return Err(SchemaError::InvalidField(format!(
+                        "Field {field_name} min_payment cannot be zero"
+                    )));
                 }
             }
         }
@@ -50,14 +54,14 @@ impl SchemaValidator {
             // Must have at least one source schema
             if mapper.source_schemas.is_empty() {
                 return Err(SchemaError::InvalidField(
-                    "Schema mapper must have at least one source schema".to_string()
+                    "Schema mapper must have at least one source schema".to_string(),
                 ));
             }
 
             // Target schema must be specified
             if mapper.target_schema.is_empty() {
                 return Err(SchemaError::InvalidField(
-                    "Schema mapper must specify a target schema".to_string()
+                    "Schema mapper must specify a target schema".to_string(),
                 ));
             }
 
@@ -66,9 +70,10 @@ impl SchemaValidator {
             for source in &mapper.source_schemas {
                 let pair = (source.clone(), mapper.target_schema.clone());
                 if !seen_pairs.insert(pair.clone()) {
-                    return Err(SchemaError::InvalidField(
-                        format!("Duplicate source-target pair: {source} -> {}", mapper.target_schema)
-                    ));
+                    return Err(SchemaError::InvalidField(format!(
+                        "Duplicate source-target pair: {source} -> {}",
+                        mapper.target_schema
+                    )));
                 }
             }
 
@@ -76,40 +81,48 @@ impl SchemaValidator {
             let mut mapped_fields = HashSet::new();
             for rule in &mapper.rules {
                 match rule {
-                    crate::schema_interpreter::types::JsonMappingRule::Rename { source_field, target_field } => {
+                    crate::schema_interpreter::types::JsonMappingRule::Rename {
+                        source_field,
+                        target_field,
+                    } => {
                         if source_field.is_empty() || target_field.is_empty() {
                             return Err(SchemaError::InvalidField(
-                                "Rename rule must specify both source and target fields".to_string()
+                                "Rename rule must specify both source and target fields"
+                                    .to_string(),
                             ));
                         }
                         if !mapped_fields.insert(source_field) {
-                            return Err(SchemaError::InvalidField(
-                                format!("Field {source_field} is mapped multiple times")
-                            ));
+                            return Err(SchemaError::InvalidField(format!(
+                                "Field {source_field} is mapped multiple times"
+                            )));
                         }
                     }
                     crate::schema_interpreter::types::JsonMappingRule::Drop { field } => {
                         if field.is_empty() {
                             return Err(SchemaError::InvalidField(
-                                "Drop rule must specify a field".to_string()
+                                "Drop rule must specify a field".to_string(),
                             ));
                         }
                         if !mapped_fields.insert(field) {
-                            return Err(SchemaError::InvalidField(
-                                format!("Field {field} is mapped multiple times")
-                            ));
+                            return Err(SchemaError::InvalidField(format!(
+                                "Field {field} is mapped multiple times"
+                            )));
                         }
                     }
-                    crate::schema_interpreter::types::JsonMappingRule::Map { source_field, target_field, .. } => {
+                    crate::schema_interpreter::types::JsonMappingRule::Map {
+                        source_field,
+                        target_field,
+                        ..
+                    } => {
                         if source_field.is_empty() || target_field.is_empty() {
                             return Err(SchemaError::InvalidField(
-                                "Map rule must specify both source and target fields".to_string()
+                                "Map rule must specify both source and target fields".to_string(),
                             ));
                         }
                         if !mapped_fields.insert(source_field) {
-                            return Err(SchemaError::InvalidField(
-                                format!("Field {source_field} is mapped multiple times")
-                            ));
+                            return Err(SchemaError::InvalidField(format!(
+                                "Field {source_field} is mapped multiple times"
+                            )));
                         }
                     }
                 }
@@ -119,14 +132,16 @@ impl SchemaValidator {
         Ok(())
     }
 
-    fn validate_permissions(policy: &JsonPermissionPolicy) -> crate::schema_interpreter::Result<()> {
+    fn validate_permissions(
+        policy: &JsonPermissionPolicy,
+    ) -> crate::schema_interpreter::Result<()> {
         match policy.read {
-            TrustDistance::Distance(_) => {},
+            TrustDistance::Distance(_) => {}
             TrustDistance::NoRequirement => {}
         }
 
         match policy.write {
-            TrustDistance::Distance(_) => {},
+            TrustDistance::Distance(_) => {}
             TrustDistance::NoRequirement => {}
         }
 
@@ -137,9 +152,11 @@ impl SchemaValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
     use crate::fees::types::config::TrustDistanceScaling;
-    use crate::schema_interpreter::types::{JsonSchemaField, JsonFieldPaymentConfig, JsonMappingRule, JsonSchemaMapper};
+    use crate::schema_interpreter::types::{
+        JsonFieldPaymentConfig, JsonMappingRule, JsonSchemaField, JsonSchemaMapper,
+    };
+    use std::collections::HashMap;
 
     fn create_valid_schema() -> JsonSchemaDefinition {
         let mut fields = HashMap::new();

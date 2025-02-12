@@ -1,9 +1,7 @@
 use crate::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 
 #[derive(Default)]
-pub struct PermissionManager {
-
-}
+pub struct PermissionManager {}
 
 impl PermissionManager {
     #[must_use]
@@ -12,13 +10,18 @@ impl PermissionManager {
     }
 
     #[must_use]
-    pub fn has_read_permission(&self, pub_key: &str, permissions_policy: &PermissionsPolicy, trust_distance: u32) -> bool {
+    pub fn has_read_permission(
+        &self,
+        pub_key: &str,
+        permissions_policy: &PermissionsPolicy,
+        trust_distance: u32,
+    ) -> bool {
         // Check trust distance first
         let trust_allowed = match permissions_policy.read_policy {
             TrustDistance::NoRequirement => {
                 eprintln!("No distance requirement for {pub_key}");
                 true
-            },
+            }
             TrustDistance::Distance(required_distance) => {
                 let allowed = trust_distance <= required_distance;
                 eprintln!("Trust distance check for {pub_key}: {trust_distance} <= {required_distance} = {allowed}");
@@ -47,13 +50,18 @@ impl PermissionManager {
     }
 
     #[must_use]
-    pub fn has_write_permission(&self, pub_key: &str, permissions_policy: &PermissionsPolicy, trust_distance: u32) -> bool {
+    pub fn has_write_permission(
+        &self,
+        pub_key: &str,
+        permissions_policy: &PermissionsPolicy,
+        trust_distance: u32,
+    ) -> bool {
         // Check trust distance first
         let trust_allowed = match permissions_policy.write_policy {
             TrustDistance::NoRequirement => {
                 eprintln!("No distance requirement for {pub_key}");
                 true
-            },
+            }
             TrustDistance::Distance(required_distance) => {
                 let allowed = trust_distance <= required_distance;
                 eprintln!("Trust distance check for {pub_key}: {trust_distance} <= {required_distance} = {allowed}");

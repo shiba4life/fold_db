@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-use crate::permissions::types::policy::PermissionsPolicy;
 use crate::fees::types::config::FieldPaymentConfig;
+use crate::permissions::types::policy::PermissionsPolicy;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SchemaField {
@@ -12,7 +12,11 @@ pub struct SchemaField {
 
 impl SchemaField {
     #[must_use]
-    pub const fn new(permission_policy: PermissionsPolicy, ref_atom_uuid: String, payment_config: FieldPaymentConfig) -> Self {
+    pub const fn new(
+        permission_policy: PermissionsPolicy,
+        ref_atom_uuid: String,
+        payment_config: FieldPaymentConfig,
+    ) -> Self {
         Self {
             permission_policy,
             ref_atom_uuid,

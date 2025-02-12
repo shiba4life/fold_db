@@ -1,24 +1,20 @@
-use fold_db::FoldDB;
-use fold_db::schema::Schema;
-use fold_db::schema::types::{Query, Mutation};
-use fold_db::schema::types::fields::SchemaField;
-use fold_db::permissions::types::policy::{PermissionsPolicy, ExplicitCounts, TrustDistance};
-use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
 use fold_db::fees::payment_config::SchemaPaymentConfig;
+use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
+use fold_db::permissions::types::policy::{ExplicitCounts, PermissionsPolicy, TrustDistance};
+use fold_db::schema::types::fields::SchemaField;
+use fold_db::schema::types::{Mutation, Query};
+use fold_db::schema::Schema;
+use fold_db::FoldDB;
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
 
 fn create_default_payment_config() -> FieldPaymentConfig {
-    FieldPaymentConfig::new(
-        1.0,
-        TrustDistanceScaling::None,
-        None,
-    ).unwrap()
+    FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
 }
 
 mod test_helpers;
-use test_helpers::{cleanup_test_db, get_test_db_path, cleanup_tmp_dir};
+use test_helpers::{cleanup_test_db, cleanup_tmp_dir, get_test_db_path};
 
 fn setup_test_db() -> (FoldDB, String) {
     let db_path = get_test_db_path();
@@ -40,12 +36,12 @@ mod tests {
 #[test]
 fn test_schema_operations() {
     let (mut db, db_path) = setup_test_db();
-    
+
     // Create test schema
     let mut fields = HashMap::new();
     let mut write_counts = HashMap::new();
     write_counts.insert("test_key".to_string(), 1);
-    
+
     fields.insert(
         "name".to_string(),
         SchemaField {
@@ -53,11 +49,13 @@ fn test_schema_operations() {
             permission_policy: PermissionsPolicy {
                 read_policy: TrustDistance::Distance(5),
                 write_policy: TrustDistance::Distance(0),
-                explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: write_counts }),
+                explicit_write_policy: Some(ExplicitCounts {
+                    counts_by_pub_key: write_counts,
+                }),
                 explicit_read_policy: None,
             },
             payment_config: create_default_payment_config(),
-        }
+        },
     );
 
     let schema = Schema {
@@ -70,7 +68,7 @@ fn test_schema_operations() {
     // Test schema loading
     assert!(db.load_schema(schema.clone()).is_ok());
     assert!(db.allow_schema("test_schema").is_ok());
-    
+
     // Test non-existent schema
     assert!(db.allow_schema("nonexistent").is_err());
 
@@ -80,25 +78,27 @@ fn test_schema_operations() {
 #[test]
 fn test_write_and_query() {
     let (mut db, db_path) = setup_test_db();
-    
+
     // Setup schema
     let field_uuid = Uuid::new_v4().to_string();
     let mut fields = HashMap::new();
     let mut write_counts = HashMap::new();
     write_counts.insert("test_key".to_string(), 1);
-    
+
     fields.insert(
         "test_field".to_string(),
         SchemaField {
             ref_atom_uuid: field_uuid.clone(),
             permission_policy: PermissionsPolicy {
-                read_policy: TrustDistance::Distance(5),  // Allow reads with trust distance up to 5
+                read_policy: TrustDistance::Distance(5), // Allow reads with trust distance up to 5
                 write_policy: TrustDistance::Distance(0),
-                explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: write_counts }),
+                explicit_write_policy: Some(ExplicitCounts {
+                    counts_by_pub_key: write_counts,
+                }),
                 explicit_read_policy: None,
             },
             payment_config: create_default_payment_config(),
-        }
+        },
     );
 
     let schema = Schema {
@@ -109,7 +109,8 @@ fn test_write_and_query() {
     };
 
     db.load_schema(schema).expect("Failed to load schema");
-    db.allow_schema("test_schema").expect("Failed to allow schema");
+    db.allow_schema("test_schema")
+        .expect("Failed to allow schema");
 
     // Test write
     let mutation = Mutation {
@@ -135,7 +136,7 @@ fn test_write_and_query() {
 
     let results = db.query_schema(query);
     assert_eq!(results.len(), 1);
-    
+
     let result = &results[0];
     assert!(result.is_ok());
     assert_eq!(result.as_ref().unwrap(), &json!("test_value"));
@@ -146,13 +147,13 @@ fn test_write_and_query() {
 #[test]
 fn test_atom_history() {
     let (mut db, db_path) = setup_test_db();
-    
+
     // Setup schema
     let field_uuid = Uuid::new_v4().to_string();
     let mut fields = HashMap::new();
     let mut write_counts = HashMap::new();
     write_counts.insert("test_key".to_string(), 1);
-    
+
     fields.insert(
         "version_field".to_string(),
         SchemaField {
@@ -160,11 +161,13 @@ fn test_atom_history() {
             permission_policy: PermissionsPolicy {
                 read_policy: TrustDistance::Distance(5),
                 write_policy: TrustDistance::Distance(0),
-                explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: write_counts }),
+                explicit_write_policy: Some(ExplicitCounts {
+                    counts_by_pub_key: write_counts,
+                }),
                 explicit_read_policy: None,
             },
             payment_config: create_default_payment_config(),
-        }
+        },
     );
 
     let schema = Schema {
@@ -175,7 +178,8 @@ fn test_atom_history() {
     };
 
     db.load_schema(schema).expect("Failed to load schema");
-    db.allow_schema("test_schema").expect("Failed to allow schema");
+    db.allow_schema("test_schema")
+        .expect("Failed to allow schema");
 
     use std::thread;
     use std::time::Duration;
@@ -208,9 +212,11 @@ fn test_atom_history() {
     assert_eq!(results[0].as_ref().unwrap(), &json!(3));
 
     // Get history
-    let history = db.get_atom_history(&field_uuid).expect("Failed to get history");
+    let history = db
+        .get_atom_history(&field_uuid)
+        .expect("Failed to get history");
     assert_eq!(history.len(), 3);
-    
+
     // Check versions are in reverse chronological order
     for (i, atom) in history.iter().enumerate() {
         let version = 3 - i;

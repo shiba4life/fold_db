@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use crate::schema::mapper::{MappingRule, SchemaMapper};
 use crate::schema::types::{Schema, SchemaError, SchemaField};
 use crate::schema_interpreter::types::{JsonSchemaDefinition, JsonSchemaField};
 use crate::schema_interpreter::validator::SchemaValidator;
-use crate::schema::mapper::{SchemaMapper, MappingRule};
+use std::collections::HashMap;
 
 /// Interprets JSON schema definitions and converts them to `FoldDB` schemas.
 #[derive(Default)]
@@ -16,13 +16,16 @@ impl SchemaInterpreter {
     }
 
     /// Interprets a JSON schema definition and converts it to a `FoldDB` schema.
-    /// 
+    ///
     /// # Errors
     /// Returns a `SchemaError` if:
     /// - The schema validation fails
     /// - Any required fields are missing
     /// - Field configurations are invalid
-    pub fn interpret(&self, json_schema: JsonSchemaDefinition) -> crate::schema_interpreter::Result<Schema> {
+    pub fn interpret(
+        &self,
+        json_schema: JsonSchemaDefinition,
+    ) -> crate::schema_interpreter::Result<Schema> {
         // First validate the JSON schema
         SchemaValidator::validate(&json_schema)?;
 
@@ -33,13 +36,19 @@ impl SchemaInterpreter {
         }
 
         // Convert schema mappers
-        let schema_mappers = json_schema.schema_mappers.into_iter()
+        let schema_mappers = json_schema
+            .schema_mappers
+            .into_iter()
             .flat_map(|mapper| {
                 mapper.source_schemas.into_iter().map(move |source| {
                     SchemaMapper::new(
                         source,
                         mapper.target_schema.clone(),
-                        mapper.rules.iter().map(|rule| MappingRule::from(rule.clone())).collect(),
+                        mapper
+                            .rules
+                            .iter()
+                            .map(|rule| MappingRule::from(rule.clone()))
+                            .collect(),
                     )
                 })
             })
@@ -64,7 +73,7 @@ impl SchemaInterpreter {
     }
 
     /// Interprets a JSON schema from a string.
-    /// 
+    ///
     /// # Errors
     /// Returns a `SchemaError` if:
     /// - The JSON string is invalid
@@ -78,7 +87,7 @@ impl SchemaInterpreter {
     }
 
     /// Interprets a JSON schema from a file.
-    /// 
+    ///
     /// # Errors
     /// Returns a `SchemaError` if:
     /// - The file cannot be read
@@ -96,9 +105,11 @@ impl SchemaInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::permissions::types::policy::TrustDistance;
     use crate::fees::types::config::TrustDistanceScaling;
-    use crate::schema_interpreter::types::{JsonPermissionPolicy, JsonFieldPaymentConfig, JsonMappingRule, JsonSchemaMapper};
+    use crate::permissions::types::policy::TrustDistance;
+    use crate::schema_interpreter::types::{
+        JsonFieldPaymentConfig, JsonMappingRule, JsonPermissionPolicy, JsonSchemaMapper,
+    };
 
     fn create_test_json_schema(with_mapper: bool) -> JsonSchemaDefinition {
         let mut fields = HashMap::new();
@@ -119,7 +130,7 @@ mod tests {
                 },
             },
         );
-        
+
         // Add fields that will be mapped
         fields.insert(
             "old_field".to_string(),
@@ -138,7 +149,7 @@ mod tests {
                 },
             },
         );
-        
+
         fields.insert(
             "new_field".to_string(),
             JsonSchemaField {
@@ -161,13 +172,11 @@ mod tests {
             vec![JsonSchemaMapper {
                 source_schemas: vec!["source_schema".to_string()],
                 target_schema: "target_schema".to_string(),
-                rules: vec![
-                    JsonMappingRule::Map {
-                        source_field: "old_field".to_string(),
-                        target_field: "new_field".to_string(),
-                        function: Some("to_lowercase".to_string()),
-                    }
-                ],
+                rules: vec![JsonMappingRule::Map {
+                    source_field: "old_field".to_string(),
+                    target_field: "new_field".to_string(),
+                    function: Some("to_lowercase".to_string()),
+                }],
             }]
         } else {
             vec![]
@@ -206,7 +215,6 @@ mod tests {
 
     #[test]
     fn test_field_conversion() {
-        let interpreter = SchemaInterpreter::new();
         let json_field = JsonSchemaField {
             permission_policy: JsonPermissionPolicy {
                 read: TrustDistance::NoRequirement,
@@ -235,18 +243,22 @@ mod tests {
 
         let schema = result.unwrap();
         assert_eq!(schema.schema_mappers.len(), 1);
-        
+
         let mapper = &schema.schema_mappers[0];
         assert_eq!(mapper.source_schema_name, "source_schema");
         assert_eq!(mapper.target_schema_name, "target_schema");
         assert_eq!(mapper.rules.len(), 1);
 
         match &mapper.rules[0] {
-            MappingRule::Map { source_field, target_field, function } => {
+            MappingRule::Map {
+                source_field,
+                target_field,
+                function,
+            } => {
                 assert_eq!(source_field, "old_field");
                 assert_eq!(target_field, "new_field");
                 assert_eq!(function, &Some("to_lowercase".to_string()));
-            },
+            }
             _ => panic!("Expected Map rule"),
         }
     }

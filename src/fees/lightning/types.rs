@@ -29,7 +29,7 @@ pub struct NodeInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Channel {
-    pub id: String,  // Renamed from channel_id to avoid struct name repetition
+    pub id: String, // Renamed from channel_id to avoid struct name repetition
     pub capacity: u64,
     pub local_balance: u64,
     pub remote_balance: u64,
