@@ -1,11 +1,9 @@
 use fold_db::{
     DataFoldNode,
     NodeConfig,
-    schema::{Schema, Query, Mutation},
+    schema::Schema,
 };
-use std::path::PathBuf;
 use std::fs;
-use serde_json::Value;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -33,6 +31,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
-    
-    Ok(())
 }

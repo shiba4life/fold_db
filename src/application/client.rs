@@ -1,23 +1,102 @@
+//! Client implementation for communicating with a DataFold node.
+//! 
+//! This module provides the client-side interface for interacting with a DataFold node
+//! through Unix Domain Sockets. It handles:
+//! - Connection management
+//! - Request/response serialization
+//! - Authentication
+//! - Timeout handling
+//! 
+//! # Example
+//! ```no_run
+//! use fold_db::{DataFoldClient, ClientConfig};
+//! use std::path::PathBuf;
+//! use std::time::Duration;
+//! 
+//! let config = ClientConfig {
+//!     socket_path: PathBuf::from("/tmp/folddb.sock"),
+//!     timeout: Duration::from_secs(5),
+//! };
+//! 
+//! let client = DataFoldClient::new(config);
+//! 
+//! // Execute a query
+//! let result: serde_json::Value = client.query(serde_json::json!({
+//!     "schema": "users",
+//!     "filter": { "age": { "gt": 21 } }
+//! })).expect("Query failed");
+//! ```
+
 use super::types::{ApiRequest, ApiResponse, AuthContext, ClientError, OperationType};
 use super::ClientConfig;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::os::unix::net::UnixStream;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, Write};
 use uuid::Uuid;
 
-/// Client for communicating with DataFold Node via Unix Domain Socket
+/// A client for communicating with a DataFold node via Unix Domain Socket.
+/// 
+/// The client provides a high-level interface for:
+/// - Executing queries
+/// - Performing mutations
+/// - Retrieving schema information
+/// - Managing authentication
 pub struct DataFoldClient {
     config: ClientConfig,
 }
 
 impl DataFoldClient {
-    /// Create a new client with the given configuration
+    /// Creates a new client with the given configuration.
+    /// 
+    /// # Arguments
+    /// * `config` - Client configuration including socket path and timeout settings
+    /// 
+    /// # Example
+    /// ```no_run
+    /// use fold_db::{DataFoldClient, ClientConfig};
+    /// use std::path::PathBuf;
+    /// use std::time::Duration;
+    /// 
+    /// let config = ClientConfig {
+    ///     socket_path: PathBuf::from("/tmp/folddb.sock"),
+    ///     timeout: Duration::from_secs(5),
+    /// };
+    /// 
+    /// let client = DataFoldClient::new(config);
+    /// ```
     pub fn new(config: ClientConfig) -> Self {
         Self { config }
     }
 
-    /// Execute a query operation
+    /// Executes a query operation against the database.
+    /// 
+    /// # Type Parameters
+    /// * `T` - The expected return type that can be deserialized from JSON
+    /// 
+    /// # Arguments
+    /// * `query` - The query to execute, must be serializable to JSON
+    /// 
+    /// # Returns
+    /// * `Result<T, ClientError>` - The query results or an error
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use fold_db::{DataFoldClient, ClientConfig};
+    /// # use std::path::PathBuf;
+    /// # use std::time::Duration;
+    /// # let client = DataFoldClient::new(ClientConfig {
+    /// #     socket_path: PathBuf::from("/tmp/folddb.sock"),
+    /// #     timeout: Duration::from_secs(5),
+    /// # });
+    /// let query = serde_json::json!({
+    ///     "schema": "users",
+    ///     "filter": { "age": { "gt": 21 } }
+    /// });
+    /// 
+    /// let results: Vec<serde_json::Value> = client.query(query)
+    ///     .expect("Query failed");
+    /// ```
     pub fn query<T: DeserializeOwned>(&self, query: impl Serialize) -> Result<T, ClientError> {
         let request = ApiRequest {
             request_id: Uuid::new_v4().to_string(),
@@ -29,7 +108,38 @@ impl DataFoldClient {
         self.execute_request(request)
     }
 
-    /// Execute a mutation operation
+    /// Executes a mutation operation on the database.
+    /// 
+    /// # Type Parameters
+    /// * `T` - The expected return type that can be deserialized from JSON
+    /// 
+    /// # Arguments
+    /// * `mutation` - The mutation to execute, must be serializable to JSON
+    /// 
+    /// # Returns
+    /// * `Result<T, ClientError>` - The mutation result or an error
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use fold_db::{DataFoldClient, ClientConfig};
+    /// # use std::path::PathBuf;
+    /// # use std::time::Duration;
+    /// # let client = DataFoldClient::new(ClientConfig {
+    /// #     socket_path: PathBuf::from("/tmp/folddb.sock"),
+    /// #     timeout: Duration::from_secs(5),
+    /// # });
+    /// let mutation = serde_json::json!({
+    ///     "schema": "users",
+    ///     "operation": "create",
+    ///     "data": {
+    ///         "name": "Alice",
+    ///         "age": 30
+    ///     }
+    /// });
+    /// 
+    /// let result: serde_json::Value = client.mutate(mutation)
+    ///     .expect("Mutation failed");
+    /// ```
     pub fn mutate<T: DeserializeOwned>(&self, mutation: impl Serialize) -> Result<T, ClientError> {
         let request = ApiRequest {
             request_id: Uuid::new_v4().to_string(),
@@ -41,7 +151,26 @@ impl DataFoldClient {
         self.execute_request(request)
     }
 
-    /// Get schema by ID
+    /// Retrieves a schema definition by its ID.
+    /// 
+    /// # Arguments
+    /// * `schema_id` - The unique identifier of the schema to retrieve
+    /// 
+    /// # Returns
+    /// * `Result<serde_json::Value, ClientError>` - The schema definition or an error
+    /// 
+    /// # Example
+    /// ```no_run
+    /// # use fold_db::{DataFoldClient, ClientConfig};
+    /// # use std::path::PathBuf;
+    /// # use std::time::Duration;
+    /// # let client = DataFoldClient::new(ClientConfig {
+    /// #     socket_path: PathBuf::from("/tmp/folddb.sock"),
+    /// #     timeout: Duration::from_secs(5),
+    /// # });
+    /// let schema = client.get_schema("users")
+    ///     .expect("Failed to retrieve schema");
+    /// ```
     pub fn get_schema(&self, schema_id: &str) -> Result<serde_json::Value, ClientError> {
         let request = ApiRequest {
             request_id: Uuid::new_v4().to_string(),
@@ -53,7 +182,24 @@ impl DataFoldClient {
         self.execute_request(request)
     }
 
-    /// Execute a request and parse the response
+    /// Executes a request and parses the response.
+    /// 
+    /// This is an internal method used by the public interface methods.
+    /// It handles the low-level details of:
+    /// - Establishing socket connection
+    /// - Setting timeouts
+    /// - Sending request data
+    /// - Reading response
+    /// - Parsing and error handling
+    /// 
+    /// # Type Parameters
+    /// * `T` - The expected return type that can be deserialized from JSON
+    /// 
+    /// # Arguments
+    /// * `request` - The API request to execute
+    /// 
+    /// # Returns
+    /// * `Result<T, ClientError>` - The parsed response or an error
     fn execute_request<T: DeserializeOwned>(&self, request: ApiRequest) -> Result<T, ClientError> {
         let stream = UnixStream::connect(&self.config.socket_path)
             .map_err(ClientError::ConnectionFailed)?;
@@ -97,7 +243,13 @@ impl DataFoldClient {
         }
     }
 
-    /// Get authentication context for requests
+    /// Retrieves the authentication context for requests.
+    /// 
+    /// Currently returns a placeholder key. This will be replaced with
+    /// proper key management in the future.
+    /// 
+    /// # Returns
+    /// * `Result<AuthContext, ClientError>` - The auth context or an error
     fn get_auth_context(&self) -> Result<AuthContext, ClientError> {
         // TODO: Implement proper key management
         // For now, return a placeholder public key

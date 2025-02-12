@@ -7,7 +7,7 @@ use std::fs;
 use std::thread;
 use std::sync::{Arc, Mutex};
 use crate::datafold_node::DataFoldNode;
-use serde_json::{json, Value};
+use serde_json::Value;
 
 /// Server that handles Unix Domain Socket connections
 pub struct SocketServer {
