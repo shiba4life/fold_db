@@ -33,7 +33,7 @@ pub enum OperationType {
 }
 
 /// Status of the API response
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponseStatus {
     Success,
