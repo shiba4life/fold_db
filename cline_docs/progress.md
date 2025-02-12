@@ -7,30 +7,54 @@
 - Atom and AtomRef implementation
 - Version history tracking
 - DataFold Node implementation
-- Example workflow tests for DataFold Node
+- Schema interpreter implementation
+- JSON schema definition format
+- Schema transformation system
+- Lightning Network payment integration
+- Payment calculation system
+- Hold invoice support
+- Permission check wrapper implementation
+  - [x] Create wrapper module
+  - [x] Implement query wrapper
+  - [x] Implement mutation wrapper
+  - [x] Update FoldDB implementation
+  - [x] Add tests
 
 ## In Progress
-- Permission check wrapper implementation
-  - [ ] Create wrapper module
-  - [ ] Implement query wrapper
-  - [ ] Implement mutation wrapper
-  - [ ] Update FoldDB implementation
-  - [ ] Add tests
+- Payment system optimizations:
+  - [ ] Payment caching
+  - [ ] State management optimization
+  - [ ] Concurrent payment processing
+  - [ ] Invoice aggregation
+  - [ ] Channel rebalancing
 
 ## Upcoming Work
-- Enhance permission system with wrapper
 - Improve error handling
 - Add more comprehensive testing
 - Documentation updates
+- Schema system enhancements:
+  - [ ] Advanced transformation rules
+  - [ ] Schema versioning
+  - [ ] Migration tools
 
 ## Known Issues
-- Permission checks are scattered in FoldDB implementation
-- Need centralized permission management
-- Query and mutation operations need consistent permission handling
+- Payment state persistence needs improvement
+- Lightning node failover handling needs enhancement
 
 ## Project Status
 - Core functionality: Complete
-- Permission System: In Progress
+- Permission System: Complete
+- Schema System: Complete
+- Payment System: Complete (Basic)
 - Testing: Partial
 - Documentation: In Progress
 - DataFold Node: Complete
+
+## Recent Additions
+- Added Lightning Network payment integration
+- Implemented schema interpreter
+- Added JSON schema definition format
+- Added schema transformation system
+- Implemented payment calculation with trust distance scaling
+- Added hold invoice support for complex operations
+- Completed permission wrapper implementation with centralized checks
