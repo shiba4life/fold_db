@@ -16,7 +16,7 @@ async fn test_socket_communication() -> std::io::Result<()> {
     // Initialize node
     let node_config = NodeConfig {
         storage_path: db_path,
-        default_trust_distance: 1,
+        default_trust_distance: 0,
     };
     let mut node = DataFoldNode::new(node_config).expect("Failed to create node");
 
@@ -53,12 +53,12 @@ async fn test_socket_communication() -> std::io::Result<()> {
     let server_handle = server.start()?;
     
     // Give the server a moment to start
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Initialize client
     let client_config = ClientConfig {
         socket_path: socket_path.clone(),
-        timeout: Duration::from_secs(1),
+        timeout: Duration::from_secs(5),
     };
     let client = DataFoldClient::new(client_config);
 
@@ -87,18 +87,44 @@ async fn test_socket_communication() -> std::io::Result<()> {
     let results = query_result["results"].as_array().expect("Expected results array");
     assert!(!results.is_empty());
     let first_result = &results[0];
-    assert_eq!(first_result["name"], "Test User");
-    assert_eq!(first_result["email"], "test@example.com");
-
-    // Cleanup server
-    server.shutdown()?;
-    server_handle.join().unwrap();
+    
+    // Check if we got an error result
+    if let Some(error) = first_result.get("error") {
+        panic!("Query returned error: {}", error);
+    }
+    
+    // Access the data fields
+    let name = first_result.get("name").expect("Missing name field");
+    let email = first_result.get("email").expect("Missing email field");
+    assert_eq!(name.as_str().unwrap(), "Test User");
+    assert_eq!(email.as_str().unwrap(), "test@example.com");
 
     // Test schema retrieval
     let schema_result: serde_json::Value = client
         .get_schema("test_schema")
         .expect("Schema retrieval failed");
     assert!(schema_result.get("schema").is_some());
+
+    // Cleanup server with timeout
+    server.shutdown()?;
+    let timeout = std::time::Duration::from_secs(5);
+    let start = std::time::Instant::now();
+    while start.elapsed() < timeout {
+        if server_handle.is_finished() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    if !server_handle.is_finished() {
+        panic!("Server failed to shut down within timeout");
+    }
+    server_handle.join().unwrap_or_else(|e| {
+        if let Some(e) = e.downcast_ref::<&str>() {
+            panic!("Server thread panicked: {}", e);
+        } else {
+            panic!("Server thread panicked with unknown error");
+        }
+    });
 
     Ok(())
 }

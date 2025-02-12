@@ -7,7 +7,7 @@ use std::fs;
 use std::thread;
 use std::sync::{Arc, Mutex};
 use crate::datafold_node::DataFoldNode;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 /// Server that handles Unix Domain Socket connections
 pub struct SocketServer {
@@ -50,25 +50,35 @@ impl SocketServer {
 
         // Handle connections in a separate thread
         let handle = thread::spawn(move || {
-            while !*shutdown.lock().unwrap() {
-                // Set non-blocking mode for the listener
-                listener.set_nonblocking(true).expect("Failed to set non-blocking mode");
-                
+            loop {
+                // Check shutdown flag first
+                if *shutdown.lock().unwrap() {
+                    break;
+                }
+
+                // Set non-blocking mode for accept
+                if let Err(e) = listener.set_nonblocking(true) {
+                    eprintln!("Failed to set non-blocking mode: {}", e);
+                    break;
+                }
+
                 match listener.accept() {
                     Ok((stream, _)) => {
                         let node = Arc::clone(&node);
-                        thread::spawn(move || {
-                            if let Err(e) = handle_connection(stream, node, buffer_size) {
-                                eprintln!("Error handling connection: {}", e);
-                            }
-                        });
+                        // Handle connection in current thread to ensure proper request processing
+                        if let Err(e) = handle_connection(stream, node, buffer_size) {
+                            eprintln!("Error handling connection: {}", e);
+                        }
                     }
                     Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        // No connection available, sleep briefly before checking again
-                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        // No connection available, sleep briefly before checking shutdown flag again
+                        std::thread::sleep(std::time::Duration::from_millis(10));
                         continue;
                     }
-                    Err(e) => eprintln!("Error accepting connection: {}", e),
+                    Err(e) => {
+                        eprintln!("Error accepting connection: {}", e);
+                        break;
+                    }
                 }
             }
         });
@@ -78,15 +88,17 @@ impl SocketServer {
 
     /// Shutdown the server gracefully
     pub fn shutdown(&self) -> std::io::Result<()> {
-        // Set shutdown flag
-        let mut shutdown = self.shutdown.lock().unwrap();
-        *shutdown = true;
-        
-        // Clean up socket file
+        // Set shutdown flag first
+        {
+            let mut shutdown = self.shutdown.lock().unwrap();
+            *shutdown = true;
+        }
+
+        // Clean up socket file to prevent new connections
         if Path::new(&self.config.socket_path).exists() {
             fs::remove_file(&self.config.socket_path)?;
         }
-        
+
         Ok(())
     }
 }
@@ -104,34 +116,38 @@ fn handle_connection(
     node: Arc<Mutex<DataFoldNode>>,
     buffer_size: usize,
 ) -> std::io::Result<()> {
-    let mut reader = BufReader::with_capacity(buffer_size, stream.try_clone()?);
-    let mut writer = stream;
-    let mut request_data = String::new();
+    // Use a scope to ensure streams are properly dropped
+    {
+        let mut reader = BufReader::with_capacity(buffer_size, stream.try_clone()?);
+        let mut writer = stream;
+        let mut request_data = String::new();
 
-    // Read request
-    reader.read_line(&mut request_data)?;
+        // Read request with a newline delimiter
+        reader.read_line(&mut request_data)?;
+        request_data = request_data.trim().to_string();
 
-    // Parse request
-    let request: ApiRequest = match serde_json::from_str(&request_data) {
-        Ok(req) => req,
-        Err(e) => {
-            let response = ApiResponse {
-                request_id: String::new(),
-                status: ResponseStatus::Error,
-                data: None,
-                error: Some(ErrorDetails {
-                    code: "PARSE_ERROR".into(),
-                    message: e.to_string(),
-                }),
-            };
-            send_response(&mut writer, response)?;
-            return Ok(());
-        }
-    };
+        // Parse request
+        let request: ApiRequest = match serde_json::from_str(&request_data) {
+            Ok(req) => req,
+            Err(e) => {
+                let response = ApiResponse {
+                    request_id: String::new(),
+                    status: ResponseStatus::Error,
+                    data: None,
+                    error: Some(ErrorDetails {
+                        code: "PARSE_ERROR".into(),
+                        message: e.to_string(),
+                    }),
+                };
+                send_response(&mut writer, response)?;
+                return Ok(());
+            }
+        };
 
-    // Process request
-    let response = process_request(request, &node);
-    send_response(&mut writer, response)?;
+        // Process request
+        let response = process_request(request, &node);
+        send_response(&mut writer, response)?;
+    }
 
     Ok(())
 }
@@ -217,8 +233,8 @@ fn process_request(request: ApiRequest, node: &Arc<Mutex<DataFoldNode>>) -> ApiR
 
 /// Send an API response
 fn send_response(writer: &mut impl Write, response: ApiResponse) -> std::io::Result<()> {
-    let response_json = serde_json::to_vec(&response)?;
-    writer.write_all(&response_json)?;
+    let response_json = serde_json::to_string(&response)?;
+    writer.write_all(response_json.as_bytes())?;
     writer.write_all(b"\n")?;
     writer.flush()?;
     Ok(())
@@ -243,6 +259,12 @@ fn handle_query(payload: serde_json::Value, node: &Arc<Mutex<DataFoldNode>>) -> 
         .filter_map(|v| v.as_str().map(String::from))
         .collect();
 
+    let node_guard = node.lock()
+        .map_err(|_| "Failed to acquire lock for query".to_string())?;
+    
+    // Clone fields for later use
+    let field_names = fields.clone();
+    
     let query = Query::new(
         schema.to_string(),
         fields,
@@ -250,23 +272,29 @@ fn handle_query(payload: serde_json::Value, node: &Arc<Mutex<DataFoldNode>>) -> 
             .as_str()
             .unwrap_or("default")
             .to_string(),
-        0, // Use node's default trust distance
+        0, // Use 0 to let node apply its default trust distance
     );
 
-    let node = node.lock()
-        .map_err(|_| "Failed to acquire lock for query".to_string())?;
-    
-    let results = node.query(query)
+    let results = node_guard.query(query)
         .map_err(|e| e.to_string())?;
     
-    // Convert results to JSON
-    let result_values: Vec<serde_json::Value> = results
-        .into_iter()
-        .filter_map(|r| r.ok())
-        .collect();
+    // Combine field results into a single object
+    let mut combined_result = serde_json::Map::new();
+    
+    // Zip the field names with their results
+    for (field, result) in field_names.iter().zip(results.into_iter()) {
+        match result {
+            Ok(value) => {
+                combined_result.insert(field.clone(), value);
+            },
+            Err(e) => {
+                return Err(format!("Error getting field {}: {}", field, e));
+            }
+        }
+    }
 
     Ok(serde_json::json!({
-        "results": result_values
+        "results": [combined_result]
     }))
 }
 
@@ -283,6 +311,10 @@ fn handle_mutation(payload: serde_json::Value, node: &Arc<Mutex<DataFoldNode>>) 
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
 
+    // Get lock on node for mutation
+    let mut node_guard = node.lock()
+        .map_err(|_| "Failed to acquire lock for mutation".to_string())?;
+    
     let mutation = Mutation::new(
         schema.to_string(),
         fields_and_values,
@@ -290,14 +322,10 @@ fn handle_mutation(payload: serde_json::Value, node: &Arc<Mutex<DataFoldNode>>) 
             .as_str()
             .unwrap_or("default")
             .to_string(),
-        0, // Use node's default trust distance
+        0, // Use 0 to let node apply its default trust distance
     );
-
-    // Get lock on node for mutation
-    let mut node = node.lock()
-        .map_err(|_| "Failed to acquire lock for mutation".to_string())?;
     
-    node.mutate(mutation)
+    node_guard.mutate(mutation)
         .map_err(|e| e.to_string())?;
     
     Ok(serde_json::json!({

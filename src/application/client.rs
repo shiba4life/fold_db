@@ -55,22 +55,29 @@ impl DataFoldClient {
 
     /// Execute a request and parse the response
     fn execute_request<T: DeserializeOwned>(&self, request: ApiRequest) -> Result<T, ClientError> {
-        let mut stream = UnixStream::connect(&self.config.socket_path)
+        let stream = UnixStream::connect(&self.config.socket_path)
             .map_err(ClientError::ConnectionFailed)?;
         
         // Set read/write timeouts
         stream.set_read_timeout(Some(self.config.timeout))?;
         stream.set_write_timeout(Some(self.config.timeout))?;
 
-        // Send request
-        let request_json = serde_json::to_vec(&request)?;
-        stream.write_all(&request_json)?;
-        stream.write_all(b"\n")?;
-
-        // Read response using BufReader to handle line endings
+        // Split stream into reader and writer
+        let mut writer = stream.try_clone()?;
         let mut reader = std::io::BufReader::new(stream);
+
+        // Send request in a new scope so writer is dropped after sending
+        {
+            let request_json = serde_json::to_string(&request)?;
+            writer.write_all(request_json.as_bytes())?;
+            writer.write_all(b"\n")?;
+            writer.flush()?;
+        }
+
+        // Read response
         let mut response_data = String::new();
         reader.read_line(&mut response_data)?;
+        response_data = response_data.trim().to_string();
 
         let response: ApiResponse = serde_json::from_str(&response_data)?;
 
