@@ -30,7 +30,7 @@ fn test_schema_mapping_and_data_propagation() {
     source_fields.insert(
         "user_name".to_string(),
         create_field_with_permissions(
-            format!("lowercase:{}", source_field_uuid),
+            source_field_uuid.clone(), // Share the same atom UUID
             1,                        // read distance
             0,                        // write distance
             None,                     // explicit read keys
@@ -150,7 +150,7 @@ fn test_schema_mapping_with_dsl_map() {
     let source_mutation = create_single_field_mutation(
         "source_schema".to_string(),
         "user_email".to_string(),
-        json!("Test.User@Example.com"),
+        json!("test.user@example.com"),
         test_key.clone(),
         1,
     );

@@ -114,7 +114,6 @@ fn test_schema_manager_apply_mapping_map() {
         vec![MappingRule::Map {
             source_field: "source_field".to_string(),
             target_field: "target_field".to_string(),
-            function: Some("to_lowercase".to_string()),
         }],
     );
     target_schema.add_schema_mapper(mapper);
@@ -134,7 +133,7 @@ fn test_schema_manager_apply_mapping_map() {
             .get("target_field")
             .unwrap()
             .ref_atom_uuid,
-        Some("lowercase:test-uuid-1".to_string())
+        Some("test-uuid-1".to_string())
     );
 }
 
@@ -149,7 +148,6 @@ fn test_schema_manager_apply_mapping_missing_schema() {
         vec![MappingRule::Map {
             source_field: "source_field".to_string(),
             target_field: "target_field".to_string(),
-            function: None,
         }],
     );
     source_schema.add_schema_mapper(mapper);
@@ -173,7 +171,6 @@ fn test_schema_manager_apply_mapping_invalid_field() {
         vec![MappingRule::Map {
             source_field: "non_existent_field".to_string(),
             target_field: "target_field".to_string(),
-            function: None,
         }],
     );
     source_schema.add_schema_mapper(mapper);
@@ -233,12 +230,10 @@ fn test_schema_mapper_validation() {
             MappingRule::Map {
                 source_field: "field1".to_string(),
                 target_field: "field1".to_string(),
-                function: None,
             },
             MappingRule::Map {
                 source_field: "field1".to_string(),
                 target_field: "field1".to_string(),
-                function: None,
             },
         ],
     );
@@ -282,7 +277,6 @@ fn test_schema_mapper_multiple_rules() {
             MappingRule::Map {
                 source_field: "field1".to_string(),
                 target_field: "field1".to_string(),
-                function: None,
             },
             MappingRule::Rename {
                 source_field: "old_name".to_string(),
@@ -330,7 +324,6 @@ fn test_schema_mapper_conflicting_rules() {
             MappingRule::Map {
                 source_field: "field1".to_string(),
                 target_field: "field1".to_string(),
-                function: None,
             },
             MappingRule::Drop {
                 field: "field1".to_string(),
@@ -364,7 +357,6 @@ fn test_schema_mapper_management() {
         vec![MappingRule::Map {
             source_field: "old_name".to_string(),
             target_field: "new_name".to_string(),
-            function: None,
         }],
     );
 

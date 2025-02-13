@@ -1,8 +1,6 @@
 use fold_db::fees::types::config::TrustDistanceScaling;
-use fold_db::permissions::types::policy::{ExplicitCounts, TrustDistance};
-use fold_db::schema::types::Schema;
+use fold_db::permissions::types::policy::TrustDistance;
 use fold_db::schema_interpreter::SchemaInterpreter;
-use std::collections::HashMap;
 
 #[test]
 fn test_interpret_user_profile_schema() {
@@ -11,14 +9,14 @@ fn test_interpret_user_profile_schema() {
         "fields": {
             "username": {
                 "permission_policy": {
-                    "read_policy": {
+                    "read": {
                         "NoRequirement": null
                     },
-                    "write_policy": {
+                    "write": {
                         "Distance": 0
                     },
-                    "explicit_read_policy": null,
-                    "explicit_write_policy": null
+                    "explicit_read": null,
+                    "explicit_write": null
                 },
                 "ref_atom_uuid": "username_atom_123",
                 "payment_config": {
@@ -31,18 +29,18 @@ fn test_interpret_user_profile_schema() {
             },
             "email": {
                 "permission_policy": {
-                    "read_policy": {
+                    "read": {
                         "Distance": 1
                     },
-                    "write_policy": {
+                    "write": {
                         "Distance": 0
                     },
-                    "explicit_read_policy": {
+                    "explicit_read": {
                         "counts_by_pub_key": {
                             "trusted_service_key": 1
                         }
                     },
-                    "explicit_write_policy": null
+                    "explicit_write": null
                 },
                 "ref_atom_uuid": "email_atom_456",
                 "payment_config": {
@@ -64,15 +62,16 @@ fn test_interpret_user_profile_schema() {
                 "target_schema": "UserProfile",
                 "rules": [
                     {
-                        "rule": "rename",
-                        "source_field": "user_name",
-                        "target_field": "username"
+                        "Rename": {
+                            "source_field": "user_name",
+                            "target_field": "username"
+                        }
                     },
                     {
-                        "rule": "map",
-                        "source_field": "email_address",
-                        "target_field": "email",
-                        "function": "to_lowercase"
+                        "Map": {
+                            "source_field": "email_address",
+                            "target_field": "email"
+                        }
                     }
                 ]
             }
@@ -164,14 +163,14 @@ fn test_invalid_schema_validation() {
         "fields": {
             "field1": {
                 "permission_policy": {
-                    "read_policy": {
+                    "read": {
                         "Distance": -1
                     },
-                    "write_policy": {
+                    "write": {
                         "Distance": 0
                     },
-                    "explicit_read_policy": null,
-                    "explicit_write_policy": null
+                    "explicit_read": null,
+                    "explicit_write": null
                 },
                 "ref_atom_uuid": "field1_atom",
                 "payment_config": {
