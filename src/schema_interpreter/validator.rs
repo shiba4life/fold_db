@@ -265,7 +265,6 @@ mod tests {
                 JsonMappingRule::Map {
                     source_field: "field".to_string(),
                     target_field: "new_field".to_string(),
-                    function: None,
                 },
                 JsonMappingRule::Rename {
                     source_field: "field".to_string(), // Duplicate mapping

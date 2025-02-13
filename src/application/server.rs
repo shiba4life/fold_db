@@ -378,12 +378,8 @@ fn handle_get_schema(payload: serde_json::Value, node: &Arc<Mutex<DataFoldNode>>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use tempfile::tempdir;
-    use crate::schema::types::{Query, Mutation, Schema};
-    use crate::schema::SchemaError;
-    use crate::datafold_node::{NodeError, NodeResult};
-    use std::collections::HashMap;
+    use crate::schema::types::Schema;
 
     // Mock DataFoldNode for testing
     struct MockNode {
@@ -431,9 +427,8 @@ mod tests {
         );
         let field = crate::schema::types::fields::SchemaField::new(
             policy,
-            "test_field_uuid".to_string(),
             crate::fees::types::config::FieldPaymentConfig::default(),
-        );
+        ).with_ref_atom_uuid("test_field_ref".to_string());
         schema.add_field("test_field".to_string(), field);
         node.load_schema(schema).expect("Failed to create schema");
 
@@ -479,9 +474,8 @@ mod tests {
         );
         let field = crate::schema::types::fields::SchemaField::new(
             policy,
-            "test_field_uuid".to_string(),
             crate::fees::types::config::FieldPaymentConfig::default(),
-        );
+        ).with_ref_atom_uuid("test_field_ref".to_string());
         schema.add_field("test_field".to_string(), field);
         node.load_schema(schema).expect("Failed to create schema");
 

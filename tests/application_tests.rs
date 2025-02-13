@@ -28,17 +28,15 @@ async fn test_socket_communication() -> std::io::Result<()> {
         "name".to_string(),
         SchemaField::new(
             PermissionsPolicy::default(),
-            "name_ref".to_string(),
             FieldPaymentConfig::default(),
-        )
+        ).with_ref_atom_uuid("name_ref".to_string())
     );
     test_schema.add_field(
         "email".to_string(),
         SchemaField::new(
             PermissionsPolicy::default(),
-            "email_ref".to_string(),
             FieldPaymentConfig::default(),
-        )
+        ).with_ref_atom_uuid("email_ref".to_string())
     );
 
     node.load_schema(test_schema).expect("Failed to load schema");

@@ -15,32 +15,29 @@ fn test_schema_manager_apply_mapping_rename() {
 
     // Create source schema
     let mut source_schema = Schema::new("source_schema".to_string());
-    let source_field = SchemaField {
-        ref_atom_uuid: "test-uuid-1".to_string(),
-        permission_policy: PermissionsPolicy::default(),
-        payment_config: create_default_payment_config(),
-    };
+    let source_field = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+    ).with_ref_atom_uuid("test-uuid".to_string());
     source_schema.add_field("old_name".to_string(), source_field);
 
     // Create target schema
     let mut target_schema = Schema::new("target_schema".to_string());
-    let target_field = SchemaField {
-        ref_atom_uuid: "test-uuid-2".to_string(),
-        permission_policy: PermissionsPolicy::default(),
-        payment_config: create_default_payment_config(),
-    };
+    let target_field = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+    );
     target_schema.add_field("new_name".to_string(), target_field);
 
     // Add mapper to source schema
     let mapper = SchemaMapper::new(
         "source_schema".to_string(),
-        "target_schema".to_string(),
         vec![MappingRule::Rename {
             source_field: "old_name".to_string(),
             target_field: "new_name".to_string(),
         }],
     );
-    source_schema.add_schema_mapper(mapper);
+    target_schema.add_schema_mapper(mapper);
 
     // Load schemas
     manager.load_schema(source_schema.clone()).unwrap();
@@ -53,7 +50,7 @@ fn test_schema_manager_apply_mapping_rename() {
     let updated_target = manager.get_schema("target_schema").unwrap().unwrap();
     assert_eq!(
         updated_target.fields.get("new_name").unwrap().ref_atom_uuid,
-        "test-uuid-1"
+        Some("test-uuid".to_string())
     );
 }
 
@@ -65,7 +62,6 @@ fn test_schema_manager_apply_mapping_drop() {
     let mut source_schema = Schema::new("source_schema".to_string());
     let mapper = SchemaMapper::new(
         "source_schema".to_string(),
-        "target_schema".to_string(),
         vec![MappingRule::Drop {
             field: "to_drop".to_string(),
         }],
@@ -74,11 +70,10 @@ fn test_schema_manager_apply_mapping_drop() {
 
     // Create target schema with field to drop
     let mut target_schema = Schema::new("target_schema".to_string());
-    let field = SchemaField {
-        ref_atom_uuid: "test-uuid".to_string(),
-        permission_policy: PermissionsPolicy::default(),
-        payment_config: create_default_payment_config(),
-    };
+    let field = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+    ).with_ref_atom_uuid("test-uuid".to_string());
     target_schema.add_field("to_drop".to_string(), field);
 
     // Load schemas
@@ -99,40 +94,37 @@ fn test_schema_manager_apply_mapping_map() {
 
     // Create source schema
     let mut source_schema = Schema::new("source_schema".to_string());
-    let source_field = SchemaField {
-        ref_atom_uuid: "test-uuid-1".to_string(),
-        permission_policy: PermissionsPolicy::default(),
-        payment_config: create_default_payment_config(),
-    };
+    let source_field = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+    ).with_ref_atom_uuid("test-uuid-1".to_string());
     source_schema.add_field("source_field".to_string(), source_field);
 
     // Create target schema
     let mut target_schema = Schema::new("target_schema".to_string());
-    let target_field = SchemaField {
-        ref_atom_uuid: "test-uuid-2".to_string(),
-        permission_policy: PermissionsPolicy::default(),
-        payment_config: create_default_payment_config(),
-    };
+    let target_field = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+    ).with_ref_atom_uuid("test-uuid-2".to_string());
     target_schema.add_field("target_field".to_string(), target_field);
 
     // Add mapper to source schema
     let mapper = SchemaMapper::new(
         "source_schema".to_string(),
-        "target_schema".to_string(),
         vec![MappingRule::Map {
             source_field: "source_field".to_string(),
             target_field: "target_field".to_string(),
             function: Some("to_lowercase".to_string()),
         }],
     );
-    source_schema.add_schema_mapper(mapper);
+    target_schema.add_schema_mapper(mapper);
 
     // Load schemas
     manager.load_schema(source_schema.clone()).unwrap();
-    manager.load_schema(target_schema).unwrap();
+    manager.load_schema(target_schema.clone()).unwrap();
 
     // Apply mapping
-    manager.apply_schema_mappers(&source_schema).unwrap();
+    manager.apply_schema_mappers(&target_schema).unwrap();
 
     // Verify mapping
     let updated_target = manager.get_schema("target_schema").unwrap().unwrap();
@@ -142,7 +134,7 @@ fn test_schema_manager_apply_mapping_map() {
             .get("target_field")
             .unwrap()
             .ref_atom_uuid,
-        "lowercase:test-uuid-1"
+        Some("lowercase:test-uuid-1".to_string())
     );
 }
 
@@ -153,8 +145,7 @@ fn test_schema_manager_apply_mapping_missing_schema() {
     // Create source schema with mapper to non-existent target
     let mut source_schema = Schema::new("source_schema".to_string());
     let mapper = SchemaMapper::new(
-        "source_schema".to_string(),
-        "non_existent_schema".to_string(),
+        "source_schema1".to_string(),
         vec![MappingRule::Map {
             source_field: "source_field".to_string(),
             target_field: "target_field".to_string(),
@@ -178,8 +169,7 @@ fn test_schema_manager_apply_mapping_invalid_field() {
     // Create source schema with mapper referencing non-existent field
     let mut source_schema = Schema::new("source_schema".to_string());
     let mapper = SchemaMapper::new(
-        "source_schema".to_string(),
-        "target_schema".to_string(),
+        "source_schema1".to_string(),
         vec![MappingRule::Map {
             source_field: "non_existent_field".to_string(),
             target_field: "target_field".to_string(),
@@ -214,11 +204,10 @@ fn test_schema_creation() {
 fn test_schema_field_management() {
     let mut schema = Schema::new("test_schema".to_string());
     let field_name = "test_field".to_string();
-    let field = SchemaField {
-        ref_atom_uuid: Uuid::new_v4().to_string(),
-        permission_policy: PermissionsPolicy::default(),
-        payment_config: create_default_payment_config(),
-    };
+    let field = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+    ).with_ref_atom_uuid("test-uuid".to_string());
 
     // Add field
     schema.add_field(field_name.clone(), field.clone());
@@ -227,20 +216,19 @@ fn test_schema_field_management() {
     assert!(schema.fields.contains_key(&field_name));
     assert_eq!(
         schema.fields.get(&field_name).unwrap().ref_atom_uuid,
-        field.ref_atom_uuid
+        Some("test-uuid".to_string())
     );
 }
 
 #[test]
 fn test_schema_mapper_validation() {
     // Test empty rules
-    let mapper = SchemaMapper::new("source".to_string(), "target".to_string(), vec![]);
+    let mapper = SchemaMapper::new("source".to_string(), vec![]);
     assert_eq!(mapper.rules.len(), 0);
 
     // Test duplicate field mappings
     let mapper = SchemaMapper::new(
         "source".to_string(),
-        "target".to_string(),
         vec![
             MappingRule::Map {
                 source_field: "field1".to_string(),
@@ -263,38 +251,33 @@ fn test_schema_mapper_multiple_rules() {
 
     // Create source schema
     let mut source_schema = Schema::new("source_schema".to_string());
-    let field1 = SchemaField {
-        ref_atom_uuid: "test-uuid-1".to_string(),
-        permission_policy: PermissionsPolicy::default(),
-        payment_config: create_default_payment_config(),
-    };
-    let field2 = SchemaField {
-        ref_atom_uuid: "test-uuid-2".to_string(),
-        permission_policy: PermissionsPolicy::default(),
-        payment_config: create_default_payment_config(),
-    };
+    let field1 = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+    ).with_ref_atom_uuid("test-uuid-1".to_string());
+    let field2 = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+    ).with_ref_atom_uuid("test-uuid-2".to_string());
     source_schema.add_field("field1".to_string(), field1);
     source_schema.add_field("old_name".to_string(), field2);
 
     // Create target schema
     let mut target_schema = Schema::new("target_schema".to_string());
-    let target_field1 = SchemaField {
-        ref_atom_uuid: "test-uuid-3".to_string(),
-        permission_policy: PermissionsPolicy::default(),
-        payment_config: create_default_payment_config(),
-    };
-    let target_field2 = SchemaField {
-        ref_atom_uuid: "test-uuid-4".to_string(),
-        permission_policy: PermissionsPolicy::default(),
-        payment_config: create_default_payment_config(),
-    };
+    let target_field1 = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+    ).with_ref_atom_uuid("test-uuid-3".to_string());
+    let target_field2 = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+    ).with_ref_atom_uuid("test-uuid-4".to_string());
     target_schema.add_field("field1".to_string(), target_field1);
     target_schema.add_field("new_name".to_string(), target_field2);
 
     // Add mapper with multiple rules
     let mapper = SchemaMapper::new(
         "source_schema".to_string(),
-        "target_schema".to_string(),
         vec![
             MappingRule::Map {
                 source_field: "field1".to_string(),
@@ -320,11 +303,11 @@ fn test_schema_mapper_multiple_rules() {
     let updated_target = manager.get_schema("target_schema").unwrap().unwrap();
     assert_eq!(
         updated_target.fields.get("field1").unwrap().ref_atom_uuid,
-        "test-uuid-1"
+        Some("test-uuid-1".to_string())
     );
     assert_eq!(
         updated_target.fields.get("new_name").unwrap().ref_atom_uuid,
-        "test-uuid-2"
+        Some("test-uuid-2".to_string())
     );
 }
 
@@ -333,18 +316,16 @@ fn test_schema_mapper_conflicting_rules() {
     let manager = SchemaManager::new();
 
     // Create source schema with conflicting rules
-    let mut source_schema = Schema::new("source_schema".to_string());
-    let field = SchemaField {
-        ref_atom_uuid: "test-uuid-1".to_string(),
-        permission_policy: PermissionsPolicy::default(),
-        payment_config: create_default_payment_config(),
-    };
+    let mut source_schema = Schema::new("target_schema".to_string());
+    let field = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+    ).with_ref_atom_uuid("test-uuid-1".to_string());
     source_schema.add_field("field1".to_string(), field);
 
     // Create mapper with conflicting rules for same field
     let mapper = SchemaMapper::new(
         "source_schema".to_string(),
-        "target_schema".to_string(),
         vec![
             MappingRule::Map {
                 source_field: "field1".to_string(),
@@ -360,11 +341,10 @@ fn test_schema_mapper_conflicting_rules() {
 
     // Create target schema
     let mut target_schema = Schema::new("target_schema".to_string());
-    let target_field = SchemaField {
-        ref_atom_uuid: "test-uuid-2".to_string(),
-        permission_policy: PermissionsPolicy::default(),
-        payment_config: create_default_payment_config(),
-    };
+    let target_field = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+    ).with_ref_atom_uuid("test-uuid-2".to_string());
     target_schema.add_field("field1".to_string(), target_field);
 
     // Load schemas
@@ -381,7 +361,6 @@ fn test_schema_mapper_management() {
     let mut schema = Schema::new("test_schema".to_string());
     let mapper = SchemaMapper::new(
         "source_schema".to_string(),
-        "target_schema".to_string(),
         vec![MappingRule::Map {
             source_field: "old_name".to_string(),
             target_field: "new_name".to_string(),
@@ -395,7 +374,6 @@ fn test_schema_mapper_management() {
     // Verify mapper was added
     assert_eq!(schema.schema_mappers.len(), 1);
     assert_eq!(schema.schema_mappers[0].source_schema_name, "source_schema");
-    assert_eq!(schema.schema_mappers[0].target_schema_name, "target_schema");
 }
 
 #[test]
@@ -404,14 +382,13 @@ fn test_schema_field_permissions() {
     let field_name = "protected_field".to_string();
 
     // Create field with custom permissions
-    let field = SchemaField {
-        ref_atom_uuid: Uuid::new_v4().to_string(),
-        permission_policy: PermissionsPolicy::new(
+    let field = SchemaField::new(
+        PermissionsPolicy::new(
             TrustDistance::Distance(2),
             TrustDistance::Distance(3),
         ),
-        payment_config: create_default_payment_config(),
-    };
+        create_default_payment_config(),
+    ).with_ref_atom_uuid(Uuid::new_v4().to_string());
 
     schema.add_field(field_name.clone(), field.clone());
 
@@ -447,11 +424,10 @@ fn test_schema_with_multiple_fields() {
     for (name, policy) in fields {
         schema.add_field(
             name.to_string(),
-            SchemaField {
-                ref_atom_uuid: Uuid::new_v4().to_string(),
-                permission_policy: policy,
-                payment_config: create_default_payment_config(),
-            },
+            SchemaField::new(
+                policy,
+                create_default_payment_config(),
+            ).with_ref_atom_uuid(Uuid::new_v4().to_string()),
         );
     }
 

@@ -47,28 +47,13 @@ pub fn parse_mapping_dsl(dsl: &str) -> Result<Vec<MappingRule>, SchemaError> {
                         });
                     }
                     "MAP" => {
-                        // Syntax: MAP source_field TO target_field [WITH function]
+                        // Syntax: MAP source_field TO target_field
                         if tokens.len() < 4 || tokens[2].to_uppercase() != "TO" {
-                            return Err(SchemaError::InvalidDSL(format!("Invalid MAP syntax on line {}. Expected: MAP source TO target [WITH function]", i + 1)));
+                            return Err(SchemaError::InvalidDSL(format!("Invalid MAP syntax on line {}. Expected: MAP source TO target", i + 1)));
                         }
-                        let function = if tokens.len() > 4 {
-                            if tokens[4].to_uppercase() != "WITH" {
-                                return Err(SchemaError::InvalidDSL(format!(
-                                    "Invalid MAP syntax on line {}. Expected WITH keyword",
-                                    i + 1
-                                )));
-                            }
-                            if tokens.len() != 6 {
-                                return Err(SchemaError::InvalidDSL(format!("Invalid MAP syntax on line {}. Expected function name after WITH", i + 1)));
-                            }
-                            Some(tokens[5].to_string())
-                        } else {
-                            None
-                        };
                         rules.push(MappingRule::Map {
                             source_field: tokens[1].to_string(),
                             target_field: tokens[3].to_string(),
-                            function,
                         });
                     }
                     _ => {
@@ -101,7 +86,7 @@ mod tests {
             # Comment line
             RENAME username TO displayName
             DROP privateEmail
-            MAP email_address TO email WITH to_lowercase
+            MAP email_address TO email
         "#;
 
         let rules = parse_mapping_dsl(dsl).unwrap();
@@ -129,11 +114,9 @@ mod tests {
             MappingRule::Map {
                 source_field,
                 target_field,
-                function,
             } => {
                 assert_eq!(source_field, "email_address");
                 assert_eq!(target_field, "email");
-                assert_eq!(function, &Some("to_lowercase".to_string()));
             }
             _ => panic!("Expected Map rule"),
         }

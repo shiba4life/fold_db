@@ -6,17 +6,13 @@ use fold_db::schema::types::fields::SchemaField;
 use fold_db::schema::Schema;
 use std::collections::HashMap;
 
-pub fn create_default_payment_config() -> FieldPaymentConfig {
-    FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
-}
 
 pub fn create_dsl_mapper(
     source_schema_name: String,
-    target_schema_name: String,
     dsl: String,
 ) -> SchemaMapper {
     let rules = parse_mapping_dsl(&dsl).expect("Failed to parse DSL");
-    SchemaMapper::new(source_schema_name, target_schema_name, rules)
+    SchemaMapper::new(source_schema_name, rules)
 }
 
 pub fn create_field_with_permissions(
@@ -26,9 +22,8 @@ pub fn create_field_with_permissions(
     explicit_read_keys: Option<HashMap<String, u8>>,
     explicit_write_keys: Option<HashMap<String, u8>>,
 ) -> SchemaField {
-    SchemaField {
-        ref_atom_uuid,
-        permission_policy: PermissionsPolicy {
+    SchemaField::new(
+        PermissionsPolicy {
             read_policy: TrustDistance::Distance(read_distance),
             write_policy: TrustDistance::Distance(write_distance),
             explicit_read_policy: explicit_read_keys.map(|counts| ExplicitCounts {
@@ -38,8 +33,8 @@ pub fn create_field_with_permissions(
                 counts_by_pub_key: counts,
             }),
         },
-        payment_config: create_default_payment_config(),
-    }
+        FieldPaymentConfig::default(),
+    ).with_ref_atom_uuid(ref_atom_uuid)
 }
 
 pub fn create_schema_with_fields(
@@ -47,23 +42,19 @@ pub fn create_schema_with_fields(
     fields: HashMap<String, SchemaField>,
     mappers: Vec<SchemaMapper>,
 ) -> Schema {
-    Schema {
-        name,
-        fields,
-        schema_mappers: mappers,
-        payment_config: SchemaPaymentConfig::default(),
-    }
+    Schema::new(name)
+        .with_fields(fields)
+        .with_schema_mappers(mappers)
+        .with_payment_config(SchemaPaymentConfig::default())
 }
 
 pub fn create_rename_mapper(
     source_schema_name: String,
-    target_schema_name: String,
     source_field: String,
     target_field: String,
 ) -> SchemaMapper {
     SchemaMapper::new(
         source_schema_name,
-        target_schema_name,
         vec![MappingRule::Rename {
             source_field,
             target_field,

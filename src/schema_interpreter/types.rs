@@ -29,11 +29,9 @@ impl From<JsonMappingRule> for MappingRule {
             JsonMappingRule::Map {
                 source_field,
                 target_field,
-                function,
             } => Self::Map {
                 source_field,
                 target_field,
-                function,
             },
         }
     }
@@ -91,7 +89,6 @@ pub enum JsonMappingRule {
     Map {
         source_field: String,
         target_field: String,
-        function: Option<String>,
     },
 }
 

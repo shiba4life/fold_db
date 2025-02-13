@@ -27,9 +27,8 @@ fn test_permission_wrapper_query() {
             TrustDistance::Distance(2), // Allow read within trust distance 2
             TrustDistance::Distance(0),
         ),
-        "test_ref".to_string(),
         create_default_payment_config(),
-    );
+    ).with_ref_atom_uuid("test_ref".to_string());
     fields.insert("test_field".to_string(), field);
 
     let schema = Schema {
@@ -84,9 +83,8 @@ fn test_permission_wrapper_no_requirement() {
             TrustDistance::NoRequirement, // No distance requirement for reads
             TrustDistance::Distance(0),
         ),
-        "test_ref".to_string(),
         create_default_payment_config(),
-    );
+    ).with_ref_atom_uuid("test_ref".to_string());
     fields.insert("test_field".to_string(), field);
 
     let schema = Schema {
@@ -138,9 +136,8 @@ fn test_permission_wrapper_mutation() {
     });
     let field = SchemaField::new(
         policy,
-        "test_ref".to_string(),
         create_default_payment_config(),
-    );
+    ).with_ref_atom_uuid("test_ref".to_string());
     fields.insert("test_field".to_string(), field);
 
     let schema = Schema {

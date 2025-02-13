@@ -23,7 +23,7 @@ fn create_test_schema() -> Schema {
 
     // Add name field
     let name_field = SchemaField {
-        ref_atom_uuid: uuid::Uuid::new_v4().to_string(),
+        ref_atom_uuid: Some(uuid::Uuid::new_v4().to_string()),
         permission_policy: PermissionsPolicy::new(
             TrustDistance::Distance(1),
             TrustDistance::Distance(1),
@@ -34,7 +34,7 @@ fn create_test_schema() -> Schema {
 
     // Add email field
     let email_field = SchemaField {
-        ref_atom_uuid: uuid::Uuid::new_v4().to_string(),
+        ref_atom_uuid: Some(uuid::Uuid::new_v4().to_string()),
         permission_policy: PermissionsPolicy::new(
             TrustDistance::Distance(1),
             TrustDistance::Distance(1),
@@ -173,7 +173,7 @@ fn test_version_history() {
     let name_field = schema.fields.get("name").unwrap();
 
     // Get history using the actual ref_atom_uuid
-    let history = node.get_history(&name_field.ref_atom_uuid);
+    let history = node.get_history(name_field.ref_atom_uuid.as_ref().unwrap());
     assert!(history.is_ok());
 
     // Verify history contents

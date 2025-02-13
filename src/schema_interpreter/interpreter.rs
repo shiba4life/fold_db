@@ -43,7 +43,6 @@ impl SchemaInterpreter {
                 mapper.source_schemas.into_iter().map(move |source| {
                     SchemaMapper::new(
                         source,
-                        mapper.target_schema.clone(),
                         mapper
                             .rules
                             .iter()
@@ -65,11 +64,10 @@ impl SchemaInterpreter {
 
     /// Converts a JSON schema field to a `FoldDB` schema field.
     fn convert_field(json_field: JsonSchemaField) -> SchemaField {
-        SchemaField {
-            permission_policy: json_field.permission_policy.into(),
-            ref_atom_uuid: json_field.ref_atom_uuid,
-            payment_config: json_field.payment_config.into(),
-        }
+        SchemaField::new(
+            json_field.permission_policy.into(),
+            json_field.payment_config.into(),
+        ).with_ref_atom_uuid(json_field.ref_atom_uuid)
     }
 
     /// Interprets a JSON schema from a string.
@@ -175,7 +173,6 @@ mod tests {
                 rules: vec![JsonMappingRule::Map {
                     source_field: "old_field".to_string(),
                     target_field: "new_field".to_string(),
-                    function: Some("to_lowercase".to_string()),
                 }],
             }]
         } else {
@@ -231,7 +228,7 @@ mod tests {
         };
 
         let field = SchemaInterpreter::convert_field(json_field);
-        assert_eq!(field.ref_atom_uuid, "test_uuid");
+        assert_eq!(field.ref_atom_uuid, Some("test_uuid".to_string()));
     }
 
     #[test]
@@ -246,18 +243,15 @@ mod tests {
 
         let mapper = &schema.schema_mappers[0];
         assert_eq!(mapper.source_schema_name, "source_schema");
-        assert_eq!(mapper.target_schema_name, "target_schema");
         assert_eq!(mapper.rules.len(), 1);
 
         match &mapper.rules[0] {
             MappingRule::Map {
                 source_field,
                 target_field,
-                function,
             } => {
                 assert_eq!(source_field, "old_field");
                 assert_eq!(target_field, "new_field");
-                assert_eq!(function, &Some("to_lowercase".to_string()));
             }
             _ => panic!("Expected Map rule"),
         }

@@ -1,13 +1,11 @@
 use super::types::MappingRule;
 use serde::{Deserialize, Serialize};
 
-/// `SchemaMapper` supports mapping data from multiple source schemas to a target schema
+/// `SchemaMapper` supports mapping data from source schema to the schema it belongs to
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SchemaMapper {
-    /// List of source schema names
+    /// Source schema name
     pub source_schema_name: String,
-    /// Target schema name
-    pub target_schema_name: String,
     /// Mapping rules to apply
     pub rules: Vec<MappingRule>,
 }
@@ -17,12 +15,10 @@ impl SchemaMapper {
     #[must_use]
     pub const fn new(
         source_schema_name: String,
-        target_schema_name: String,
         rules: Vec<MappingRule>,
     ) -> Self {
         Self {
             source_schema_name,
-            target_schema_name,
             rules,
         }
     }

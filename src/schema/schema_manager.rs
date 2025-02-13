@@ -102,7 +102,8 @@ impl SchemaManager {
                 schema_name = schema.name
             )));
         }
-        self.load_schema(schema)
+        self.load_schema(schema)?;
+        Ok(())
     }
 
     fn validate_mapping_rules(rules: &[MappingRule]) -> Result<(), SchemaError> {
@@ -158,11 +159,11 @@ impl SchemaManager {
                 .clone();
 
             let mut target_schema = schemas
-                .get(&mapper.target_schema_name)
+                .get(&schema.name)
                 .ok_or_else(|| {
                     SchemaError::NotFound(format!(
                         "Target schema not found: {target_schema_name}",
-                        target_schema_name = mapper.target_schema_name
+                        target_schema_name = schema.name
                     ))
                 })?
                 .clone();
@@ -200,35 +201,17 @@ impl SchemaManager {
                     MappingRule::Map {
                         source_field,
                         target_field,
-                        function,
                     } => {
+                        // Map the aref_uuid from the source field to the target field
                         let source_field_value =
                             source_schema.fields.get(source_field).ok_or_else(|| {
                                 SchemaError::InvalidField(format!(
                                     "Source field not found: {source_field}"
                                 ))
                             })?;
-
-                        if !target_schema.fields.contains_key(target_field) {
-                            return Err(SchemaError::InvalidField(format!(
-                                "Target field not found: {target_field}"
-                            )));
-                        }
-
-                        let mut field = source_field_value.clone();
-                        if let Some(func_name) = function {
-                            match func_name.as_str() {
-                                "to_lowercase" => {
-                                    // Apply lowercase transformation to the field's atom value
-                                    // This will be handled by the query system when retrieving the value
-                                    field.ref_atom_uuid = format!("lowercase:{}", field.ref_atom_uuid);
-                                }
-                                _ => return Err(SchemaError::MappingError(
-                                    format!("Unknown mapping function: {func_name}")
-                                )),
-                            }
-                        }
-                        target_schema.fields.insert(target_field.clone(), field);
+                        let source_field_aref_uuid = source_field_value.ref_atom_uuid.clone().unwrap();
+                        let target_field_value = target_schema.fields.get_mut(target_field).unwrap();
+                        target_field_value.ref_atom_uuid = Some(source_field_aref_uuid);
                     }
                 }
             }

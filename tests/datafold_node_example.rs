@@ -24,7 +24,7 @@ fn test_complete_node_workflow() {
 
     // Add title field
     let title_field = SchemaField {
-        ref_atom_uuid: uuid::Uuid::new_v4().to_string(),
+        ref_atom_uuid: Some(uuid::Uuid::new_v4().to_string()),
         permission_policy: PermissionsPolicy::new(
             TrustDistance::Distance(1), // Anyone with trust distance 1 can read
             TrustDistance::Distance(1), // Only trusted users can write
@@ -35,7 +35,7 @@ fn test_complete_node_workflow() {
 
     // Add content field
     let content_field = SchemaField {
-        ref_atom_uuid: uuid::Uuid::new_v4().to_string(),
+        ref_atom_uuid: Some(uuid::Uuid::new_v4().to_string()),
         permission_policy: PermissionsPolicy::new(
             TrustDistance::Distance(1),
             TrustDistance::Distance(1),

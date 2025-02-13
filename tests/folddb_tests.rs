@@ -45,7 +45,7 @@ fn test_schema_operations() {
     fields.insert(
         "name".to_string(),
         SchemaField {
-            ref_atom_uuid: Uuid::new_v4().to_string(),
+            ref_atom_uuid: Some(Uuid::new_v4().to_string()),
             permission_policy: PermissionsPolicy {
                 read_policy: TrustDistance::Distance(5),
                 write_policy: TrustDistance::Distance(0),
@@ -88,7 +88,7 @@ fn test_write_and_query() {
     fields.insert(
         "test_field".to_string(),
         SchemaField {
-            ref_atom_uuid: field_uuid.clone(),
+            ref_atom_uuid: Some(field_uuid.clone()),
             permission_policy: PermissionsPolicy {
                 read_policy: TrustDistance::Distance(5), // Allow reads with trust distance up to 5
                 write_policy: TrustDistance::Distance(0),
@@ -157,7 +157,7 @@ fn test_atom_history() {
     fields.insert(
         "version_field".to_string(),
         SchemaField {
-            ref_atom_uuid: field_uuid.clone(),
+            ref_atom_uuid: Some(field_uuid.clone()),
             permission_policy: PermissionsPolicy {
                 read_policy: TrustDistance::Distance(5),
                 write_policy: TrustDistance::Distance(0),

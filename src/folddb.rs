@@ -1,6 +1,7 @@
 use serde_json::Value;
 use sled;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 use crate::atom::{Atom, AtomRef};
 use crate::permissions::PermissionWrapper;
@@ -162,23 +163,13 @@ impl FoldDB {
             .get(field)
             .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
 
-        // Try getting the atom
-        // Check if there's a transformation to apply
-        let (transform, actual_uuid) = if let Some(stripped) = field.ref_atom_uuid.strip_prefix("lowercase:") {
-            ("lowercase", stripped)
-        } else {
-            ("", field.ref_atom_uuid.as_str())
+        // If no ref_atom_uuid is set, return null
+        let Some(ref_atom_uuid) = &field.ref_atom_uuid else {
+            return Ok(Value::Null);
         };
 
-        match self.get_latest_atom(actual_uuid) {
-            Ok(atom) => {
-                let content = if transform.is_empty() {
-                    atom.content().clone()
-                } else {
-                    atom.get_transformed_content(transform)
-                };
-                Ok(content)
-            }
+        match self.get_latest_atom(ref_atom_uuid) {
+            Ok(atom) => Ok(atom.content().clone()),
             Err(_) => Ok(Value::Null),
         }
     }
@@ -200,7 +191,14 @@ impl FoldDB {
             .get(field)
             .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
 
-        let aref_uuid = field.ref_atom_uuid.clone();
+        // If there's no ref_atom_uuid, create a new one
+        let aref_uuid = field.ref_atom_uuid.clone().unwrap_or_else(|| {
+            let aref_uuid = Uuid::new_v4().to_string();
+            let aref = AtomRef::new(aref_uuid.clone());
+            self.ref_atoms.insert(aref_uuid.clone(), aref);
+            aref_uuid
+        });
+
         let prev_atom_uuid = self
             .ref_atoms
             .get(&aref_uuid)

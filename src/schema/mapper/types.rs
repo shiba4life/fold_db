@@ -13,6 +13,5 @@ pub enum MappingRule {
     Map {
         source_field: String,
         target_field: String,
-        function: Option<String>,
     },
 }

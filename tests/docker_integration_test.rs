@@ -69,18 +69,16 @@ fn test_docker_node_integration() -> Result<(), Box<dyn std::error::Error>> {
         "id".to_string(),
         SchemaField::new(
             permissions.clone(),
-            Uuid::new_v4().to_string(),
             payment_config.clone(),
-        ),
+        ).with_ref_atom_uuid(Uuid::new_v4().to_string()),
     );
     
     schema.add_field(
         "data".to_string(),
         SchemaField::new(
             permissions,
-            Uuid::new_v4().to_string(),
             payment_config,
-        ),
+        ).with_ref_atom_uuid(Uuid::new_v4().to_string()),
     );
     
     // Create test_data directory and write schema

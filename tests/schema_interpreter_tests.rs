@@ -110,7 +110,7 @@ fn test_interpret_user_profile_schema() {
         .permission_policy
         .explicit_write_policy
         .is_none());
-    assert_eq!(username_field.ref_atom_uuid, "username_atom_123");
+    assert_eq!(username_field.ref_atom_uuid, Some("username_atom_123".to_string()));
     assert_eq!(username_field.payment_config.base_multiplier, 1.0);
     assert!(matches!(
         username_field.payment_config.trust_distance_scaling,
@@ -144,7 +144,7 @@ fn test_interpret_user_profile_schema() {
         Some(&1)
     );
 
-    assert_eq!(email_field.ref_atom_uuid, "email_atom_456");
+    assert_eq!(email_field.ref_atom_uuid, Some("email_atom_456".to_string()));
     assert_eq!(email_field.payment_config.base_multiplier, 2.0);
     assert!(matches!(
         email_field.payment_config.trust_distance_scaling,
