@@ -1,13 +1,22 @@
 use fold_db::fees::payment_config::SchemaPaymentConfig;
 use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
 use fold_db::permissions::types::policy::{ExplicitCounts, PermissionsPolicy, TrustDistance};
-use fold_db::schema::mapper::{MappingRule, SchemaMapper};
+use fold_db::schema::mapper::{MappingRule, SchemaMapper, parse_mapping_dsl};
 use fold_db::schema::types::fields::SchemaField;
 use fold_db::schema::Schema;
 use std::collections::HashMap;
 
 pub fn create_default_payment_config() -> FieldPaymentConfig {
     FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
+}
+
+pub fn create_dsl_mapper(
+    source_schema_name: String,
+    target_schema_name: String,
+    dsl: String,
+) -> SchemaMapper {
+    let rules = parse_mapping_dsl(&dsl).expect("Failed to parse DSL");
+    SchemaMapper::new(source_schema_name, target_schema_name, rules)
 }
 
 pub fn create_field_with_permissions(

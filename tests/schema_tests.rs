@@ -142,7 +142,7 @@ fn test_schema_manager_apply_mapping_map() {
             .get("target_field")
             .unwrap()
             .ref_atom_uuid,
-        "test-uuid-1"
+        "lowercase:test-uuid-1"
     );
 }
 

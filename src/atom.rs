@@ -37,6 +37,20 @@ impl Atom {
     }
 
     #[must_use]
+    pub fn get_transformed_content(&self, transform: &str) -> Value {
+        match transform {
+            "lowercase" => {
+                if let Value::String(s) = &self.content {
+                    Value::String(s.to_lowercase())
+                } else {
+                    self.content.clone()
+                }
+            }
+            _ => self.content.clone(),
+        }
+    }
+
+    #[must_use]
     pub fn uuid(&self) -> &str {
         &self.uuid
     }

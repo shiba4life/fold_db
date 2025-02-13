@@ -163,8 +163,22 @@ impl FoldDB {
             .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
 
         // Try getting the atom
-        match self.get_latest_atom(&field.ref_atom_uuid) {
-            Ok(atom) => Ok(atom.content().clone()),
+        // Check if there's a transformation to apply
+        let (transform, actual_uuid) = if let Some(stripped) = field.ref_atom_uuid.strip_prefix("lowercase:") {
+            ("lowercase", stripped)
+        } else {
+            ("", field.ref_atom_uuid.as_str())
+        };
+
+        match self.get_latest_atom(actual_uuid) {
+            Ok(atom) => {
+                let content = if transform.is_empty() {
+                    atom.content().clone()
+                } else {
+                    atom.get_transformed_content(transform)
+                };
+                Ok(content)
+            }
             Err(_) => Ok(Value::Null),
         }
     }

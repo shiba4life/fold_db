@@ -200,7 +200,7 @@ impl SchemaManager {
                     MappingRule::Map {
                         source_field,
                         target_field,
-                        function: _function,
+                        function,
                     } => {
                         let source_field_value =
                             source_schema.fields.get(source_field).ok_or_else(|| {
@@ -215,8 +215,19 @@ impl SchemaManager {
                             )));
                         }
 
-                        // TODO: Apply function transformation when implemented
-                        let field = source_field_value.clone();
+                        let mut field = source_field_value.clone();
+                        if let Some(func_name) = function {
+                            match func_name.as_str() {
+                                "to_lowercase" => {
+                                    // Apply lowercase transformation to the field's atom value
+                                    // This will be handled by the query system when retrieving the value
+                                    field.ref_atom_uuid = format!("lowercase:{}", field.ref_atom_uuid);
+                                }
+                                _ => return Err(SchemaError::MappingError(
+                                    format!("Unknown mapping function: {func_name}")
+                                )),
+                            }
+                        }
                         target_schema.fields.insert(target_field.clone(), field);
                     }
                 }
