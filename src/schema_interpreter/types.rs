@@ -19,6 +19,7 @@ pub struct JsonSchemaField {
     pub permission_policy: JsonPermissionPolicy,
     pub ref_atom_uuid: String,
     pub payment_config: JsonFieldPaymentConfig,
+    pub field_mappers: HashMap<String, String>,
 }
 
 /// JSON representation of permission policy

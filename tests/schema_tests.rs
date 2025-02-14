@@ -1,7 +1,8 @@
 use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
 use fold_db::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 use fold_db::schema::types::fields::SchemaField;
-use fold_db::schema::{Schema, SchemaManager};
+use fold_db::schema::Schema;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 fn create_default_payment_config() -> FieldPaymentConfig {
@@ -31,10 +32,9 @@ fn test_schema_field_management() {
 
     // Verify field was added
     assert!(schema.fields.contains_key(&field_name));
-    assert_eq!(
-        schema.fields.get(&field_name).unwrap().ref_atom_uuid,
-        Some("test-uuid".to_string())
-    );
+    let stored_field = schema.fields.get(&field_name).unwrap();
+    assert_eq!(stored_field.ref_atom_uuid, Some("test-uuid".to_string()));
+    assert!(stored_field.field_mappers.is_empty());
 }
 
 #[test]
@@ -63,6 +63,28 @@ fn test_schema_field_permissions() {
         TrustDistance::Distance(d) => assert_eq!(d, 3),
         _ => panic!("Expected Distance variant"),
     }
+}
+
+#[test]
+fn test_schema_field_mappers() {
+    let mut schema = Schema::new("test_schema".to_string());
+    let field_name = "mapped_field".to_string();
+    
+    let mut field_mappers = HashMap::new();
+    field_mappers.insert("transform".to_string(), "uppercase".to_string());
+    
+    let field = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+    )
+    .with_ref_atom_uuid(Uuid::new_v4().to_string())
+    .with_field_mappers(field_mappers.clone());
+
+    schema.add_field(field_name.clone(), field);
+
+    // Verify field mappers
+    let stored_field = schema.fields.get(&field_name).unwrap();
+    assert_eq!(stored_field.field_mappers, field_mappers);
 }
 
 #[test]

@@ -28,7 +28,9 @@ fn test_permission_wrapper_query() {
             TrustDistance::Distance(0),
         ),
         create_default_payment_config(),
-    ).with_ref_atom_uuid("test_ref".to_string());
+    )
+    .with_ref_atom_uuid("test_ref".to_string())
+    .with_field_mappers(HashMap::new());
     fields.insert("test_field".to_string(), field);
 
     let schema = Schema {
@@ -83,7 +85,9 @@ fn test_permission_wrapper_no_requirement() {
             TrustDistance::Distance(0),
         ),
         create_default_payment_config(),
-    ).with_ref_atom_uuid("test_ref".to_string());
+    )
+    .with_ref_atom_uuid("test_ref".to_string())
+    .with_field_mappers(HashMap::new());
     fields.insert("test_field".to_string(), field);
 
     let schema = Schema {
@@ -135,7 +139,9 @@ fn test_permission_wrapper_mutation() {
     let field = SchemaField::new(
         policy,
         create_default_payment_config(),
-    ).with_ref_atom_uuid("test_ref".to_string());
+    )
+    .with_ref_atom_uuid("test_ref".to_string())
+    .with_field_mappers(HashMap::new());
     fields.insert("test_field".to_string(), field);
 
     let schema = Schema {

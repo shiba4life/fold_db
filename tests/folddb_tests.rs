@@ -55,6 +55,7 @@ fn test_schema_operations() {
                 explicit_read_policy: None,
             },
             payment_config: create_default_payment_config(),
+            field_mappers: HashMap::new(),
         },
     );
 
@@ -97,6 +98,7 @@ fn test_write_and_query() {
                 explicit_read_policy: None,
             },
             payment_config: create_default_payment_config(),
+            field_mappers: HashMap::new(),
         },
     );
 
@@ -165,6 +167,7 @@ fn test_atom_history() {
                 explicit_read_policy: None,
             },
             payment_config: create_default_payment_config(),
+            field_mappers: HashMap::new(),
         },
     );
 

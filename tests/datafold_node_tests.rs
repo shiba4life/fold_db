@@ -8,6 +8,7 @@ use fold_db::{DataFoldNode, NodeConfig};
 use serde_json::json;
 use tempfile::tempdir;
 use uuid;
+use std::collections::HashMap;
 
 fn create_test_node() -> DataFoldNode {
     let dir = tempdir().unwrap();
@@ -29,6 +30,7 @@ fn create_test_schema() -> Schema {
             TrustDistance::Distance(1),
         ),
         payment_config: FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
+        field_mappers: HashMap::new(),
     };
     schema.add_field("name".to_string(), name_field);
 
@@ -40,6 +42,7 @@ fn create_test_schema() -> Schema {
             TrustDistance::Distance(1),
         ),
         payment_config: FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
+        field_mappers: HashMap::new(),
     };
     schema.add_field("email".to_string(), email_field);
 

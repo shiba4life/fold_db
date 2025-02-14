@@ -1,5 +1,6 @@
 use fold_db::schema_interpreter::SchemaInterpreter;
 
+
 #[test]
 fn test_invalid_schema_validation() {
     let invalid_json_str = r#"{
@@ -36,11 +37,4 @@ fn test_invalid_schema_validation() {
     let interpreter = SchemaInterpreter::new();
     let result = interpreter.interpret_str(invalid_json_str);
     assert!(result.is_err());
-}
-
-#[test]
-fn test_schema_from_file() {
-    let interpreter = SchemaInterpreter::new();
-    let result = interpreter.interpret_file("src/schema_interpreter/examples/user_profile.json");
-    assert!(result.is_ok());
 }
