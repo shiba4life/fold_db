@@ -61,7 +61,6 @@ fn test_schema_operations() {
     let schema = Schema {
         name: "test_schema".to_string(),
         fields,
-        schema_mappers: Vec::new(),
         payment_config: SchemaPaymentConfig::default(),
     };
 
@@ -104,7 +103,6 @@ fn test_write_and_query() {
     let schema = Schema {
         name: "test_schema".to_string(),
         fields,
-        schema_mappers: Vec::new(),
         payment_config: SchemaPaymentConfig::default(),
     };
 
@@ -173,7 +171,6 @@ fn test_atom_history() {
     let schema = Schema {
         name: "test_schema".to_string(),
         fields,
-        schema_mappers: Vec::new(),
         payment_config: SchemaPaymentConfig::default(),
     };
 

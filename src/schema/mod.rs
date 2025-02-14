@@ -1,4 +1,3 @@
-pub mod mapper;
 pub mod schema_manager;
 pub mod types;
 

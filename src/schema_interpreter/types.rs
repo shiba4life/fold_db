@@ -2,7 +2,6 @@ use crate::fees::payment_config::SchemaPaymentConfig;
 use crate::fees::types::config::FieldPaymentConfig;
 use crate::fees::types::config::TrustDistanceScaling;
 use crate::permissions::types::policy::{ExplicitCounts, PermissionsPolicy, TrustDistance};
-use crate::schema::mapper::types::MappingRule;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -11,30 +10,7 @@ use std::collections::HashMap;
 pub struct JsonSchemaDefinition {
     pub name: String,
     pub fields: HashMap<String, JsonSchemaField>,
-    pub schema_mappers: Vec<JsonSchemaMapper>,
     pub payment_config: SchemaPaymentConfig,
-}
-
-impl From<JsonMappingRule> for MappingRule {
-    fn from(json: JsonMappingRule) -> Self {
-        match json {
-            JsonMappingRule::Rename {
-                source_field,
-                target_field,
-            } => Self::Rename {
-                source_field,
-                target_field,
-            },
-            JsonMappingRule::Drop { field } => Self::Drop { field },
-            JsonMappingRule::Map {
-                source_field,
-                target_field,
-            } => Self::Map {
-                source_field,
-                target_field,
-            },
-        }
-    }
 }
 
 /// Represents a field in the JSON schema
@@ -64,32 +40,6 @@ pub struct JsonFieldPaymentConfig {
     pub base_multiplier: f64,
     pub trust_distance_scaling: TrustDistanceScaling,
     pub min_payment: Option<u64>,
-}
-
-/// Represents a schema mapping configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JsonSchemaMapper {
-    pub source_schemas: Vec<String>,
-    pub target_schema: String,
-    pub rules: Vec<JsonMappingRule>,
-}
-
-/// Represents a mapping rule
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "rule")]
-pub enum JsonMappingRule {
-    #[serde(rename = "rename")]
-    Rename {
-        source_field: String,
-        target_field: String,
-    },
-    #[serde(rename = "drop")]
-    Drop { field: String },
-    #[serde(rename = "map")]
-    Map {
-        source_field: String,
-        target_field: String,
-    },
 }
 
 impl From<JsonPermissionPolicy> for PermissionsPolicy {
@@ -122,9 +72,6 @@ impl JsonSchemaDefinition {
     /// - Any field's base multiplier is not positive
     /// - Any field's min factor is less than 1.0
     /// - Any field's min payment is zero when specified
-    /// - Any schema mapper has no source schemas
-    /// - Any schema mapper has duplicate source-target pairs
-    /// - Any schema mapper has fields mapped multiple times
     pub fn validate(&self) -> crate::schema_interpreter::Result<()> {
         // Base multiplier must be positive
         if self.payment_config.base_multiplier <= 0.0 {

@@ -33,7 +33,6 @@ fn test_schema_versioning_with_permissions() {
     let schema = create_schema_with_fields(
         "test_schema".to_string(),
         fields,
-        vec![], // no mappers
     );
 
     // Load and allow schema

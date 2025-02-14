@@ -34,7 +34,6 @@ fn test_permission_wrapper_query() {
     let schema = Schema {
         name: "test_schema".to_string(),
         fields,
-        schema_mappers: Vec::new(),
         payment_config: SchemaPaymentConfig::default(),
     };
 
@@ -90,7 +89,6 @@ fn test_permission_wrapper_no_requirement() {
     let schema = Schema {
         name: "test_schema".to_string(),
         fields,
-        schema_mappers: Vec::new(),
         payment_config: SchemaPaymentConfig::default(),
     };
 
@@ -143,7 +141,6 @@ fn test_permission_wrapper_mutation() {
     let schema = Schema {
         name: "test_schema".to_string(),
         fields,
-        schema_mappers: Vec::new(),
         payment_config: SchemaPaymentConfig::default(),
     };
 

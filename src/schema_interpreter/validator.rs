@@ -1,7 +1,6 @@
 use crate::permissions::types::policy::TrustDistance;
 use crate::schema::types::SchemaError;
 use crate::schema_interpreter::types::{JsonPermissionPolicy, JsonSchemaDefinition};
-use std::collections::HashSet;
 
 pub struct SchemaValidator;
 
@@ -13,7 +12,6 @@ impl SchemaValidator {
     /// - The schema name is empty
     /// - Any field has invalid permissions
     /// - Any field has invalid payment configuration
-    /// - Any schema mapper has invalid rules
     pub fn validate(schema: &JsonSchemaDefinition) -> crate::schema_interpreter::Result<()> {
         // Validate schema name
         if schema.name.is_empty() {
@@ -49,86 +47,6 @@ impl SchemaValidator {
             }
         }
 
-        // Validate schema mappers
-        for mapper in &schema.schema_mappers {
-            // Must have at least one source schema
-            if mapper.source_schemas.is_empty() {
-                return Err(SchemaError::InvalidField(
-                    "Schema mapper must have at least one source schema".to_string(),
-                ));
-            }
-
-            // Target schema must be specified
-            if mapper.target_schema.is_empty() {
-                return Err(SchemaError::InvalidField(
-                    "Schema mapper must specify a target schema".to_string(),
-                ));
-            }
-
-            // Check for duplicate source-target pairs
-            let mut seen_pairs = HashSet::new();
-            for source in &mapper.source_schemas {
-                let pair = (source.clone(), mapper.target_schema.clone());
-                if !seen_pairs.insert(pair.clone()) {
-                    return Err(SchemaError::InvalidField(format!(
-                        "Duplicate source-target pair: {source} -> {}",
-                        mapper.target_schema
-                    )));
-                }
-            }
-
-            // Validate mapping rules
-            let mut mapped_fields = HashSet::new();
-            for rule in &mapper.rules {
-                match rule {
-                    crate::schema_interpreter::types::JsonMappingRule::Rename {
-                        source_field,
-                        target_field,
-                    } => {
-                        if source_field.is_empty() || target_field.is_empty() {
-                            return Err(SchemaError::InvalidField(
-                                "Rename rule must specify both source and target fields"
-                                    .to_string(),
-                            ));
-                        }
-                        if !mapped_fields.insert(source_field) {
-                            return Err(SchemaError::InvalidField(format!(
-                                "Field {source_field} is mapped multiple times"
-                            )));
-                        }
-                    }
-                    crate::schema_interpreter::types::JsonMappingRule::Drop { field } => {
-                        if field.is_empty() {
-                            return Err(SchemaError::InvalidField(
-                                "Drop rule must specify a field".to_string(),
-                            ));
-                        }
-                        if !mapped_fields.insert(field) {
-                            return Err(SchemaError::InvalidField(format!(
-                                "Field {field} is mapped multiple times"
-                            )));
-                        }
-                    }
-                    crate::schema_interpreter::types::JsonMappingRule::Map {
-                        source_field,
-                        target_field,
-                        ..
-                    } => {
-                        if source_field.is_empty() || target_field.is_empty() {
-                            return Err(SchemaError::InvalidField(
-                                "Map rule must specify both source and target fields".to_string(),
-                            ));
-                        }
-                        if !mapped_fields.insert(source_field) {
-                            return Err(SchemaError::InvalidField(format!(
-                                "Field {source_field} is mapped multiple times"
-                            )));
-                        }
-                    }
-                }
-            }
-        }
-
         Ok(())
     }
 
@@ -154,7 +72,7 @@ mod tests {
     use super::*;
     use crate::fees::types::config::TrustDistanceScaling;
     use crate::schema_interpreter::types::{
-        JsonFieldPaymentConfig, JsonMappingRule, JsonSchemaField, JsonSchemaMapper,
+        JsonFieldPaymentConfig, JsonSchemaField,
     };
     use std::collections::HashMap;
 
@@ -181,7 +99,6 @@ mod tests {
         JsonSchemaDefinition {
             name: "test_schema".to_string(),
             fields,
-            schema_mappers: vec![],
             payment_config: crate::fees::payment_config::SchemaPaymentConfig {
                 base_multiplier: 1.0,
                 min_payment_threshold: 0,
@@ -244,34 +161,4 @@ mod tests {
         assert!(SchemaValidator::validate(&schema).is_err());
     }
 
-    #[test]
-    fn test_validate_invalid_mapper() {
-        let mut schema = create_valid_schema();
-        schema.schema_mappers = vec![JsonSchemaMapper {
-            source_schemas: vec![], // Invalid - empty source schemas
-            target_schema: "target".to_string(),
-            rules: vec![],
-        }];
-        assert!(SchemaValidator::validate(&schema).is_err());
-    }
-
-    #[test]
-    fn test_validate_duplicate_mapping() {
-        let mut schema = create_valid_schema();
-        schema.schema_mappers = vec![JsonSchemaMapper {
-            source_schemas: vec!["source".to_string()],
-            target_schema: "target".to_string(),
-            rules: vec![
-                JsonMappingRule::Map {
-                    source_field: "field".to_string(),
-                    target_field: "new_field".to_string(),
-                },
-                JsonMappingRule::Rename {
-                    source_field: "field".to_string(), // Duplicate mapping
-                    target_field: "other_field".to_string(),
-                },
-            ],
-        }];
-        assert!(SchemaValidator::validate(&schema).is_err());
-    }
 }

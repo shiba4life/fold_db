@@ -50,7 +50,6 @@ fn test_permission_based_access() {
     let schema = create_schema_with_fields(
         "test_schema".to_string(),
         fields,
-        vec![], // no mappers
     );
 
     // Load and allow schema
