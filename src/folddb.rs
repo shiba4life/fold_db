@@ -31,7 +31,10 @@ impl FoldDB {
 
     /// Loads and validates a schema, running any transforms
     pub fn load_schema(&mut self, schema: Schema) -> Result<(), SchemaError> {
-        self.schema_manager.load_schema(schema)
+        let name = schema.name.clone();
+        self.schema_manager.load_schema(schema)?;
+        self.schema_manager.map_fields(&name);
+        Ok(())
     }
 
     /// Makes a schema queriable and writable

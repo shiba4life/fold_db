@@ -105,4 +105,22 @@ impl SchemaManager {
         Ok(())
     }
 
+    pub fn map_fields(&self, schema_name: &str) {
+        let mut schema = self.get_schema(schema_name).unwrap().unwrap();
+        for field in schema.fields.values_mut() {
+            for (source_schema_name, source_field_name) in field.field_mappers.iter() {
+                if !self.schema_exists(source_schema_name).unwrap() {
+                    continue;
+                }
+                let source_schema = self.get_schema(source_schema_name).unwrap().unwrap();
+                if !source_schema.fields.contains_key(source_field_name) {
+                    continue;
+                }
+                let source_field = source_schema.fields.get(source_field_name).unwrap();
+                let field_ref_atom_uuid = source_field.ref_atom_uuid.clone();
+                field.ref_atom_uuid = Some(field_ref_atom_uuid.unwrap());
+            }
+        }
+    }
+
 }
