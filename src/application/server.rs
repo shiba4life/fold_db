@@ -397,6 +397,7 @@ mod tests {
             let config = crate::datafold_node::NodeConfig {
                 storage_path: self.temp_dir.path().to_path_buf(),
                 default_trust_distance: 1,
+                docker: crate::datafold_node::DockerConfig::default(),
             };
             DataFoldNode::new(config).expect("Failed to create node")
         }

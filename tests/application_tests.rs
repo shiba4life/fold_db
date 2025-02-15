@@ -17,6 +17,7 @@ async fn test_socket_communication() -> std::io::Result<()> {
     let node_config = NodeConfig {
         storage_path: db_path,
         default_trust_distance: 0,
+        docker: fold_db::datafold_node::DockerConfig::default(),
     };
     let mut node = DataFoldNode::new(node_config).expect("Failed to create node");
 
@@ -162,6 +163,7 @@ async fn test_socket_permissions() -> std::io::Result<()> {
     let node_config = NodeConfig {
         storage_path: db_path,
         default_trust_distance: 1,
+        docker: fold_db::datafold_node::DockerConfig::default(),
     };
     let node = DataFoldNode::new(node_config).expect("Failed to create node");
 

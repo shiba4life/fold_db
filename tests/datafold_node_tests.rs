@@ -1,4 +1,4 @@
-use fold_db::atom::Atom;
+ use fold_db::atom::Atom;
 use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
 use fold_db::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 use fold_db::schema::types::fields::SchemaField;
@@ -15,6 +15,7 @@ fn create_test_node() -> DataFoldNode {
     let config = NodeConfig {
         storage_path: dir.path().to_path_buf(),
         default_trust_distance: 1,
+        docker: fold_db::datafold_node::DockerConfig::default(),
     };
     DataFoldNode::new(config).unwrap()
 }

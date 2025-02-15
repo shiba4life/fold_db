@@ -8,12 +8,13 @@
 //! 
 //! # Example
 //! ```no_run
-//! use fold_db::{DataFoldNode, NodeConfig};
+//! use fold_db::{DataFoldNode, NodeConfig, datafold_node::DockerConfig};
 //! use std::path::PathBuf;
 //! 
 //! let config = NodeConfig {
 //!     storage_path: PathBuf::from("/tmp/db"),
 //!     default_trust_distance: 1,
+//!     docker: DockerConfig::default(),
 //! };
 //! 
 //! let node = DataFoldNode::new(config).expect("Failed to create node");
@@ -22,10 +23,46 @@
 use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::collections::HashMap;
 
 use crate::folddb::FoldDB;
 use crate::schema::types::{Mutation, Query};
 use crate::schema::{Schema, SchemaError};
+
+// Docker container configuration
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DockerConfig {
+    /// Memory limit in bytes
+    pub memory_limit: u64,
+    /// CPU limit (number of cores)
+    pub cpu_limit: f64,
+    /// Container environment variables
+    pub environment: HashMap<String, String>,
+    /// Network configuration
+    pub network_config: DockerNetworkConfig,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DockerNetworkConfig {
+    /// Enable network isolation
+    pub network_isolated: bool,
+    /// Exposed ports configuration
+    pub exposed_ports: HashMap<u16, u16>, // container_port -> host_port
+}
+
+impl Default for DockerConfig {
+    fn default() -> Self {
+        Self {
+            memory_limit: 512 * 1024 * 1024, // 512MB
+            cpu_limit: 1.0,
+            environment: HashMap::new(),
+            network_config: DockerNetworkConfig {
+                network_isolated: true,
+                exposed_ports: HashMap::new(),
+            },
+        }
+    }
+}
 
 /// Configuration for a DataFoldNode instance.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -35,6 +72,30 @@ pub struct NodeConfig {
     /// Default trust distance for queries when not explicitly specified
     /// Must be greater than 0
     pub default_trust_distance: u32,
+    /// Docker configuration for containerized applications
+    #[serde(default)]
+    pub docker: DockerConfig,
+}
+
+use std::process::Command;
+
+/// Container state tracking
+#[derive(Debug, Clone)]
+pub struct ContainerState {
+    /// Container ID
+    pub id: String,
+    /// Container status
+    pub status: ContainerStatus,
+    /// Network ID if using isolated network
+    pub network_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub enum ContainerStatus {
+    Created,
+    Running,
+    Stopped,
+    Failed(String),
 }
 
 /// A node in the FoldDB distributed database system.
@@ -50,6 +111,8 @@ pub struct DataFoldNode {
     db: Arc<FoldDB>,
     /// Node configuration
     config: NodeConfig,
+    /// Active containers
+    containers: HashMap<String, ContainerState>,
 }
 
 /// Errors that can occur during node operations.
@@ -63,6 +126,8 @@ pub enum NodeError {
     PermissionError(String),
     /// Error in node configuration
     ConfigError(String),
+    /// Error in Docker operations
+    DockerError(String),
 }
 
 impl std::fmt::Display for NodeError {
@@ -72,6 +137,7 @@ impl std::fmt::Display for NodeError {
             Self::SchemaError(err) => write!(f, "Schema error: {}", err),
             Self::PermissionError(msg) => write!(f, "Permission error: {}", msg),
             Self::ConfigError(msg) => write!(f, "Configuration error: {}", msg),
+            Self::DockerError(msg) => write!(f, "Docker error: {}", msg),
         }
     }
 }
@@ -95,6 +161,9 @@ pub type NodeResult<T> = Result<T, NodeError>;
 impl DataFoldNode {
     /// Creates a new DataFoldNode with the specified configuration.
     /// 
+    /// This will initialize a new database instance at the specified storage path
+    /// and set up Docker networking if container support is enabled.
+    /// 
     /// This will initialize a new database instance at the specified storage path.
     /// If the storage path already contains a database, a new node will be created
     /// that can access that data.
@@ -107,12 +176,13 @@ impl DataFoldNode {
     /// 
     /// # Example
     /// ```no_run
-    /// use fold_db::{DataFoldNode, NodeConfig};
+    /// use fold_db::{DataFoldNode, NodeConfig, datafold_node::DockerConfig};
     /// use std::path::PathBuf;
     /// 
     /// let config = NodeConfig {
     ///     storage_path: PathBuf::from("/tmp/db"),
     ///     default_trust_distance: 1,
+    ///     docker: DockerConfig::default(),
     /// };
     /// 
     /// let node = DataFoldNode::new(config).expect("Failed to create node");
@@ -125,7 +195,140 @@ impl DataFoldNode {
                 .ok_or_else(|| NodeError::ConfigError("Invalid storage path".to_string()))?,
         )?);
 
-        Ok(Self { db, config })
+        Ok(Self { 
+            db, 
+            config,
+            containers: HashMap::new(),
+        })
+    }
+
+    /// Loads a Docker application into a new container.
+    /// 
+    /// # Arguments
+    /// * `image` - Docker image name
+    /// * `app_id` - Unique identifier for the application
+    /// 
+    /// # Returns
+    /// * `NodeResult<String>` - Container ID if successful
+    pub fn load_docker_app(&mut self, image: &str, app_id: &str) -> NodeResult<String> {
+        // Check if Docker is available
+        if let Err(e) = Command::new("docker").arg("--version").output() {
+            return Err(NodeError::DockerError(format!("Docker not available: {}", e)));
+        }
+
+        // Create container with resource limits
+        let create_output = Command::new("docker")
+            .arg("create")
+            .arg("--memory")
+            .arg(format!("{}b", self.config.docker.memory_limit))
+            .arg("--cpus")
+            .arg(self.config.docker.cpu_limit.to_string())
+            .arg("--network")
+            .arg(if self.config.docker.network_config.network_isolated { "none" } else { "bridge" })
+            .args(self.config.docker.environment.iter().flat_map(|(k, v)| {
+                let env_arg = format!("{}={}", k, v);
+                vec!["-e".to_string(), env_arg]
+            }).collect::<Vec<String>>())
+            .args(self.config.docker.network_config.exposed_ports.iter().flat_map(|(container, host)| {
+                let port_arg = format!("{}:{}", host, container);
+                vec!["-p".to_string(), port_arg]
+            }).collect::<Vec<String>>())
+            .arg(image)
+            .output()
+            .map_err(|e| NodeError::DockerError(format!("Failed to create container: {}", e)))?;
+
+        if !create_output.status.success() {
+            return Err(NodeError::DockerError(format!(
+                "Container creation failed: {}",
+                String::from_utf8_lossy(&create_output.stderr)
+            )));
+        }
+
+        let container_id = String::from_utf8_lossy(&create_output.stdout).trim().to_string();
+
+        // Start container
+        let start_output = Command::new("docker")
+            .args(["start", &container_id])
+            .output()
+            .map_err(|e| NodeError::DockerError(format!("Failed to start container: {}", e)))?;
+
+        if !start_output.status.success() {
+            // Cleanup failed container
+            let _ = Command::new("docker")
+                .args(["rm", &container_id])
+                .output();
+            
+            return Err(NodeError::DockerError(format!(
+                "Container start failed: {}",
+                String::from_utf8_lossy(&start_output.stderr)
+            )));
+        }
+
+        // Track container state
+        self.containers.insert(app_id.to_string(), ContainerState {
+            id: container_id.clone(),
+            status: ContainerStatus::Running,
+            network_id: None,
+        });
+
+        Ok(container_id)
+    }
+
+    /// Stops and removes a Docker application container.
+    /// 
+    /// # Arguments
+    /// * `app_id` - Application identifier
+    /// 
+    /// # Returns
+    /// * `NodeResult<()>` - Success or error
+    pub fn remove_docker_app(&mut self, app_id: &str) -> NodeResult<()> {
+        if let Some(container) = self.containers.remove(app_id) {
+            // Stop container
+            let stop_output = Command::new("docker")
+                .args(["stop", &container.id])
+                .output()
+                .map_err(|e| NodeError::DockerError(format!("Failed to stop container: {}", e)))?;
+
+            if !stop_output.status.success() {
+                return Err(NodeError::DockerError(format!(
+                    "Container stop failed: {}",
+                    String::from_utf8_lossy(&stop_output.stderr)
+                )));
+            }
+
+            // Remove container
+            let rm_output = Command::new("docker")
+                .args(["rm", &container.id])
+                .output()
+                .map_err(|e| NodeError::DockerError(format!("Failed to remove container: {}", e)))?;
+
+            if !rm_output.status.success() {
+                return Err(NodeError::DockerError(format!(
+                    "Container removal failed: {}",
+                    String::from_utf8_lossy(&rm_output.stderr)
+                )));
+            }
+
+            // Cleanup network if isolated
+            if let Some(network_id) = container.network_id {
+                let _ = Command::new("docker")
+                    .args(["network", "rm", &network_id])
+                    .output();
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Gets the status of a Docker application container.
+    /// 
+    /// # Arguments
+    /// * `app_id` - Application identifier
+    /// 
+    /// # Returns
+    /// * `NodeResult<Option<ContainerStatus>>` - Container status if found
+    pub fn get_docker_app_status(&self, app_id: &str) -> NodeResult<Option<ContainerStatus>> {
+        Ok(self.containers.get(app_id).map(|c| c.status.clone()))
     }
 
     /// Loads an existing database node from the specified configuration.
@@ -283,6 +486,7 @@ mod tests {
         NodeConfig {
             storage_path: dir.path().to_path_buf(),
             default_trust_distance: 1,
+            docker: DockerConfig::default(),
         }
     }
 
@@ -302,5 +506,58 @@ mod tests {
         assert!(node.set_trust_distance(1).is_ok());
     }
 
-    // Add more tests as needed...
+    #[test]
+    fn test_docker_app_lifecycle() {
+        // Skip if Docker is not available
+        if Command::new("docker").arg("--version").output().is_err() {
+            println!("Skipping docker test - Docker not available");
+            return;
+        }
+
+        let mut config = create_test_config();
+        
+        // Configure Docker settings
+        config.docker.memory_limit = 256 * 1024 * 1024; // 256MB
+        config.docker.cpu_limit = 0.5;
+        config.docker.environment.insert("TEST_ENV".to_string(), "test_value".to_string());
+        config.docker.network_config.exposed_ports.insert(8080, 8081);
+
+        let mut node = DataFoldNode::new(config).unwrap();
+
+        // Test loading app
+        let app_id = "test-app";
+        let container_id = node.load_docker_app("hello-world:latest", app_id).unwrap();
+        assert!(!container_id.is_empty());
+
+        // Test getting status
+        let status = node.get_docker_app_status(app_id).unwrap();
+        assert!(matches!(status, Some(ContainerStatus::Running)));
+
+        // Test removing app
+        assert!(node.remove_docker_app(app_id).is_ok());
+
+        // Verify app is removed
+        let status = node.get_docker_app_status(app_id).unwrap();
+        assert!(status.is_none());
+    }
+
+    #[test]
+    fn test_docker_app_error_handling() {
+        // Skip if Docker is not available
+        if Command::new("docker").arg("--version").output().is_err() {
+            println!("Skipping docker test - Docker not available");
+            return;
+        }
+
+        let config = create_test_config();
+        let mut node = DataFoldNode::new(config).unwrap();
+
+        // Test loading non-existent image
+        let result = node.load_docker_app("non-existent-image:latest", "test-app");
+        assert!(matches!(result, Err(NodeError::DockerError(_))));
+
+        // Test removing non-existent app
+        let result = node.remove_docker_app("non-existent-app");
+        assert!(result.is_ok()); // Should succeed silently if app doesn't exist
+    }
 }

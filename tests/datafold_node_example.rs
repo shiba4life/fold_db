@@ -13,6 +13,7 @@ fn main() {
     let config = NodeConfig {
         storage_path: dir.path().to_path_buf(),
         default_trust_distance: 1,
+        docker: fold_db::datafold_node::DockerConfig::default(),
     };
 
     // Create a new node

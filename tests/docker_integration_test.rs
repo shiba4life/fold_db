@@ -149,7 +149,16 @@ services:
     // Create node config
     let node_config = r#"{
         "storage_path": "/app/data",
-        "default_trust_distance": 1
+        "default_trust_distance": 1,
+        "docker": {
+            "memory_limit": 1073741824,
+            "cpu_limit": 1.0,
+            "environment": {},
+            "network_config": {
+                "network_isolated": true,
+                "exposed_ports": {}
+            }
+        }
     }"#;
     
     fs::create_dir_all(test_dir.join("config"))?;
@@ -166,6 +175,7 @@ services:
     let node_config = NodeConfig {
         storage_path: PathBuf::from("/app/data"),
         default_trust_distance: 1,
+        docker: fold_db::datafold_node::DockerConfig::default(),
     };
     
     let mut node = DataFoldNode::new(node_config)?;
