@@ -49,3 +49,9 @@ pub struct NodeConfig {
     #[serde(default)]
     pub docker: DockerConfig,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeInfo {
+    pub id: String,
+    pub trust_distance: u32,
+}

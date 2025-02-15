@@ -1,10 +1,7 @@
 use super::fields::SchemaField;
 use crate::fees::SchemaPaymentConfig;
-use crate::fees::types::FieldPaymentConfig;
-use crate::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 /// A schema defines the structure and permissions of a data collection
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,7 +39,9 @@ impl Schema {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fees::types::TrustDistanceScaling;
+    use crate::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
+    use crate::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+    use uuid::Uuid;
 
     fn create_default_payment_config() -> FieldPaymentConfig {
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()

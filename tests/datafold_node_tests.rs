@@ -1,5 +1,4 @@
  use fold_db::testing::{
-    Atom,
     FieldPaymentConfig,
     TrustDistanceScaling,
     PermissionsPolicy,
@@ -8,7 +7,6 @@
     Mutation,
     Query,
     Schema,
-    SchemaError,
 };
 use fold_db::{DataFoldNode, NodeConfig};
 use serde_json::json;
@@ -117,11 +115,8 @@ fn test_node_data_operations() {
 fn test_trust_distance_handling() {
     let mut node = create_test_node();
 
-    // Test invalid trust distance
-    assert!(node.set_trust_distance(0).is_err());
-
-    // Test valid trust distance
-    assert!(node.set_trust_distance(2).is_ok());
+    // Test add trusted node
+    assert!(node.add_trusted_node("test_node").is_ok());
 
     // Verify default trust distance is applied to queries
     let schema = create_test_schema();
@@ -169,14 +164,6 @@ fn test_version_history() {
             .collect(),
     };
     node.mutate(mutation2).unwrap();
-
-    // Query to get the atom reference
-    let query = Query {
-        schema_name: "user_profile".to_string(),
-        pub_key: "test_key".to_string(),
-        fields: vec!["name".to_string()],
-        trust_distance: 1,
-    };
 
     // Get the schema to find the field's ref_atom_uuid
     let schema = node.get_schema("user_profile").unwrap().unwrap();

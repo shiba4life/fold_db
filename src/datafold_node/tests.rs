@@ -19,12 +19,14 @@ fn test_node_creation() {
 }
 
 #[test]
-fn test_trust_distance_validation() {
+fn test_add_trusted_node() {
     let config = create_test_config();
     let mut node = DataFoldNode::new(config).unwrap();
 
-    assert!(node.set_trust_distance(0).is_err());
-    assert!(node.set_trust_distance(1).is_ok());
+    assert!(node.add_trusted_node("test_node").is_ok());
+    assert!(node.get_trusted_nodes().contains_key("test_node"));
+    assert!(node.remove_trusted_node("test_node").is_ok());
+    assert!(!node.get_trusted_nodes().contains_key("test_node"));
 }
 
 #[test]

@@ -1,5 +1,4 @@
 use serde_json::Value;
-use sled;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -33,7 +32,7 @@ impl FoldDB {
     pub fn load_schema(&mut self, schema: Schema) -> Result<(), SchemaError> {
         let name = schema.name.clone();
         self.schema_manager.load_schema(schema)?;
-        self.schema_manager.map_fields(&name);
+        self.schema_manager.map_fields(&name)?;
         Ok(())
     }
 

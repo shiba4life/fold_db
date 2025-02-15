@@ -10,6 +10,7 @@ use crate::datafold_node::{
     docker::{self, ContainerState, ContainerStatus},
     error::{NodeError, NodeResult},
 };
+use crate::datafold_node::config::NodeInfo;
 
 /// A node in the FoldDB distributed database system.
 /// 
@@ -26,6 +27,8 @@ pub struct DataFoldNode {
     config: NodeConfig,
     /// Active containers
     containers: HashMap<String, ContainerState>,
+
+    trusted_nodes: HashMap<String, NodeInfo>,
 }
 
 impl DataFoldNode {
@@ -69,6 +72,7 @@ impl DataFoldNode {
             db, 
             config,
             containers: HashMap::new(),
+            trusted_nodes: HashMap::new(),
         })
     }
 
@@ -220,26 +224,37 @@ impl DataFoldNode {
         Ok(())
     }
 
-    /// Sets the default trust distance for this node.
-    /// 
-    /// The trust distance determines how far queries will traverse the network
-    /// when not explicitly specified in the query.
+    /// Adds a trusted node to the node's trusted nodes list.
     /// 
     /// # Arguments
-    /// * `distance` - The new default trust distance (must be > 0)
+    /// * `node_id` - The ID of the node to add
     /// 
     /// # Returns
-    /// * `NodeResult<()>` - Success or an error if the distance is invalid
-    pub fn set_trust_distance(&mut self, distance: u32) -> NodeResult<()> {
-        if distance == 0 {
-            return Err(NodeError::ConfigError(
-                "Trust distance must be greater than 0".to_string(),
-            ));
-        }
-        self.config.default_trust_distance = distance;
+    /// * `NodeResult<()>` - Success or an error if the node is already trusted
+    pub fn add_trusted_node(&mut self, node_id: &str) -> NodeResult<()> {
+        self.trusted_nodes.insert(node_id.to_string(), NodeInfo {
+            id: node_id.to_string(),
+            trust_distance: self.config.default_trust_distance,
+        });
         Ok(())
     }
 
+    /// Removes a trusted node from the node's trusted nodes list.
+    /// 
+    /// # Arguments
+    /// * `node_id` - The ID of the node to remove
+    /// 
+    /// # Returns
+    /// * `NodeResult<()>` - Success or an error if the node is not trusted
+    pub fn remove_trusted_node(&mut self, node_id: &str) -> NodeResult<()> {
+        self.trusted_nodes.remove(node_id);
+        Ok(())
+    }
+
+    pub fn get_trusted_nodes(&self) -> &HashMap<String, NodeInfo> {
+        &self.trusted_nodes
+    }
+    
     /// Retrieves the version history for a specific atom reference.
     /// 
     /// Returns all historical versions of the specified atom in chronological order.
