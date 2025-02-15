@@ -9,15 +9,47 @@ use std::sync::{Arc, Mutex};
 use crate::datafold_node::DataFoldNode;
 use serde_json::Value;
 
-/// Server that handles Unix Domain Socket connections
+/// Unix Domain Socket server for handling client connections to a DataFold node.
+/// 
+/// The SocketServer provides:
+/// - Network access to node operations
+/// - Request/response handling
+/// - Connection management
+/// - Authentication verification
+/// - Concurrent request processing
+/// 
+/// It acts as a bridge between clients and the DataFold node by:
+/// - Managing Unix Domain Socket connections
+/// - Parsing and validating requests
+/// - Coordinating with the node for operations
+/// - Formatting and sending responses
+/// - Handling errors and timeouts
 pub struct SocketServer {
+    /// Server configuration including socket path and permissions
     config: SocketConfig,
+    /// Thread-safe reference to the DataFold node
     node: Arc<Mutex<DataFoldNode>>,
+    /// Flag for graceful shutdown coordination
     shutdown: Arc<Mutex<bool>>,
 }
 
 impl SocketServer {
-    /// Create a new socket server
+    /// Creates a new socket server with the specified configuration and node.
+    /// 
+    /// This method:
+    /// 1. Wraps the node in thread-safe containers
+    /// 2. Creates necessary socket directories
+    /// 3. Cleans up any existing socket file
+    /// 4. Initializes the shutdown flag
+    /// 
+    /// # Arguments
+    /// 
+    /// * `config` - Server configuration
+    /// * `node` - DataFold node to serve
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing the new server or an IO error
     pub fn new(config: SocketConfig, node: DataFoldNode) -> std::io::Result<Self> {
         // Wrap node and shutdown flag in Arc and Mutex for shared ownership
         let node = Arc::new(Mutex::new(node));
@@ -35,7 +67,20 @@ impl SocketServer {
         Ok(Self { config, node, shutdown })
     }
 
-    /// Start the server and listen for connections
+    /// Starts the server and begins listening for connections.
+    /// 
+    /// This method:
+    /// 1. Creates and binds the Unix Domain Socket
+    /// 2. Sets socket permissions
+    /// 3. Spawns a handler thread for connections
+    /// 4. Manages non-blocking accept operations
+    /// 
+    /// The server runs until shutdown is requested, handling
+    /// connections and processing requests.
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing the server thread handle or an IO error
     pub fn start(&self) -> std::io::Result<thread::JoinHandle<()>> {
         let listener = UnixListener::bind(&self.config.socket_path)?;
         let shutdown = Arc::clone(&self.shutdown);
@@ -108,7 +153,16 @@ impl SocketServer {
         Ok(handle)
     }
 
-    /// Shutdown the server gracefully
+    /// Shuts down the server gracefully.
+    /// 
+    /// This method:
+    /// 1. Sets the shutdown flag to stop accepting new connections
+    /// 2. Cleans up the socket file
+    /// 3. Allows existing connections to complete
+    /// 
+    /// # Returns
+    /// 
+    /// A Result indicating success or an IO error
     pub fn shutdown(&self) -> std::io::Result<()> {
         // Set shutdown flag first
         {
@@ -132,7 +186,23 @@ impl Drop for SocketServer {
     }
 }
 
-/// Handle an individual client connection
+/// Handles an individual client connection.
+/// 
+/// This function:
+/// 1. Sets up buffered reading and writing
+/// 2. Reads and parses the request
+/// 3. Processes the request through the node
+/// 4. Sends the response back to the client
+/// 
+/// # Arguments
+/// 
+/// * `stream` - The client's connection stream
+/// * `node` - Thread-safe reference to the DataFold node
+/// * `buffer_size` - Size of the read buffer
+/// 
+/// # Returns
+/// 
+/// A Result indicating success or an IO error
 fn handle_connection(
     stream: std::os::unix::net::UnixStream,
     node: Arc<Mutex<DataFoldNode>>,
@@ -174,7 +244,21 @@ fn handle_connection(
     Ok(())
 }
 
-/// Process an API request
+/// Processes an API request through the DataFold node.
+/// 
+/// This function:
+/// 1. Verifies request authentication
+/// 2. Routes the request to the appropriate handler
+/// 3. Formats the response with results or errors
+/// 
+/// # Arguments
+/// 
+/// * `request` - The API request to process
+/// * `node` - Thread-safe reference to the DataFold node
+/// 
+/// # Returns
+/// 
+/// An ApiResponse containing the results or error details
 fn process_request(request: ApiRequest, node: &Arc<Mutex<DataFoldNode>>) -> ApiResponse {
     let request_id = request.request_id.clone();
 
@@ -253,7 +337,16 @@ fn process_request(request: ApiRequest, node: &Arc<Mutex<DataFoldNode>>) -> ApiR
     }
 }
 
-/// Send an API response
+/// Sends an API response to the client.
+/// 
+/// # Arguments
+/// 
+/// * `writer` - The stream to write the response to
+/// * `response` - The response to send
+/// 
+/// # Returns
+/// 
+/// A Result indicating success or an IO error
 fn send_response(writer: &mut impl Write, response: ApiResponse) -> std::io::Result<()> {
     let response_json = serde_json::to_string(&response)?;
     writer.write_all(response_json.as_bytes())?;
@@ -262,14 +355,39 @@ fn send_response(writer: &mut impl Write, response: ApiResponse) -> std::io::Res
     Ok(())
 }
 
-/// Verify authentication context
+/// Verifies the authentication context of a request.
+/// 
+/// Currently implements a basic check for non-empty public key.
+/// This will be replaced with proper cryptographic verification.
+/// 
+/// # Arguments
+/// 
+/// * `auth` - The authentication context to verify
+/// 
+/// # Returns
+/// 
+/// true if authentication is valid, false otherwise
 fn verify_auth(auth: &crate::application::types::AuthContext) -> bool {
     // TODO: Implement proper authentication verification
     // For now, accept any non-empty public key
     !auth.public_key.is_empty()
 }
 
-/// Handle a query operation
+/// Handles a query operation.
+/// 
+/// This function:
+/// 1. Extracts query parameters from the payload
+/// 2. Constructs and executes the query
+/// 3. Formats the results
+/// 
+/// # Arguments
+/// 
+/// * `payload` - The query parameters
+/// * `node` - Thread-safe reference to the DataFold node
+/// 
+/// # Returns
+/// 
+/// A Result containing the query results or an error message
 fn handle_query(payload: serde_json::Value, node: &Arc<Mutex<DataFoldNode>>) -> Result<serde_json::Value, String> {
     use crate::schema::types::Query;
 
@@ -320,7 +438,21 @@ fn handle_query(payload: serde_json::Value, node: &Arc<Mutex<DataFoldNode>>) -> 
     }))
 }
 
-/// Handle a mutation operation
+/// Handles a mutation operation.
+/// 
+/// This function:
+/// 1. Extracts mutation parameters from the payload
+/// 2. Constructs and executes the mutation
+/// 3. Returns the result
+/// 
+/// # Arguments
+/// 
+/// * `payload` - The mutation parameters
+/// * `node` - Thread-safe reference to the DataFold node
+/// 
+/// # Returns
+/// 
+/// A Result containing the mutation result or an error message
 fn handle_mutation(payload: serde_json::Value, node: &Arc<Mutex<DataFoldNode>>) -> Result<serde_json::Value, String> {
     use crate::schema::types::Mutation;
     use std::collections::HashMap;
@@ -355,7 +487,21 @@ fn handle_mutation(payload: serde_json::Value, node: &Arc<Mutex<DataFoldNode>>) 
     }))
 }
 
-/// Handle a get schema operation
+/// Handles a get schema operation.
+/// 
+/// This function:
+/// 1. Extracts the schema identifier from the payload
+/// 2. Retrieves the schema from the node
+/// 3. Formats the response
+/// 
+/// # Arguments
+/// 
+/// * `payload` - The schema request parameters
+/// * `node` - Thread-safe reference to the DataFold node
+/// 
+/// # Returns
+/// 
+/// A Result containing the schema or an error message
 fn handle_get_schema(payload: serde_json::Value, node: &Arc<Mutex<DataFoldNode>>) -> Result<serde_json::Value, String> {
     // Try to get schema_id from payload, falling back to direct schema name if not found
     let schema_id = payload["schema_id"]

@@ -9,14 +9,38 @@ use crate::fees::{
     Error, GlobalPaymentConfig, LightningPaymentRequest, PaymentState, PaymentStatus,
 };
 
+/// Manages payment processing and Lightning Network integration.
+/// 
+/// The PaymentManager handles all aspects of payment lifecycle:
+/// - Invoice generation and tracking
+/// - Payment verification and status updates
+/// - Hold invoice management
+/// - Payment timeouts and retries
+/// - Invoice cleanup and cancellation
+/// 
+/// It provides thread-safe access to payment state and integrates
+/// with the Lightning Network for actual payment processing.
 #[derive(Debug)]
 pub struct PaymentManager {
+    /// Global configuration for payment processing
     config: GlobalPaymentConfig,
+    /// Thread-safe storage of payment states
     invoice_states: Arc<RwLock<HashMap<String, PaymentState>>>,
+    /// Client for Lightning Network interactions
     lightning_client: Arc<Box<dyn LightningClient>>,
 }
 
 impl PaymentManager {
+    /// Creates a new PaymentManager instance.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `config` - Global configuration for payment processing
+    /// * `lightning_client` - Client implementation for Lightning Network operations
+    /// 
+    /// # Returns
+    /// 
+    /// A new PaymentManager instance configured for payment processing
     #[must_use]
     pub fn new(config: GlobalPaymentConfig, lightning_client: Box<dyn LightningClient>) -> Self {
         Self {
@@ -26,9 +50,26 @@ impl PaymentManager {
         }
     }
 
-    /// Generates a new lightning invoice.
-    ///
+    /// Generates a new Lightning Network invoice.
+    /// 
+    /// This method:
+    /// 1. Validates the payment amount
+    /// 2. Creates an invoice through the Lightning client
+    /// 3. Initializes payment state tracking
+    /// 4. Configures appropriate timeouts
+    /// 
+    /// # Arguments
+    /// 
+    /// * `amount` - Payment amount in satoshis
+    /// * `memo` - Description for the payment
+    /// * `hold_invoice` - Whether to create a hold invoice
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing the payment request or an error
+    /// 
     /// # Errors
+    /// 
     /// Returns an Error if:
     /// - The invoice amount is invalid
     /// - The lightning client fails to generate the invoice
@@ -69,9 +110,26 @@ impl PaymentManager {
         Ok(invoice)
     }
 
-    /// Verifies the status of a payment.
-    ///
+    /// Verifies the current status of a payment.
+    /// 
+    /// This method:
+    /// 1. Updates the last checked timestamp
+    /// 2. Checks for payment expiration
+    /// 3. Verifies payment status with Lightning node
+    /// 4. Updates internal payment state
+    /// 
+    /// # Arguments
+    /// 
+    /// * `payment_hash` - Hash identifying the payment to verify
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing:
+    /// - true if payment is settled
+    /// - false if pending or failed
+    /// 
     /// # Errors
+    /// 
     /// Returns an Error if:
     /// - The payment hash is not found
     /// - The lightning client fails to check the payment status
@@ -117,9 +175,26 @@ impl PaymentManager {
         }
     }
 
-    /// Waits for a payment to complete.
-    ///
+    /// Waits for a payment to complete with periodic status checks.
+    /// 
+    /// This method:
+    /// 1. Periodically checks payment status
+    /// 2. Handles payment timeouts
+    /// 3. Manages retry attempts
+    /// 
+    /// # Arguments
+    /// 
+    /// * `invoice` - The payment request to monitor
+    /// * `check_interval` - Time between status checks
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing:
+    /// - true if payment completed successfully
+    /// - Error if payment failed or timed out
+    /// 
     /// # Errors
+    /// 
     /// Returns an Error if:
     /// - The payment verification fails
     /// - The maximum number of retries is exceeded
@@ -150,10 +225,25 @@ impl PaymentManager {
     }
 
     /// Cancels a pending payment.
-    ///
+    /// 
+    /// This method:
+    /// 1. Verifies the payment is not already finalized
+    /// 2. Cancels the invoice with the Lightning node
+    /// 3. Updates the payment status
+    /// 
+    /// # Arguments
+    /// 
+    /// * `payment_hash` - Hash identifying the payment to cancel
+    /// 
+    /// # Returns
+    /// 
+    /// A Result indicating success or containing an error
+    /// 
     /// # Errors
+    /// 
     /// Returns an Error if:
     /// - The payment hash is not found
+    /// - The payment is already finalized
     /// - The lightning client fails to cancel the invoice
     pub async fn cancel_payment(&self, payment_hash: &str) -> Result<(), Error> {
         {
@@ -179,8 +269,20 @@ impl PaymentManager {
     }
 
     /// Cleans up expired invoices.
-    ///
+    /// 
+    /// This method:
+    /// 1. Identifies expired invoices
+    /// 2. Cancels them with the Lightning node
+    /// 3. Updates their status to expired
+    /// 
+    /// Failed cancellations are logged but don't stop the cleanup process.
+    /// 
+    /// # Returns
+    /// 
+    /// A Result indicating success or containing an error
+    /// 
     /// # Errors
+    /// 
     /// Returns an Error if:
     /// - The lightning client fails to cancel any expired invoices
     pub async fn cleanup_expired_invoices(&self) -> Result<(), Error> {
@@ -218,8 +320,17 @@ impl PaymentManager {
     }
 
     /// Gets the current status of a payment.
-    ///
+    /// 
+    /// # Arguments
+    /// 
+    /// * `payment_hash` - Hash identifying the payment
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing the payment status or an error
+    /// 
     /// # Errors
+    /// 
     /// Returns an Error if:
     /// - The payment hash is not found
     pub async fn get_payment_status(&self, payment_hash: &str) -> Result<PaymentStatus, Error> {

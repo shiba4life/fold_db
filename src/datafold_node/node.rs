@@ -14,40 +14,53 @@ use crate::datafold_node::config::NodeInfo;
 
 /// A node in the FoldDB distributed database system.
 /// 
-/// DataFoldNode manages local data storage and processing, including:
-/// - Schema management
-/// - Query processing
-/// - Mutation handling
-/// - Version history tracking
+/// DataFoldNode is responsible for:
+/// - Managing local data storage and processing
+/// - Running and supervising application containers
+/// - Controlling network access and isolation
+/// - Handling schema operations
+/// - Processing queries and mutations
+/// - Maintaining trust relationships
+/// - Managing version history
+/// 
+/// The node provides a secure environment for applications by:
+/// - Running them in isolated Docker containers
+/// - Mediating all network access
+/// - Enforcing schema-based data validation
+/// - Applying permission and payment policies
 #[derive(Clone)]
 pub struct DataFoldNode {
-    /// The underlying database instance
+    /// The underlying database instance for data storage and operations
     db: Arc<FoldDB>,
-    /// Node configuration
+    /// Configuration settings for this node
     config: NodeConfig,
-    /// Active containers
+    /// Map of active application containers and their states
     containers: HashMap<String, ContainerState>,
-
+    /// Map of trusted nodes and their trust distances
     trusted_nodes: HashMap<String, NodeInfo>,
 }
 
 impl DataFoldNode {
     /// Creates a new DataFoldNode with the specified configuration.
     /// 
-    /// This will initialize a new database instance at the specified storage path
-    /// and set up Docker networking if container support is enabled.
+    /// This method:
+    /// 1. Initializes a new database instance at the storage path
+    /// 2. Sets up Docker networking if container support is enabled
+    /// 3. Configures trust relationships and permissions
     /// 
-    /// This will initialize a new database instance at the specified storage path.
     /// If the storage path already contains a database, a new node will be created
     /// that can access that data.
     /// 
     /// # Arguments
+    /// 
     /// * `config` - Configuration for the new node
     /// 
     /// # Returns
-    /// * `NodeResult<Self>` - The newly created node or an error if initialization failed
+    /// 
+    /// A Result containing the new node or an error if initialization failed
     /// 
     /// # Example
+    /// 
     /// ```no_run
     /// use fold_db::{DataFoldNode, NodeConfig, datafold_node::DockerConfig};
     /// use std::path::PathBuf;
@@ -78,12 +91,22 @@ impl DataFoldNode {
 
     /// Loads a Docker application into a new container.
     /// 
+    /// This method:
+    /// 1. Verifies Docker availability
+    /// 2. Creates a new container from the specified image
+    /// 3. Starts the container
+    /// 4. Tracks the container's state
+    /// 
+    /// If any step fails, the container is cleaned up before returning an error.
+    /// 
     /// # Arguments
-    /// * `image` - Docker image name
+    /// 
+    /// * `image` - Docker image name to run
     /// * `app_id` - Unique identifier for the application
     /// 
     /// # Returns
-    /// * `NodeResult<String>` - Container ID if successful
+    /// 
+    /// A Result containing the container ID or an error
     pub fn load_docker_app(&mut self, image: &str, app_id: &str) -> NodeResult<String> {
         docker::check_docker_available()?;
 
@@ -107,11 +130,19 @@ impl DataFoldNode {
 
     /// Stops and removes a Docker application container.
     /// 
+    /// This method:
+    /// 1. Stops the container if running
+    /// 2. Removes the container
+    /// 3. Cleans up any associated network configuration
+    /// 4. Updates internal container tracking
+    /// 
     /// # Arguments
+    /// 
     /// * `app_id` - Application identifier
     /// 
     /// # Returns
-    /// * `NodeResult<()>` - Success or error
+    /// 
+    /// A Result indicating success or an error
     pub fn remove_docker_app(&mut self, app_id: &str) -> NodeResult<()> {
         if let Some(container) = self.containers.remove(app_id) {
             docker::stop_container(&container.id)?;
@@ -129,10 +160,12 @@ impl DataFoldNode {
     /// Gets the status of a Docker application container.
     /// 
     /// # Arguments
+    /// 
     /// * `app_id` - Application identifier
     /// 
     /// # Returns
-    /// * `NodeResult<Option<ContainerStatus>>` - Container status if found
+    /// 
+    /// A Result containing the container status if found
     pub fn get_docker_app_status(&self, app_id: &str) -> NodeResult<Option<ContainerStatus>> {
         Ok(self.containers.get(app_id).map(|c| c.status.clone()))
     }
@@ -143,10 +176,12 @@ impl DataFoldNode {
     /// existing data at the storage path.
     /// 
     /// # Arguments
+    /// 
     /// * `config` - Configuration pointing to the existing database location
     /// 
     /// # Returns
-    /// * `NodeResult<Self>` - The loaded node or an error if loading failed
+    /// 
+    /// A Result containing the loaded node or an error
     pub fn load(config: NodeConfig) -> NodeResult<Self> {
         // For now, loading is same as creating new since FoldDB handles existing data
         Self::new(config)
@@ -154,15 +189,21 @@ impl DataFoldNode {
 
     /// Loads a schema into the database.
     /// 
-    /// The schema will be available for subsequent queries and mutations.
+    /// This method:
+    /// 1. Validates the schema structure
+    /// 2. Checks for conflicts with existing schemas
+    /// 3. Makes the schema available for operations
     /// 
     /// # Arguments
+    /// 
     /// * `schema` - The schema to load
     /// 
     /// # Returns
-    /// * `NodeResult<()>` - Success or an error if schema loading failed
+    /// 
+    /// A Result indicating success or an error
     /// 
     /// # Errors
+    /// 
     /// Returns an error if:
     /// - The schema is invalid
     /// - There are conflicts with existing schemas
@@ -177,23 +218,30 @@ impl DataFoldNode {
     /// Retrieves a schema by its ID.
     /// 
     /// # Arguments
+    /// 
     /// * `schema_id` - The unique identifier of the schema
     /// 
     /// # Returns
-    /// * `NodeResult<Option<Schema>>` - The schema if found, None if not found, or an error
+    /// 
+    /// A Result containing the schema if found
     pub fn get_schema(&self, schema_id: &str) -> NodeResult<Option<Schema>> {
         Ok(self.db.schema_manager.get_schema(schema_id)?)
     }
 
     /// Executes a query against the database.
     /// 
-    /// If the query's trust_distance is 0, it will be set to the node's default_trust_distance.
+    /// This method:
+    /// 1. Applies default trust distance if not specified
+    /// 2. Validates permissions for each requested field
+    /// 3. Retrieves and returns the requested data
     /// 
     /// # Arguments
+    /// 
     /// * `query` - The query to execute
     /// 
     /// # Returns
-    /// * `NodeResult<Vec<Result<Value, SchemaError>>>` - Query results or errors for each matched item
+    /// 
+    /// A Result containing query results or errors for each field
     pub fn query(&self, mut query: Query) -> NodeResult<Vec<Result<Value, SchemaError>>> {
         // Apply default trust distance if not set
         if query.trust_distance == 0 {
@@ -206,13 +254,22 @@ impl DataFoldNode {
 
     /// Executes a mutation on the database.
     /// 
+    /// This method:
+    /// 1. Validates the mutation against schema constraints
+    /// 2. Checks permissions for each field
+    /// 3. Creates new versions of modified data
+    /// 4. Updates references to point to new versions
+    /// 
     /// # Arguments
+    /// 
     /// * `mutation` - The mutation to execute
     /// 
     /// # Returns
-    /// * `NodeResult<()>` - Success or an error if the mutation failed
+    /// 
+    /// A Result indicating success or an error
     /// 
     /// # Errors
+    /// 
     /// Returns an error if:
     /// - The mutation violates schema constraints
     /// - The database is locked
@@ -226,11 +283,18 @@ impl DataFoldNode {
 
     /// Adds a trusted node to the node's trusted nodes list.
     /// 
+    /// Trust relationships affect:
+    /// - Permission calculations
+    /// - Payment requirements
+    /// - Data access control
+    /// 
     /// # Arguments
+    /// 
     /// * `node_id` - The ID of the node to add
     /// 
     /// # Returns
-    /// * `NodeResult<()>` - Success or an error if the node is already trusted
+    /// 
+    /// A Result indicating success or an error
     pub fn add_trusted_node(&mut self, node_id: &str) -> NodeResult<()> {
         self.trusted_nodes.insert(node_id.to_string(), NodeInfo {
             id: node_id.to_string(),
@@ -242,28 +306,38 @@ impl DataFoldNode {
     /// Removes a trusted node from the node's trusted nodes list.
     /// 
     /// # Arguments
+    /// 
     /// * `node_id` - The ID of the node to remove
     /// 
     /// # Returns
-    /// * `NodeResult<()>` - Success or an error if the node is not trusted
+    /// 
+    /// A Result indicating success or an error
     pub fn remove_trusted_node(&mut self, node_id: &str) -> NodeResult<()> {
         self.trusted_nodes.remove(node_id);
         Ok(())
     }
 
+    /// Gets the current list of trusted nodes and their trust distances.
+    /// 
+    /// # Returns
+    /// 
+    /// A reference to the map of trusted nodes
     pub fn get_trusted_nodes(&self) -> &HashMap<String, NodeInfo> {
         &self.trusted_nodes
     }
     
     /// Retrieves the version history for a specific atom reference.
     /// 
-    /// Returns all historical versions of the specified atom in chronological order.
+    /// This method follows the chain of previous versions to build
+    /// a complete history of changes to the data.
     /// 
     /// # Arguments
+    /// 
     /// * `aref_uuid` - The UUID of the atom reference
     /// 
     /// # Returns
-    /// * `NodeResult<Vec<Value>>` - List of historical versions or an error
+    /// 
+    /// A Result containing the list of historical versions
     pub fn get_history(&self, aref_uuid: &str) -> NodeResult<Vec<Value>> {
         let history = self
             .db
@@ -278,13 +352,16 @@ impl DataFoldNode {
 
     /// Allows operations on a schema.
     /// 
-    /// Grants permission to perform operations on the specified schema.
+    /// This method enables queries and mutations on the specified schema
+    /// after it has been loaded and validated.
     /// 
     /// # Arguments
+    /// 
     /// * `schema_name` - Name of the schema to allow operations on
     /// 
     /// # Returns
-    /// * `NodeResult<()>` - Success or an error if permission cannot be granted
+    /// 
+    /// A Result indicating success or an error
     pub fn allow_schema(&mut self, schema_name: &str) -> NodeResult<()> {
         Arc::get_mut(&mut self.db)
             .ok_or_else(|| NodeError::ConfigError("Cannot get mutable reference to database".into()))?

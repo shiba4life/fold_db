@@ -1,0 +1,148 @@
+@startuml FoldDB Class Diagram
+
+' Core Components
+package "Core" {
+    class FoldDB {
+        + new()
+    }
+
+    class Atom {
+        - uuid: String
+        - source_schema_name: String
+        - source_pub_key: String
+        - created_at: DateTime<Utc>
+        - prev_atom_uuid: Option<String>
+        - content: Value
+        + new()
+        + content()
+        + get_transformed_content()
+        + uuid()
+        + source_schema_name()
+        + source_pub_key()
+        + created_at()
+        + prev_atom_uuid()
+    }
+
+    class AtomRef {
+        - uuid: String
+        - atom_uuid: Option<String>
+        - updated_at: DateTime<Utc>
+        + new()
+        + set_atom_uuid()
+        + get_atom_uuid()
+        + uuid()
+        + updated_at()
+    }
+}
+
+' Schema Management
+package "Schema" {
+    class SchemaManager {
+        + load_schema()
+        + validate_schema()
+        + get_schema()
+    }
+
+    class Schema {
+        - name: String
+        - fields: Vec<SchemaField>
+        + validate()
+        + transform()
+    }
+
+    class SchemaInterpreter {
+        + interpret()
+        + validate()
+    }
+
+    class SchemaField {
+        - name: String
+        - field_type: String
+        - permissions: PermissionPolicy
+        - payment_config: SchemaPaymentConfig
+    }
+}
+
+' Permissions
+package "Permissions" {
+    class PermissionManager {
+        + validate_access()
+        + check_trust_distance()
+    }
+
+    class PermissionWrapper {
+        + wrap()
+        + unwrap()
+    }
+
+    class PermissionPolicy {
+        - read_policy: Policy
+        - write_policy: Policy
+        + validate()
+    }
+}
+
+' Payment System
+package "Fees" {
+    class PaymentManager {
+        + calculate_fee()
+        + verify_payment()
+        + generate_invoice()
+    }
+
+    class PaymentCalculator {
+        + calculate()
+        + scale_by_trust()
+    }
+
+    class LightningClient {
+        + create_invoice()
+        + verify_payment()
+    }
+}
+
+' Application Layer
+package "Application" {
+    class DataFoldNode {
+        + start()
+        + stop()
+        + handle_request()
+    }
+
+    class SocketServer {
+        + listen()
+        + handle_connection()
+    }
+
+    class DataFoldClient {
+        + connect()
+        + query()
+        + mutate()
+    }
+}
+
+' Relationships
+FoldDB --> SchemaManager
+FoldDB --> PermissionManager
+FoldDB --> PaymentManager
+FoldDB --> "*" Atom
+Atom --> "0..1" Atom: prev_atom
+AtomRef --> "1" Atom: references
+
+SchemaManager --> "*" Schema
+Schema --> "*" SchemaField
+SchemaField --> "1" PermissionPolicy
+SchemaField --> "1" SchemaPaymentConfig
+SchemaManager --> SchemaInterpreter
+
+PermissionManager --> "*" PermissionPolicy
+PermissionManager --> PermissionWrapper
+
+PaymentManager --> PaymentCalculator
+PaymentManager --> LightningClient
+
+DataFoldNode --> FoldDB
+DataFoldNode --> SocketServer
+DataFoldClient --> SocketServer
+
+@enduml

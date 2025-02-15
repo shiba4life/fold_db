@@ -2,7 +2,19 @@ use super::{Schema, SchemaError}; // Updated to use re-exported types
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+/// Manages the lifecycle and operations of schemas in the database.
+/// 
+/// The SchemaManager is responsible for:
+/// - Loading and unloading schemas
+/// - Validating schema structure
+/// - Managing schema field mappings
+/// - Tracking schema relationships
+/// - Providing schema access and validation services
+/// 
+/// It uses a thread-safe mutex to protect the schema collection,
+/// allowing safe concurrent access from multiple threads.
 pub struct SchemaManager {
+    /// Thread-safe storage for loaded schemas
     schemas: Mutex<HashMap<String, Schema>>,
 }
 
@@ -121,14 +133,25 @@ impl Default for SchemaManager {
 }
 
 impl SchemaManager {
+    /// Creates a new SchemaManager instance.
+    /// 
+    /// Initializes an empty collection of schemas protected by a mutex.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Loads a schema into the manager.
-    ///
+    /// 
+    /// This method adds a new schema to the manager's collection, making it
+    /// available for validation, mapping, and querying operations.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema` - The schema to load
+    /// 
     /// # Errors
+    /// 
     /// Returns a `SchemaError` if the schema lock cannot be acquired.
     pub fn load_schema(&self, schema: Schema) -> Result<(), SchemaError> {
         self.schemas
@@ -139,8 +162,21 @@ impl SchemaManager {
     }
 
     /// Unloads a schema from the manager.
-    ///
+    /// 
+    /// Removes a schema from the manager's collection, making it unavailable
+    /// for further operations.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema_name` - Name of the schema to unload
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing true if the schema was found and removed,
+    /// false if it didn't exist
+    /// 
     /// # Errors
+    /// 
     /// Returns a `SchemaError::MappingError` if the schema lock cannot be acquired.
     pub fn unload_schema(&self, schema_name: &str) -> Result<bool, SchemaError> {
         let mut schemas = self
@@ -151,8 +187,17 @@ impl SchemaManager {
     }
 
     /// Retrieves a schema by name.
-    ///
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema_name` - Name of the schema to retrieve
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing an Option with the schema if found
+    /// 
     /// # Errors
+    /// 
     /// Returns a `SchemaError::MappingError` if the schema lock cannot be acquired.
     pub fn get_schema(&self, schema_name: &str) -> Result<Option<Schema>, SchemaError> {
         let schemas = self
@@ -162,9 +207,14 @@ impl SchemaManager {
         Ok(schemas.get(schema_name).cloned())
     }
 
-    /// Lists all schema names.
-    ///
+    /// Lists all schema names currently loaded in the manager.
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing a vector of schema names
+    /// 
     /// # Errors
+    /// 
     /// Returns a `SchemaError::MappingError` if the schema lock cannot be acquired.
     pub fn list_schemas(&self) -> Result<Vec<String>, SchemaError> {
         let schemas = self
@@ -174,9 +224,18 @@ impl SchemaManager {
         Ok(schemas.keys().cloned().collect())
     }
 
-    /// Checks if a schema exists.
-    ///
+    /// Checks if a schema exists in the manager.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema_name` - Name of the schema to check
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing true if the schema exists, false otherwise
+    /// 
     /// # Errors
+    /// 
     /// Returns a `SchemaError::MappingError` if the schema lock cannot be acquired.
     pub fn schema_exists(&self, schema_name: &str) -> Result<bool, SchemaError> {
         let schemas = self
@@ -186,17 +245,42 @@ impl SchemaManager {
         Ok(schemas.contains_key(schema_name))
     }
 
-    /// Checks if a schema is loaded.
-    ///
+    /// Checks if a schema is loaded and available for use.
+    /// 
+    /// This is an alias for schema_exists, provided for semantic clarity
+    /// when checking schema availability.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema_name` - Name of the schema to check
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing true if the schema is loaded, false otherwise
+    /// 
     /// # Errors
+    /// 
     /// Returns a `SchemaError::MappingError` if the schema lock cannot be acquired.
     pub fn is_loaded(&self, schema_name: &str) -> Result<bool, SchemaError> {
         self.schema_exists(schema_name)
     }
 
-    /// Loads a schema with a specific name.
-    ///
+    /// Loads a schema with name validation.
+    /// 
+    /// This method ensures the schema's name matches the provided name
+    /// before loading it into the manager.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - Expected name of the schema
+    /// * `schema` - The schema to load
+    /// 
+    /// # Returns
+    /// 
+    /// A Result indicating success or an error
+    /// 
     /// # Errors
+    /// 
     /// Returns:
     /// - `SchemaError::InvalidData` if the schema name doesn't match the provided name
     /// - `SchemaError::MappingError` if the schema lock cannot be acquired
@@ -211,6 +295,24 @@ impl SchemaManager {
         Ok(())
     }
 
+    /// Maps fields between schemas based on their field_mappers configurations.
+    /// 
+    /// This method:
+    /// 1. Finds all fields in the target schema that map to other schemas
+    /// 2. Locates the corresponding source fields
+    /// 3. Copies the ref_atom_uuid from source to target fields
+    /// 4. Updates the target schema with the new mappings
+    /// 
+    /// This enables schema transformation and field relationships by
+    /// linking fields across different schemas.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema_name` - Name of the schema whose fields should be mapped
+    /// 
+    /// # Returns
+    /// 
+    /// A Result indicating success or containing a SchemaError
     pub fn map_fields(&self, schema_name: &str) -> Result<(), SchemaError> {
         let schemas = self.schemas
             .lock()
@@ -252,5 +354,4 @@ impl SchemaManager {
         }
         Ok(())
     }
-
 }

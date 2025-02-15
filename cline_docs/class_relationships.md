@@ -1,133 +1,136 @@
-# FoldDB Class Relationships
+# Class Relationships Documentation
 
-## Core Components Overview
+## Core Components
 
-### FoldDB (Main Entry Point)
-- **Primary Dependencies:**
-  - SchemaManager
-  - PermissionWrapper
-  - Atom
-  - AtomRef
-- **Responsibilities:**
-  - Database operations coordination
-  - Schema loading and management
-  - Permission validation through PermissionWrapper
-  - Atom and AtomRef storage management
-  - Query and mutation execution
+### FoldDB
+- Central coordinator for all database operations
+- Manages interactions between SchemaManager, PermissionManager, and PaymentManager
+- Handles Atom creation and retrieval
+- Core entry point for all database operations
+
+### Atom
+- Immutable data container with version tracking
+- Contains actual content and metadata
+- Links to previous versions through prev_atom_uuid
+- Includes schema and source information
+- Timestamps for auditing
+
+### AtomRef
+- Mutable reference to latest version of an Atom
+- Provides indirection for version management
+- Tracks update timestamps
+- Enables atomic updates through reference switching
+
+## Schema Management
 
 ### SchemaManager
-- **Dependencies:**
-  - Schema
-- **Responsibilities:**
-  - Schema validation and storage
-  - Schema transformation execution
-  - Schema lifecycle management (load/unload)
-- **Used By:**
-  - FoldDB for schema operations
-  - PermissionWrapper for permission validation
+- Manages schema lifecycle and validation
+- Coordinates with SchemaInterpreter for schema loading
+- Maintains registry of available schemas
+- Provides schema validation services
+
+### Schema
+- Represents data structure definition
+- Contains collection of SchemaFields
+- Handles validation and transformation rules
+- Defines data shape and constraints
+
+### SchemaInterpreter
+- Interprets JSON schema definitions
+- Validates schema structure
+- Processes field configurations
+- Handles schema transformations
+
+### SchemaField
+- Defines individual field properties
+- Links to permission policies
+- Contains payment configurations
+- Specifies field type and constraints
+
+## Permissions
 
 ### PermissionManager
-- **Dependencies:**
-  - PermissionsPolicy
-  - TrustDistance
-- **Responsibilities:**
-  - Permission validation
-  - Trust distance calculations
-  - Read/write permission checks
-- **Used By:**
-  - PermissionWrapper as the core permission logic
+- Validates access permissions
+- Calculates trust distances
+- Manages permission policies
+- Coordinates with PermissionWrapper
 
-### Atom & AtomRef System
-- **Atom**
-  - Immutable data container
-  - Stores content and metadata
-  - Links to previous versions
-- **AtomRef**
-  - Points to latest version of data
-  - Enables version tracking
-  - Used by FoldDB for data access
+### PermissionWrapper
+- Wraps data with permission checks
+- Provides permission verification layer
+- Ensures consistent permission application
 
-## Data Flow Relationships
+### PermissionPolicy
+- Defines read/write access rules
+- Contains policy validation logic
+- Specifies access control rules
 
-1. **Schema Definition Flow**
-   ```
-   FoldDB -> SchemaManager -> Schema
-   ```
-   - FoldDB receives schema definitions
-   - SchemaManager validates and stores schemas
-   - Schema objects define data structure and permissions
+## Payment System
 
-2. **Permission Check Flow**
-   ```
-   FoldDB -> PermissionWrapper -> PermissionManager -> PermissionsPolicy
-   ```
-   - FoldDB initiates permission checks
-   - PermissionWrapper coordinates permission validation
-   - PermissionManager performs actual permission checks
-   - PermissionsPolicy defines access rules
+### PaymentManager
+- Coordinates payment processing
+- Manages Lightning Network integration
+- Handles invoice generation
+- Verifies payment completion
 
-3. **Data Storage Flow**
-   ```
-   FoldDB -> Atom -> AtomRef
-   ```
-   - FoldDB manages data operations
-   - Atoms store immutable data versions
-   - AtomRefs track latest versions
+### PaymentCalculator
+- Calculates fees based on trust and schema
+- Applies scaling factors
+- Determines payment requirements
+
+### LightningClient
+- Interfaces with Lightning Network
+- Creates and manages invoices
+- Verifies payment status
+
+## Application Layer
+
+### DataFoldNode
+- Manages application containers
+- Provides API access
+- Coordinates network access
+- Handles client connections
+
+### SocketServer
+- Manages network communications
+- Handles connection lifecycle
+- Provides socket-based API
+
+### DataFoldClient
+- Client interface to FoldDB
+- Handles queries and mutations
+- Manages connection state
 
 ## Key Relationships
 
-### FoldDB ↔ SchemaManager
-- FoldDB delegates all schema operations
-- SchemaManager provides schema validation and management
-- Two-way communication for schema operations
+1. Version Management
+   - Atoms link to previous versions creating a chain
+   - AtomRefs provide latest version lookup
+   - Enables atomic updates and version history
 
-### FoldDB ↔ PermissionWrapper
-- FoldDB requests permission checks
-- PermissionWrapper coordinates with PermissionManager
-- Enforces access control on operations
+2. Schema Validation Flow
+   - SchemaManager coordinates with SchemaInterpreter
+   - Schemas contain SchemaFields
+   - Fields link to PermissionPolicies and PaymentConfigs
 
-### Atom ↔ AtomRef
-- AtomRef maintains pointer to current Atom
-- Atoms link to previous versions
-- Enables version history tracking
+3. Access Control
+   - PermissionManager validates through PermissionPolicies
+   - PermissionWrapper provides security layer
+   - Integrated with schema-level permissions
 
-### Schema ↔ PermissionsPolicy
-- Schema defines field-level permissions
-- PermissionsPolicy implements access rules
-- Integrated through permission checks
+4. Payment Processing
+   - PaymentManager coordinates with PaymentCalculator
+   - LightningClient handles payment network interaction
+   - Integrated with schema-level payment requirements
 
-## Implementation Details
+5. Application Integration
+   - DataFoldNode provides container management
+   - SocketServer handles communications
+   - DataFoldClient provides API access
 
-### Concurrency Management
-- SchemaManager uses Mutex for thread-safe schema access
-- Atomic operations through immutable Atoms
-- Version control through AtomRef updates
-
-### Error Handling
-- Consistent error types across components
-- SchemaError for schema-related issues
-- Permission validation results
-- Atomic operation guarantees
-
-### Data Access Patterns
-1. Schema validation first
-2. Permission checks second
-3. Data access/modification last
-4. Version history maintenance
-
-## Extension Points
-
-### Schema Transformation
-- Transform pipeline in SchemaManager
-- Extensible schema validation
-- Custom schema operations
-
-### Permission Models
-- Trust distance calculations
-- Explicit permission overrides
-- Public key based access control
-
-### Storage Layer
-- Sled database backend
-- In-memory caching
-- Versioned data storage
+This architecture enables:
+- Immutable data storage with version tracking
+- Schema-based validation and transformation
+- Fine-grained permission control
+- Integrated payment processing
+- Containerized application management

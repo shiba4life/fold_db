@@ -3,21 +3,58 @@ use crate::schema_interpreter::types::{JsonSchemaDefinition, JsonSchemaField};
 use crate::schema_interpreter::validator::SchemaValidator;
 use std::collections::HashMap;
 
-/// Interprets JSON schema definitions and converts them to `FoldDB` schemas.
+/// Interprets and converts JSON schema definitions into FoldDB schemas.
+/// 
+/// The SchemaInterpreter is responsible for:
+/// - Validating JSON schema definitions
+/// - Converting JSON fields to FoldDB schema fields
+/// - Handling schema loading from various sources
+/// - Ensuring schema integrity and completeness
+/// 
+/// It provides a bridge between human-readable JSON schema definitions
+/// and the internal schema representation used by FoldDB, ensuring that:
+/// - All required fields are present
+/// - Field configurations are valid
+/// - Permissions are properly defined
+/// - Payment requirements are correctly specified
 #[derive(Default)]
 pub struct SchemaInterpreter;
 
 impl SchemaInterpreter {
     /// Creates a new schema interpreter.
+    /// 
+    /// The interpreter is stateless, so this method simply returns
+    /// a new instance ready for schema interpretation.
     #[must_use]
     pub const fn new() -> Self {
         Self
     }
 
-    /// Interprets a JSON schema definition and converts it to a `FoldDB` schema.
-    ///
+    /// Interprets a JSON schema definition and converts it to a FoldDB schema.
+    /// 
+    /// This method:
+    /// 1. Validates the JSON schema structure
+    /// 2. Converts each field definition
+    /// 3. Assembles the complete schema
+    /// 
+    /// The conversion process ensures that all required components are present
+    /// and properly configured, including:
+    /// - Field definitions and types
+    /// - Permission policies
+    /// - Payment configurations
+    /// - Field mappings
+    /// 
+    /// # Arguments
+    /// 
+    /// * `json_schema` - The JSON schema definition to interpret
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing the converted Schema or an error
+    /// 
     /// # Errors
-    /// Returns a `SchemaError` if:
+    /// 
+    /// Returns a SchemaError if:
     /// - The schema validation fails
     /// - Any required fields are missing
     /// - Field configurations are invalid
@@ -42,7 +79,21 @@ impl SchemaInterpreter {
         })
     }
 
-    /// Converts a JSON schema field to a `FoldDB` schema field.
+    /// Converts a JSON schema field definition to a FoldDB schema field.
+    /// 
+    /// This method handles the conversion of:
+    /// - Permission policies
+    /// - Payment configurations
+    /// - Field references
+    /// - Field mappings
+    /// 
+    /// # Arguments
+    /// 
+    /// * `json_field` - The JSON field definition to convert
+    /// 
+    /// # Returns
+    /// 
+    /// The converted SchemaField
     fn convert_field(json_field: JsonSchemaField) -> SchemaField {
         SchemaField::new(
             json_field.permission_policy.into(),
@@ -53,9 +104,23 @@ impl SchemaInterpreter {
     }
 
     /// Interprets a JSON schema from a string.
-    ///
+    /// 
+    /// This method:
+    /// 1. Parses the JSON string
+    /// 2. Validates the schema structure
+    /// 3. Converts it to a FoldDB schema
+    /// 
+    /// # Arguments
+    /// 
+    /// * `json_str` - The JSON schema definition as a string
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing the converted Schema or an error
+    /// 
     /// # Errors
-    /// Returns a `SchemaError` if:
+    /// 
+    /// Returns a SchemaError if:
     /// - The JSON string is invalid
     /// - The schema validation fails
     /// - Any required fields are missing
@@ -67,9 +132,23 @@ impl SchemaInterpreter {
     }
 
     /// Interprets a JSON schema from a file.
-    ///
+    /// 
+    /// This method:
+    /// 1. Reads the schema file
+    /// 2. Parses the JSON content
+    /// 3. Validates and converts the schema
+    /// 
+    /// # Arguments
+    /// 
+    /// * `path` - Path to the JSON schema file
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing the converted Schema or an error
+    /// 
     /// # Errors
-    /// Returns a `SchemaError` if:
+    /// 
+    /// Returns a SchemaError if:
     /// - The file cannot be read
     /// - The file contains invalid JSON
     /// - The schema validation fails

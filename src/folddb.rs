@@ -8,15 +8,40 @@ use crate::schema::schema_manager::SchemaManager;
 use crate::schema::types::{Mutation, Query};
 use crate::schema::{Schema, SchemaError};
 
+/// The main database coordinator that manages schemas, permissions, and data storage.
+/// 
+/// FoldDB serves as the central point of coordination for all database operations,
+/// managing the interactions between:
+/// - Schema validation and management
+/// - Permission checking and access control
+/// - Atomic data storage and versioning
+/// - Field-level data operations
+/// 
+/// The database uses an embedded sled instance for persistent storage while maintaining
+/// in-memory caches for frequently accessed atoms and atom references.
 pub struct FoldDB {
+    /// The underlying sled database instance for persistent storage
     pub db: sled::Db,
+    /// In-memory cache of atoms for faster access
     pub atoms: HashMap<String, Atom>,
+    /// In-memory cache of atom references for faster access
     pub ref_atoms: HashMap<String, AtomRef>,
+    /// Manager for schema validation and transformation
     pub schema_manager: SchemaManager,
+    /// Wrapper for handling permission checks
     permission_wrapper: PermissionWrapper,
 }
 
 impl FoldDB {
+    /// Creates a new FoldDB instance with the specified storage path.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `path` - The filesystem path where the sled database will store its data
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing the new FoldDB instance or a sled error
     pub fn new(path: &str) -> sled::Result<Self> {
         let db = sled::open(path)?;
         Ok(Self {
@@ -28,7 +53,21 @@ impl FoldDB {
         })
     }
 
-    /// Loads and validates a schema, running any transforms
+    /// Loads and validates a schema into the database.
+    /// 
+    /// This method:
+    /// 1. Validates the schema structure
+    /// 2. Runs any specified transformations
+    /// 3. Maps schema fields to their storage locations
+    /// 4. Makes the schema available for queries and mutations
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema` - The schema to load and validate
+    /// 
+    /// # Returns
+    /// 
+    /// A Result indicating success or containing a SchemaError
     pub fn load_schema(&mut self, schema: Schema) -> Result<(), SchemaError> {
         let name = schema.name.clone();
         self.schema_manager.load_schema(schema)?;
@@ -36,7 +75,18 @@ impl FoldDB {
         Ok(())
     }
 
-    /// Makes a schema queriable and writable
+    /// Enables querying and writing operations for a schema.
+    /// 
+    /// The schema must have been previously loaded using `load_schema`.
+    /// This separation allows for schema validation before enabling operations.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema_name` - Name of the schema to enable
+    /// 
+    /// # Returns
+    /// 
+    /// A Result indicating success or containing a SchemaError if the schema doesn't exist
     pub fn allow_schema(&mut self, schema_name: &str) -> Result<(), SchemaError> {
         let exists = self.schema_manager.schema_exists(schema_name)?;
         if !exists {
@@ -48,7 +98,21 @@ impl FoldDB {
         Ok(())
     }
 
-    /// Executes a query against a schema
+    /// Executes a query against a schema, checking permissions for each field.
+    /// 
+    /// This method:
+    /// 1. Validates permissions for each requested field
+    /// 2. Retrieves allowed field values
+    /// 3. Returns results for each field individually
+    /// 
+    /// # Arguments
+    /// 
+    /// * `query` - The query containing schema name, fields, and authentication info
+    /// 
+    /// # Returns
+    /// 
+    /// A vector of Results, one for each requested field, containing either
+    /// the field value or a SchemaError
     pub fn query_schema(&self, query: Query) -> Vec<Result<Value, SchemaError>> {
         // Process each field, checking permissions individually
         query
@@ -77,7 +141,21 @@ impl FoldDB {
             .collect()
     }
 
-    /// Writes data to a schema
+    /// Writes data to a schema, checking permissions for each field.
+    /// 
+    /// This method:
+    /// 1. Validates permissions for each field being written
+    /// 2. Creates new Atoms for the updated values
+    /// 3. Updates AtomRefs to point to the new versions
+    /// 4. Maintains the version history chain
+    /// 
+    /// # Arguments
+    /// 
+    /// * `mutation` - The mutation containing schema name, field values, and authentication info
+    /// 
+    /// # Returns
+    /// 
+    /// A Result indicating success or containing a SchemaError
     pub fn write_schema(&mut self, mutation: Mutation) -> Result<(), SchemaError> {
         // Process each field, checking permissions individually
         for (field_name, value) in mutation.fields_and_values.iter() {
@@ -103,6 +181,17 @@ impl FoldDB {
         Ok(())
     }
 
+    /// Retrieves the latest version of an Atom through its AtomRef.
+    /// 
+    /// First checks the in-memory cache, then falls back to disk storage.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `aref_uuid` - UUID of the AtomRef pointing to the desired Atom
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing either the latest Atom or an error if not found
     fn get_latest_atom(&self, aref_uuid: &str) -> Result<Atom, Box<dyn std::error::Error>> {
         // Try in-memory cache first
         if let Some(aref) = self.ref_atoms.get(aref_uuid) {
@@ -127,6 +216,18 @@ impl FoldDB {
         Ok(atom)
     }
 
+    /// Retrieves the complete version history for an Atom.
+    /// 
+    /// Follows the chain of prev_atom_uuid references to build the full history,
+    /// starting from the most recent version and working backwards.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `aref_uuid` - UUID of the AtomRef pointing to the most recent version
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing a vector of Atoms in chronological order (newest first)
     pub fn get_atom_history(
         &self,
         aref_uuid: &str,
@@ -148,6 +249,18 @@ impl FoldDB {
         Ok(history)
     }
 
+    /// Retrieves the value of a specific field from a schema.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema_name` - Name of the schema containing the field
+    /// * `field` - Name of the field to retrieve
+    /// * `_pub_key` - Public key for authentication (currently unused)
+    /// * `_trust_distance` - Trust distance for permission calculation (currently unused)
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing either the field value or a SchemaError
     pub fn get_field_value(
         &self,
         schema_name: &str,
@@ -176,6 +289,24 @@ impl FoldDB {
         }
     }
 
+    /// Sets the value of a specific field in a schema.
+    /// 
+    /// This method:
+    /// 1. Creates a new Atom with the updated value
+    /// 2. Links it to the previous version if one exists
+    /// 3. Updates or creates an AtomRef to point to the new version
+    /// 4. Persists changes to both memory and disk
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema_name` - Name of the schema containing the field
+    /// * `field` - Name of the field to update
+    /// * `content` - New value for the field
+    /// * `source_pub_key` - Public key of the entity making the change
+    /// 
+    /// # Returns
+    /// 
+    /// A Result indicating success or containing a SchemaError
     pub fn set_field_value(
         &mut self,
         schema_name: &str,
