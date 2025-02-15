@@ -1,8 +1,13 @@
-use fold_db::fees::payment_config::SchemaPaymentConfig;
-use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
-use fold_db::permissions::types::policy::{ExplicitCounts, PermissionsPolicy, TrustDistance};
-use fold_db::schema::types::fields::SchemaField;
-use fold_db::schema::Schema;
+use fold_db::testing::{
+    SchemaPaymentConfig,
+    FieldPaymentConfig,
+    TrustDistanceScaling,
+    ExplicitCounts,
+    PermissionsPolicy,
+    TrustDistance,
+    SchemaField,
+    Schema,
+};
 use std::collections::HashMap;
 
 pub fn create_field_with_permissions(

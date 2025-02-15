@@ -3,6 +3,10 @@ name = "fold_db"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+test-utils = []  # Feature flag for test utilities
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -16,6 +20,11 @@ thiserror = "1.0"
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 tempfile = "3.8"
+fold_db = { path = ".", features = ["test-utils"] }  # Enable test-utils for tests
+
+[lib]
+name = "fold_db"
+path = "src/lib.rs"
 
 [[bin]]
 name = "datafold_node"

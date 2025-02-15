@@ -1,7 +1,10 @@
 use fold_db::{ClientConfig, DataFoldClient, DataFoldNode, NodeConfig, SocketConfig, SocketServer};
-use fold_db::schema::{Schema, SchemaField};
-use fold_db::permissions::types::policy::PermissionsPolicy;
-use fold_db::fees::types::config::FieldPaymentConfig;
+use fold_db::testing::{
+    Schema,
+    SchemaField,
+    PermissionsPolicy,
+    FieldPaymentConfig,
+};
 use serde_json::json;
 use std::time::Duration;
 use tempfile::tempdir;

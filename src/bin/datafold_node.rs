@@ -1,8 +1,4 @@
-use fold_db::{
-    DataFoldNode,
-    NodeConfig,
-    schema::Schema,
-};
+use fold_db::{DataFoldNode, NodeConfig, Schema};
 use std::fs;
 
 #[tokio::main]

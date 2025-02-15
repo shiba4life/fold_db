@@ -1,4 +1,4 @@
-use fold_db::schema_interpreter::SchemaInterpreter;
+use fold_db::testing::SchemaInterpreter;
 
 
 #[test]

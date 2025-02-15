@@ -1,9 +1,15 @@
- use fold_db::atom::Atom;
-use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
-use fold_db::permissions::types::policy::{PermissionsPolicy, TrustDistance};
-use fold_db::schema::types::fields::SchemaField;
-use fold_db::schema::types::{Mutation, Query};
-use fold_db::schema::{Schema, SchemaError};
+ use fold_db::testing::{
+    Atom,
+    FieldPaymentConfig,
+    TrustDistanceScaling,
+    PermissionsPolicy,
+    TrustDistance,
+    SchemaField,
+    Mutation,
+    Query,
+    Schema,
+    SchemaError,
+};
 use fold_db::{DataFoldNode, NodeConfig};
 use serde_json::json;
 use tempfile::tempdir;

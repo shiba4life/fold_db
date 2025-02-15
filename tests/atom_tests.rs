@@ -1,5 +1,5 @@
 use chrono::Utc;
-use fold_db::atom::{Atom, AtomRef};
+use fold_db::testing::{Atom, AtomRef};
 use serde_json::json;
 
 #[test]

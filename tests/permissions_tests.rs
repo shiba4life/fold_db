@@ -1,11 +1,16 @@
-use fold_db::{
-    fees::payment_config::SchemaPaymentConfig,
-    fees::types::{FieldPaymentConfig, TrustDistanceScaling},
-    permissions::types::policy::TrustDistance,
-    permissions::{PermissionWrapper, PermissionsPolicy},
-    schema::schema_manager::SchemaManager,
-    schema::types::{Mutation, Query, SchemaField},
-    schema::Schema,
+use fold_db::testing::{
+    SchemaPaymentConfig,
+    FieldPaymentConfig,
+    TrustDistanceScaling,
+    TrustDistance,
+    PermissionWrapper,
+    PermissionsPolicy,
+    SchemaManager,
+    Mutation,
+    Query,
+    SchemaField,
+    Schema,
+    ExplicitCounts,
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -133,7 +138,7 @@ fn test_permission_wrapper_mutation() {
     );
     let mut explicit_counts = HashMap::new();
     explicit_counts.insert("allowed_key".to_string(), 1);
-    policy.explicit_write_policy = Some(fold_db::permissions::types::policy::ExplicitCounts {
+    policy.explicit_write_policy = Some(ExplicitCounts {
         counts_by_pub_key: explicit_counts,
     });
     let field = SchemaField::new(

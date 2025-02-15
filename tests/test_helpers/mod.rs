@@ -1,6 +1,8 @@
 pub mod operation_builder;
 pub mod schema_builder;
 
+// Re-export testing utilities for all tests
+pub use fold_db::testing::*;
 use fold_db::FoldDB;
 use std::fs;
 use std::path::Path;
@@ -114,6 +116,6 @@ pub fn setup_test_db() -> (FoldDB, String) {
 pub fn setup_and_allow_schema(
     db: &mut FoldDB,
     schema_name: &str,
-) -> Result<(), fold_db::schema::SchemaError> {
+) -> Result<(), fold_db::testing::SchemaError> {
     db.allow_schema(schema_name)
 }

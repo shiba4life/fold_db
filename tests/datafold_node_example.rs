@@ -1,7 +1,11 @@
-use fold_db::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
-use fold_db::permissions::types::policy::{PermissionsPolicy, TrustDistance};
-use fold_db::schema::types::fields::SchemaField;
-use fold_db::schema::Schema;
+use fold_db::testing::{
+    FieldPaymentConfig,
+    TrustDistanceScaling,
+    PermissionsPolicy,
+    TrustDistance,
+    SchemaField,
+    Schema,
+};
 use fold_db::{DataFoldNode, NodeConfig};
 use std::collections::HashMap;
 use tempfile::tempdir;

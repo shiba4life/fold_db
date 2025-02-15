@@ -5,12 +5,16 @@ use std::env;
 use std::io;
 use std::path::Path;
 
-use fold_db::{
-    DataFoldNode,
-    NodeConfig,
-    schema::{Schema, Query, Mutation, SchemaField},
-    permissions::types::policy::{PermissionsPolicy, TrustDistance},
-    fees::types::config::{FieldPaymentConfig, TrustDistanceScaling},
+use fold_db::{DataFoldNode, NodeConfig};
+use fold_db::testing::{
+    Schema,
+    Query,
+    Mutation,
+    SchemaField,
+    PermissionsPolicy,
+    TrustDistance,
+    FieldPaymentConfig,
+    TrustDistanceScaling,
 };
 use serde_json::json;
 use std::collections::HashMap;
