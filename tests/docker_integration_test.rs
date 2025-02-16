@@ -74,6 +74,7 @@ fn test_docker_node_integration() -> Result<(), Box<dyn std::error::Error>> {
         SchemaField::new(
             permissions.clone(),
             payment_config.clone(),
+            HashMap::new(),
         ).with_ref_atom_uuid(Uuid::new_v4().to_string()),
     );
     
@@ -82,6 +83,7 @@ fn test_docker_node_integration() -> Result<(), Box<dyn std::error::Error>> {
         SchemaField::new(
             permissions,
             payment_config,
+            HashMap::new(),
         ).with_ref_atom_uuid(Uuid::new_v4().to_string()),
     );
     

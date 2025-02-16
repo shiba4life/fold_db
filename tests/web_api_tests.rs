@@ -35,15 +35,14 @@ fn create_test_schema() -> Schema {
     let mut schema = Schema::new("user_profile".to_string());
 
     // Add name field
-    let name_field = SchemaField {
-        ref_atom_uuid: Some(uuid::Uuid::new_v4().to_string()),
-        permission_policy: PermissionsPolicy::new(
+    let name_field = SchemaField::new(
+        PermissionsPolicy::new(
             TrustDistance::Distance(1),
             TrustDistance::Distance(1),
         ),
-        payment_config: FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
-        field_mappers: HashMap::new(),
-    };
+        FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
+        HashMap::new(),
+    );
     schema.add_field("name".to_string(), name_field);
 
     schema

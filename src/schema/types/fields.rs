@@ -26,7 +26,7 @@ pub struct SchemaField {
     
     /// Reference to the atom containing this field's value
     /// The actual field value is fetched through this reference
-    pub ref_atom_uuid: Option<String>,
+    ref_atom_uuid: Option<String>,
     
     /// Mappings for field transformations and schema evolution
     /// Keys are source schema names, values are source field names
@@ -51,12 +51,13 @@ impl SchemaField {
     /// 
     /// A new SchemaField instance with the specified configurations
     #[must_use]
-    pub fn new(permission_policy: PermissionsPolicy, payment_config: FieldPaymentConfig) -> Self {
+    pub fn new(permission_policy: PermissionsPolicy, payment_config: FieldPaymentConfig, 
+        field_mappers: HashMap<String, String>) -> Self {
         Self {
             permission_policy,
             payment_config,
             ref_atom_uuid: None,
-            field_mappers: HashMap::new(),
+            field_mappers,
         }
     }
 
@@ -78,6 +79,10 @@ impl SchemaField {
         self
     }
 
+    pub fn get_ref_atom_uuid(&self) -> Option<String> {
+        self.ref_atom_uuid.clone()
+    }
+
     /// Sets the field mappings for schema transformation.
     /// 
     /// This builder method configures how this field maps to fields
@@ -96,5 +101,9 @@ impl SchemaField {
     pub fn with_field_mappers(mut self, field_mappers: HashMap<String, String>) -> Self {
         self.field_mappers = field_mappers;
         self
+    }
+
+    pub fn set_ref_atom_uuid(&mut self, ref_atom_uuid: String) {
+        self.ref_atom_uuid = Some(ref_atom_uuid);
     }
 }

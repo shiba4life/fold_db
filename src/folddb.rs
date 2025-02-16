@@ -279,11 +279,11 @@ impl FoldDB {
             .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
 
         // If no ref_atom_uuid is set, return null
-        let Some(ref_atom_uuid) = &field.ref_atom_uuid else {
+        let Some(ref_atom_uuid) = field.get_ref_atom_uuid() else {
             return Ok(Value::Null);
         };
 
-        match self.get_latest_atom(ref_atom_uuid) {
+        match self.get_latest_atom(&ref_atom_uuid) {
             Ok(atom) => Ok(atom.content().clone()),
             Err(_) => Ok(Value::Null),
         }
@@ -314,26 +314,33 @@ impl FoldDB {
         content: Value,
         source_pub_key: String,
     ) -> Result<(), SchemaError> {
-        let schema = self
-            .schema_manager
-            .get_schema(schema_name)?
-            .ok_or_else(|| SchemaError::NotFound(format!("Schema {} not found", schema_name)))?;
+        // First, get or create the aref_uuid
+        let aref_uuid = {
+            let schema = self.schema_manager.get_schema(schema_name)?
+                .ok_or_else(|| SchemaError::NotFound(format!("Schema {} not found", schema_name)))?;
+            let field = schema.fields.get(field)
+                .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
+            
+            field.get_ref_atom_uuid().unwrap_or_else(|| {
+                let aref_uuid = Uuid::new_v4().to_string();
+                let aref = AtomRef::new(aref_uuid.clone());
+                self.ref_atoms.insert(aref_uuid.clone(), aref);
+                aref_uuid
+            })
+        };
 
-        let field = schema
-            .fields
-            .get(field)
-            .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
+        // Then update the schema with the new aref_uuid
+        {
+            let mut schema = self.schema_manager.get_schema(schema_name)?
+                .ok_or_else(|| SchemaError::NotFound(format!("Schema {} not found", schema_name)))?
+                .clone();
+            if let Some(field) = schema.fields.get_mut(field) {
+                field.set_ref_atom_uuid(aref_uuid.clone());
+            }
+            self.schema_manager.load_schema(schema)?;
+        }
 
-        // If there's no ref_atom_uuid, create a new one
-        let aref_uuid = field.ref_atom_uuid.clone().unwrap_or_else(|| {
-            let aref_uuid = Uuid::new_v4().to_string();
-            let aref = AtomRef::new(aref_uuid.clone());
-            self.ref_atoms.insert(aref_uuid.clone(), aref);
-            aref_uuid
-        });
-
-        let prev_atom_uuid = self
-            .ref_atoms
+        let prev_atom_uuid = self.ref_atoms
             .get(&aref_uuid)
             .map(|aref| aref.get_atom_uuid().unwrap().clone());
 
@@ -345,7 +352,6 @@ impl FoldDB {
             content,
         );
 
-        // Store value and update in-memory cache
         let atom_bytes = serde_json::to_vec(&atom)
             .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize atom: {}", e)))?;
         self.db

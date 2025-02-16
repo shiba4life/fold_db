@@ -98,9 +98,9 @@ impl SchemaInterpreter {
         SchemaField::new(
             json_field.permission_policy.into(),
             json_field.payment_config.into(),
+            json_field.field_mappers,
         )
         .with_ref_atom_uuid(json_field.ref_atom_uuid)
-        .with_field_mappers(json_field.field_mappers)
     }
 
     /// Interprets a JSON schema from a string.
@@ -240,6 +240,6 @@ mod tests {
         };
 
         let field = SchemaInterpreter::convert_field(json_field);
-        assert_eq!(field.ref_atom_uuid, Some("test_uuid".to_string()));
+        assert_eq!(field.get_ref_atom_uuid(), Some("test_uuid".to_string()));
     }
 }

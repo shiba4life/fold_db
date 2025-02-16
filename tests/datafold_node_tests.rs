@@ -11,7 +11,6 @@
 use fold_db::{DataFoldNode, NodeConfig};
 use serde_json::json;
 use tempfile::tempdir;
-use uuid;
 use std::collections::HashMap;
 
 fn create_test_node() -> DataFoldNode {
@@ -28,27 +27,25 @@ fn create_test_schema() -> Schema {
     let mut schema = Schema::new("user_profile".to_string());
 
     // Add name field
-    let name_field = SchemaField {
-        ref_atom_uuid: Some(uuid::Uuid::new_v4().to_string()),
-        permission_policy: PermissionsPolicy::new(
+    let name_field = SchemaField::new(
+        PermissionsPolicy::new(
             TrustDistance::Distance(1),
             TrustDistance::Distance(1),
         ),
-        payment_config: FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
-        field_mappers: HashMap::new(),
-    };
+        FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
+        HashMap::new(),
+    );
     schema.add_field("name".to_string(), name_field);
 
     // Add email field
-    let email_field = SchemaField {
-        ref_atom_uuid: Some(uuid::Uuid::new_v4().to_string()),
-        permission_policy: PermissionsPolicy::new(
+    let email_field = SchemaField::new(
+        PermissionsPolicy::new(
             TrustDistance::Distance(1),
             TrustDistance::Distance(1),
         ),
-        payment_config: FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
-        field_mappers: HashMap::new(),
-    };
+        FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
+        HashMap::new(),
+    );
     schema.add_field("email".to_string(), email_field);
 
     schema
@@ -170,7 +167,7 @@ fn test_version_history() {
     let name_field = schema.fields.get("name").unwrap();
 
     // Get history using the actual ref_atom_uuid
-    let history = node.get_history(name_field.ref_atom_uuid.as_ref().unwrap());
+    let history = node.get_history(&name_field.get_ref_atom_uuid().unwrap());
     assert!(history.is_ok());
 
     // Verify history contents

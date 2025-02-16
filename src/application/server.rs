@@ -526,7 +526,7 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
     use crate::schema::types::Schema;
-
+    use std::collections::HashMap;
     // Mock DataFoldNode for testing
     struct MockNode {
         temp_dir: tempfile::TempDir,
@@ -575,6 +575,7 @@ mod tests {
         let field = crate::schema::types::fields::SchemaField::new(
             policy,
             crate::fees::types::config::FieldPaymentConfig::default(),
+            HashMap::new(),
         ).with_ref_atom_uuid("test_field_ref".to_string());
         schema.add_field("test_field".to_string(), field);
         node.load_schema(schema).expect("Failed to create schema");
@@ -622,6 +623,7 @@ mod tests {
         let field = crate::schema::types::fields::SchemaField::new(
             policy,
             crate::fees::types::config::FieldPaymentConfig::default(),
+            HashMap::new(),
         ).with_ref_atom_uuid("test_field_ref".to_string());
         schema.add_field("test_field".to_string(), field);
         node.load_schema(schema).expect("Failed to create schema");

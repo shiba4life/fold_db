@@ -29,6 +29,7 @@ fn test_schema_field_management() {
     let field = SchemaField::new(
         PermissionsPolicy::default(),
         create_default_payment_config(),
+        HashMap::new(),
     ).with_ref_atom_uuid("test-uuid".to_string());
 
     // Add field
@@ -37,7 +38,7 @@ fn test_schema_field_management() {
     // Verify field was added
     assert!(schema.fields.contains_key(&field_name));
     let stored_field = schema.fields.get(&field_name).unwrap();
-    assert_eq!(stored_field.ref_atom_uuid, Some("test-uuid".to_string()));
+    assert_eq!(stored_field.get_ref_atom_uuid(), Some("test-uuid".to_string()));
     assert!(stored_field.field_mappers.is_empty());
 }
 
@@ -53,6 +54,7 @@ fn test_schema_field_permissions() {
             TrustDistance::Distance(3),
         ),
         create_default_payment_config(),
+        HashMap::new(),
     ).with_ref_atom_uuid(Uuid::new_v4().to_string());
 
     schema.add_field(field_name.clone(), field.clone());
@@ -80,8 +82,8 @@ fn test_schema_field_mappers() {
     let field = SchemaField::new(
         PermissionsPolicy::default(),
         create_default_payment_config(),
-    )
-    .with_ref_atom_uuid(Uuid::new_v4().to_string())
+        HashMap::new(),
+    ).with_ref_atom_uuid(Uuid::new_v4().to_string())
     .with_field_mappers(field_mappers.clone());
 
     schema.add_field(field_name.clone(), field);
@@ -114,6 +116,7 @@ fn test_schema_with_multiple_fields() {
             SchemaField::new(
                 policy,
                 create_default_payment_config(),
+                HashMap::new(),
             ).with_ref_atom_uuid(Uuid::new_v4().to_string()),
         );
     }
@@ -162,6 +165,7 @@ fn test_user_profile_schema() {
         SchemaField::new(
             PermissionsPolicy::default(), // Public read access
             create_default_payment_config(),
+                HashMap::new(),
         ).with_ref_atom_uuid(Uuid::new_v4().to_string())
     );
 
@@ -174,6 +178,7 @@ fn test_user_profile_schema() {
                 TrustDistance::Distance(1)  // Limited write access
             ),
             create_default_payment_config(),
+            HashMap::new(),
         ).with_ref_atom_uuid(Uuid::new_v4().to_string())
     );
 
@@ -186,6 +191,7 @@ fn test_user_profile_schema() {
                 TrustDistance::Distance(3)  // Restricted write access
             ),
             create_default_payment_config(),
+            HashMap::new(),
         ).with_ref_atom_uuid(Uuid::new_v4().to_string())
     );
 

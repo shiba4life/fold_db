@@ -26,8 +26,10 @@ mod tests {
     use crate::schema::types::fields::SchemaField;
 
     fn create_test_field(ref_atom_uuid: Option<String>, field_mappers: HashMap<String, String>) -> SchemaField {
-        let mut field = SchemaField::new(PermissionsPolicy::default(), FieldPaymentConfig::default())
-            .with_field_mappers(field_mappers);
+        let mut field = SchemaField::new(
+            PermissionsPolicy::default(), 
+            FieldPaymentConfig::default(), 
+            field_mappers);
         if let Some(uuid) = ref_atom_uuid {
             field = field.with_ref_atom_uuid(uuid);
         }
@@ -66,7 +68,7 @@ mod tests {
         // Verify the mapping
         let mapped_schema = manager.get_schema("target_schema").unwrap().unwrap();
         let mapped_field = mapped_schema.fields.get("target_field").unwrap();
-        assert_eq!(mapped_field.ref_atom_uuid, Some("test_uuid".to_string()));
+        assert_eq!(mapped_field.get_ref_atom_uuid(), Some("test_uuid".to_string()));
     }
 
     #[test]
@@ -91,7 +93,7 @@ mod tests {
         // Verify the field was not mapped
         let mapped_schema = manager.get_schema("target_schema").unwrap().unwrap();
         let mapped_field = mapped_schema.fields.get("target_field").unwrap();
-        assert_eq!(mapped_field.ref_atom_uuid, None);
+        assert_eq!(mapped_field.get_ref_atom_uuid(), None);
     }
 
     #[test]
@@ -120,7 +122,7 @@ mod tests {
         // Verify the field was not mapped
         let mapped_schema = manager.get_schema("target_schema").unwrap().unwrap();
         let mapped_field = mapped_schema.fields.get("target_field").unwrap();
-        assert_eq!(mapped_field.ref_atom_uuid, None);
+        assert_eq!(mapped_field.get_ref_atom_uuid(), None);
     }
 }
 
@@ -325,7 +327,7 @@ impl SchemaManager {
                 for (source_schema_name, source_field_name) in &field.field_mappers {
                     if let Some(source_schema) = schemas.get(source_schema_name) {
                         if let Some(source_field) = source_schema.fields.get(source_field_name) {
-                            if let Some(ref_atom_uuid) = &source_field.ref_atom_uuid {
+                            if let Some(ref_atom_uuid) = source_field.get_ref_atom_uuid() {
                                 field_mappings.push((
                                     field_name.clone(),
                                     ref_atom_uuid.clone()
@@ -349,7 +351,7 @@ impl SchemaManager {
         // Apply the collected mappings
         for (field_name, ref_atom_uuid) in field_mappings {
             if let Some(field) = schema.fields.get_mut(&field_name) {
-                field.ref_atom_uuid = Some(ref_atom_uuid);
+                field.set_ref_atom_uuid(ref_atom_uuid);
             }
         }
         Ok(())

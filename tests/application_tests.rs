@@ -8,6 +8,7 @@ use fold_db::testing::{
 use serde_json::json;
 use std::time::Duration;
 use tempfile::tempdir;
+use std::collections::HashMap;
 
 #[tokio::test]
 async fn test_socket_communication() -> std::io::Result<()> {
@@ -33,6 +34,7 @@ async fn test_socket_communication() -> std::io::Result<()> {
         SchemaField::new(
             PermissionsPolicy::default(),
             FieldPaymentConfig::default(),
+            HashMap::new(),
         ).with_ref_atom_uuid("name_ref".to_string())
     );
     test_schema.add_field(
@@ -40,6 +42,7 @@ async fn test_socket_communication() -> std::io::Result<()> {
         SchemaField::new(
             PermissionsPolicy::default(),
             FieldPaymentConfig::default(),
+            HashMap::new(),
         ).with_ref_atom_uuid("email_ref".to_string())
     );
 

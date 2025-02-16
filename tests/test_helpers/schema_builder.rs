@@ -1,7 +1,6 @@
 use fold_db::testing::{
     SchemaPaymentConfig,
     FieldPaymentConfig,
-    TrustDistanceScaling,
     ExplicitCounts,
     PermissionsPolicy,
     TrustDistance,
@@ -29,6 +28,7 @@ pub fn create_field_with_permissions(
             }),
         },
         FieldPaymentConfig::default(),
+        HashMap::new(),
     ).with_ref_atom_uuid(ref_atom_uuid)
 }
 
