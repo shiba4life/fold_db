@@ -214,8 +214,7 @@ impl DataFoldNode {
             },
             Operation::Mutation { schema, operation: _, data } => {
                 let fields_and_values = match data {
-                    Value::Object(map) => map.into_iter()
-                        .map(|(k, v)| (k, v))
+                      Value::Object(map) => map.into_iter()
                         .collect(),
                     _ => return Err(NodeError::ConfigError("Mutation data must be an object".into()))
                 };

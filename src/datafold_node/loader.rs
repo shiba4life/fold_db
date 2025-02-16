@@ -13,7 +13,6 @@ mod tests {
     use super::*;
     use crate::NodeConfig;
     use crate::datafold_node::DockerConfig;
-    use std::path::PathBuf;
     use tempfile::tempdir;
 
     #[test]
