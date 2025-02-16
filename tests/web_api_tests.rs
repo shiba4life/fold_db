@@ -167,3 +167,63 @@ async fn test_schema_loading_malformed_json() {
 
     assert_eq!(response.status(), 400); // Warp will return 400 for invalid JSON
 }
+
+#[tokio::test]
+async fn test_schema_deletion() {
+    let node = create_test_server().await;
+    let schema = create_test_schema();
+    
+    // First load a schema
+    let load_api = warp::path!("api" / "schema")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_node(Arc::clone(&node)))
+        .and_then(handle_schema);
+
+    let load_response = request()
+        .method("POST")
+        .path("/api/schema")
+        .json(&schema)
+        .reply(&load_api)
+        .await;
+    assert_eq!(load_response.status(), 200);
+
+    // Create delete endpoint filter
+    let delete_api = warp::path!("api" / "schema" / String)
+        .and(warp::delete())
+        .and(with_node(Arc::clone(&node)))
+        .and_then(fold_db::datafold_node::web_server::handle_delete_schema);
+
+    // Test deleting existing schema
+    let delete_response = request()
+        .method("DELETE")
+        .path(&format!("/api/schema/{}", schema.name))
+        .reply(&delete_api)
+        .await;
+
+    assert_eq!(delete_response.status(), 200);
+    let response_data: ApiSuccessResponse<&str> = serde_json::from_slice(delete_response.body()).unwrap();
+    assert_eq!(response_data.data, "Schema removed successfully");
+
+    // Test deleting non-existent schema
+    let delete_nonexistent = request()
+        .method("DELETE")
+        .path("/api/schema/nonexistent")
+        .reply(&delete_api)
+        .await;
+
+    assert_eq!(delete_nonexistent.status(), 200);
+    let error_response: ApiErrorResponse = serde_json::from_slice(delete_nonexistent.body()).unwrap();
+    assert_eq!(error_response.error, "Schema not found");
+
+    // Verify schema was actually deleted by trying to delete it again
+    let delete_again = request()
+        .method("DELETE")
+        .path(&format!("/api/schema/{}", schema.name))
+        .reply(&delete_api)
+        .await;
+
+    assert_eq!(delete_again.status(), 200);
+    let error_response: ApiErrorResponse = serde_json::from_slice(delete_again.body()).unwrap();
+    assert_eq!(error_response.error, "Schema not found");
+}

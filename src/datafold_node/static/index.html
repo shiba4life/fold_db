@@ -223,7 +223,7 @@
             }
 
             try {
-                const response = await fetch(`/api/schema/${schemaName}`, {
+                const response = await fetch(`/api/schema/${encodeURIComponent(schemaName)}`, {
                     method: 'DELETE'
                 });
 
