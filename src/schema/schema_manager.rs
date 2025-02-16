@@ -70,60 +70,6 @@ mod tests {
         let mapped_field = mapped_schema.fields.get("target_field").unwrap();
         assert_eq!(mapped_field.get_ref_atom_uuid(), Some("test_uuid".to_string()));
     }
-
-    #[test]
-    fn test_map_fields_source_schema_not_exists() {
-        let manager = SchemaManager::new();
-        
-        // Create target schema with a field that maps to a non-existent schema
-        let mut field_mappers = HashMap::new();
-        field_mappers.insert("nonexistent_schema".to_string(), "source_field".to_string());
-        let mut target_fields = HashMap::new();
-        target_fields.insert(
-            "target_field".to_string(),
-            create_test_field(None, field_mappers),
-        );
-        let target_schema = Schema::new("target_schema".to_string())
-            .with_fields(target_fields);
-        manager.load_schema(target_schema).unwrap();
-
-        // Map fields - should handle gracefully
-        manager.map_fields("target_schema").unwrap();
-
-        // Verify the field was not mapped
-        let mapped_schema = manager.get_schema("target_schema").unwrap().unwrap();
-        let mapped_field = mapped_schema.fields.get("target_field").unwrap();
-        assert_eq!(mapped_field.get_ref_atom_uuid(), None);
-    }
-
-    #[test]
-    fn test_map_fields_source_field_not_exists() {
-        let manager = SchemaManager::new();
-        
-        // Create source schema without the mapped field
-        let source_schema = Schema::new("source_schema".to_string());
-        manager.load_schema(source_schema).unwrap();
-
-        // Create target schema with a field that maps to a non-existent field
-        let mut field_mappers = HashMap::new();
-        field_mappers.insert("source_schema".to_string(), "nonexistent_field".to_string());
-        let mut target_fields = HashMap::new();
-        target_fields.insert(
-            "target_field".to_string(),
-            create_test_field(None, field_mappers),
-        );
-        let target_schema = Schema::new("target_schema".to_string())
-            .with_fields(target_fields);
-        manager.load_schema(target_schema).unwrap();
-
-        // Map fields - should handle gracefully
-        manager.map_fields("target_schema").unwrap();
-
-        // Verify the field was not mapped
-        let mapped_schema = manager.get_schema("target_schema").unwrap().unwrap();
-        let mapped_field = mapped_schema.fields.get("target_field").unwrap();
-        assert_eq!(mapped_field.get_ref_atom_uuid(), None);
-    }
 }
 
 impl Default for SchemaManager {

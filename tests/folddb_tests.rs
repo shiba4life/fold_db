@@ -170,7 +170,7 @@ fn test_atom_history() {
             },
             create_default_payment_config(),
             HashMap::new(),
-        ),
+        ).with_ref_atom_uuid(field_uuid.clone()),
     );
 
     let schema = Schema {

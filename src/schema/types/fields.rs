@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use crate::permissions::types::policy::PermissionsPolicy;
 use crate::fees::types::config::FieldPaymentConfig;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 /// Defines the configuration and behavior of a single field within a schema.
 /// 
@@ -56,7 +57,7 @@ impl SchemaField {
         Self {
             permission_policy,
             payment_config,
-            ref_atom_uuid: None,
+            ref_atom_uuid: Some(Uuid::new_v4().to_string()),
             field_mappers,
         }
     }
