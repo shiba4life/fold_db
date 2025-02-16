@@ -2,13 +2,14 @@ use std::convert::Infallible;
 use std::sync::Arc;
 use warp::{Filter, Rejection, Reply};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use crate::datafold_node::node::DataFoldNode;
 use crate::schema::types::schema::Schema;
 use crate::schema_interpreter::types::Operation;
 
 #[derive(Debug, Deserialize)]
-struct QueryRequest {
-    operation: String,
+pub struct QueryRequest {
+    pub operation: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -161,7 +162,7 @@ pub async fn handle_delete_schema(
     }
 }
 
-async fn handle_execute(
+pub async fn handle_execute(
     query: QueryRequest,
     node: Arc<tokio::sync::Mutex<DataFoldNode>>,
 ) -> Result<impl Reply, Rejection> {
@@ -176,8 +177,53 @@ async fn handle_execute(
     let mut node = node.lock().await;
     let result = node.execute_operation(operation);
 
+    // Print the result for debugging
+    println!("Operation result: {:?}", result);
+
     match result {
-        Ok(result) => Ok(warp::reply::json(&ApiSuccessResponse::new(result))),
+        Ok(result) => {
+            // Check if the result is actually an error wrapped in Ok
+            if let serde_json::Value::Array(arr) = &result {
+                if arr.len() == 1 {
+                    if let Some(serde_json::Value::Object(obj)) = arr.get(0) {
+                        if let Some(err_obj) = obj.get("Err") {
+                            if let Some(not_found) = err_obj.as_object().and_then(|o| o.get("NotFound")) {
+                                let error_msg = not_found.as_str().unwrap_or("Schema not found").to_string();
+                                if error_msg.contains("Schema") {
+                                    return Ok(warp::reply::json(&ApiErrorResponse::new("Schema not found")));
+                                }
+                                return Ok(warp::reply::json(&ApiErrorResponse::new(error_msg)));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // For successful query results, ensure we return an object
+            match result {
+                serde_json::Value::Object(obj) => Ok(warp::reply::json(&ApiSuccessResponse::new(obj))),
+                serde_json::Value::Array(arr) => {
+                    if arr.len() == 1 {
+                        match &arr[0] {
+                            serde_json::Value::Object(obj) => {
+                                if let Some(ok_value) = obj.get("Ok") {
+                                    if let Some(field_name) = ok_value.as_str() {
+                                        return Ok(warp::reply::json(&ApiSuccessResponse::new(json!({
+                                            "name": field_name
+                                        }))))
+                                    }
+                                }
+                                Ok(warp::reply::json(&ApiSuccessResponse::new(obj)))
+                            },
+                            _ => Ok(warp::reply::json(&ApiSuccessResponse::new(json!({ "result": arr[0] }))))
+                        }
+                    } else {
+                        Ok(warp::reply::json(&ApiSuccessResponse::new(json!({ "results": arr }))))
+                    }
+                },
+                _ => Ok(warp::reply::json(&ApiSuccessResponse::new(json!({ "result": result }))))
+            }
+        },
         Err(e) => Ok(warp::reply::json(&ApiErrorResponse::new(e.to_string()))),
     }
 }

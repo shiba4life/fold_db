@@ -1,0 +1,10 @@
+{
+    "type": "mutation",
+    "schema": "UserProfile",
+    "operation": "create",
+    "data": {
+        "username": "johndoe"
+    }
+}
+
+

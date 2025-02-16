@@ -205,7 +205,7 @@ impl DataFoldNode {
                     schema_name: schema,
                     fields,
                     pub_key: String::new(), // TODO: Get from auth context
-                    trust_distance: self.config.default_trust_distance,
+                    trust_distance: 0, // Set write distance to 0 for all queries
                 };
                 
                 let results = self.db.query_schema(query);
@@ -223,7 +223,7 @@ impl DataFoldNode {
                     schema_name: schema,
                     fields_and_values,
                     pub_key: String::new(), // TODO: Get from auth context
-                    trust_distance: self.config.default_trust_distance,
+                    trust_distance: 0, // Set write distance to 0 for all mutations
                 };
 
                 Arc::get_mut(&mut self.db)

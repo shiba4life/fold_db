@@ -2,6 +2,7 @@ use fold_db::testing::{
     Schema, SchemaField, PermissionsPolicy, TrustDistance, 
     FieldPaymentConfig, TrustDistanceScaling
 };
+use serde_json::json;
 use fold_db::{DataFoldNode, NodeConfig};
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -166,6 +167,237 @@ async fn test_schema_loading_malformed_json() {
         .await;
 
     assert_eq!(response.status(), 400); // Warp will return 400 for invalid JSON
+}
+
+#[tokio::test]
+async fn test_execute_query() {
+    let node = create_test_server().await;
+    let schema = create_test_schema();
+    
+    // First load the schema
+    let load_api = warp::path!("api" / "schema")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_node(Arc::clone(&node)))
+        .and_then(handle_schema);
+
+    let load_response = request()
+        .method("POST")
+        .path("/api/schema")
+        .json(&schema)
+        .reply(&load_api)
+        .await;
+    assert_eq!(load_response.status(), 200);
+
+    // Create a record first using mutation
+    let execute_api = warp::path!("api" / "execute")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_node(Arc::clone(&node)))
+        .and_then(fold_db::datafold_node::web_server::handle_execute);
+
+    let mutation = json!({
+        "operation": json!({
+            "type": "mutation",
+            "schema": "user_profile",
+            "operation": "create",
+            "data": {
+                "name": "John Doe"
+            }
+        }).to_string()
+    });
+
+    let mutation_response = request()
+        .method("POST")
+        .path("/api/execute")
+        .json(&mutation)
+        .reply(&execute_api)
+        .await;
+    assert_eq!(mutation_response.status(), 200);
+
+    // Then test query
+    let query = json!({
+        "operation": json!({
+            "type": "query",
+            "schema": "user_profile",
+            "fields": ["name"],
+            "filter": null
+        }).to_string()
+    });
+
+    let query_response = request()
+        .method("POST")
+        .path("/api/execute")
+        .json(&query)
+        .reply(&execute_api)
+        .await;
+
+    assert_eq!(query_response.status(), 200);
+    let response_data: ApiSuccessResponse<serde_json::Value> = serde_json::from_slice(query_response.body()).unwrap();
+    assert!(response_data.data.is_object());
+    
+    // Verify the queried data
+    let data = response_data.data.as_object().unwrap();
+    assert!(data.contains_key("name"));
+    assert_eq!(data["name"].as_str().unwrap(), "John Doe");
+}
+
+#[tokio::test]
+async fn test_execute_query_invalid_schema() {
+    let node = create_test_server().await;
+    
+    // Create execute endpoint filter
+    let execute_api = warp::path!("api" / "execute")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_node(Arc::clone(&node)))
+        .and_then(fold_db::datafold_node::web_server::handle_execute);
+
+    // Test query with non-existent schema
+    let query = json!({
+        "operation": json!({
+            "type": "query",
+            "schema": "nonexistent_schema",
+            "fields": ["name"],
+            "filter": null
+        }).to_string()
+    });
+
+    let response = request()
+        .method("POST")
+        .path("/api/execute")
+        .json(&query)
+        .reply(&execute_api)
+        .await;
+
+    assert_eq!(response.status(), 200);
+    let error_response: ApiErrorResponse = serde_json::from_slice(response.body()).unwrap();
+    assert!(error_response.error.contains("Schema not found"));
+}
+
+#[tokio::test]
+async fn test_execute_mutation() {
+    let node = create_test_server().await;
+    let schema = create_test_schema();
+    
+    // First load the schema
+    let load_api = warp::path!("api" / "schema")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_node(Arc::clone(&node)))
+        .and_then(handle_schema);
+
+    let load_response = request()
+        .method("POST")
+        .path("/api/schema")
+        .json(&schema)
+        .reply(&load_api)
+        .await;
+    assert_eq!(load_response.status(), 200);
+
+    // Create execute endpoint filter
+    let execute_api = warp::path!("api" / "execute")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_node(Arc::clone(&node)))
+        .and_then(fold_db::datafold_node::web_server::handle_execute);
+
+    // Test successful mutation
+    let mutation = json!({
+        "operation": json!({
+            "type": "mutation",
+            "schema": "user_profile",
+            "operation": "create",
+            "data": {
+                "name": "John Doe"
+            }
+        }).to_string()
+    });
+
+    let mutation_response = request()
+        .method("POST")
+        .path("/api/execute")
+        .json(&mutation)
+        .reply(&execute_api)
+        .await;
+
+    assert_eq!(mutation_response.status(), 200);
+    let response_data: ApiSuccessResponse<serde_json::Value> = serde_json::from_slice(mutation_response.body()).unwrap();
+    assert!(response_data.data.is_object());
+
+    // Verify the mutation worked by querying the data
+    let query = json!({
+        "operation": json!({
+            "type": "query",
+            "schema": "user_profile",
+            "fields": ["name"],
+            "filter": null
+        }).to_string()
+    });
+
+    let query_response = request()
+        .method("POST")
+        .path("/api/execute")
+        .json(&query)
+        .reply(&execute_api)
+        .await;
+
+    assert_eq!(query_response.status(), 200);
+    let query_data: ApiSuccessResponse<serde_json::Value> = serde_json::from_slice(query_response.body()).unwrap();
+    let data = query_data.data.as_object().unwrap();
+    assert!(data.contains_key("name"));
+    assert_eq!(data["name"].as_str().unwrap(), "John Doe");
+}
+
+#[tokio::test]
+async fn test_execute_mutation_invalid_data() {
+    let node = create_test_server().await;
+    let schema = create_test_schema();
+    
+    // First load the schema
+    let load_api = warp::path!("api" / "schema")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_node(Arc::clone(&node)))
+        .and_then(handle_schema);
+
+    let load_response = request()
+        .method("POST")
+        .path("/api/schema")
+        .json(&schema)
+        .reply(&load_api)
+        .await;
+    assert_eq!(load_response.status(), 200);
+
+    // Create execute endpoint filter
+    let execute_api = warp::path!("api" / "execute")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_node(Arc::clone(&node)))
+        .and_then(fold_db::datafold_node::web_server::handle_execute);
+
+    // Test mutation with invalid data
+    let mutation = json!({
+        "operation": json!({
+            "type": "mutation",
+            "schema": "user_profile",
+            "operation": "create",
+            "data": {
+                "invalid_field": "some value"
+            }
+        }).to_string()
+    });
+
+    let response = request()
+        .method("POST")
+        .path("/api/execute")
+        .json(&mutation)
+        .reply(&execute_api)
+        .await;
+
+    assert_eq!(response.status(), 200);
+    let error_response: ApiErrorResponse = serde_json::from_slice(response.body()).unwrap();
+    assert!(error_response.error.contains("Invalid field"));
 }
 
 #[tokio::test]
