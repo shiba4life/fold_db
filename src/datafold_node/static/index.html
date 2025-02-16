@@ -12,7 +12,7 @@
             padding: 20px;
             line-height: 1.6;
         }
-        h1, h2 {
+        h1, h2, h3 {
             color: #333;
             border-bottom: 2px solid #eee;
             padding-bottom: 10px;
@@ -92,12 +92,65 @@
         .tab-content.active {
             display: block;
         }
+        .schema-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .schema-item:hover {
+            background: #e9ecef;
+        }
+        .schema-item h3 {
+            margin-top: 0;
+            margin-bottom: 0;
+            color: #007bff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .remove-schema {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .remove-schema:hover {
+            background: #c82333;
+        }
+        .schema-item h3::after {
+            content: '▼';
+            font-size: 0.8em;
+            transition: transform 0.2s;
+        }
+        .schema-item.collapsed h3::after {
+            transform: rotate(-90deg);
+        }
+        .schema-item pre {
+            margin: 10px 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+            display: none;
+        }
+        .schema-item.expanded pre {
+            display: block;
+        }
     </style>
 </head>
 <body>
     <h1>DataFold Node</h1>
     <div class="status success">
         Node is running successfully
+    </div>
+
+    <div class="section">
+        <h2>Loaded Schemas</h2>
+        <div id="schemaList"></div>
     </div>
 
     <div class="section">
@@ -130,6 +183,75 @@
     </div>
 
     <script>
+        // Load schemas on page load
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/api/schemas');
+                const result = await response.json();
+                
+                const schemaListDiv = document.getElementById('schemaList');
+                if (result.error) {
+                    schemaListDiv.className = 'status error';
+                    schemaListDiv.textContent = result.error;
+                } else if (result.data.length === 0) {
+                    schemaListDiv.className = 'status';
+                    schemaListDiv.textContent = 'No schemas loaded';
+                } else {
+                    schemaListDiv.innerHTML = result.data.map(schema => `
+                        <div class="schema-item collapsed" onclick="toggleSchema(this)">
+                            <h3>
+                                <span>${schema.name}</span>
+                                <button class="remove-schema" onclick="removeSchema('${schema.name}', event)">Remove</button>
+                            </h3>
+                            <pre>${JSON.stringify(schema, null, 2)}</pre>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                const schemaListDiv = document.getElementById('schemaList');
+                schemaListDiv.className = 'status error';
+                schemaListDiv.textContent = `Error loading schemas: ${error.message}`;
+            }
+        });
+
+        // Remove schema
+        async function removeSchema(schemaName, event) {
+            event.stopPropagation(); // Prevent schema toggle
+            
+            if (!confirm(`Are you sure you want to remove schema "${schemaName}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/schema/${schemaName}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+                
+                if (result.error) {
+                    displayResult(result.error, true);
+                } else {
+                    displayResult('Schema removed successfully');
+                    // Refresh schema list
+                    window.dispatchEvent(new Event('load'));
+                }
+            } catch (error) {
+                displayResult(`Error: ${error.message}`, true);
+            }
+        }
+
+        // Toggle schema expansion
+        function toggleSchema(element) {
+            if (element.classList.contains('collapsed')) {
+                element.classList.remove('collapsed');
+                element.classList.add('expanded');
+            } else {
+                element.classList.remove('expanded');
+                element.classList.add('collapsed');
+            }
+        }
+
         // Helper function to display results/errors
         function displayResult(data, isError = false) {
             const resultsDiv = document.getElementById('results');
@@ -171,6 +293,8 @@
                     displayResult(result.error, true);
                 } else {
                     displayResult('Schema loaded successfully');
+                    // Refresh schema list
+                    window.dispatchEvent(new Event('load'));
                 }
             } catch (error) {
                 displayResult(`Error: ${error.message}`, true);

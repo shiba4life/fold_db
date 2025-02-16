@@ -48,6 +48,12 @@ impl WebServer {
         // API routes
         let api = {
             let node = Arc::clone(&node);
+            let list_schemas = warp::path!("api" / "schemas")
+                .and(warp::get())
+                .and(with_node(node.clone()))
+                .and_then(handle_list_schemas);
+
+            let node = Arc::clone(&node);
             let schema = warp::path!("api" / "schema")
                 .and(warp::post())
                 .and(warp::body::json())
@@ -58,10 +64,16 @@ impl WebServer {
             let execute = warp::path!("api" / "execute")
                 .and(warp::post())
                 .and(warp::body::json())
-                .and(with_node(node))
+                .and(with_node(node.clone()))
                 .and_then(handle_execute);
 
-            schema.or(execute)
+            let node = Arc::clone(&node);
+            let delete_schema = warp::path!("api" / "schema" / String)
+                .and(warp::delete())
+                .and(with_node(node))
+                .and_then(handle_delete_schema);
+
+            list_schemas.or(schema).or(execute).or(delete_schema)
         };
 
         // Static files
@@ -95,6 +107,17 @@ pub fn with_node(
     warp::any().map(move || Arc::clone(&node))
 }
 
+pub async fn handle_list_schemas(
+    node: Arc<tokio::sync::Mutex<DataFoldNode>>,
+) -> Result<impl Reply, Rejection> {
+    let node = node.lock().await;
+    let schemas = node.list_schemas();
+    match schemas {
+        Ok(schemas) => Ok(warp::reply::json(&ApiSuccessResponse::new(schemas))),
+        Err(e) => Ok(warp::reply::json(&ApiErrorResponse::new(e.to_string()))),
+    }
+}
+
 pub async fn handle_schema(
     schema: Schema,
     node: Arc<tokio::sync::Mutex<DataFoldNode>>,
@@ -117,6 +140,23 @@ pub async fn handle_schema(
 
     match result {
         Ok(_) => Ok(warp::reply::json(&ApiSuccessResponse::new(schema))),
+        Err(e) => Ok(warp::reply::json(&ApiErrorResponse::new(e.to_string()))),
+    }
+}
+
+pub async fn handle_delete_schema(
+    name: String,
+    node: Arc<tokio::sync::Mutex<DataFoldNode>>,
+) -> Result<impl Reply, Rejection> {
+    let mut node = node.lock().await;
+    
+    // Check if schema exists before trying to remove it
+    if !node.get_schema(&name).map(|s| s.is_some()).unwrap_or(false) {
+        return Ok(warp::reply::json(&ApiErrorResponse::new("Schema not found")));
+    }
+
+    match node.remove_schema(&name) {
+        Ok(_) => Ok(warp::reply::json(&ApiSuccessResponse::new("Schema removed successfully"))),
         Err(e) => Ok(warp::reply::json(&ApiErrorResponse::new(e.to_string()))),
     }
 }

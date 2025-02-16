@@ -19,6 +19,8 @@
           "None": null
         },
         "min_payment": null
+      },
+      "field_mappers": {
       }
     },
     "email": {
@@ -47,28 +49,11 @@
           }
         },
         "min_payment": 1000
+      },
+      "field_mappers": {
       }
     }
   },
-  "schema_mappers": [
-    {
-      "source_schemas": ["LegacyUser"],
-      "target_schema": "UserProfile",
-      "rules": [
-        {
-          "rule": "rename",
-          "source_field": "user_name",
-          "target_field": "username"
-        },
-        {
-          "rule": "map",
-          "source_field": "email_address",
-          "target_field": "email",
-          "function": "to_lowercase"
-        }
-      ]
-    }
-  ],
   "payment_config": {
     "base_multiplier": 1.5,
     "min_payment_threshold": 500

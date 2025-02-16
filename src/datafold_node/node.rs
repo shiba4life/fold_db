@@ -249,6 +249,22 @@ impl DataFoldNode {
         Ok(self.db.schema_manager.get_schema(schema_id)?)
     }
 
+    /// Lists all loaded schemas in the database.
+    /// 
+    /// # Returns
+    /// 
+    /// A Result containing a vector of all loaded schemas
+    pub fn list_schemas(&self) -> NodeResult<Vec<Schema>> {
+        let schema_names = self.db.schema_manager.list_schemas()?;
+        let mut schemas = Vec::new();
+        for name in schema_names {
+            if let Some(schema) = self.db.schema_manager.get_schema(&name)? {
+                schemas.push(schema);
+            }
+        }
+        Ok(schemas)
+    }
+
     /// Executes a query against the database.
     /// 
     /// This method:
@@ -388,5 +404,25 @@ impl DataFoldNode {
             .ok_or_else(|| NodeError::ConfigError("Cannot get mutable reference to database".into()))?
             .allow_schema(schema_name)?;
         Ok(())
+    }
+
+    /// Removes a schema from the database.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema_name` - Name of the schema to remove
+    /// 
+    /// # Returns
+    /// 
+    /// A Result indicating success or an error
+    pub fn remove_schema(&mut self, schema_name: &str) -> NodeResult<()> {
+        let db = Arc::get_mut(&mut self.db)
+            .ok_or_else(|| NodeError::ConfigError("Cannot get mutable reference to database".into()))?;
+        
+        match db.schema_manager.unload_schema(schema_name) {
+            Ok(true) => Ok(()),
+            Ok(false) => Err(NodeError::ConfigError(format!("Schema {} not found", schema_name))),
+            Err(e) => Err(NodeError::from(e))
+        }
     }
 }

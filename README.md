@@ -50,6 +50,10 @@ FoldDB is a schema-based database system that provides atomic operations, fine-g
 
 ## Usage
 
+```bash
+cargo run --bin datafold_node
+```
+
 ```rust
 use folddb::{FoldDB, Schema};
 
