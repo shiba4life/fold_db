@@ -1,6 +1,7 @@
 use std::fmt;
+use serde::Serialize;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum SchemaError {
     NotFound(String),
     InvalidField(String),

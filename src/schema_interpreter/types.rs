@@ -4,6 +4,24 @@ use crate::fees::types::config::TrustDistanceScaling;
 use crate::permissions::types::policy::{ExplicitCounts, PermissionsPolicy, TrustDistance};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum Operation {
+    #[serde(rename = "query")]
+    Query {
+        schema: String,
+        fields: Vec<String>,
+        filter: Option<Value>,
+    },
+    #[serde(rename = "mutation")]
+    Mutation {
+        schema: String,
+        operation: String,
+        data: Value,
+    }
+}
 
 /// Represents a complete JSON schema definition
 #[derive(Debug, Clone, Serialize, Deserialize)]

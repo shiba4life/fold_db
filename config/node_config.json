@@ -1,27 +1,13 @@
 {
-  "storage": {
-    "path": "/app/data",
-    "max_size_gb": 10
-  },
-  "api": {
-    "host": "0.0.0.0",
-    "port": 8080,
-    "max_request_size_mb": 10,
-    "timeout_seconds": 30
-  },
-  "security": {
-    "default_trust_distance": 1,
-    "require_authentication": true,
-    "allowed_origins": ["*"]
-  },
-  "resources": {
-    "max_concurrent_queries": 100,
-    "max_concurrent_mutations": 50,
-    "cache_size_mb": 512
-  },
-  "logging": {
-    "level": "info",
-    "format": "json",
-    "output": "stdout"
+  "storage_path": "data",
+  "default_trust_distance": 1,
+  "docker": {
+    "memory_limit": 536870912,
+    "cpu_limit": 1.0,
+    "environment": {},
+    "network_config": {
+      "network_isolated": true,
+      "exposed_ports": {}
+    }
   }
 }

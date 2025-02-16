@@ -5,6 +5,7 @@ use serde_json::Value;
 use crate::folddb::FoldDB;
 use crate::schema::types::{Mutation, Query};
 use crate::schema::{Schema, SchemaError};
+use crate::schema_interpreter::types::Operation;
 use crate::datafold_node::{
     config::NodeConfig,
     docker::{self, ContainerState, ContainerStatus},
@@ -188,31 +189,52 @@ impl DataFoldNode {
     }
 
     /// Loads a schema into the database.
-    /// 
-    /// This method:
-    /// 1. Validates the schema structure
-    /// 2. Checks for conflicts with existing schemas
-    /// 3. Makes the schema available for operations
-    /// 
-    /// # Arguments
-    /// 
-    /// * `schema` - The schema to load
-    /// 
-    /// # Returns
-    /// 
-    /// A Result indicating success or an error
-    /// 
-    /// # Errors
-    /// 
-    /// Returns an error if:
-    /// - The schema is invalid
-    /// - There are conflicts with existing schemas
-    /// - The database is currently locked
     pub fn load_schema(&mut self, schema: Schema) -> NodeResult<()> {
         Arc::get_mut(&mut self.db)
             .ok_or_else(|| NodeError::ConfigError("Cannot get mutable reference to database".into()))?
-            .load_schema(schema)?;
+            .load_schema(schema)
+            .map_err(NodeError::from)?;
         Ok(())
+    }
+
+    /// Executes an operation (query or mutation) on the database.
+    pub fn execute_operation(&mut self, operation: Operation) -> NodeResult<Value> {
+        match operation {
+            Operation::Query { schema, fields, filter: _ } => {
+                let query = Query {
+                    schema_name: schema,
+                    fields,
+                    pub_key: String::new(), // TODO: Get from auth context
+                    trust_distance: self.config.default_trust_distance,
+                };
+                
+                let results = self.db.query_schema(query);
+                Ok(serde_json::to_value(&results)
+                    .map_err(|e| NodeError::ConfigError(e.to_string()))?)
+            },
+            Operation::Mutation { schema, operation: _, data } => {
+                let fields_and_values = match data {
+                    Value::Object(map) => map.into_iter()
+                        .map(|(k, v)| (k, v))
+                        .collect(),
+                    _ => return Err(NodeError::ConfigError("Mutation data must be an object".into()))
+                };
+
+                let mutation = Mutation {
+                    schema_name: schema,
+                    fields_and_values,
+                    pub_key: String::new(), // TODO: Get from auth context
+                    trust_distance: self.config.default_trust_distance,
+                };
+
+                Arc::get_mut(&mut self.db)
+                    .ok_or_else(|| NodeError::ConfigError("Cannot get mutable reference to database".into()))?
+                    .write_schema(mutation)
+                    .map_err(NodeError::from)?;
+
+                Ok(Value::Null)
+            }
+        }
     }
 
     /// Retrieves a schema by its ID.

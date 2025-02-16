@@ -24,6 +24,7 @@ mod config;
 mod docker;
 mod error;
 mod node;
+mod web_server;
 #[cfg(test)]
 mod tests;
 
@@ -31,3 +32,4 @@ pub use config::{DockerConfig, DockerNetworkConfig, NodeConfig};
 pub use docker::{ContainerState, ContainerStatus};
 pub use error::{NodeError, NodeResult};
 pub use node::DataFoldNode;
+pub use web_server::WebServer;

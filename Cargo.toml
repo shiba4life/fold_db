@@ -14,8 +14,9 @@ sled = "0.34"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "sync", "time", "fs", "signal"] }
 thiserror = "1.0"
+warp = "0.3"
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
