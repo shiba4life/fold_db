@@ -8,3 +8,5 @@ pub use types::errors::SchemaError;
 
 /// Public prelude module containing types needed by tests and external code
 pub mod prelude {}
+
+pub use types::*;

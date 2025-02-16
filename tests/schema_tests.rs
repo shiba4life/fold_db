@@ -151,3 +151,64 @@ fn test_schema_with_multiple_fields() {
         _ => panic!("Expected Distance variant"),
     }
 }
+
+#[test]
+fn test_user_profile_schema() {
+    let mut schema = Schema::new("user_profile".to_string());
+    
+    // Public fields - basic profile info
+    schema.add_field(
+        "username".to_string(),
+        SchemaField::new(
+            PermissionsPolicy::default(), // Public read access
+            create_default_payment_config(),
+        ).with_ref_atom_uuid(Uuid::new_v4().to_string())
+    );
+
+    // Protected fields - contact info
+    schema.add_field(
+        "email".to_string(),
+        SchemaField::new(
+            PermissionsPolicy::new(
+                TrustDistance::Distance(1), // Limited read access
+                TrustDistance::Distance(1)  // Limited write access
+            ),
+            create_default_payment_config(),
+        ).with_ref_atom_uuid(Uuid::new_v4().to_string())
+    );
+
+    // Private fields - sensitive info
+    schema.add_field(
+        "payment_info".to_string(),
+        SchemaField::new(
+            PermissionsPolicy::new(
+                TrustDistance::Distance(3), // Restricted read access
+                TrustDistance::Distance(3)  // Restricted write access
+            ),
+            create_default_payment_config(),
+        ).with_ref_atom_uuid(Uuid::new_v4().to_string())
+    );
+
+    // Verify schema structure
+    assert_eq!(schema.name, "user_profile");
+    assert_eq!(schema.fields.len(), 3);
+
+    // Verify field permissions
+    let username_field = schema.fields.get("username").unwrap();
+    match username_field.permission_policy.read_policy {
+        TrustDistance::Distance(d) => assert_eq!(d, 0), // Public read
+        _ => panic!("Expected Distance variant"),
+    }
+
+    let email_field = schema.fields.get("email").unwrap();
+    match email_field.permission_policy.read_policy {
+        TrustDistance::Distance(d) => assert_eq!(d, 1), // Limited read
+        _ => panic!("Expected Distance variant"),
+    }
+
+    let payment_field = schema.fields.get("payment_info").unwrap();
+    match payment_field.permission_policy.read_policy {
+        TrustDistance::Distance(d) => assert_eq!(d, 3), // Restricted read
+        _ => panic!("Expected Distance variant"),
+    }
+}

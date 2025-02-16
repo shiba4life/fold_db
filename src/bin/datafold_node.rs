@@ -1,4 +1,4 @@
-use fold_db::{DataFoldNode, NodeConfig, Schema, datafold_node::WebServer};
+use fold_db::{DataFoldNode, NodeConfig, datafold_node::{WebServer, load_schema_from_file}};
 use std::{fs, sync::Arc};
 
 #[tokio::main]
@@ -21,25 +21,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Load schema if provided
     println!("Checking for schema...");
-    match fs::read_to_string("config/schema.json") {
-        Ok(schema_str) => {
-            println!("Found schema.json, loading...");
-            match serde_json::from_str::<Schema>(&schema_str) {
-                Ok(schema) => {
-                    match node.load_schema(schema) {
-                        Ok(_) => println!("Schema loaded successfully"),
-                        Err(e) => eprintln!("Error loading schema into node: {}", e),
-                    }
-                },
-                Err(e) => eprintln!("Error parsing schema.json: {}", e),
-            }
-        },
-        Err(e) => eprintln!("Error reading schema.json: {}", e),
+    if let Err(e) = load_schema_from_file("config/schema.json", &mut node) {
+        eprintln!("Error loading schema: {}", e);
+    } else {
+        println!("Schema loaded successfully");
     }
     
-    // Wrap in Arc and create web server
+    // Wrap in Arc<Mutex> and create web server
     println!("Creating web server...");
-    let node = Arc::new(node);
+    let node = Arc::new(tokio::sync::Mutex::new(node));
     let server = WebServer::new(node);
     println!("Web server created, starting on port 8080...");
     

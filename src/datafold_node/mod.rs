@@ -24,7 +24,8 @@ mod config;
 mod docker;
 mod error;
 mod node;
-mod web_server;
+pub mod web_server;
+mod loader;
 #[cfg(test)]
 mod tests;
 
@@ -32,4 +33,5 @@ pub use config::{DockerConfig, DockerNetworkConfig, NodeConfig};
 pub use docker::{ContainerState, ContainerStatus};
 pub use error::{NodeError, NodeResult};
 pub use node::DataFoldNode;
-pub use web_server::WebServer;
+pub use web_server::{WebServer, ApiSuccessResponse, ApiErrorResponse, handle_schema, with_node};
+pub use loader::load_schema_from_file;

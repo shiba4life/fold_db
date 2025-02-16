@@ -7,12 +7,12 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
             line-height: 1.6;
         }
-        h1 {
+        h1, h2 {
             color: #333;
             border-bottom: 2px solid #eee;
             padding-bottom: 10px;
@@ -27,6 +27,71 @@
             background: #e6ffe6;
             color: #006600;
         }
+        .status.error {
+            background: #ffe6e6;
+            color: #660000;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            font-family: monospace;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #results {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .tab-container {
+            margin: 20px 0;
+        }
+        .tab-buttons {
+            margin-bottom: 10px;
+        }
+        .tab-button {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 10px 20px;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+        .tab-button.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -34,15 +99,130 @@
     <div class="status success">
         Node is running successfully
     </div>
-    <p>
-        This node is part of the FoldDB distributed database system. It provides:
-    </p>
-    <ul>
-        <li>Schema-based data storage</li>
-        <li>Field-level permissions control</li>
-        <li>Trust-based access model</li>
-        <li>Version history tracking</li>
-        <li>Pay-per-query access</li>
-    </ul>
+
+    <div class="section">
+        <h2>Schema</h2>
+        <textarea id="schemaInput" placeholder="Enter your schema JSON here..."></textarea>
+        <button onclick="loadSchema()">Load Schema</button>
+    </div>
+
+    <div class="section">
+        <h2>Operations</h2>
+        <div class="tab-container">
+            <div class="tab-buttons">
+                <button class="tab-button active" onclick="switchTab('query')">Query</button>
+                <button class="tab-button" onclick="switchTab('mutation')">Mutation</button>
+            </div>
+            <div id="queryTab" class="tab-content active">
+                <textarea id="queryInput" placeholder="Enter your query operation JSON here..."></textarea>
+                <button onclick="executeOperation('query')">Run Query</button>
+            </div>
+            <div id="mutationTab" class="tab-content">
+                <textarea id="mutationInput" placeholder="Enter your mutation operation JSON here..."></textarea>
+                <button onclick="executeOperation('mutation')">Run Mutation</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Results</h2>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Helper function to display results/errors
+        function displayResult(data, isError = false) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.className = isError ? 'status error' : 'status success';
+            resultsDiv.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        }
+
+        // Helper function to validate JSON
+        function isValidJSON(str) {
+            try {
+                JSON.parse(str);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // Load schema
+        async function loadSchema() {
+            const schemaInput = document.getElementById('schemaInput').value;
+            
+            if (!isValidJSON(schemaInput)) {
+                displayResult('Invalid JSON format in schema', true);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/schema', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: schemaInput
+                });
+
+                const result = await response.json();
+                
+                if (result.error) {
+                    displayResult(result.error, true);
+                } else {
+                    displayResult('Schema loaded successfully');
+                }
+            } catch (error) {
+                displayResult(`Error: ${error.message}`, true);
+            }
+        }
+
+        // Execute operation (query or mutation)
+        async function executeOperation(type) {
+            const input = document.getElementById(`${type}Input`).value;
+            
+            if (!isValidJSON(input)) {
+                displayResult('Invalid JSON format in operation', true);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        operation: input
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.error) {
+                    displayResult(result.error, true);
+                } else {
+                    displayResult(result.data);
+                }
+            } catch (error) {
+                displayResult(`Error: ${error.message}`, true);
+            }
+        }
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            document.querySelector(`.tab-button[onclick="switchTab('${tabName}')"]`).classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabName}Tab`).classList.add('active');
+        }
+    </script>
 </body>
 </html>

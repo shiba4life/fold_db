@@ -11,34 +11,34 @@ struct QueryRequest {
     operation: String,
 }
 
-#[derive(Debug, Serialize)]
-struct ApiResponse<T> {
-    data: Option<T>,
-    error: Option<String>,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApiSuccessResponse<T: Serialize> {
+    pub data: T,
 }
 
-impl<T> ApiResponse<T> {
-    fn success(data: T) -> Self {
-        Self {
-            data: Some(data),
-            error: None,
-        }
-    }
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApiErrorResponse {
+    pub error: String,
+}
 
-    fn error(msg: impl Into<String>) -> Self {
-        Self {
-            data: None,
-            error: Some(msg.into()),
-        }
+impl<T: Serialize> ApiSuccessResponse<T> {
+    pub fn new(data: T) -> Self {
+        Self { data }
+    }
+}
+
+impl ApiErrorResponse {
+    pub fn new(msg: impl Into<String>) -> Self {
+        Self { error: msg.into() }
     }
 }
 
 pub struct WebServer {
-    node: Arc<DataFoldNode>,
+    node: Arc<tokio::sync::Mutex<DataFoldNode>>,
 }
 
 impl WebServer {
-    pub fn new(node: Arc<DataFoldNode>) -> Self {
+    pub fn new(node: Arc<tokio::sync::Mutex<DataFoldNode>>) -> Self {
         Self { node }
     }
 
@@ -74,7 +74,6 @@ impl WebServer {
 
         let routes = api.or(index).or(static_files);
 
-
         println!("Starting web server on port {}", port);
         let addr = ([127, 0, 0, 1], port);
         println!("Binding to address: {:?}", addr);
@@ -90,48 +89,55 @@ impl WebServer {
     }
 }
 
-fn with_node(
-    node: Arc<DataFoldNode>,
-) -> impl Filter<Extract = (Arc<DataFoldNode>,), Error = Infallible> + Clone {
+pub fn with_node(
+    node: Arc<tokio::sync::Mutex<DataFoldNode>>,
+) -> impl Filter<Extract = (Arc<tokio::sync::Mutex<DataFoldNode>>,), Error = Infallible> + Clone {
     warp::any().map(move || Arc::clone(&node))
 }
 
-async fn handle_schema(
+pub async fn handle_schema(
     schema: Schema,
-    node: Arc<DataFoldNode>,
+    node: Arc<tokio::sync::Mutex<DataFoldNode>>,
 ) -> Result<impl Reply, Rejection> {
-    let mut node = (*node).clone();
-    let result = tokio::task::spawn_blocking(move || {
-        node.load_schema(schema)
-    }).await;
+    // Validate schema before loading
+    if schema.name.is_empty() {
+        return Ok(warp::reply::json(&ApiErrorResponse::new("Schema name cannot be empty")));
+    }
+
+    // Check if schema already exists
+    let mut node = node.lock().await;
+    let exists = node.get_schema(&schema.name).map(|s| s.is_some()).unwrap_or(false);
+    if exists {
+        return Ok(warp::reply::json(&ApiErrorResponse::new("Schema error: Schema already exists")));
+    }
+
+    // Load schema if it doesn't exist
+    let schema_clone = schema.clone();
+    let result = node.load_schema(schema_clone);
 
     match result {
-        Ok(Ok(_)) => Ok(warp::reply::json(&ApiResponse::<()>::success(()))),
-        Ok(Err(e)) => Ok(warp::reply::json(&ApiResponse::<()>::error(e.to_string()))),
-        Err(e) => Ok(warp::reply::json(&ApiResponse::<()>::error(format!("Task error: {}", e)))),
+        Ok(_) => Ok(warp::reply::json(&ApiSuccessResponse::new(schema))),
+        Err(e) => Ok(warp::reply::json(&ApiErrorResponse::new(e.to_string()))),
     }
 }
 
 async fn handle_execute(
     query: QueryRequest,
-    node: Arc<DataFoldNode>,
+    node: Arc<tokio::sync::Mutex<DataFoldNode>>,
 ) -> Result<impl Reply, Rejection> {
     // Parse the operation string into an Operation
     let operation: Operation = match serde_json::from_str(&query.operation) {
         Ok(op) => op,
-        Err(e) => return Ok(warp::reply::json(&ApiResponse::<serde_json::Value>::error(
+        Err(e) => return Ok(warp::reply::json(&ApiErrorResponse::new(
             format!("Invalid operation format: {}", e)
         ))),
     };
 
-    let mut node = (*node).clone();
-    let result = tokio::task::spawn_blocking(move || {
-        node.execute_operation(operation)
-    }).await;
+    let mut node = node.lock().await;
+    let result = node.execute_operation(operation);
 
     match result {
-        Ok(Ok(result)) => Ok(warp::reply::json(&ApiResponse::success(result))),
-        Ok(Err(e)) => Ok(warp::reply::json(&ApiResponse::<serde_json::Value>::error(e.to_string()))),
-        Err(e) => Ok(warp::reply::json(&ApiResponse::<serde_json::Value>::error(format!("Task error: {}", e)))),
+        Ok(result) => Ok(warp::reply::json(&ApiSuccessResponse::new(result))),
+        Err(e) => Ok(warp::reply::json(&ApiErrorResponse::new(e.to_string()))),
     }
 }
