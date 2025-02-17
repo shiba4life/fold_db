@@ -53,7 +53,7 @@ mod tests {
         let test_schema_name = "test_persistence_schema";
         cleanup_test_schema(test_schema_name); // Cleanup any leftover test files
         
-        let manager = SchemaManager::new();
+        let manager = SchemaManager::new("data");
         
         // Create a test schema
         let mut fields = HashMap::new();
@@ -89,7 +89,7 @@ mod tests {
 
     #[test]
     fn test_map_fields_success() {
-        let manager = SchemaManager::new();
+        let manager = SchemaManager::new("data");
         
         // Create source schema with a field that has a ref_atom_uuid
         let mut source_fields = HashMap::new();
@@ -126,7 +126,6 @@ mod tests {
 impl Default for SchemaManager {
     fn default() -> Self {
         let schemas_dir = PathBuf::from("data/schemas");
-        // Create schemas directory if it doesn't exist
         fs::create_dir_all(&schemas_dir).expect("Failed to create schemas directory");
         
         Self {
@@ -137,13 +136,16 @@ impl Default for SchemaManager {
 }
 
 impl SchemaManager {
-    /// Creates a new SchemaManager instance.
-    /// 
-    /// Initializes an empty collection of schemas protected by a mutex
-    /// and ensures the schemas directory exists.
+    /// Creates a new SchemaManager instance with a custom schemas directory.
     #[must_use]
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(path: &str) -> Self {
+        let schemas_dir = PathBuf::from(path).join("schemas");
+        fs::create_dir_all(&schemas_dir).expect("Failed to create schemas directory");
+        
+        Self {
+            schemas: Mutex::new(HashMap::new()),
+            schemas_dir,
+        }
     }
 
     /// Gets the path for a schema file.

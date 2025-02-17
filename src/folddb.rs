@@ -75,7 +75,7 @@ impl FoldDB {
             }
         }
 
-        let schema_manager = SchemaManager::new();
+        let schema_manager = SchemaManager::new(path);
         let _ = schema_manager.load_schemas_from_disk();
 
         Ok(Self {
