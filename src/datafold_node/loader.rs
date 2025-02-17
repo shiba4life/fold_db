@@ -1,8 +1,9 @@
 use crate::{Schema, DataFoldNode};
 use std::fs;
+use std::path::Path;
 
-pub fn load_schema_from_file(path: &str, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
-    let schema_str = fs::read_to_string(path)?;
+pub fn load_schema_from_file<P: AsRef<Path>>(path: P, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    let schema_str = fs::read_to_string(path.as_ref())?;
     let schema: Schema = serde_json::from_str(&schema_str)?;
     node.load_schema(schema)?;
     Ok(())
@@ -39,7 +40,7 @@ mod tests {
         };
         
         let mut node = DataFoldNode::new(config)?;
-        load_schema_from_file(schema_path.to_str().unwrap(), &mut node)?;
+        load_schema_from_file(&schema_path, &mut node)?;
         Ok(())
     }
-} 
+}

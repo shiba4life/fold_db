@@ -540,11 +540,32 @@ mod tests {
         }
 
         fn into_node(self) -> DataFoldNode {
+            // Create base directory for the test database
+            let base_path = self.temp_dir.path().join("test_db");
+            std::fs::create_dir_all(&base_path)
+                .expect("Failed to create test_db directory");
+            
+            // Create required directories for data storage
+            let data_dir = base_path.join("data");
+            std::fs::create_dir_all(&data_dir)
+                .expect("Failed to create data directory");
+            
+            // Create required directories for atom and ref storage
+            let atoms_dir = data_dir.join("atoms");
+            let refs_dir = data_dir.join("refs");
+            std::fs::create_dir_all(&atoms_dir)
+                .expect("Failed to create atoms directory");
+            std::fs::create_dir_all(&refs_dir)
+                .expect("Failed to create refs directory");
+            
+            // Create node with base path
+            // Note: SchemaManager will append 'schemas' to this path
             let config = crate::datafold_node::NodeConfig {
-                storage_path: self.temp_dir.path().to_path_buf(),
+                storage_path: base_path,
                 default_trust_distance: 1,
                 docker: crate::datafold_node::DockerConfig::default(),
             };
+            
             DataFoldNode::new(config).expect("Failed to create node")
         }
     }
@@ -578,6 +599,7 @@ mod tests {
             HashMap::new(),
         ).with_ref_atom_uuid("test_field_ref".to_string());
         schema.add_field("test_field".to_string(), field);
+        
         node.load_schema(schema).expect("Failed to create schema");
 
         // Create and start server

@@ -5,8 +5,11 @@ use fold_db::testing::{
     TrustDistance,
     SchemaField,
     Schema,
+    SchemaManager,
 };
 use std::collections::HashMap;
+use std::path::PathBuf;
+use tempfile::tempdir;
 use uuid::Uuid;
 
 fn create_default_payment_config() -> FieldPaymentConfig {
@@ -216,5 +219,82 @@ fn test_user_profile_schema() {
     match payment_field.permission_policy.read_policy {
         TrustDistance::Distance(d) => assert_eq!(d, 3), // Restricted read
         _ => panic!("Expected Distance variant"),
+    }
+}
+
+#[test]
+fn test_schema_persistence() {
+    // Create a temporary directory for test
+    let test_dir = tempdir().unwrap();
+    let manager = SchemaManager::new(test_dir.path().to_str().unwrap());
+
+    // Create a test schema
+    let mut schema = Schema::new("test_persistence".to_string());
+    let field = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+        HashMap::new(),
+    ).with_ref_atom_uuid("test-uuid".to_string());
+    schema.add_field("test_field".to_string(), field);
+
+    // Test schema loading and persistence
+    manager.load_schema(schema.clone()).unwrap();
+    
+    // Test schema retrieval to verify persistence
+    let loaded_schema = manager.get_schema("test_persistence").unwrap().unwrap();
+    assert_eq!(loaded_schema.name, "test_persistence");
+    assert_eq!(
+        loaded_schema.fields.get("test_field").unwrap().get_ref_atom_uuid(),
+        Some("test-uuid".to_string())
+    );
+
+    // Create a new manager instance to verify disk persistence
+    let new_manager = SchemaManager::new(test_dir.path().to_str().unwrap());
+    new_manager.load_schemas_from_disk().unwrap();
+    let reloaded_schema = new_manager.get_schema("test_persistence").unwrap().unwrap();
+    assert_eq!(reloaded_schema.name, "test_persistence");
+    
+    // Test schema unloading
+    assert!(manager.unload_schema("test_persistence").unwrap());
+    
+    // Verify schema was removed by trying to load it
+    let removed_schema = manager.get_schema("test_persistence").unwrap();
+    assert!(removed_schema.is_none());
+}
+
+#[test]
+fn test_schema_disk_loading() {
+    // Create a temporary directory for test
+    let test_dir = tempdir().unwrap();
+    let manager = SchemaManager::new(test_dir.path().to_str().unwrap());
+
+    // Create and save multiple schemas
+    let schemas = vec![
+        ("schema1", "field1"),
+        ("schema2", "field2"),
+        ("schema3", "field3"),
+    ];
+
+    for (schema_name, field_name) in schemas.iter() {
+        let mut schema = Schema::new(schema_name.to_string());
+        let field = SchemaField::new(
+            PermissionsPolicy::default(),
+            create_default_payment_config(),
+            HashMap::new(),
+        ).with_ref_atom_uuid(format!("uuid-{}", field_name));
+        schema.add_field(field_name.to_string(), field);
+        manager.load_schema(schema).unwrap();
+    }
+
+    // Create a new manager instance and load schemas from disk
+    let new_manager = SchemaManager::new(test_dir.path().to_str().unwrap());
+    new_manager.load_schemas_from_disk().unwrap();
+
+    // Verify all schemas were loaded
+    for (schema_name, field_name) in schemas.iter() {
+        let schema = new_manager.get_schema(schema_name).unwrap().unwrap();
+        assert_eq!(schema.name, *schema_name);
+        let field = schema.fields.get(*field_name).unwrap();
+        assert_eq!(field.get_ref_atom_uuid(), Some(format!("uuid-{}", field_name)));
     }
 }

@@ -168,11 +168,22 @@ impl SchemaManager {
     /// Returns a `SchemaError` if serialization or file operations fail.
     fn persist_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
         let path = self.schema_path(&schema.name);
+        
+        // Ensure parent directory exists
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| SchemaError::InvalidData(format!(
+                    "Failed to create schema directory: {}", e
+                )))?;
+        }
+        
         let json = serde_json::to_string_pretty(schema)
             .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize schema: {}", e)))?;
         
         fs::write(&path, json)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to write schema file: {}", e)))?;
+            .map_err(|e| SchemaError::InvalidData(format!(
+                "Failed to write schema file: {}, path: {}", e, path.to_string_lossy()
+            )))?;   
         
         Ok(())
     }
