@@ -1,6 +1,9 @@
 use super::{Schema, SchemaError}; // Updated to use re-exported types
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::Mutex;
+use serde_json;
 
 /// Manages the lifecycle and operations of schemas in the database.
 /// 
@@ -10,12 +13,15 @@ use std::sync::Mutex;
 /// - Managing schema field mappings
 /// - Tracking schema relationships
 /// - Providing schema access and validation services
+/// - Persisting schemas to disk
 /// 
 /// It uses a thread-safe mutex to protect the schema collection,
 /// allowing safe concurrent access from multiple threads.
 pub struct SchemaManager {
     /// Thread-safe storage for loaded schemas
     schemas: Mutex<HashMap<String, Schema>>,
+    /// Base directory for schema storage
+    schemas_dir: PathBuf,
 }
 
 #[cfg(test)]
@@ -24,6 +30,12 @@ mod tests {
     use crate::fees::types::config::FieldPaymentConfig;
     use crate::permissions::types::policy::PermissionsPolicy;
     use crate::schema::types::fields::SchemaField;
+    use std::fs;
+
+    fn cleanup_test_schema(name: &str) {
+        let path = PathBuf::from("data/schemas").join(format!("{}.json", name));
+        let _ = fs::remove_file(path);
+    }
 
     fn create_test_field(ref_atom_uuid: Option<String>, field_mappers: HashMap<String, String>) -> SchemaField {
         let mut field = SchemaField::new(
@@ -34,6 +46,45 @@ mod tests {
             field = field.with_ref_atom_uuid(uuid);
         }
         field
+    }
+
+    #[test]
+    fn test_schema_persistence() {
+        let test_schema_name = "test_persistence_schema";
+        cleanup_test_schema(test_schema_name); // Cleanup any leftover test files
+        
+        let manager = SchemaManager::new();
+        
+        // Create a test schema
+        let mut fields = HashMap::new();
+        fields.insert(
+            "test_field".to_string(),
+            create_test_field(Some("test_uuid".to_string()), HashMap::new()),
+        );
+        let schema = Schema::new(test_schema_name.to_string())
+            .with_fields(fields);
+        
+        // Load and persist schema
+        manager.load_schema(schema.clone()).unwrap();
+        
+        // Verify file exists
+        let schema_path = manager.schema_path(test_schema_name);
+        assert!(schema_path.exists());
+        
+        // Read and verify content
+        let content = fs::read_to_string(&schema_path).unwrap();
+        let loaded_schema: Schema = serde_json::from_str(&content).unwrap();
+        assert_eq!(loaded_schema.name, test_schema_name);
+        assert_eq!(
+            loaded_schema.fields.get("test_field").unwrap().get_ref_atom_uuid(),
+            Some("test_uuid".to_string())
+        );
+        
+        // Test unload removes file
+        manager.unload_schema(test_schema_name).unwrap();
+        assert!(!schema_path.exists());
+        
+        cleanup_test_schema(test_schema_name);
     }
 
     #[test]
@@ -74,8 +125,13 @@ mod tests {
 
 impl Default for SchemaManager {
     fn default() -> Self {
+        let schemas_dir = PathBuf::from("data/schemas");
+        // Create schemas directory if it doesn't exist
+        fs::create_dir_all(&schemas_dir).expect("Failed to create schemas directory");
+        
         Self {
             schemas: Mutex::new(HashMap::new()),
+            schemas_dir,
         }
     }
 }
@@ -83,16 +139,47 @@ impl Default for SchemaManager {
 impl SchemaManager {
     /// Creates a new SchemaManager instance.
     /// 
-    /// Initializes an empty collection of schemas protected by a mutex.
+    /// Initializes an empty collection of schemas protected by a mutex
+    /// and ensures the schemas directory exists.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Loads a schema into the manager.
+    /// Gets the path for a schema file.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema_name` - Name of the schema
+    fn schema_path(&self, schema_name: &str) -> PathBuf {
+        self.schemas_dir.join(format!("{}.json", schema_name))
+    }
+
+    /// Persists a schema to disk.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema` - The schema to persist
+    /// 
+    /// # Errors
+    /// 
+    /// Returns a `SchemaError` if serialization or file operations fail.
+    fn persist_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
+        let path = self.schema_path(&schema.name);
+        let json = serde_json::to_string_pretty(schema)
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize schema: {}", e)))?;
+        
+        fs::write(&path, json)
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to write schema file: {}", e)))?;
+        
+        Ok(())
+    }
+
+    /// Loads a schema into the manager and persists it to disk.
     /// 
     /// This method adds a new schema to the manager's collection, making it
-    /// available for validation, mapping, and querying operations.
+    /// available for validation, mapping, and querying operations. It also
+    /// persists the schema to the filesystem.
     /// 
     /// # Arguments
     /// 
@@ -100,19 +187,26 @@ impl SchemaManager {
     /// 
     /// # Errors
     /// 
-    /// Returns a `SchemaError` if the schema lock cannot be acquired.
+    /// Returns a `SchemaError` if:
+    /// - The schema lock cannot be acquired
+    /// - Schema persistence fails
     pub fn load_schema(&self, schema: Schema) -> Result<(), SchemaError> {
+        // First persist the schema
+        self.persist_schema(&schema)?;
+        
+        // Then add it to memory
         self.schemas
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?
             .insert(schema.name.clone(), schema);
+        
         Ok(())
     }
 
-    /// Unloads a schema from the manager.
+    /// Unloads a schema from the manager and removes its persistent storage.
     /// 
-    /// Removes a schema from the manager's collection, making it unavailable
-    /// for further operations.
+    /// Removes a schema from the manager's collection and deletes its file,
+    /// making it unavailable for further operations.
     /// 
     /// # Arguments
     /// 
@@ -125,13 +219,27 @@ impl SchemaManager {
     /// 
     /// # Errors
     /// 
-    /// Returns a `SchemaError::MappingError` if the schema lock cannot be acquired.
+    /// Returns a `SchemaError::MappingError` if:
+    /// - The schema lock cannot be acquired
+    /// - File deletion fails
     pub fn unload_schema(&self, schema_name: &str) -> Result<bool, SchemaError> {
         let mut schemas = self
             .schemas
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-        Ok(schemas.remove(schema_name).is_some())
+        
+        let was_present = schemas.remove(schema_name).is_some();
+        
+        if was_present {
+            // Remove the schema file if it exists
+            let path = self.schema_path(schema_name);
+            if path.exists() {
+                fs::remove_file(&path)
+                    .map_err(|e| SchemaError::InvalidData(format!("Failed to delete schema file: {}", e)))?;
+            }
+        }
+        
+        Ok(was_present)
     }
 
     /// Retrieves a schema by name.
@@ -243,7 +351,37 @@ impl SchemaManager {
         Ok(())
     }
 
-    /// Maps fields between schemas based on their field_mappers configurations.
+    /// Loads all schema files from the schemas directory.
+    /// 
+    /// This method:
+    /// 1. Reads the schemas directory
+    /// 2. Loads and validates each .json file as a schema
+    /// 3. Adds valid schemas to the manager
+    /// 
+    /// # Errors
+    /// 
+    /// Returns a `SchemaError` if:
+    /// - The schemas directory cannot be read
+    /// - A schema file cannot be read or parsed
+    /// - Schema loading fails
+    pub fn load_schemas_from_disk(&self) -> Result<(), SchemaError> {
+        if let Ok(entries) = std::fs::read_dir(&self.schemas_dir) {
+            for entry in entries.flatten() {
+                if let Some(ext) = entry.path().extension() {
+                    if ext == "json" {
+                        if let Ok(contents) = std::fs::read_to_string(entry.path()) {
+                            if let Ok(schema) = serde_json::from_str(&contents) {
+                                let _ = self.load_schema(schema);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Maps fields between schemas based on their defined relationships.
     /// 
     /// This method:
     /// 1. Finds all fields in the target schema that map to other schemas

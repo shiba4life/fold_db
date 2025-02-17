@@ -14,10 +14,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config: NodeConfig = serde_json::from_str(&config_str)?;
     println!("Config loaded successfully");
     
-    // Initialize node without Arc
-    println!("Initializing DataFold Node...");
-    let mut node = DataFoldNode::new(config)?;
-    println!("Node initialized successfully");
+    // Load or initialize node without Arc
+    println!("Loading DataFold Node...");
+    let mut node = DataFoldNode::load(config)?;
+    println!("Node loaded successfully");
     
     // Load schema if provided
     println!("Checking for schema...");

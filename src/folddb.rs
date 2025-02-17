@@ -43,12 +43,46 @@ impl FoldDB {
     /// 
     /// A Result containing the new FoldDB instance or a sled error
     pub fn new(path: &str) -> sled::Result<Self> {
-        let db = sled::open(path)?;
+        // Try to load existing database
+        let db = match sled::open(path) {
+            Ok(db) => db,
+            Err(e) => {
+                // If database doesn't exist, create new one
+                if e.to_string().contains("No such file or directory") {
+                    sled::open(path)?
+                } else {
+                    return Err(e);
+                }
+            }
+        };
+
+        // Load any existing atoms and refs from disk
+        let mut atoms = HashMap::new();
+        let mut ref_atoms = HashMap::new();
+
+        for result in db.iter() {
+            let (key, value) = result?;
+            let key_str = String::from_utf8_lossy(&key);
+            
+            if key_str.starts_with("atom:") {
+                if let Ok(atom) = serde_json::from_slice(&value) {
+                    atoms.insert(key_str.into_owned(), atom);
+                }
+            } else if key_str.starts_with("ref:") {
+                if let Ok(atom_ref) = serde_json::from_slice(&value) {
+                    ref_atoms.insert(key_str.into_owned(), atom_ref);
+                }
+            }
+        }
+
+        let schema_manager = SchemaManager::new();
+        let _ = schema_manager.load_schemas_from_disk();
+
         Ok(Self {
             db,
-            atoms: HashMap::new(),
-            ref_atoms: HashMap::new(),
-            schema_manager: SchemaManager::new(),
+            atoms,
+            ref_atoms, 
+            schema_manager,
             permission_wrapper: PermissionWrapper::new(),
         })
     }
