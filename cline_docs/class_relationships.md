@@ -83,24 +83,6 @@
 - Creates and manages invoices
 - Verifies payment status
 
-## Application Layer
-
-### DataFoldNode
-- Manages application containers
-- Provides API access
-- Coordinates network access
-- Handles client connections
-
-### SocketServer
-- Manages network communications
-- Handles connection lifecycle
-- Provides socket-based API
-
-### DataFoldClient
-- Client interface to FoldDB
-- Handles queries and mutations
-- Manages connection state
-
 ## Key Relationships
 
 1. Version Management
@@ -122,11 +104,6 @@
    - PaymentManager coordinates with PaymentCalculator
    - LightningClient handles payment network interaction
    - Integrated with schema-level payment requirements
-
-5. Application Integration
-   - DataFoldNode provides container management
-   - SocketServer handles communications
-   - DataFoldClient provides API access
 
 This architecture enables:
 - Immutable data storage with version tracking

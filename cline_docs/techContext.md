@@ -5,7 +5,6 @@
 - sled embedded database for persistent storage
 - serde for serialization/deserialization
 - JSON for data and schema representation
-- Unix Domain Sockets for client communication
 - tokio for async runtime
 - Docker for application containerization
 - Bitcoin Lightning Network for payments
@@ -16,17 +15,8 @@
 - Lightning Network node for payment processing
 - File-based storage system
 - Docker runtime for application containers
-- Unix-compatible system for socket communication
 
 ## Technical Constraints
-
-### Socket Communication Constraints
-- Unix Domain Socket based client-server communication
-- Non-blocking I/O operations
-- Thread-safe request processing
-- Connection cleanup on shutdown
-- Socket permissions management
-- Buffer size limitations
 
 ### Schema System Constraints
 - JSON-based schema definitions
@@ -57,15 +47,7 @@
 
 ## Components
 
-1. Socket Server
-   - Unix Domain Socket based
-   - Thread-safe operation
-   - Non-blocking I/O
-   - Request/response handling
-   - Connection management
-   - Error handling
-
-2. Schema System
+1. Schema System
    - JSON schema definitions
    - Field-level configurations
    - Schema mapping/transformation
@@ -89,17 +71,13 @@
    - Thread-safe permission checks
 
 ## Performance Considerations
-- Non-blocking I/O for socket operations
 - Thread-safe concurrent processing
-- Buffer size optimization
-- Connection pooling
 - Resource cleanup
 - Error recovery
 - Schema caching
 - Payment state management
 
 ## Security Considerations
-- Socket permissions management
 - Public key authentication
 - Trust distance validation
 - Permission enforcement

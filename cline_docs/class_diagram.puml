@@ -101,26 +101,6 @@ package "Fees" {
     }
 }
 
-' Application Layer
-package "Application" {
-    class DataFoldNode {
-        + start()
-        + stop()
-        + handle_request()
-    }
-
-    class SocketServer {
-        + listen()
-        + handle_connection()
-    }
-
-    class DataFoldClient {
-        + connect()
-        + query()
-        + mutate()
-    }
-}
-
 ' Relationships
 FoldDB --> SchemaManager
 FoldDB --> PermissionManager
@@ -140,9 +120,5 @@ PermissionManager --> PermissionWrapper
 
 PaymentManager --> PaymentCalculator
 PaymentManager --> LightningClient
-
-DataFoldNode --> FoldDB
-DataFoldNode --> SocketServer
-DataFoldClient --> SocketServer
 
 @enduml

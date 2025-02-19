@@ -16,18 +16,8 @@ FoldDB is a database system that provides:
 - Monetization of data access through micropayments
 - Schema transformation and migration
 - Complex data access pricing based on trust relationships
-- Secure application execution through sandboxed environments
-- Safe network access mediation for applications
 
 ## How It Works
-
-### Application Layer
-- Applications run in sandboxed Docker containers
-- DataFold Node acts as gatekeeper for all network access
-- Applications interact with data through Node-provided API
-- Containers are stateless beyond runtime
-- All data modifications are append-only
-- Node handles trust relationships and micropayments
 
 ### Core System
 - Data is stored in Atoms which are immutable units containing content and metadata

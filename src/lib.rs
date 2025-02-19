@@ -3,7 +3,6 @@
 //! This crate provides the core FoldDB functionality and client/server implementations.
 
 // Public modules that are part of the external API
-pub mod application;
 pub mod datafold_node;
 
 // Internal implementation modules
@@ -15,7 +14,6 @@ pub(crate) mod schema_interpreter;
 pub(crate) mod folddb;
 
 // Re-export only the types that should be part of the public API
-pub use application::{DataFoldClient, SocketServer, ClientConfig, SocketConfig};
 pub use datafold_node::{DataFoldNode, NodeConfig, NodeError, NodeResult};
 pub use folddb::FoldDB;
 pub use schema::Schema;

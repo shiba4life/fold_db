@@ -4,30 +4,13 @@
 - Modular design with clear separation of concerns:
   - Schema management and interpretation
   - Schema transformation and mapping
-  - Socket-based communication
   - Request/response handling
   - Error management
   - Concurrent operation support
 
-## Application Layer
-- Unix Domain Socket server for client communication
-- Thread-safe request processing
-- Non-blocking I/O operations
-- Graceful shutdown handling
-- Connection management
-- Error recovery
-
 ## Key Components
 
-1. SocketServer
-   - Client connection management
-   - Request/response handling
-   - Authentication verification
-   - Concurrent request processing
-   - Error handling and recovery
-   - Socket cleanup and permissions
-
-2. SchemaManager
+1. SchemaManager
    - Schema lifecycle management
    - Schema persistence
    - Field mapping coordination
@@ -74,14 +57,12 @@
 - Thread-safe concurrency patterns
 
 ## Data Flow
-1. Client connects via Unix Domain Socket
-2. Request is authenticated and validated
-3. Operation type is determined (Query/Mutation/Schema)
-4. Permissions are checked
-5. Payment requirements calculated if applicable
-6. Operation is executed
-7. Response is formatted and sent
-8. Connection is managed for cleanup
+1. Request is authenticated and validated
+2. Operation type is determined (Query/Mutation/Schema)
+3. Permissions are checked
+4. Payment requirements calculated if applicable
+5. Operation is executed
+6. Response is formatted and sent
 
 ## Schema Management Flow
 1. Schema is loaded from JSON definition
