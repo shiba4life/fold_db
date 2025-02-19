@@ -4,10 +4,11 @@
 - Rust programming language
 - sled embedded database for persistent storage
 - serde for serialization/deserialization
-- JSON for data representation
-- Bitcoin Lightning Network for payments
+- JSON for data and schema representation
+- Unix Domain Sockets for client communication
 - tokio for async runtime
 - Docker for application containerization
+- Bitcoin Lightning Network for payments
 
 ## Development Setup
 - Rust toolchain required
@@ -15,15 +16,26 @@
 - Lightning Network node for payment processing
 - File-based storage system
 - Docker runtime for application containers
+- Unix-compatible system for socket communication
 
 ## Technical Constraints
 
-### Application Container Constraints
-- All application code must run in sandboxed containers
-- Containers must be stateless beyond runtime
-- Network access only through Node API
-- Data modifications are append-only
-- Container lifecycle managed by DataFold Node
+### Socket Communication Constraints
+- Unix Domain Socket based client-server communication
+- Non-blocking I/O operations
+- Thread-safe request processing
+- Connection cleanup on shutdown
+- Socket permissions management
+- Buffer size limitations
+
+### Schema System Constraints
+- JSON-based schema definitions
+- Field mapping relationships must be explicit
+- No circular field mappings allowed
+- Schema names must be unique
+- All schema files stored in dedicated directory
+- Thread-safe schema operations
+- Persistent schema storage required
 
 ### Core System Constraints
 - Immutable data model (all changes create new versions)
@@ -33,24 +45,33 @@
 - Schema must be loaded before data operations
 - Write operations require explicit permissions
 - Read operations can use either trust distance or explicit permissions
-- Payment requirements:
-  - All base multipliers must be positive
-  - Trust distance scaling factors must be >= 1.0
-  - Payment thresholds must be non-negative
-  - Lightning Network connection required for paid operations
+- Thread-safe concurrent operations
+
+### Payment Requirements
+- All base multipliers must be positive
+- Trust distance scaling factors must be >= 1.0
+- Payment thresholds must be non-negative
+- Lightning Network connection required for paid operations
+- Hold invoices for complex operations
+- Payment verification before operation execution
 
 ## Components
-1. Core Database
-   - Atomic operations
-   - Version tracking
-   - Schema validation
-   - Permission checks
+
+1. Socket Server
+   - Unix Domain Socket based
+   - Thread-safe operation
+   - Non-blocking I/O
+   - Request/response handling
+   - Connection management
+   - Error handling
 
 2. Schema System
    - JSON schema definitions
    - Field-level configurations
    - Schema mapping/transformation
-   - Schema interpreter for validation
+   - Schema persistence
+   - Field relationship tracking
+   - Thread-safe operations
 
 3. Payment System
    - Lightning Network integration
@@ -58,9 +79,31 @@
    - Trust distance scaling
    - Payment verification
    - Hold invoice support
+   - Thread-safe payment processing
 
 4. Permission System
    - Trust-based access control
    - Field-level permissions
    - Explicit policy management
    - Permission wrapper implementation
+   - Thread-safe permission checks
+
+## Performance Considerations
+- Non-blocking I/O for socket operations
+- Thread-safe concurrent processing
+- Buffer size optimization
+- Connection pooling
+- Resource cleanup
+- Error recovery
+- Schema caching
+- Payment state management
+
+## Security Considerations
+- Socket permissions management
+- Public key authentication
+- Trust distance validation
+- Permission enforcement
+- Payment verification
+- Error handling
+- Resource cleanup
+- Data validation

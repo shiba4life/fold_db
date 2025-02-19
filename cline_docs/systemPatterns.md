@@ -3,22 +3,39 @@
 ## Core Architecture
 - Modular design with clear separation of concerns:
   - Schema management and interpretation
-  - Permissions management
-  - Payment processing
-  - Atom/AtomRef storage
-  - Database operations
-  - Sandboxed application containers
+  - Schema transformation and mapping
+  - Socket-based communication
+  - Request/response handling
+  - Error management
+  - Concurrent operation support
 
 ## Application Layer
-- Containerized application runtime (Docker)
-- Node-mediated network access
-- API-based data interaction
-- Stateless container design
-- Append-only data modifications
+- Unix Domain Socket server for client communication
+- Thread-safe request processing
+- Non-blocking I/O operations
+- Graceful shutdown handling
+- Connection management
+- Error recovery
 
 ## Key Components
 
-1. DataFold Node
+1. SocketServer
+   - Client connection management
+   - Request/response handling
+   - Authentication verification
+   - Concurrent request processing
+   - Error handling and recovery
+   - Socket cleanup and permissions
+
+2. SchemaManager
+   - Schema lifecycle management
+   - Schema persistence
+   - Field mapping coordination
+   - Schema validation
+   - Schema relationship tracking
+   - Thread-safe operations
+
+3. DataFold Node
    - Application container management
    - Network access gatekeeper
    - API provider for applications
@@ -26,37 +43,24 @@
    - Trust and permission validator
    - Micropayment negotiator
 
-2. FoldDB
+4. FoldDB
    - Main entry point
    - Manages database operations
    - Coordinates between components
    
-2. SchemaManager & Interpreter
-   - Handles schema validation
-   - Manages schema loading
-   - Tracks available schemas
-   - Interprets JSON schema definitions
-   - Validates schema constraints
-   - Manages schema transformations
-
-3. PermissionManager
+5. PermissionManager
    - Validates access permissions
    - Handles trust distance calculations
    - Manages explicit permissions
    - Permission check wrapper
    - Query/mutation permission validation
 
-4. PaymentManager
+6. PaymentManager
    - Lightning Network integration
    - Payment calculation and scaling
    - Invoice generation and tracking
    - Payment verification
    - Hold invoice management
-
-5. Atoms & AtomRefs
-   - Atoms: Immutable data containers
-   - AtomRefs: Pointers to latest versions
-   - Version history tracking
 
 ## Design Patterns
 - Repository pattern for data access
@@ -67,32 +71,40 @@
 - Observer pattern for payment tracking
 - Command pattern for database operations
 - Immutable data structures
+- Thread-safe concurrency patterns
 
 ## Data Flow
-1. Operations start with schema validation
-2. Permissions are checked before access
-3. Payment requirements calculated if applicable
-4. Payment verification if required
-5. Data is stored in immutable Atoms
-6. AtomRefs track latest versions
-7. Version history maintained through linked Atoms
+1. Client connects via Unix Domain Socket
+2. Request is authenticated and validated
+3. Operation type is determined (Query/Mutation/Schema)
+4. Permissions are checked
+5. Payment requirements calculated if applicable
+6. Operation is executed
+7. Response is formatted and sent
+8. Connection is managed for cleanup
 
-## Payment Flow
-1. Calculate required payment based on:
-   - Global base rate
-   - Schema multiplier
-   - Field multipliers
-   - Trust distance scaling
-2. Generate Lightning invoice
-3. Monitor payment status
-4. Verify payment completion
-5. Process operation on success
+## Schema Management Flow
+1. Schema is loaded from JSON definition
+2. Fields and relationships are validated
+3. Field mappings are processed
+4. Reference UUIDs are tracked
+5. Schema is persisted to disk
+6. Schema is made available for operations
 
-## Schema Interpretation Flow
-1. Load JSON schema definition
-2. Validate structure and constraints
-3. Process field configurations
-4. Set up permission policies
-5. Configure payment requirements
-6. Apply schema transformations
-7. Register schema with database
+## Error Handling Flow
+1. Error is caught at appropriate level
+2. Context is added to error
+3. Error is categorized by type
+4. Response is formatted with error details
+5. Client is notified
+6. Resources are cleaned up
+7. Error is logged if necessary
+
+## Testing Strategy
+1. Unit tests for components
+2. Integration tests for flows
+3. Concurrent operation tests
+4. Error handling tests
+5. Performance benchmarks
+6. Socket communication tests
+7. Schema transformation tests
