@@ -12,8 +12,6 @@ pub enum NodeError {
     PermissionError(String),
     /// Error in node configuration
     ConfigError(String),
-    /// Error in Docker operations
-    DockerError(String),
 }
 
 impl fmt::Display for NodeError {
@@ -23,7 +21,6 @@ impl fmt::Display for NodeError {
             Self::SchemaError(err) => write!(f, "Schema error: {}", err),
             Self::PermissionError(msg) => write!(f, "Permission error: {}", msg),
             Self::ConfigError(msg) => write!(f, "Configuration error: {}", msg),
-            Self::DockerError(msg) => write!(f, "Docker error: {}", msg),
         }
     }
 }

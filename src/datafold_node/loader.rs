@@ -13,7 +13,6 @@ pub fn load_schema_from_file<P: AsRef<Path>>(path: P, node: &mut DataFoldNode) -
 mod tests {
     use super::*;
     use crate::NodeConfig;
-    use crate::datafold_node::DockerConfig;
     use tempfile::tempdir;
 
     #[test]
@@ -36,7 +35,6 @@ mod tests {
         let config = NodeConfig {
             storage_path: db_path.into(),
             default_trust_distance: 1,
-            docker: DockerConfig::default(),
         };
         
         let mut node = DataFoldNode::new(config)?;

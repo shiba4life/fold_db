@@ -8,7 +8,6 @@ use crate::schema::{Schema, SchemaError};
 use crate::schema_interpreter::types::Operation;
 use crate::datafold_node::{
     config::NodeConfig,
-    docker::{self, ContainerState, ContainerStatus},
     error::{NodeError, NodeResult},
 };
 use crate::datafold_node::config::NodeInfo;
@@ -17,16 +16,12 @@ use crate::datafold_node::config::NodeInfo;
 /// 
 /// DataFoldNode is responsible for:
 /// - Managing local data storage and processing
-/// - Running and supervising application containers
-/// - Controlling network access and isolation
 /// - Handling schema operations
 /// - Processing queries and mutations
 /// - Maintaining trust relationships
 /// - Managing version history
 /// 
 /// The node provides a secure environment for applications by:
-/// - Running them in isolated Docker containers
-/// - Mediating all network access
 /// - Enforcing schema-based data validation
 /// - Applying permission and payment policies
 #[derive(Clone)]
@@ -35,8 +30,6 @@ pub struct DataFoldNode {
     db: Arc<FoldDB>,
     /// Configuration settings for this node
     config: NodeConfig,
-    /// Map of active application containers and their states
-    containers: HashMap<String, ContainerState>,
     /// Map of trusted nodes and their trust distances
     trusted_nodes: HashMap<String, NodeInfo>,
 }
@@ -46,8 +39,7 @@ impl DataFoldNode {
     /// 
     /// This method:
     /// 1. Initializes a new database instance at the storage path
-    /// 2. Sets up Docker networking if container support is enabled
-    /// 3. Configures trust relationships and permissions
+    /// 2. Configures trust relationships and permissions
     /// 
     /// If the storage path already contains a database, a new node will be created
     /// that can access that data.
@@ -63,13 +55,12 @@ impl DataFoldNode {
     /// # Example
     /// 
     /// ```no_run
-    /// use fold_db::{DataFoldNode, NodeConfig, datafold_node::DockerConfig};
+    /// use fold_db::{DataFoldNode, NodeConfig};
     /// use std::path::PathBuf;
     /// 
     /// let config = NodeConfig {
     ///     storage_path: PathBuf::from("/tmp/db"),
     ///     default_trust_distance: 1,
-    ///     docker: DockerConfig::default(),
     /// };
     /// 
     /// let node = DataFoldNode::new(config).expect("Failed to create node");
@@ -85,90 +76,8 @@ impl DataFoldNode {
         Ok(Self { 
             db, 
             config,
-            containers: HashMap::new(),
             trusted_nodes: HashMap::new(),
         })
-    }
-
-    /// Loads a Docker application into a new container.
-    /// 
-    /// This method:
-    /// 1. Verifies Docker availability
-    /// 2. Creates a new container from the specified image
-    /// 3. Starts the container
-    /// 4. Tracks the container's state
-    /// 
-    /// If any step fails, the container is cleaned up before returning an error.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `image` - Docker image name to run
-    /// * `app_id` - Unique identifier for the application
-    /// 
-    /// # Returns
-    /// 
-    /// A Result containing the container ID or an error
-    pub fn load_docker_app(&mut self, image: &str, app_id: &str) -> NodeResult<String> {
-        docker::check_docker_available()?;
-
-        let container_id = docker::create_container(image, &self.config.docker)?;
-        
-        if let Err(e) = docker::start_container(&container_id) {
-            // Cleanup failed container
-            let _ = docker::remove_container(&container_id);
-            return Err(e);
-        }
-
-        // Track container state
-        self.containers.insert(app_id.to_string(), ContainerState {
-            id: container_id.clone(),
-            status: ContainerStatus::Running,
-            network_id: None,
-        });
-
-        Ok(container_id)
-    }
-
-    /// Stops and removes a Docker application container.
-    /// 
-    /// This method:
-    /// 1. Stops the container if running
-    /// 2. Removes the container
-    /// 3. Cleans up any associated network configuration
-    /// 4. Updates internal container tracking
-    /// 
-    /// # Arguments
-    /// 
-    /// * `app_id` - Application identifier
-    /// 
-    /// # Returns
-    /// 
-    /// A Result indicating success or an error
-    pub fn remove_docker_app(&mut self, app_id: &str) -> NodeResult<()> {
-        if let Some(container) = self.containers.remove(app_id) {
-            docker::stop_container(&container.id)?;
-            docker::remove_container(&container.id)?;
-
-            // Cleanup network if isolated
-            if let Some(network_id) = container.network_id {
-                docker::cleanup_network(&network_id);
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Gets the status of a Docker application container.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `app_id` - Application identifier
-    /// 
-    /// # Returns
-    /// 
-    /// A Result containing the container status if found
-    pub fn get_docker_app_status(&self, app_id: &str) -> NodeResult<Option<ContainerStatus>> {
-        Ok(self.containers.get(app_id).map(|c| c.status.clone()))
     }
 
     /// Loads an existing database node from the specified configuration.
