@@ -2,10 +2,9 @@ use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-mod test_helpers;
-use test_helpers::operation_builder::{create_mutation, create_query};
-use test_helpers::schema_builder::{create_field_with_permissions, create_schema_with_fields};
-use test_helpers::{cleanup_test_db, setup_and_allow_schema, setup_test_db};
+use crate::test_data::test_helpers::operation_builder::{create_mutation, create_query};
+use crate::test_data::test_helpers::schema_builder::{create_field_with_permissions, create_schema_with_fields};
+use crate::test_data::test_helpers::{cleanup_test_db, setup_and_allow_schema, setup_test_db};
 
 #[test]
 fn test_permission_based_access() {

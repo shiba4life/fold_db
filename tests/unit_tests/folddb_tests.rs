@@ -19,8 +19,7 @@ fn create_default_payment_config() -> FieldPaymentConfig {
     FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
 }
 
-mod test_helpers;
-use test_helpers::{cleanup_test_db, cleanup_tmp_dir, get_test_db_path};
+use crate::test_data::test_helpers::{cleanup_test_db, cleanup_tmp_dir, get_test_db_path};
 
 fn setup_test_db() -> (FoldDB, String) {
     let db_path = get_test_db_path();

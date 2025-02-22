@@ -18,8 +18,7 @@ use std::collections::HashMap;
 use uuid;
 use std::convert::Infallible;
 
-// Import test helpers
-mod test_helpers;
+use crate::test_data::test_helpers;
 
 async fn create_test_server() -> Arc<tokio::sync::Mutex<DataFoldNode>> {
     let dir = tempdir().unwrap();
