@@ -207,9 +207,25 @@ pub async fn handle_execute(
                         match &arr[0] {
                             serde_json::Value::Object(obj) => {
                                 if let Some(ok_value) = obj.get("Ok") {
-                                    if let Some(field_name) = ok_value.as_str() {
+                                    if let Some(field_value) = ok_value.as_str() {
+                                        // Parse the operation to get the requested field name
+                                        if let Ok(Operation::Query { fields, .. }) = serde_json::from_str::<Operation>(&query.operation) {
+                                            if let Some(field) = fields.first() {
+                                                // Parse the field value as JSON to handle proper serialization
+                                                if let Ok(value) = serde_json::from_str::<serde_json::Value>(field_value) {
+                                                    return Ok(warp::reply::json(&ApiSuccessResponse::new(json!({
+                                                        field: value
+                                                    }))))
+                                                }
+                                                // Fallback to string if not valid JSON
+                                                return Ok(warp::reply::json(&ApiSuccessResponse::new(json!({
+                                                    field: field_value
+                                                }))))
+                                            }
+                                        }
+                                        // Fallback to using the value directly if we can't get the field name
                                         return Ok(warp::reply::json(&ApiSuccessResponse::new(json!({
-                                            "name": field_name
+                                            "value": field_value
                                         }))))
                                     }
                                 }
