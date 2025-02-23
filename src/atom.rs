@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 /// An immutable data container that represents a single version of content in the database.
@@ -136,26 +137,26 @@ impl Atom {
     }
 }
 
-/// A mutable reference to the latest version of an Atom.
+/// A mutable reference to one or more Atom versions.
 /// 
 /// AtomRefs provide a level of indirection that enables atomic updates
 /// to data while maintaining the immutable nature of Atoms. They track:
 /// - A unique identifier for the reference itself
-/// - The UUID of the current Atom version
+/// - A mapping of keys to Atom UUIDs
 /// - The timestamp of the last update
 /// 
-/// When data needs to be updated, a new Atom is created and the AtomRef
-/// is updated to point to the new version, providing atomic updates
-/// while preserving the complete version history.
+/// The mapping supports both array-like access (using "0".."n" as keys)
+/// and map-like access (using arbitrary string keys). The default key "0"
+/// maintains backward compatibility with single-atom references.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AtomRef {
     uuid: String,
-    atom_uuid: Option<String>,
+    atom_uuids: HashMap<String, String>,
     updated_at: DateTime<Utc>,
 }
 
 impl AtomRef {
-    /// Creates a new AtomRef pointing to the specified Atom.
+    /// Creates a new AtomRef pointing to the specified Atom using the default key "0".
     /// 
     /// # Arguments
     /// 
@@ -166,36 +167,76 @@ impl AtomRef {
     /// A new AtomRef instance with a generated UUID and current timestamp
     #[must_use]
     pub fn new(atom_uuid: String) -> Self {
+        let mut atom_uuids = HashMap::new();
+        atom_uuids.insert("0".to_string(), atom_uuid);
         Self {
             uuid: Uuid::new_v4().to_string(),
-            atom_uuid: Some(atom_uuid),
+            atom_uuids,
             updated_at: Utc::now(),
         }
     }
 
-    /// Updates this reference to point to a new Atom version.
+    /// Updates the reference at the default key "0" to point to a new Atom version.
     /// 
-    /// This is the primary method for updating data in the system,
-    /// as it allows switching to a new version atomically.
+    /// This maintains backward compatibility with the previous single-reference implementation.
     /// 
     /// # Arguments
     /// 
     /// * `atom_uuid` - UUID of the new Atom version to reference
     pub fn set_atom_uuid(&mut self, atom_uuid: String) {
-        self.atom_uuid = Some(atom_uuid);
+        self.set_atom_uuid_with_key("0".to_string(), atom_uuid);
     }
 
-    /// Returns the UUID of the current Atom this reference points to.
+    /// Updates or adds a reference at the specified key to point to an Atom version.
     /// 
-    /// Returns None if this reference hasn't been initialized with an Atom.
+    /// # Arguments
+    /// 
+    /// * `key` - The key to associate with the Atom UUID
+    /// * `atom_uuid` - UUID of the Atom version to reference
+    pub fn set_atom_uuid_with_key(&mut self, key: String, atom_uuid: String) {
+        self.atom_uuids.insert(key, atom_uuid);
+        self.updated_at = Utc::now();
+    }
+
+    /// Returns the UUID of the Atom referenced by the default key "0".
+    /// 
+    /// This maintains backward compatibility with the previous single-reference implementation.
+    /// Returns None if no Atom is referenced at the default key.
     #[must_use]
-    pub const fn get_atom_uuid(&self) -> Option<&String> {
-        self.atom_uuid.as_ref()
+    pub fn get_atom_uuid(&self) -> Option<&String> {
+        self.atom_uuids.get("0")
+    }
+
+    /// Returns the UUID of the Atom referenced by the specified key.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `key` - The key whose associated Atom UUID should be returned
+    /// 
+    /// Returns None if no Atom is referenced at the specified key.
+    #[must_use]
+    pub fn get_atom_uuid_by_key(&self, key: &str) -> Option<&String> {
+        self.atom_uuids.get(key)
+    }
+
+    /// Removes the reference at the specified key.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `key` - The key whose associated Atom UUID should be removed
+    /// 
+    /// Returns the removed Atom UUID if it existed, None otherwise.
+    pub fn remove_atom_uuid(&mut self, key: &str) -> Option<String> {
+        let result = self.atom_uuids.remove(key);
+        if result.is_some() {
+            self.updated_at = Utc::now();
+        }
+        result
     }
 
     /// Returns the unique identifier of this AtomRef.
     /// 
-    /// This UUID identifies the reference itself, not the Atom it points to.
+    /// This UUID identifies the reference itself, not the Atoms it points to.
     #[must_use]
     pub fn uuid(&self) -> &str {
         &self.uuid
@@ -203,8 +244,7 @@ impl AtomRef {
 
     /// Returns the timestamp of the last update to this reference.
     /// 
-    /// This timestamp is updated whenever the reference is modified to
-    /// point to a new version of the data.
+    /// This timestamp is updated whenever references are modified, added, or removed.
     #[must_use]
     pub const fn updated_at(&self) -> DateTime<Utc> {
         self.updated_at
@@ -269,8 +309,10 @@ mod tests {
             json!({"test": true}),
         );
 
+        // Test default key behavior
         let atom_ref = AtomRef::new(atom.uuid().to_string());
         assert_eq!(atom_ref.get_atom_uuid(), Some(&atom.uuid().to_string()));
+        assert_eq!(atom_ref.get_atom_uuid_by_key("0"), Some(&atom.uuid().to_string()));
 
         let new_atom = Atom::new(
             "test_schema".to_string(),
@@ -287,5 +329,41 @@ mod tests {
             Some(&new_atom.uuid().to_string())
         );
         assert!(updated_ref.updated_at() >= atom_ref.updated_at());
+    }
+
+    #[test]
+    fn test_atom_ref_with_multiple_keys() {
+        let atoms: Vec<_> = (0..3)
+            .map(|i| {
+                Atom::new(
+                    "test_schema".to_string(),
+                    "test_key".to_string(),
+                    None,
+                    json!({ "index": i }),
+                )
+            })
+            .collect();
+
+        // Test array-like usage
+        let mut array_ref = AtomRef::new(atoms[0].uuid().to_string());
+        array_ref.set_atom_uuid_with_key("1".to_string(), atoms[1].uuid().to_string());
+        array_ref.set_atom_uuid_with_key("2".to_string(), atoms[2].uuid().to_string());
+
+        assert_eq!(array_ref.get_atom_uuid_by_key("0"), Some(&atoms[0].uuid().to_string()));
+        assert_eq!(array_ref.get_atom_uuid_by_key("1"), Some(&atoms[1].uuid().to_string()));
+        assert_eq!(array_ref.get_atom_uuid_by_key("2"), Some(&atoms[2].uuid().to_string()));
+
+        // Test map-like usage
+        let mut map_ref = AtomRef::new(atoms[0].uuid().to_string());
+        map_ref.set_atom_uuid_with_key("first".to_string(), atoms[1].uuid().to_string());
+        map_ref.set_atom_uuid_with_key("second".to_string(), atoms[2].uuid().to_string());
+
+        assert_eq!(map_ref.get_atom_uuid(), Some(&atoms[0].uuid().to_string())); // Default key
+        assert_eq!(map_ref.get_atom_uuid_by_key("first"), Some(&atoms[1].uuid().to_string()));
+        assert_eq!(map_ref.get_atom_uuid_by_key("second"), Some(&atoms[2].uuid().to_string()));
+
+        // Test removal
+        assert_eq!(map_ref.remove_atom_uuid("first"), Some(atoms[1].uuid().to_string()));
+        assert_eq!(map_ref.get_atom_uuid_by_key("first"), None);
     }
 }
