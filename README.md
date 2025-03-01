@@ -122,6 +122,66 @@ cargo run --example basic_usage
    - Handle version history appropriately
    - Consider atomic operation boundaries
 
+## Contributing
+
+We welcome contributions to FoldDB! This project is open for anyone to contribute, modify, and use without limitation.
+
+### How to Contribute
+
+1. **Fork the Repository**: Create your own fork of the project
+2. **Create a Branch**: Make your changes in a new branch
+3. **Submit a Pull Request**: Open a PR with a clear description of your changes
+4. **Code Review**: Participate in the review process
+
+### Development Guidelines
+
+- Follow the existing code style and patterns
+- Add tests for new functionality
+- Update documentation to reflect your changes
+- Keep pull requests focused on a single topic
+
+### Reporting Issues
+
+- Use the issue tracker to report bugs
+- Include detailed steps to reproduce the issue
+- Mention your environment and FoldDB version
+
+## Code of Conduct
+
+We are committed to providing a welcoming and inclusive experience for everyone. We expect all participants to adhere to the following principles:
+
+- Be respectful and considerate
+- Be open to collaboration and different viewpoints
+- Gracefully accept constructive criticism
+- Focus on what is best for the community
+- Show empathy towards other community members
+
 ## License
 
-[License details to be added]
+FoldDB is released under the MIT License.
+
+```
+MIT License
+
+Copyright (c) 2025 FoldDB Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+This open-source license allows anyone to freely use, modify, distribute, and contribute to FoldDB without limitation.
