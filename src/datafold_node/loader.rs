@@ -1,4 +1,5 @@
-use crate::{Schema, DataFoldNode};
+use crate::schema::Schema;
+use crate::datafold_node::DataFoldNode;
 use std::fs;
 use std::path::Path;
 
@@ -12,7 +13,7 @@ pub fn load_schema_from_file<P: AsRef<Path>>(path: P, node: &mut DataFoldNode) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::NodeConfig;
+    use crate::datafold_node::config::NodeConfig;
     use tempfile::tempdir;
 
     #[test]

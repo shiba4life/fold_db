@@ -2,7 +2,6 @@ pub mod operation_builder;
 pub mod schema_builder;
 
 // Re-export testing utilities for all tests
-pub use fold_db::testing::*;
 use fold_db::FoldDB;
 use std::fs;
 use std::path::Path;
@@ -42,8 +41,9 @@ pub fn get_test_db_path() -> String {
     let safe_uuid = Uuid::new_v4().to_string().replace("-", "_");
     let db_path = tmp_dir.join(format!("test_db_{}", safe_uuid));
 
-    // Create the database directory
+    // Create the database directory and schemas subdirectory
     fs::create_dir_all(&db_path).expect("Failed to create database directory");
+    fs::create_dir_all(db_path.join("schemas")).expect("Failed to create schemas directory");
 
     db_path.to_string_lossy().into_owned()
 }

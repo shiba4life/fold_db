@@ -1,4 +1,4 @@
-use fold_db::testing::SchemaInterpreter;
+use fold_db::testing::SchemaCore;
 
 
 #[test]
@@ -34,7 +34,7 @@ fn test_invalid_schema_validation() {
         }
     }"#;
 
-    let interpreter = SchemaInterpreter::new();
-    let result = interpreter.interpret_str(invalid_json_str);
+    let core = SchemaCore::new("data");
+    let result = core.load_schema_from_json(invalid_json_str);
     assert!(result.is_err());
 }

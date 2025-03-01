@@ -1,4 +1,4 @@
-use fold_db::testing::{Schema, SchemaManager};
+use fold_db::testing::{Schema, SchemaCore};
 use tempfile::tempdir;
 use crate::test_data::schema_test_data::*;
 
@@ -83,7 +83,7 @@ fn test_user_profile_schema() {
 fn test_schema_persistence() {
     // Create a temporary directory for test
     let test_dir = tempdir().unwrap();
-    let manager = SchemaManager::new(test_dir.path().to_str().unwrap());
+    let manager = SchemaCore::new(test_dir.path().to_str().unwrap());
 
     // Create and load a test schema
     let schema = create_test_schema("test_persistence");
@@ -98,7 +98,7 @@ fn test_schema_persistence() {
     );
 
     // Create a new manager instance to verify disk persistence
-    let new_manager = SchemaManager::new(test_dir.path().to_str().unwrap());
+    let new_manager = SchemaCore::new(test_dir.path().to_str().unwrap());
     new_manager.load_schemas_from_disk().unwrap();
     let reloaded_schema = new_manager.get_schema("test_persistence").unwrap().unwrap();
     assert_eq!(reloaded_schema.name, "test_persistence");
@@ -115,7 +115,7 @@ fn test_schema_persistence() {
 fn test_schema_disk_loading() {
     // Create a temporary directory for test
     let test_dir = tempdir().unwrap();
-    let manager = SchemaManager::new(test_dir.path().to_str().unwrap());
+    let manager = SchemaCore::new(test_dir.path().to_str().unwrap());
 
     // Create and save multiple schemas
     let schemas = vec![
@@ -130,7 +130,7 @@ fn test_schema_disk_loading() {
     }
 
     // Create a new manager instance and load schemas from disk
-    let new_manager = SchemaManager::new(test_dir.path().to_str().unwrap());
+    let new_manager = SchemaCore::new(test_dir.path().to_str().unwrap());
     new_manager.load_schemas_from_disk().unwrap();
 
     // Verify all schemas were loaded

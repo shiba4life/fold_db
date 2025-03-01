@@ -1,4 +1,20 @@
 use serde::{Deserialize, Serialize};
+use std::fmt;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum FieldType {
+    Single,
+    Collection,
+}
+
+impl fmt::Display for FieldType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FieldType::Single => write!(f, "single"),
+            FieldType::Collection => write!(f, "collection"),
+        }
+    }
+}
 use crate::permissions::types::policy::PermissionsPolicy;
 use crate::fees::types::config::FieldPaymentConfig;
 use std::collections::HashMap;
@@ -28,6 +44,9 @@ pub struct SchemaField {
     /// Reference to the atom containing this field's value
     /// The actual field value is fetched through this reference
     ref_atom_uuid: Option<String>,
+
+    /// Type of the field - single value or collection
+    field_type: FieldType,
     
     /// Mappings for field transformations and schema evolution
     /// Keys are source schema names, values are source field names
@@ -52,13 +71,18 @@ impl SchemaField {
     /// 
     /// A new SchemaField instance with the specified configurations
     #[must_use]
-    pub fn new(permission_policy: PermissionsPolicy, payment_config: FieldPaymentConfig, 
-        field_mappers: HashMap<String, String>) -> Self {
+    pub fn new(
+        permission_policy: PermissionsPolicy, 
+        payment_config: FieldPaymentConfig,
+        field_mappers: HashMap<String, String>,
+        field_type: Option<FieldType>,
+    ) -> Self {
         Self {
             permission_policy,
             payment_config,
             ref_atom_uuid: Some(Uuid::new_v4().to_string()),
             field_mappers,
+            field_type: field_type.unwrap_or(FieldType::Single),
         }
     }
 
@@ -82,6 +106,23 @@ impl SchemaField {
 
     pub fn get_ref_atom_uuid(&self) -> Option<String> {
         self.ref_atom_uuid.clone()
+    }
+
+    /// Returns whether this field is a collection
+    #[must_use]
+    pub fn is_collection(&self) -> bool {
+        self.field_type == FieldType::Collection
+    }
+
+    /// Returns the type of this field
+    #[must_use]
+    pub fn field_type(&self) -> &FieldType {
+        &self.field_type
+    }
+
+    /// Sets the type of this field
+    pub fn set_field_type(&mut self, field_type: FieldType) {
+        self.field_type = field_type;
     }
 
     /// Sets the field mappings for schema transformation.

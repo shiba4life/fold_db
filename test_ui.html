@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataFold Node</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1, h2, h3 {
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .status {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .status.success {
+            background: #e6ffe6;
+            color: #006600;
+        }
+        .status.error {
+            background: #ffe6e6;
+            color: #660000;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            font-family: monospace;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #results {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .tab-container {
+            margin: 20px 0;
+        }
+        .tab-buttons {
+            margin-bottom: 10px;
+        }
+        .tab-button {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 10px 20px;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+        .tab-button.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .schema-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .schema-item:hover {
+            background: #e9ecef;
+        }
+        .schema-item h3 {
+            margin-top: 0;
+            margin-bottom: 0;
+            color: #007bff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .remove-schema {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .remove-schema:hover {
+            background: #c82333;
+        }
+        .schema-item h3::after {
+            content: '▼';
+            font-size: 0.8em;
+            transition: transform 0.2s;
+        }
+        .schema-item.collapsed h3::after {
+            transform: rotate(-90deg);
+        }
+        .schema-item pre {
+            margin: 10px 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+            display: none;
+        }
+        .schema-item.expanded pre {
+            display: block;
+        }
+        .example-buttons {
+            margin-top: 10px;
+        }
+        .example-buttons button {
+            background: #6c757d;
+            font-size: 0.9em;
+            padding: 8px 15px;
+        }
+        .example-buttons button:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <h1>DataFold Node</h1>
+    <div class="status success">
+        Node is running successfully
+    </div>
+
+    <div class="section">
+        <h2>Operations</h2>
+        <div class="tab-container">
+            <div class="tab-buttons">
+                <button class="tab-button active" onclick="switchTab('schemas')">Loaded Schemas</button>
+                <button class="tab-button" onclick="switchTab('schema')">Schema</button>
+                <button class="tab-button" onclick="switchTab('query')">Query</button>
+                <button class="tab-button" onclick="switchTab('mutation')">Mutation</button>
+            </div>
+            <div id="schemasTab" class="tab-content active">
+                <div id="schemaList">
+                    <div class="schema-item collapsed" onclick="toggleSchema(this)">
+                        <h3>
+                            <span>UserProfile</span>
+                            <button class="remove-schema" onclick="removeSchema('UserProfile', event)">Remove</button>
+                        </h3>
+                        <pre>{
+  "name": "UserProfile",
+  "fields": {
+    "username": {
+      "field_type": "Single",
+      "permission_policy": {
+        "read_policy": { "NoRequirement": null },
+        "write_policy": { "Distance": 0 },
+        "explicit_read_policy": null,
+        "explicit_write_policy": null
+      }
+    }
+  }
+}</pre>
+                    </div>
+                    <div class="schema-item collapsed" onclick="toggleSchema(this)">
+                        <h3>
+                            <span>UserProfile2</span>
+                            <button class="remove-schema" onclick="removeSchema('UserProfile2', event)">Remove</button>
+                        </h3>
+                        <pre>{
+  "name": "UserProfile2",
+  "fields": {
+    "username": {
+      "field_type": "Single",
+      "permission_policy": {
+        "read_policy": { "NoRequirement": null },
+        "write_policy": { "Distance": 0 },
+        "explicit_read_policy": null,
+        "explicit_write_policy": null
+      }
+    }
+  }
+}</pre>
+                    </div>
+                </div>
+                <div class="example-buttons">
+                    <button onclick="loadSchemaList()">Refresh Schema List</button>
+                </div>
+            </div>
+            <div id="schemaTab" class="tab-content">
+                <textarea id="schemaInput" placeholder="Enter your schema JSON here..."></textarea>
+                <button onclick="loadSchema()">Load Schema</button>
+                <div class="example-buttons">
+                    <button onclick="loadExampleSchema()">Load Example Schema</button>
+                </div>
+            </div>
+            <div id="queryTab" class="tab-content">
+                <textarea id="queryInput" placeholder="Enter your query operation JSON here..."></textarea>
+                <button onclick="executeOperation('query')">Run Query</button>
+                <div class="example-buttons">
+                    <button onclick="loadExampleQuery()">Load Example Query</button>
+                </div>
+            </div>
+            <div id="mutationTab" class="tab-content">
+                <textarea id="mutationInput" placeholder="Enter your mutation operation JSON here..."></textarea>
+                <button onclick="executeOperation('mutation')">Run Mutation</button>
+                <div class="example-buttons">
+                    <button onclick="loadExampleMutation()">Load Example Mutation</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Results</h2>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Toggle schema expansion
+        function toggleSchema(element) {
+            if (element.classList.contains('collapsed')) {
+                element.classList.remove('collapsed');
+                element.classList.add('expanded');
+            } else {
+                element.classList.remove('expanded');
+                element.classList.add('collapsed');
+            }
+        }
+
+        // Helper function to display results/errors
+        function displayResult(data, isError = false) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.className = isError ? 'status error' : 'status success';
+            resultsDiv.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        }
+
+        // Remove schema
+        function removeSchema(schemaName, event) {
+            event.stopPropagation(); // Prevent schema toggle
+            
+            if (!confirm(`Are you sure you want to remove schema "${schemaName}"?`)) {
+                return;
+            }
+
+            displayResult(`Schema ${schemaName} removed successfully`);
+        }
+
+        // Load schema
+        function loadSchema() {
+            const schemaInput = document.getElementById('schemaInput').value;
+            displayResult('Schema loaded successfully');
+        }
+
+        // Execute operation (query or mutation)
+        function executeOperation(type) {
+            const input = document.getElementById(`${type}Input`).value;
+            displayResult(`${type} executed successfully`);
+        }
+
+        // Load schema list
+        function loadSchemaList() {
+            displayResult('Schema list refreshed');
+        }
+
+        // Load example data
+        function loadExampleSchema() {
+            document.getElementById('schemaInput').value = JSON.stringify({
+                name: "ExampleSchema",
+                fields: {
+                    username: {
+                        field_type: "Single",
+                        permission_policy: {
+                            read_policy: { NoRequirement: null },
+                            write_policy: { Distance: 0 }
+                        }
+                    }
+                }
+            }, null, 2);
+        }
+
+        function loadExampleQuery() {
+            document.getElementById('queryInput').value = JSON.stringify({
+                type: "query",
+                schema: "UserProfile",
+                fields: ["username", "email", "bio"],
+                filter: null
+            }, null, 2);
+        }
+
+        function loadExampleMutation() {
+            document.getElementById('mutationInput').value = JSON.stringify({
+                type: "mutation",
+                schema: "UserProfile",
+                mutation_type: "create",
+                data: {
+                    username: "johndoe",
+                    email: "john.doe@example.com",
+                    bio: "Software developer"
+                }
+            }, null, 2);
+        }
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            document.querySelector(`.tab-button[onclick="switchTab('${tabName}')"]`).classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabName}Tab`).classList.add('active');
+            
+            // Refresh schema list when switching to schemas tab
+            if (tabName === 'schemas') {
+                // In a real app, this would fetch the schema list
+            }
+        }
+    </script>
+</body>

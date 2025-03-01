@@ -1,4 +1,4 @@
-use super::fields::SchemaField;
+use crate::schema::types::fields::SchemaField;
 use crate::fees::SchemaPaymentConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -104,6 +104,7 @@ mod tests {
     use super::*;
     use crate::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
     use crate::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+    use crate::schema::types::fields::FieldType;
     use uuid::Uuid;
 
     fn create_default_payment_config() -> FieldPaymentConfig {
@@ -127,6 +128,7 @@ mod tests {
             PermissionsPolicy::default(),
             create_default_payment_config(),
             HashMap::new(),
+            Some(FieldType::Single),
         ).with_ref_atom_uuid("test-uuid".to_string());
 
         // Add field
@@ -152,6 +154,7 @@ mod tests {
             ),
             create_default_payment_config(),
             HashMap::new(),
+            Some(FieldType::Single),
         ).with_ref_atom_uuid(Uuid::new_v4().to_string());
 
         schema.add_field(field_name.clone(), field.clone());
@@ -180,6 +183,7 @@ mod tests {
             PermissionsPolicy::default(),
             create_default_payment_config(),
             field_mappers.clone(),
+            Some(FieldType::Single),
         )
         .with_ref_atom_uuid(Uuid::new_v4().to_string());
 
@@ -214,6 +218,7 @@ mod tests {
                     policy,
                     create_default_payment_config(),
                     HashMap::new(),
+                    Some(FieldType::Single),
                 ).with_ref_atom_uuid(Uuid::new_v4().to_string()),
             );
         }

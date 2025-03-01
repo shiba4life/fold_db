@@ -1,4 +1,4 @@
-use fold_db::testing::{Mutation, Query};
+use fold_db::testing::{Mutation, Query, MutationType};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -27,6 +27,7 @@ pub fn create_mutation(
         fields_and_values,
         pub_key,
         trust_distance,
+        mutation_type: MutationType::Create,
     }
 }
 
@@ -45,5 +46,6 @@ pub fn create_single_field_mutation(
         fields_and_values,
         pub_key,
         trust_distance,
+        mutation_type: MutationType::Create,
     }
 }

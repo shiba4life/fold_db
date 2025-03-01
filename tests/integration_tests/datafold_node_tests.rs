@@ -1,4 +1,4 @@
- use fold_db::testing::{
+use fold_db::testing::{
     FieldPaymentConfig,
     TrustDistanceScaling,
     PermissionsPolicy,
@@ -7,6 +7,8 @@
     Mutation,
     Query,
     Schema,
+    MutationType,
+    FieldType,
 };
 use fold_db::{DataFoldNode, NodeConfig};
 use serde_json::json;
@@ -33,6 +35,7 @@ fn create_test_schema() -> Schema {
         ),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
+        Some(FieldType::Single),
     );
     schema.add_field("name".to_string(), name_field);
 
@@ -44,6 +47,7 @@ fn create_test_schema() -> Schema {
         ),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
+        Some(FieldType::Single),
     );
     schema.add_field("email".to_string(), email_field);
 
@@ -75,6 +79,7 @@ fn test_node_data_operations() {
 
     // Test mutation
     let mutation = Mutation {
+        mutation_type: MutationType::Create,
         schema_name: "user_profile".to_string(),
         pub_key: "test_key".to_string(),
         trust_distance: 1,
@@ -139,8 +144,14 @@ fn test_version_history() {
     node.load_schema(schema).unwrap();
     node.allow_schema("user_profile").unwrap();
 
+    // Get initial schema to see the field's ref_atom_uuid
+    let initial_schema = node.get_schema("user_profile").unwrap().unwrap();
+    let initial_name_field = initial_schema.fields.get("name").unwrap();
+    println!("Initial name field ref_atom_uuid: {:?}", initial_name_field.get_ref_atom_uuid());
+
     // Create initial data
     let mutation1 = Mutation {
+        mutation_type: MutationType::Create,
         schema_name: "user_profile".to_string(),
         pub_key: "test_key".to_string(),
         trust_distance: 1,
@@ -150,8 +161,24 @@ fn test_version_history() {
     };
     node.mutate(mutation1).unwrap();
 
+    // Get schema after first mutation to check ref_atom_uuid
+    let schema_after_create = node.get_schema("user_profile").unwrap().unwrap();
+    let name_field_after_create = schema_after_create.fields.get("name").unwrap();
+    println!("Name field ref_atom_uuid after create: {:?}", name_field_after_create.get_ref_atom_uuid());
+
+    // Query current value
+    let query1 = Query {
+        schema_name: "user_profile".to_string(),
+        fields: vec!["name".to_string()],
+        pub_key: "test_key".to_string(),
+        trust_distance: 1,
+    };
+    let results1 = node.query(query1).unwrap();
+    println!("Value after create: {:?}", results1[0]);
+
     // Update data
     let mutation2 = Mutation {
+        mutation_type: MutationType::Update,
         schema_name: "user_profile".to_string(),
         pub_key: "test_key".to_string(),
         trust_distance: 1,
@@ -161,12 +188,25 @@ fn test_version_history() {
     };
     node.mutate(mutation2).unwrap();
 
-    // Get the schema to find the field's ref_atom_uuid
-    let schema = node.get_schema("user_profile").unwrap().unwrap();
-    let name_field = schema.fields.get("name").unwrap();
+    // Query updated value
+    let query2 = Query {
+        schema_name: "user_profile".to_string(),
+        fields: vec!["name".to_string()],
+        pub_key: "test_key".to_string(),
+        trust_distance: 1,
+    };
+    let results2 = node.query(query2).unwrap();
+    println!("Value after update: {:?}", results2[0]);
+
+    // Get schema after update to check ref_atom_uuid
+    let schema_after_update = node.get_schema("user_profile").unwrap().unwrap();
+    let name_field_after_update = schema_after_update.fields.get("name").unwrap();
+    println!("Name field ref_atom_uuid after update: {:?}", name_field_after_update.get_ref_atom_uuid());
 
     // Get history using the actual ref_atom_uuid
-    let history = node.get_history(&name_field.get_ref_atom_uuid().unwrap());
+    let history = node.get_history(&name_field_after_update.get_ref_atom_uuid().unwrap());
+    println!("History result: {:?}", history);
+
     assert!(history.is_ok());
 
     // Verify history contents

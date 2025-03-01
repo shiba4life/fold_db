@@ -5,12 +5,14 @@ use fold_db::testing::{
     TrustDistance,
     PermissionWrapper,
     PermissionsPolicy,
-    SchemaManager,
+    SchemaCore,
     Mutation,
     Query,
     SchemaField,
     Schema,
     ExplicitCounts,
+    MutationType,
+    FieldType,
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -23,7 +25,7 @@ fn create_default_payment_config() -> FieldPaymentConfig {
 fn test_permission_wrapper_query() {
     // Setup
     let wrapper = PermissionWrapper::new();
-    let schema_manager = SchemaManager::new("data");
+    let schema_manager = SchemaCore::new("data");
 
     // Create a test schema
     let mut fields = HashMap::new();
@@ -34,6 +36,7 @@ fn test_permission_wrapper_query() {
         ),
         create_default_payment_config(),
         HashMap::new(),
+        Some(FieldType::Single),
     ).with_ref_atom_uuid("test_ref".to_string())
     .with_field_mappers(HashMap::new());
     fields.insert("test_field".to_string(), field);
@@ -80,7 +83,7 @@ fn test_permission_wrapper_query() {
 fn test_permission_wrapper_no_requirement() {
     // Setup
     let wrapper = PermissionWrapper::new();
-    let schema_manager = SchemaManager::new("data");
+    let schema_manager = SchemaCore::new("data");
 
     // Create a test schema with no distance requirement
     let mut fields = HashMap::new();
@@ -91,6 +94,7 @@ fn test_permission_wrapper_no_requirement() {
         ),
         create_default_payment_config(),
         HashMap::new(),
+        Some(FieldType::Single),
     ).with_ref_atom_uuid("test_ref".to_string())
     .with_field_mappers(HashMap::new());
     fields.insert("test_field".to_string(), field);
@@ -127,7 +131,7 @@ fn test_permission_wrapper_no_requirement() {
 fn test_permission_wrapper_mutation() {
     // Setup
     let wrapper = PermissionWrapper::new();
-    let schema_manager = SchemaManager::new("data");
+    let schema_manager = SchemaCore::new("data");
 
     // Create a test schema with both explicit write permissions and trust distance
     let mut fields = HashMap::new();
@@ -145,6 +149,7 @@ fn test_permission_wrapper_mutation() {
         policy,
         create_default_payment_config(),
         HashMap::new(),
+        Some(FieldType::Single),
     ).with_ref_atom_uuid("test_ref".to_string())
     .with_field_mappers(HashMap::new());
     fields.insert("test_field".to_string(), field);
@@ -162,6 +167,7 @@ fn test_permission_wrapper_mutation() {
         // Should pass - has explicit permission and within trust distance
         (
             Mutation {
+                mutation_type: MutationType::Create,
                 schema_name: "test_schema".to_string(),
                 fields_and_values: {
                     let mut map = HashMap::new();
@@ -176,6 +182,7 @@ fn test_permission_wrapper_mutation() {
         // Should fail - untrusted key and exceeds trust distance
         (
             Mutation {
+                mutation_type: MutationType::Create,
                 schema_name: "test_schema".to_string(),
                 fields_and_values: {
                     let mut map = HashMap::new();

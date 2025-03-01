@@ -6,6 +6,7 @@ use fold_db::testing::{
     TrustDistance,
     SchemaField,
     Schema,
+    FieldType,
 };
 use std::collections::HashMap;
 
@@ -29,6 +30,7 @@ pub fn create_field_with_permissions(
         },
         FieldPaymentConfig::default(),
         HashMap::new(),
+        Some(FieldType::Single),
     ).with_ref_atom_uuid(ref_atom_uuid)
 }
 

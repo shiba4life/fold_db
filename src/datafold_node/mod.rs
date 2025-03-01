@@ -1,34 +1,12 @@
-//! DataFoldNode module provides the core node functionality for the FoldDB database system.
-//! 
-//! A DataFoldNode represents a single node in the distributed database system, responsible for:
-//! - Managing local data storage
-//! - Handling schema operations
-//! - Processing queries and mutations
-//! - Managing trust relationships between nodes
-//! 
-//! # Example
-//! ```no_run
-//! use fold_db::{DataFoldNode, NodeConfig};
-//! use std::path::PathBuf;
-//! 
-//! let config = NodeConfig {
-//!     storage_path: PathBuf::from("/tmp/db"),
-//!     default_trust_distance: 1,
-//! };
-//! 
-//! let node = DataFoldNode::new(config).expect("Failed to create node");
-//! ```
-
-mod config;
-mod error;
-mod node;
+pub mod config;
+pub mod error;
+pub mod loader;
+pub mod node;
+pub mod network;
 pub mod web_server;
-mod loader;
-#[cfg(test)]
-mod tests;
+pub mod web_server_compat;
 
-pub use config::NodeConfig;
-pub use error::{NodeError, NodeResult};
 pub use node::DataFoldNode;
-pub use web_server::{WebServer, ApiSuccessResponse, ApiErrorResponse, handle_schema, with_node};
+pub use web_server::WebServer;
 pub use loader::load_schema_from_file;
+pub use network::{NetworkManager, NetworkConfig, NodeId, NodeInfo, SchemaInfo, QueryResult, SerializableQueryResult, NodeCapabilities};

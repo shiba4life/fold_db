@@ -1,17 +1,15 @@
 use fold_db::testing::{Schema, SchemaField, PermissionsPolicy};
 use fold_db::{DataFoldNode, NodeConfig};
-use fold_db::datafold_node::web_server::{WebServer, ApiSuccessResponse};
+use fold_db::datafold_node::web_server_compat::ApiSuccessResponse;
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::tempdir;
 use warp::{
     test::request,
     Filter,
-    filters::BoxedFilter,
-    Reply,
-    Rejection,
 };
-use crate::test_data::{schema_test_data, test_helpers::operation_builder};
+use fold_db::testing::FieldType;
+use crate::test_data::schema_test_data;
 
 async fn create_test_server() -> Arc<tokio::sync::Mutex<DataFoldNode>> {
     let dir = tempdir().unwrap();
@@ -30,14 +28,14 @@ async fn test_schema_field_mapping() {
     let schema_api = warp::path!("api" / "schema")
         .and(warp::post())
         .and(warp::body::json())
-        .and(fold_db::datafold_node::web_server::with_node(Arc::clone(&node)))
-        .and_then(fold_db::datafold_node::web_server::handle_schema);
+        .and(fold_db::datafold_node::web_server_compat::with_node(Arc::clone(&node)))
+        .and_then(fold_db::datafold_node::web_server_compat::handle_schema);
 
     let execute_api = warp::path!("api" / "execute")
         .and(warp::post())
         .and(warp::body::json())
-        .and(fold_db::datafold_node::web_server::with_node(Arc::clone(&node)))
-        .and_then(fold_db::datafold_node::web_server::handle_execute);
+        .and(fold_db::datafold_node::web_server_compat::with_node(Arc::clone(&node)))
+        .and_then(fold_db::datafold_node::web_server_compat::handle_execute);
 
     // 1. Create and load the first user profile schema
     let user_profile = schema_test_data::create_user_profile_schema();
@@ -54,12 +52,14 @@ async fn test_schema_field_mapping() {
         "operation": json!({
             "type": "mutation",
             "schema": "user_profile",
-            "operation": "create",
             "data": {
                 "username": "johndoe"
-            }
+            },
+            "mutation_type": "create"
         }).to_string()
     });
+
+    println!("Mutation: {:?}", mutation);
 
     let mutation_response = request()
         .method("POST")
@@ -78,6 +78,7 @@ async fn test_schema_field_mapping() {
         PermissionsPolicy::default(),
         schema_test_data::create_default_payment_config(),
         field_mappings,
+        Some(FieldType::Single),
     );
     user_profile2.add_field("username".to_string(), username_field);
     

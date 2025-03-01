@@ -1,35 +1,47 @@
 # Active Context
 
 ## Current Task
-Implementing schema system enhancements:
-- Schema transformation capabilities with field-level mapping
-- Advanced schema relationship management
-- Error handling improvements for schema operations
-- Test coverage expansion for schema transformations
-- Schema persistence and validation refinements
+Simplifying the project architecture by unifying components and streamlining error handling.
 
 ## Recent Changes
-- Enhanced schema management system
-  - Added robust schema persistence with JSON storage
-  - Implemented comprehensive field mapping between schemas
-  - Added schema validation and loading from disk
-  - Improved error handling for schema operations
-  - Added thread-safe schema operations
-- Added schema transformation capabilities
-  - Field-level mapping support with validation
-  - Reference tracking between schemas
-  - Automatic field updates during transformation
-  - Schema relationship management and tracking
-  - Schema persistence with version control
-- Improved testing infrastructure
-  - Added schema mapping integration tests
-  - Enhanced unit test coverage
-  - Added schema transformation test cases
-  - Implemented concurrent operation tests
+1. Created a new `SchemaCore` class that combines functionality from:
+   - SchemaManager (schema storage, persistence, field mapping)
+   - SchemaInterpreter (schema validation, JSON parsing)
+   - SchemaValidator (validation logic)
+
+2. Updated all references to SchemaManager and SchemaInterpreter to use SchemaCore instead:
+   - Updated imports in various files
+   - Modified method calls to use the new unified API
+   - Updated tests to use the new component
+
+3. Removed unused files:
+   - Deleted src/schema/schema_manager.rs
+   - Deleted src/schema_interpreter directory and its contents
+   - Deleted src/schema/loader.rs (functionality duplicated in src/datafold_node/loader.rs)
+
+4. Implemented a unified error handling system:
+   - Created a centralized `FoldDbError` type in src/error.rs
+   - Defined specific error categories (Schema, Database, Network, etc.)
+   - Removed deprecated error types (NodeError, NetworkError)
+   - Updated all modules to use the new error system directly
+   - Eliminated backward compatibility code for cleaner implementation
+
+5. Updated system documentation to reflect the simplified architecture
 
 ## Next Steps
-- Further enhance schema transformation capabilities
-- Implement advanced field mapping validations
-- Add performance optimizations for schema operations
-- Expand test coverage for edge cases
-- Improve error recovery mechanisms
+1. ✅ Continue streamlining the network layer
+   - ✅ Break down the NetworkManager into smaller components
+   - ✅ Simplify message handling logic
+   - ✅ Improve error recovery mechanisms
+   - ✅ Unify client and server components (QueryService, SchemaService)
+   - ✅ Simplify NetworkCore to use unified services
+
+2. Evaluate if the permission system could benefit from similar simplification
+   - Look for opportunities to reduce duplication in permission checking logic
+   - Consider unifying trust distance and explicit permission checks
+
+3. ✅ Fix remaining warnings in the code
+
+4. Add tests for the new unified error handling system
+
+5. Add tests for the new network layer components

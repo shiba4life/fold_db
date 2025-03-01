@@ -6,6 +6,7 @@ use fold_db::testing::{
     SchemaField,
     Schema,
 };
+use fold_db::testing::FieldType;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -20,6 +21,7 @@ pub fn create_test_schema(name: &str) -> Schema {
         PermissionsPolicy::default(),
         create_default_payment_config(),
         HashMap::new(),
+        Some(FieldType::Single),
     ).with_ref_atom_uuid("test-uuid".to_string());
 
     schema.add_field(field_name, field);
@@ -36,6 +38,7 @@ pub fn create_user_profile_schema() -> Schema {
             PermissionsPolicy::default(), // Public read access
             create_default_payment_config(),
             HashMap::new(),
+            Some(FieldType::Single),
         ).with_ref_atom_uuid(Uuid::new_v4().to_string())
     );
 
@@ -49,6 +52,7 @@ pub fn create_user_profile_schema() -> Schema {
             ),
             create_default_payment_config(),
             HashMap::new(),
+            Some(FieldType::Single),
         ).with_ref_atom_uuid(Uuid::new_v4().to_string())
     );
 
@@ -62,6 +66,7 @@ pub fn create_user_profile_schema() -> Schema {
             ),
             create_default_payment_config(),
             HashMap::new(),
+            Some(FieldType::Single),
         ).with_ref_atom_uuid(Uuid::new_v4().to_string())
     );
 
@@ -90,6 +95,7 @@ pub fn create_multi_field_schema() -> Schema {
                 policy,
                 create_default_payment_config(),
                 HashMap::new(),
+                Some(FieldType::Single),
             ).with_ref_atom_uuid(Uuid::new_v4().to_string()),
         );
     }

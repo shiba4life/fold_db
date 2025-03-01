@@ -9,6 +9,8 @@ use fold_db::testing::{
     Mutation,
     Query,
     Schema,
+    MutationType,
+    FieldType,
 };
 use fold_db::FoldDB;
 use serde_json::json;
@@ -19,12 +21,10 @@ fn create_default_payment_config() -> FieldPaymentConfig {
     FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
 }
 
-use crate::test_data::test_helpers::{cleanup_test_db, cleanup_tmp_dir, get_test_db_path};
+use crate::test_data::test_helpers::{cleanup_test_db, cleanup_tmp_dir};
 
 fn setup_test_db() -> (FoldDB, String) {
-    let db_path = get_test_db_path();
-    let db = FoldDB::new(&db_path).expect("Failed to create test database");
-    (db, db_path)
+    crate::test_data::test_helpers::setup_test_db()
 }
 
 // Clean up tmp directory after all tests
@@ -60,6 +60,7 @@ fn test_schema_operations() {
             },
             create_default_payment_config(),
             HashMap::new(),
+            Some(FieldType::Single),
         ),
     );
 
@@ -101,6 +102,7 @@ fn test_write_and_query() {
             },
             create_default_payment_config(),
             HashMap::new(),
+            Some(FieldType::Single),
         ),
     );
 
@@ -116,6 +118,7 @@ fn test_write_and_query() {
 
     // Test write
     let mutation = Mutation {
+        mutation_type: MutationType::Create,
         schema_name: "test_schema".to_string(),
         fields_and_values: {
             let mut map = HashMap::new();
@@ -169,6 +172,7 @@ fn test_atom_history() {
             },
             create_default_payment_config(),
             HashMap::new(),
+            Some(FieldType::Single),
         ).with_ref_atom_uuid(field_uuid.clone()),
     );
 
@@ -188,6 +192,7 @@ fn test_atom_history() {
     // Write multiple versions with small delay between writes
     for i in 1..=3 {
         let mutation = Mutation {
+            mutation_type: MutationType::Create,
             schema_name: "test_schema".to_string(),
             fields_and_values: {
                 let mut map = HashMap::new();

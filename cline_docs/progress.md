@@ -2,7 +2,7 @@
 
 ## Completed Features
 - Core database operations (read/write)
-- Schema management system
+- Schema system
   - [x] JSON schema definitions
   - [x] Schema persistence with version control
   - [x] Advanced field mapping system
@@ -11,11 +11,24 @@
   - [x] Thread-safe operations
   - [x] Schema relationship tracking
   - [x] Field-level mapping validation
+  - [x] Unified schema management and interpretation
 - Basic permissions system
   - [x] Trust-based access control
   - [x] Field-level permissions
   - [x] Permission policies
   - [x] Thread-safe permission checks
+- Network layer
+  - [x] Node discovery mechanism
+  - [x] Connection management
+  - [x] Message protocol
+  - [x] Schema listing between nodes
+  - [x] Remote querying
+  - [x] Integration with DataFoldNode
+- Error handling system
+  - [x] Centralized error types
+  - [x] Error categorization
+  - [x] Direct error handling without legacy types
+  - [x] Simplified error propagation
 - Atom and AtomRef implementation
 - Version history tracking
 - Schema interpreter implementation
@@ -32,14 +45,37 @@
   - Transformation System: In Progress
 - Permission System: Complete
 - Payment System: Complete
+- Error Handling System:
+  - Basic Features: Complete
+  - Advanced Features (recovery mechanisms): Planned
+- Network Layer:
+  - Basic Features: Complete
+  - Advanced Features: In Progress
+  - Security Features: Planned
 - Testing: 
   - Unit Tests: Complete
   - Integration Tests: 90% Complete
   - Schema Transformation Tests: In Progress
+  - Network Layer Tests: Planned
+  - Error Handling Tests: Planned
 - Documentation: Complete
-- Error Handling: Complete
 
 ## Recent Additions
+- Unified error handling system
+  - Centralized FoldDbError type
+  - Specific error categories
+  - Direct error propagation
+  - Removed legacy error types
+- Network layer implementation
+  - Node discovery with UDP broadcasts
+  - TCP-based connections with message protocol
+  - Schema listing between nodes
+  - Remote querying capabilities
+  - Integration with DataFoldNode
+- Unified schema system
+  - Combined SchemaManager and SchemaInterpreter
+  - Simplified API
+  - Improved error handling
 - Enhanced schema persistence system
   - Version control support
   - Robust error handling
@@ -52,14 +88,30 @@
   - Schema mapping tests
   - Transformation tests
   - Concurrent operation tests
-- Enhanced error handling
-  - Detailed error messages
-  - Recovery mechanisms
-  - Context preservation
 
 ## Next Milestones
+- Add tests for unified error handling system
+- Add tests for new network layer components
+- Implement advanced node discovery mechanisms
+- Add security enhancements for node communication
+- Implement NAT traversal for better connectivity
+- Add node reputation tracking
 - Complete schema transformation system
 - Implement advanced field validations
 - Optimize schema operations
 - Expand transformation test coverage
 - Enhance error recovery mechanisms
+- Simplify permission system
+
+## Recent Improvements
+- Streamlined network layer components:
+  - Split NetworkManager into smaller, focused components
+  - Created ConnectionManager for handling connections
+  - Created MessageRouter for routing messages to handlers
+  - Created QueryService and SchemaService for handling specific operations
+  - Improved error recovery in network operations
+  - Simplified message handling with a handler registry pattern
+  - Unified client and server components (QueryService, SchemaService)
+  - Simplified NetworkCore to use unified services
+  - Reduced code duplication and improved maintainability
+  - Fixed warnings and improved code quality

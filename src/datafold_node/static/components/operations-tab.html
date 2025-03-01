@@ -1,0 +1,35 @@
+<!-- Query Tab Component -->
+<div id="queryTab" class="tab-content">
+    <textarea id="queryInput" placeholder="Enter your query operation JSON here...
+Example:
+{
+  &quot;type&quot;: &quot;query&quot;,
+  &quot;schema&quot;: &quot;UserProfile&quot;,
+  &quot;fields&quot;: [&quot;username&quot;, &quot;email&quot;, &quot;bio&quot;],
+  &quot;filter&quot;: null
+}"></textarea>
+    <button id="runQueryBtn">Run Query</button>
+    <div class="example-buttons">
+        <button id="loadExampleQueryBtn">Load Example Query</button>
+    </div>
+</div>
+
+<!-- Mutation Tab Component -->
+<div id="mutationTab" class="tab-content">
+    <textarea id="mutationInput" placeholder="Enter your mutation operation JSON here...
+Example:
+{
+  &quot;type&quot;: &quot;mutation&quot;,
+  &quot;schema&quot;: &quot;UserProfile&quot;,
+  &quot;mutation_type&quot;: &quot;create&quot;,
+  &quot;data&quot;: {
+    &quot;username&quot;: &quot;johndoe&quot;,
+    &quot;email&quot;: &quot;john.doe@example.com&quot;,
+    &quot;bio&quot;: &quot;Software developer&quot;
+  }
+}"></textarea>
+    <button id="runMutationBtn">Run Mutation</button>
+    <div class="example-buttons">
+        <button id="loadExampleMutationBtn">Load Example Mutation</button>
+    </div>
+</div>

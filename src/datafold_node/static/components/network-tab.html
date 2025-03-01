@@ -1,0 +1,117 @@
+<!-- Network Tab Component -->
+<div id="networkTab" class="tab-content">
+    <div class="section">
+        <h3>Network Status</h3>
+        <div id="networkStatus">
+            <div class="status">Loading network status...</div>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h3>Network Operations</h3>
+        <div class="network-actions">
+            <button id="startNetworkBtn">Start Network</button>
+            <button id="stopNetworkBtn">Stop Network</button>
+            <button id="discoverNodesBtn">Discover Nodes</button>
+            <button id="listNodesBtn">List Connected Nodes</button>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h3>Network Configuration</h3>
+        <form id="networkConfigForm">
+            <div class="form-group">
+                <label for="listenAddress">Listen Address:</label>
+                <input type="text" id="listenAddress" value="127.0.0.1:8000" class="form-control">
+            </div>
+            
+            <div class="form-group">
+                <label for="discoveryPort">Discovery Port:</label>
+                <input type="number" id="discoveryPort" value="8001" class="form-control">
+            </div>
+            
+            <div class="form-group">
+                <label for="maxConnections">Max Connections:</label>
+                <input type="number" id="maxConnections" value="10" class="form-control">
+            </div>
+            
+            <div class="form-group">
+                <label for="connectionTimeout">Connection Timeout (seconds):</label>
+                <input type="number" id="connectionTimeout" value="30" class="form-control">
+            </div>
+            
+            <div class="form-group">
+                <label for="announcementInterval">Announcement Interval (seconds):</label>
+                <input type="number" id="announcementInterval" value="60" class="form-control">
+            </div>
+            
+            <div class="form-group">
+                <label for="enableDiscovery">Enable Discovery:</label>
+                <input type="checkbox" id="enableDiscovery" checked>
+            </div>
+            
+            <button type="button" id="initNetworkBtn">Initialize Network</button>
+        </form>
+    </div>
+    
+    <div class="section">
+        <h3>Connect to Node</h3>
+        <div class="form-group">
+            <label for="nodeId">Node ID:</label>
+            <input type="text" id="nodeId" placeholder="Enter node ID" class="form-control">
+        </div>
+        <button id="connectToNodeBtn">Connect</button>
+    </div>
+</div>
+
+<style>
+    .network-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .form-group {
+        margin-bottom: 15px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+</style>
+
+<script>
+    // Initialize network with form data
+    document.getElementById('initNetworkBtn')?.addEventListener('click', () => {
+        const config = {
+            listen_address: document.getElementById('listenAddress').value,
+            discovery_port: parseInt(document.getElementById('discoveryPort').value),
+            max_connections: parseInt(document.getElementById('maxConnections').value),
+            connection_timeout_secs: parseInt(document.getElementById('connectionTimeout').value),
+            announcement_interval_secs: parseInt(document.getElementById('announcementInterval').value),
+            enable_discovery: document.getElementById('enableDiscovery').checked
+        };
+        
+        networkModule.initNetwork(config);
+    });
+    
+    // Connect to node
+    document.getElementById('connectToNodeBtn')?.addEventListener('click', () => {
+        const nodeId = document.getElementById('nodeId').value.trim();
+        if (nodeId) {
+            networkModule.connectToNode(nodeId);
+        } else {
+            utils.displayResult('Please enter a node ID', true);
+        }
+    });
+</script>

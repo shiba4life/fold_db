@@ -4,6 +4,8 @@
 package "Core" {
     class FoldDB {
         + new()
+        + execute_operation()
+        + handle_error()
     }
 
     class Atom {
@@ -38,21 +40,32 @@ package "Core" {
 ' Schema Management
 package "Schema" {
     class SchemaManager {
+        - schemas: HashMap<String, Schema>
+        - persistence: SchemaPersistence
         + load_schema()
         + validate_schema()
         + get_schema()
+        + transform_schema()
+        + persist_schema()
+        + track_relationships()
     }
 
     class Schema {
         - name: String
         - fields: Vec<SchemaField>
+        - version: String
+        - relationships: Vec<SchemaRelationship>
         + validate()
         + transform()
+        + get_field_mappings()
+        + track_references()
     }
 
     class SchemaInterpreter {
         + interpret()
         + validate()
+        + transform_fields()
+        + handle_errors()
     }
 
     class SchemaField {
@@ -60,6 +73,31 @@ package "Schema" {
         - field_type: String
         - permissions: PermissionPolicy
         - payment_config: SchemaPaymentConfig
+        - mappings: Vec<FieldMapping>
+        - validation_rules: Vec<ValidationRule>
+    }
+
+    class SchemaPersistence {
+        + save()
+        + load()
+        + version_control()
+        + track_changes()
+    }
+
+    class SchemaRelationship {
+        - source_field: String
+        - target_field: String
+        - relationship_type: RelationType
+        + validate()
+        + transform()
+    }
+
+    class FieldMapping {
+        - source_field: String
+        - target_field: String
+        - transformation_rules: Vec<TransformationRule>
+        + apply_transformation()
+        + validate_mapping()
     }
 }
 
@@ -68,17 +106,20 @@ package "Permissions" {
     class PermissionManager {
         + validate_access()
         + check_trust_distance()
+        + handle_permission_error()
     }
 
     class PermissionWrapper {
         + wrap()
         + unwrap()
+        + validate_wrapped_data()
     }
 
     class PermissionPolicy {
         - read_policy: Policy
         - write_policy: Policy
         + validate()
+        + check_policy()
     }
 }
 
@@ -88,16 +129,36 @@ package "Fees" {
         + calculate_fee()
         + verify_payment()
         + generate_invoice()
+        + handle_payment_error()
     }
 
     class PaymentCalculator {
         + calculate()
         + scale_by_trust()
+        + validate_payment()
     }
 
     class LightningClient {
         + create_invoice()
         + verify_payment()
+        + handle_network_error()
+    }
+}
+
+' Error Handling
+package "ErrorHandling" {
+    class ErrorManager {
+        + handle_error()
+        + recover()
+        + log_error()
+    }
+
+    class ErrorContext {
+        - error_type: ErrorType
+        - context: Value
+        - stack_trace: String
+        + add_context()
+        + get_recovery_action()
     }
 }
 
@@ -105,20 +166,28 @@ package "Fees" {
 FoldDB --> SchemaManager
 FoldDB --> PermissionManager
 FoldDB --> PaymentManager
+FoldDB --> ErrorManager
 FoldDB --> "*" Atom
 Atom --> "0..1" Atom: prev_atom
 AtomRef --> "1" Atom: references
 
 SchemaManager --> "*" Schema
+SchemaManager --> SchemaPersistence
 Schema --> "*" SchemaField
+Schema --> "*" SchemaRelationship
+SchemaField --> "*" FieldMapping
 SchemaField --> "1" PermissionPolicy
 SchemaField --> "1" SchemaPaymentConfig
 SchemaManager --> SchemaInterpreter
 
 PermissionManager --> "*" PermissionPolicy
 PermissionManager --> PermissionWrapper
+PermissionManager --> ErrorManager
 
 PaymentManager --> PaymentCalculator
 PaymentManager --> LightningClient
+PaymentManager --> ErrorManager
+
+ErrorManager --> "*" ErrorContext
 
 @enduml

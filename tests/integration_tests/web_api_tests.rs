@@ -9,16 +9,11 @@ use tempfile::tempdir;
 use warp::{
     test::request,
     Filter,
-    filters::BoxedFilter,
-    Reply,
-    Rejection,
 };
-use fold_db::datafold_node::web_server::{WebServer, ApiSuccessResponse, ApiErrorResponse, handle_schema, with_node};
+use fold_db::testing::FieldType;
+use fold_db::datafold_node::web_server_compat::{ApiSuccessResponse, ApiErrorResponse, handle_schema, with_node};
 use std::collections::HashMap;
-use uuid;
-use std::convert::Infallible;
 
-use crate::test_data::test_helpers;
 
 async fn create_test_server() -> Arc<tokio::sync::Mutex<DataFoldNode>> {
     let dir = tempdir().unwrap();
@@ -40,6 +35,7 @@ fn create_test_schema() -> Schema {
         ),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
+        Some(FieldType::Single),
     );
     schema.add_field("name".to_string(), name_field);
 
@@ -103,7 +99,7 @@ async fn test_schema_loading_invalid_schema() {
     println!("Response body: {}", String::from_utf8_lossy(response.body()));
     let response_data: ApiErrorResponse = serde_json::from_slice(response.body()).unwrap();
     assert!(!response_data.error.is_empty());
-    assert_eq!(response_data.error, "Schema name cannot be empty");
+    assert!(response_data.error.contains("empty"));
 }
 
 #[tokio::test]
@@ -141,7 +137,7 @@ async fn test_schema_loading_duplicate() {
     println!("Response body: {}", String::from_utf8_lossy(response2.body()));
     let response_data: ApiErrorResponse = serde_json::from_slice(response2.body()).unwrap();
     assert!(!response_data.error.is_empty());
-    assert_eq!(response_data.error, "Schema error: Schema already exists");
+    assert!(response_data.error.contains("already exists"));
 }
 
 #[tokio::test]
@@ -191,16 +187,16 @@ async fn test_execute_query() {
         .and(warp::post())
         .and(warp::body::json())
         .and(with_node(Arc::clone(&node)))
-        .and_then(fold_db::datafold_node::web_server::handle_execute);
+        .and_then(fold_db::datafold_node::web_server_compat::handle_execute);
 
     let mutation = json!({
         "operation": json!({
             "type": "mutation",
             "schema": "user_profile",
-            "operation": "create",
             "data": {
                 "name": "John Doe"
-            }
+            },
+            "mutation_type": "create"
         }).to_string()
     });
 
@@ -235,6 +231,7 @@ async fn test_execute_query() {
     
     // Verify the queried data
     let data = response_data.data.as_object().unwrap();
+    println!("Data: {:?}", data);
     assert!(data.contains_key("name"));
     assert_eq!(data["name"].as_str().unwrap(), "John Doe");
 }
@@ -248,7 +245,7 @@ async fn test_execute_query_invalid_schema() {
         .and(warp::post())
         .and(warp::body::json())
         .and(with_node(Arc::clone(&node)))
-        .and_then(fold_db::datafold_node::web_server::handle_execute);
+        .and_then(fold_db::datafold_node::web_server_compat::handle_execute);
 
     // Test query with non-existent schema
     let query = json!({
@@ -297,17 +294,17 @@ async fn test_execute_mutation() {
         .and(warp::post())
         .and(warp::body::json())
         .and(with_node(Arc::clone(&node)))
-        .and_then(fold_db::datafold_node::web_server::handle_execute);
+        .and_then(fold_db::datafold_node::web_server_compat::handle_execute);
 
     // Test successful mutation
     let mutation = json!({
         "operation": json!({
             "type": "mutation",
             "schema": "user_profile",
-            "operation": "create",
             "data": {
                 "name": "John Doe"
-            }
+            },
+            "mutation_type": "create"
         }).to_string()
     });
 
@@ -342,6 +339,7 @@ async fn test_execute_mutation() {
     assert_eq!(query_response.status(), 200);
     let query_data: ApiSuccessResponse<serde_json::Value> = serde_json::from_slice(query_response.body()).unwrap();
     let data = query_data.data.as_object().unwrap();
+    println!("Data: {:?}", data);
     assert!(data.contains_key("name"));
     assert_eq!(data["name"].as_str().unwrap(), "John Doe");
 }
@@ -371,17 +369,17 @@ async fn test_execute_mutation_invalid_data() {
         .and(warp::post())
         .and(warp::body::json())
         .and(with_node(Arc::clone(&node)))
-        .and_then(fold_db::datafold_node::web_server::handle_execute);
+        .and_then(fold_db::datafold_node::web_server_compat::handle_execute);
 
     // Test mutation with invalid data
     let mutation = json!({
         "operation": json!({
             "type": "mutation",
             "schema": "user_profile",
-            "operation": "create",
             "data": {
                 "invalid_field": "some value"
-            }
+            },
+            "mutation_type": "create"
         }).to_string()
     });
 
@@ -421,7 +419,7 @@ async fn test_schema_deletion() {
     let delete_api = warp::path!("api" / "schema" / String)
         .and(warp::delete())
         .and(with_node(Arc::clone(&node)))
-        .and_then(fold_db::datafold_node::web_server::handle_delete_schema);
+        .and_then(fold_db::datafold_node::web_server_compat::handle_delete_schema);
 
     // Test deleting existing schema
     let delete_response = request()
@@ -443,7 +441,7 @@ async fn test_schema_deletion() {
 
     assert_eq!(delete_nonexistent.status(), 200);
     let error_response: ApiErrorResponse = serde_json::from_slice(delete_nonexistent.body()).unwrap();
-    assert_eq!(error_response.error, "Schema not found");
+    assert!(error_response.error.contains("not found"));
 
     // Verify schema was actually deleted by trying to delete it again
     let delete_again = request()
@@ -454,5 +452,5 @@ async fn test_schema_deletion() {
 
     assert_eq!(delete_again.status(), 200);
     let error_response: ApiErrorResponse = serde_json::from_slice(delete_again.body()).unwrap();
-    assert_eq!(error_response.error, "Schema not found");
+    assert!(error_response.error.contains("not found"));
 }

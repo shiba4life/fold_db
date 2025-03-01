@@ -1,0 +1,234 @@
+/* Base styles */
+body {
+    font-family: Arial, sans-serif;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+    line-height: 1.6;
+}
+
+h1, h2, h3 {
+    color: #333;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+}
+
+/* Status indicators */
+.status {
+    background: #f5f5f5;
+    padding: 15px;
+    border-radius: 4px;
+    margin: 20px 0;
+}
+
+.status.success {
+    background: #e6ffe6;
+    color: #006600;
+}
+
+.status.error {
+    background: #ffe6e6;
+    color: #660000;
+}
+
+/* Section containers */
+.section {
+    margin: 20px 0;
+    padding: 20px;
+    border: 1px solid #eee;
+    border-radius: 4px;
+}
+
+/* Form elements */
+textarea {
+    width: 100%;
+    min-height: 200px;
+    font-family: monospace;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #0056b3;
+}
+
+button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+/* Results display */
+#results {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    font-family: monospace;
+}
+
+/* Tab system */
+.tab-container {
+    margin: 20px 0;
+}
+
+.tab-buttons {
+    margin-bottom: 10px;
+}
+
+.tab-button {
+    background: #999;
+    border: 1px solid #ddd;
+    padding: 10px 20px;
+    margin-right: 5px;
+    cursor: pointer;
+}
+
+.tab-button.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Schema items */
+.schema-item {
+    background: #f8f9fa;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.schema-item:hover {
+    background: #e9ecef;
+}
+
+.schema-item h3 {
+    margin-top: 0;
+    margin-bottom: 0;
+    color: #007bff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.remove-schema {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+.remove-schema:hover {
+    background: #c82333;
+}
+
+.schema-item h3::after {
+    content: '▼';
+    font-size: 0.8em;
+    transition: transform 0.2s;
+}
+
+.schema-item.collapsed h3::after {
+    transform: rotate(-90deg);
+}
+
+.schema-item pre {
+    margin: 10px 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    display: none;
+}
+
+.schema-item.expanded pre {
+    display: block;
+}
+
+/* Example buttons */
+.example-buttons {
+    margin-top: 10px;
+}
+
+.example-buttons button {
+    background: #6c757d;
+    font-size: 0.9em;
+    padding: 8px 15px;
+}
+
+.example-buttons button:hover {
+    background: #5a6268;
+}
+
+/* Network status */
+.network-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.status-card {
+    flex: 1;
+    min-width: 200px;
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
+    border-left: 4px solid #007bff;
+}
+
+.status-card h4 {
+    margin-top: 0;
+    color: #007bff;
+}
+
+.status-card p {
+    margin-bottom: 0;
+}
+
+/* Loading indicator */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(0, 123, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #007bff;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .tab-button {
+        padding: 8px 15px;
+        font-size: 0.9em;
+    }
+    
+    .section {
+        padding: 15px;
+    }
+}

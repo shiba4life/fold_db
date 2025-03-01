@@ -1,5 +1,5 @@
 use crate::permissions::permission_manager::PermissionManager;
-use crate::schema::schema_manager::SchemaManager;
+use crate::schema::SchemaCore;
 use crate::schema::types::{Mutation, Query, SchemaError};
 
 /// Provides a high-level interface for permission validation on schema operations.
@@ -68,7 +68,7 @@ impl PermissionWrapper {
         &self,
         query: &Query,
         field_name: &str,
-        schema_manager: &SchemaManager,
+        schema_manager: &SchemaCore,
     ) -> FieldPermissionResult {
         let schema = match schema_manager.get_schema(&query.schema_name) {
             Ok(Some(s)) => s,
@@ -147,7 +147,7 @@ impl PermissionWrapper {
         &self,
         mutation: &Mutation,
         field_name: &str,
-        schema_manager: &SchemaManager,
+        schema_manager: &SchemaCore,
     ) -> FieldPermissionResult {
         let schema = match schema_manager.get_schema(&mutation.schema_name) {
             Ok(Some(s)) => s,

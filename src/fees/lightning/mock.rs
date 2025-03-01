@@ -24,7 +24,7 @@ impl LightningClient for MockLightningClient {
     async fn create_invoice(
         &self,
         amount: u64,
-        memo: String,
+        _memo: String,
         expiry: Duration,
         hold_invoice: bool,
     ) -> Result<LightningPaymentRequest, Error> {

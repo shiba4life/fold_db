@@ -1,0 +1,43 @@
+<!-- Schema Tab Component -->
+<div id="schemasTab" class="tab-content active">
+    <div id="schemaList">
+        <!-- Schema list will be loaded here dynamically -->
+        <div class="status">Loading schemas...</div>
+    </div>
+    <div class="example-buttons">
+        <button onclick="schemaModule.loadSchemaList()">Refresh Schema List</button>
+    </div>
+</div>
+
+<div id="schemaTab" class="tab-content">
+    <textarea id="schemaInput" placeholder="Enter your schema JSON here...
+Example:
+{
+  &quot;name&quot;: &quot;UserProfile&quot;,
+  &quot;fields&quot;: {
+    &quot;username&quot;: {
+      &quot;field_type&quot;: &quot;Single&quot;,
+      &quot;permission_policy&quot;: {
+        &quot;read_policy&quot;: { &quot;NoRequirement&quot;: null },
+        &quot;write_policy&quot;: { &quot;Distance&quot;: 0 },
+        &quot;explicit_read_policy&quot;: null,
+        &quot;explicit_write_policy&quot;: null
+      },
+      &quot;payment_config&quot;: {
+        &quot;base_multiplier&quot;: 1.0,
+        &quot;trust_distance_scaling&quot;: { &quot;None&quot;: null },
+        &quot;min_payment&quot;: null
+      },
+      &quot;field_mappers&quot;: {}
+    }
+  },
+  &quot;payment_config&quot;: {
+    &quot;base_multiplier&quot;: 1.0,
+    &quot;min_payment_threshold&quot;: 0
+  }
+}"></textarea>
+    <button id="loadSchemaBtn">Load Schema</button>
+    <div class="example-buttons">
+        <button id="loadExampleSchemaBtn">Load Example Schema</button>
+    </div>
+</div>
