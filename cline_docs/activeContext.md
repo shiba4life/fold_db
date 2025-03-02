@@ -1,47 +1,63 @@
 # Active Context
 
 ## Current Task
-Simplifying the project architecture by unifying components and streamlining error handling.
+Removing all code associated with the plugin system from the DataFold Node.
 
 ## Recent Changes
-1. Created a new `SchemaCore` class that combines functionality from:
-   - SchemaManager (schema storage, persistence, field mapping)
-   - SchemaInterpreter (schema validation, JSON parsing)
-   - SchemaValidator (validation logic)
+1. Removed the plugin system core components:
+   - Removed `PluginManager` for loading and managing plugins
+   - Removed `EventBus` for plugin communication
+   - Removed `PluginSandbox` for security and resource management
+   - Removed plugin error handling
 
-2. Updated all references to SchemaManager and SchemaInterpreter to use SchemaCore instead:
-   - Updated imports in various files
-   - Modified method calls to use the new unified API
-   - Updated tests to use the new component
+2. Removed the plugin API for JavaScript/web integration:
+   - Removed JavaScript API for plugins
+   - Removed plugin UI integration with mount points
+   - Removed plugin permissions system
+   - Removed resource usage monitoring and limits
+   - Removed plugin event system for cross-plugin communication
 
-3. Removed unused files:
-   - Deleted src/schema/schema_manager.rs
-   - Deleted src/schema_interpreter directory and its contents
-   - Deleted src/schema/loader.rs (functionality duplicated in src/datafold_node/loader.rs)
+3. Removed web server integration for plugins:
+   - Removed plugin API handlers
+   - Removed plugin routes from the web server
+   - Removed plugin management UI
+   - Removed plugin mount points in the UI
 
-4. Implemented a unified error handling system:
-   - Created a centralized `FoldDbError` type in src/error.rs
-   - Defined specific error categories (Schema, Database, Network, etc.)
-   - Removed deprecated error types (NodeError, NetworkError)
-   - Updated all modules to use the new error system directly
-   - Eliminated backward compatibility code for cleaner implementation
+4. Removed support for different plugin types:
+   - Removed support for vanilla HTML/JS plugins
+   - Removed support for React-based plugins
 
-5. Updated system documentation to reflect the simplified architecture
+5. Removed plugin system tests:
+   - Removed unit tests for PluginManager
+   - Removed unit tests for EventBus
+   - Removed unit tests for PluginSandbox
+   - Removed integration tests for plugin system
+
+6. Updated the DataFoldNode to remove plugin system initialization:
+   - Removed plugin initialization in the main node startup
+   - Removed plugin directory structure
+   - Removed example plugins
+
+7. Removed plugin-related documentation:
+   - Removed plugin framework options documentation
+   - Removed plugin versioning documentation
+   - Removed plugin framework Vue documentation
+   - Removed plugin dependency management documentation
+   - Removed plugin marketplace documentation
+   - Removed plugin framework Svelte documentation
+   - Removed plugin hot-reloading documentation
 
 ## Next Steps
-1. ✅ Continue streamlining the network layer
-   - ✅ Break down the NetworkManager into smaller components
-   - ✅ Simplify message handling logic
-   - ✅ Improve error recovery mechanisms
-   - ✅ Unify client and server components (QueryService, SchemaService)
-   - ✅ Simplify NetworkCore to use unified services
+1. Verify that the system works correctly without the plugin system:
+   - Run tests to ensure core functionality is not affected
+   - Check for any remaining plugin-related code or references
+   - Ensure the web UI works properly without plugin-related features
 
-2. Evaluate if the permission system could benefit from similar simplification
-   - Look for opportunities to reduce duplication in permission checking logic
-   - Consider unifying trust distance and explicit permission checks
+2. Consider implementing alternative extension mechanisms if needed:
+   - Evaluate if any core functionality needs to be replaced
+   - Consider simpler extension mechanisms if required
 
-3. ✅ Fix remaining warnings in the code
-
-4. Add tests for the new unified error handling system
-
-5. Add tests for the new network layer components
+3. Update documentation to reflect the removal of the plugin system:
+   - Update system architecture documentation
+   - Update user guides
+   - Update developer documentation

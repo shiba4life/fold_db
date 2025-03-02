@@ -28,6 +28,18 @@ pub struct DataFoldNode {
     node_id: String,
 }
 
+impl std::fmt::Debug for DataFoldNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DataFoldNode")
+            .field("config", &self.config)
+            .field("trusted_nodes", &self.trusted_nodes)
+            .field("node_id", &self.node_id)
+            .field("db", &"<FoldDB>")
+            .field("network", &format!("<NetworkManager: {}>", self.network.is_some()))
+            .finish()
+    }
+}
+
 impl DataFoldNode {
     /// Creates a new DataFoldNode with the specified configuration.
     pub fn new(config: NodeConfig) -> FoldDbResult<Self> {
@@ -406,4 +418,7 @@ impl DataFoldNode {
     pub fn get_node_id(&self) -> &str {
         &self.node_id
     }
+
+    // Plugin-related methods
+
 }

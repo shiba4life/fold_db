@@ -17,7 +17,7 @@ impl WebServer {
         let node = Arc::clone(&self.node);
 
         // API routes
-        let api = self.create_api_routes(node);
+        let api = self.create_api_routes(Arc::clone(&node));
 
         // Static files
         let index = warp::get()
@@ -36,6 +36,7 @@ impl WebServer {
             
         let static_files = warp::path("static")
             .and(warp::fs::dir("src/datafold_node/static"));
+            
 
         let routes = api
             .or(index)
