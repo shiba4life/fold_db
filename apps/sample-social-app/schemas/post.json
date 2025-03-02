@@ -1,0 +1,10 @@
+{
+  "name": "post",
+  "fields": {
+    "content": {"type": "string"},
+    "author": {"type": "ref", "schema": "user-profile"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "likes": {"type": "array", "items": {"type": "ref", "schema": "user-profile"}},
+    "comments": {"type": "array", "items": {"type": "ref", "schema": "comment"}}
+  }
+}

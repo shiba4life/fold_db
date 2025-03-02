@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f2f5;
+        }
+        
+        header {
+            background-color: #1877f2;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        nav {
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            background-color: #1877f2;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #166fe5;
+        }
+        
+        main {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .post-form {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        .post-form textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: none;
+            margin-bottom: 10px;
+        }
+        
+        .post {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .post-author {
+            font-weight: bold;
+        }
+        
+        .post-date {
+            color: #65676b;
+            font-size: 0.9em;
+        }
+        
+        .post-content {
+            margin-bottom: 10px;
+        }
+        
+        .post-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .post-actions button {
+            background-color: #e4e6eb;
+            color: #050505;
+        }
+        
+        .post-actions button:hover {
+            background-color: #d8dadf;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Social App</h1>
+        <nav>
+            <button id="feed-btn">Feed</button>
+            <button id="profile-btn">Profile</button>
+            <button id="friends-btn">Friends</button>
+        </nav>
+    </header>
+    
+    <main id="content">
+        <!-- Feed View -->
+        <div id="feed-view">
+            <div class="post-form">
+                <h2>Create Post</h2>
+                <textarea id="post-content" rows="4" placeholder="What's on your mind?"></textarea>
+                <button id="post-btn">Post</button>
+            </div>
+            
+            <div id="posts-container">
+                <!-- Posts will be loaded here -->
+            </div>
+        </div>
+        
+        <!-- Profile View -->
+        <div id="profile-view" class="hidden">
+            <h2>My Profile</h2>
+            <div id="profile-info">
+                <p><strong>Username:</strong> <span id="username">loading...</span></p>
+                <p><strong>Bio:</strong> <span id="bio">loading...</span></p>
+            </div>
+            <h3>My Posts</h3>
+            <div id="my-posts-container">
+                <!-- User's posts will be loaded here -->
+            </div>
+        </div>
+        
+        <!-- Friends View -->
+        <div id="friends-view" class="hidden">
+            <h2>Friends</h2>
+            <div id="friends-container">
+                <!-- Friends will be loaded here -->
+            </div>
+            <h3>Friend Suggestions</h3>
+            <div id="suggestions-container">
+                <!-- Friend suggestions will be loaded here -->
+            </div>
+        </div>
+    </main>
+    
+    <script>
+        // Initialize app when APIs are available
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'init-apis') {
+                window.apis = event.data.apis;
+                initializeApp();
+            }
+        });
+        
+        function initializeApp() {
+            console.log('Social App initialized with APIs:', window.apis);
+            
+            // Set up event listeners
+            document.getElementById('feed-btn').addEventListener('click', showFeed);
+            document.getElementById('profile-btn').addEventListener('click', showProfile);
+            document.getElementById('friends-btn').addEventListener('click', showFriends);
+            document.getElementById('post-btn').addEventListener('click', createPost);
+            
+            // Load initial data
+            loadFeed();
+        }
+        
+        function showFeed() {
+            document.getElementById('feed-view').classList.remove('hidden');
+            document.getElementById('profile-view').classList.add('hidden');
+            document.getElementById('friends-view').classList.add('hidden');
+            loadFeed();
+        }
+        
+        function showProfile() {
+            document.getElementById('feed-view').classList.add('hidden');
+            document.getElementById('profile-view').classList.remove('hidden');
+            document.getElementById('friends-view').classList.add('hidden');
+            loadProfile();
+        }
+        
+        function showFriends() {
+            document.getElementById('feed-view').classList.add('hidden');
+            document.getElementById('profile-view').classList.add('hidden');
+            document.getElementById('friends-view').classList.remove('hidden');
+            loadFriends();
+        }
+        
+        async function loadFeed() {
+            try {
+                const posts = await mockGetPosts();
+                renderPosts(posts, 'posts-container');
+            } catch (error) {
+                console.error('Error loading feed:', error);
+            }
+        }
+        
+        async function loadProfile() {
+            try {
+                const profile = await mockGetProfile();
+                document.getElementById('username').textContent = profile.username;
+                document.getElementById('bio').textContent = profile.bio;
+                
+                const posts = await mockGetUserPosts(profile.id);
+                renderPosts(posts, 'my-posts-container');
+            } catch (error) {
+                console.error('Error loading profile:', error);
+            }
+        }
+        
+        async function loadFriends() {
+            try {
+                const friends = await mockGetFriends();
+                renderFriends(friends, 'friends-container');
+                
+                const suggestions = await mockGetFriendSuggestions();
+                renderFriends(suggestions, 'suggestions-container');
+            } catch (error) {
+                console.error('Error loading friends:', error);
+            }
+        }
+        
+        async function createPost() {
+            const content = document.getElementById('post-content').value.trim();
+            if (!content) return;
+            
+            try {
+                const post = await mockCreatePost(content);
+                document.getElementById('post-content').value = '';
+                
+                // Add the new post to the feed
+                const postsContainer = document.getElementById('posts-container');
+                const postElement = createPostElement(post);
+                postsContainer.insertBefore(postElement, postsContainer.firstChild);
+                
+                // Notify other apps
+                window.parent.postMessage({
+                    type: 'app-event',
+                    event: 'post:created',
+                    data: {
+                        type: 'post',
+                        id: post.id,
+                        timestamp: new Date()
+                    }
+                }, '*');
+            } catch (error) {
+                console.error('Error creating post:', error);
+            }
+        }
+        
+        function renderPosts(posts, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            if (posts.length === 0) {
+                container.innerHTML = '<p>No posts yet.</p>';
+                return;
+            }
+            
+            posts.forEach(post => {
+                const postElement = createPostElement(post);
+                container.appendChild(postElement);
+            });
+        }
+        
+        function createPostElement(post) {
+            const postElement = document.createElement('div');
+            postElement.className = 'post';
+            postElement.innerHTML = `
+                <div class="post-header">
+                    <div class="post-author">${post.author.username}</div>
+                    <div class="post-date">${formatDate(post.timestamp)}</div>
+                </div>
+                <div class="post-content">${post.content}</div>
+                <div class="post-actions">
+                    <button class="like-btn" data-post-id="${post.id}">Like (${post.likes.length})</button>
+                    <button class="comment-btn" data-post-id="${post.id}">Comment (${post.comments.length})</button>
+                </div>
+            `;
+            
+            // Add event listeners
+            const likeBtn = postElement.querySelector('.like-btn');
+            likeBtn.addEventListener('click', () => likePost(post.id));
+            
+            const commentBtn = postElement.querySelector('.comment-btn');
+            commentBtn.addEventListener('click', () => showComments(post.id));
+            
+            return postElement;
+        }
+        
+        function renderFriends(friends, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            if (friends.length === 0) {
+                container.innerHTML = '<p>No friends found.</p>';
+                return;
+            }
+            
+            friends.forEach(friend => {
+                const friendElement = document.createElement('div');
+                friendElement.className = 'friend';
+                friendElement.innerHTML = `
+                    <p><strong>${friend.username}</strong> - ${friend.bio}</p>
+                    ${containerId === 'suggestions-container' ? 
+                        `<button class="add-friend-btn" data-user-id="${friend.id}">Add Friend</button>` : 
+                        ''}
+                `;
+                
+                container.appendChild(friendElement);
+            });
+            
+            // Add event listeners for add friend buttons
+            const addFriendBtns = container.querySelectorAll('.add-friend-btn');
+            addFriendBtns.forEach(btn => {
+                btn.addEventListener('click', () => addFriend(btn.dataset.userId));
+            });
+        }
+        
+        async function likePost(postId) {
+            try {
+                await mockLikePost(postId);
+                // Refresh the feed to show updated likes
+                loadFeed();
+            } catch (error) {
+                console.error('Error liking post:', error);
+            }
+        }
+        
+        async function showComments(postId) {
+            // In a real app, this would show a comments section
+            console.log('Show comments for post:', postId);
+        }
+        
+        async function addFriend(userId) {
+            try {
+                await mockAddFriend(userId);
+                // Refresh friends list
+                loadFriends();
+            } catch (error) {
+                console.error('Error adding friend:', error);
+            }
+        }
+        
+        function formatDate(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleString();
+        }
+        
+        // Mock API functions (would use real APIs in production)
+        async function mockGetPosts() {
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            return [
+                {
+                    id: '1',
+                    content: 'Just launched my new app on Datafold!',
+                    author: { id: '1', username: 'alice' },
+                    timestamp: new Date(Date.now() - 3600000).toISOString(),
+                    likes: [{ id: '2', username: 'bob' }],
+                    comments: []
+                },
+                {
+                    id: '2',
+                    content: 'Exploring the new Datafold app system. It\'s amazing!',
+                    author: { id: '2', username: 'bob' },
+                    timestamp: new Date(Date.now() - 7200000).toISOString(),
+                    likes: [{ id: '1', username: 'alice' }, { id: '3', username: 'charlie' }],
+                    comments: [{ id: '1', author: { id: '1', username: 'alice' }, content: 'Totally agree!' }]
+                }
+            ];
+        }
+        
+        async function mockGetUserPosts(userId) {
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            return [
+                {
+                    id: '3',
+                    content: 'Working on a new project using Datafold!',
+                    author: { id: '1', username: 'alice' },
+                    timestamp: new Date(Date.now() - 86400000).toISOString(),
+                    likes: [],
+                    comments: []
+                }
+            ];
+        }
+        
+        async function mockGetProfile() {
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            return {
+                id: '1',
+                username: 'alice',
+                bio: 'Software developer and Datafold enthusiast'
+            };
+        }
+        
+        async function mockGetFriends() {
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            return [
+                { id: '2', username: 'bob', bio: 'Tech enthusiast' },
+                { id: '3', username: 'charlie', bio: 'Data scientist' }
+            ];
+        }
+        
+        async function mockGetFriendSuggestions() {
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            return [
+                { id: '4', username: 'dave', bio: 'Software architect' },
+                { id: '5', username: 'eve', bio: 'UX designer' }
+            ];
+        }
+        
+        async function mockCreatePost(content) {
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            return {
+                id: Date.now().toString(),
+                content: content,
+                author: { id: '1', username: 'alice' },
+                timestamp: new Date().toISOString(),
+                likes: [],
+                comments: []
+            };
+        }
+        
+        async function mockLikePost(postId) {
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            return { success: true };
+        }
+        
+        async function mockAddFriend(userId) {
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            return { success: true };
+        }
+    </script>
+</body>
+</html>

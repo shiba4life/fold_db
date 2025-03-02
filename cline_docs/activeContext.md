@@ -1,63 +1,73 @@
 # Active Context
 
 ## Current Task
-Removing all code associated with the plugin system from the DataFold Node.
+Implementing an App system to load various third-party apps into DataFold.
 
 ## Recent Changes
-1. Removed the plugin system core components:
-   - Removed `PluginManager` for loading and managing plugins
-   - Removed `EventBus` for plugin communication
-   - Removed `PluginSandbox` for security and resource management
-   - Removed plugin error handling
+1. Created the app system core components:
+   - Created `AppManifest` for app metadata and requirements
+   - Implemented `AppRegistry` for managing app lifecycle
+   - Added `AppLoader` for loading apps from disk
+   - Created `AppWindow` for window management
+   - Implemented `ApiManager` for API access control
+   - Added `AppResourceManager` for resource allocation
 
-2. Removed the plugin API for JavaScript/web integration:
-   - Removed JavaScript API for plugins
-   - Removed plugin UI integration with mount points
-   - Removed plugin permissions system
-   - Removed resource usage monitoring and limits
-   - Removed plugin event system for cross-plugin communication
+2. Implemented app API for JavaScript/web integration:
+   - Created JavaScript API proxies for apps
+   - Implemented window-based app UI
+   - Added app permissions system
+   - Implemented resource usage monitoring and limits
+   - Created app message system for cross-app communication
 
-3. Removed web server integration for plugins:
-   - Removed plugin API handlers
-   - Removed plugin routes from the web server
-   - Removed plugin management UI
-   - Removed plugin mount points in the UI
+3. Added web server integration for apps:
+   - Created app API handlers
+   - Added app routes to the web server
+   - Implemented app management UI endpoints
+   - Added app lifecycle management endpoints
 
-4. Removed support for different plugin types:
-   - Removed support for vanilla HTML/JS plugins
-   - Removed support for React-based plugins
+4. Added support for app schemas:
+   - Implemented schema loading for apps
+   - Added schema validation for app data
+   - Created schema relationship tracking for apps
 
-5. Removed plugin system tests:
-   - Removed unit tests for PluginManager
-   - Removed unit tests for EventBus
-   - Removed unit tests for PluginSandbox
-   - Removed integration tests for plugin system
+5. Created a sample social app:
+   - Implemented app manifest
+   - Created app UI with HTML/CSS/JS
+   - Added schema definitions for user profiles, posts, and comments
+   - Implemented mock API integration
 
-6. Updated the DataFoldNode to remove plugin system initialization:
-   - Removed plugin initialization in the main node startup
-   - Removed plugin directory structure
-   - Removed example plugins
+6. Updated the DataFoldNode to initialize the app system:
+   - Added app system initialization in the main node startup
+   - Created app directory structure
+   - Implemented app loading on startup
 
-7. Removed plugin-related documentation:
-   - Removed plugin framework options documentation
-   - Removed plugin versioning documentation
-   - Removed plugin framework Vue documentation
-   - Removed plugin dependency management documentation
-   - Removed plugin marketplace documentation
-   - Removed plugin framework Svelte documentation
-   - Removed plugin hot-reloading documentation
+7. Updated documentation:
+   - Created app development guide
+   - Added app architecture documentation
+   - Updated progress documentation
+   - Added sample app documentation
 
 ## Next Steps
-1. Verify that the system works correctly without the plugin system:
-   - Run tests to ensure core functionality is not affected
-   - Check for any remaining plugin-related code or references
-   - Ensure the web UI works properly without plugin-related features
+1. Enhance the app system with additional features:
+   - Implement app versioning
+   - Add app update mechanism
+   - Create app marketplace
+   - Implement app hot-reloading
 
-2. Consider implementing alternative extension mechanisms if needed:
-   - Evaluate if any core functionality needs to be replaced
-   - Consider simpler extension mechanisms if required
+2. Improve app security:
+   - Enhance permission system
+   - Add resource usage limits
+   - Implement app sandboxing
+   - Add app verification
 
-3. Update documentation to reflect the removal of the plugin system:
-   - Update system architecture documentation
-   - Update user guides
-   - Update developer documentation
+3. Expand app communication mechanisms:
+   - Implement shared services
+   - Add event bus for app events
+   - Create app-to-app messaging
+   - Add app data sharing
+
+4. Add app testing infrastructure:
+   - Create app testing framework
+   - Add app validation tools
+   - Implement app performance monitoring
+   - Add app debugging tools

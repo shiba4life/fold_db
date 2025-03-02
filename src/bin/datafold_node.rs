@@ -1,5 +1,5 @@
 use fold_db::{DataFoldNode, NodeConfig, datafold_node::{WebServer, load_schema_from_file}};
-use std::{fs, sync::Arc};
+use std::{fs, sync::Arc, path::Path};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,6 +25,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("Error loading schema: {}", e);
     } else {
         println!("Schema loaded successfully");
+    }
+    
+    // Initialize app system
+    println!("Initializing app system...");
+    let apps_dir = Path::new("apps");
+    if !apps_dir.exists() {
+        fs::create_dir_all(apps_dir)?;
+        println!("Created apps directory");
+    }
+    node.init_app_system(apps_dir)?;
+    println!("App system initialized");
+    
+    // Register core APIs
+    println!("Registering core APIs...");
+    node.register_api("data", "1.0.0", "Data access API")?;
+    node.register_api("schema", "1.0.0", "Schema management API")?;
+    node.register_api("network", "1.0.0", "Network API")?;
+    println!("Core APIs registered");
+    
+    // Load apps
+    println!("Loading apps...");
+    if let Ok(loaded_apps) = node.load_all_apps() {
+        if loaded_apps.is_empty() {
+            println!("No apps found");
+        } else {
+            println!("Loaded apps: {}", loaded_apps.join(", "));
+        }
+    } else {
+        println!("Failed to load apps");
     }
     
     // Wrap in Arc<Mutex> and create web server

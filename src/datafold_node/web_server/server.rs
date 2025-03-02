@@ -37,13 +37,18 @@ impl WebServer {
         let static_files = warp::path("static")
             .and(warp::fs::dir("src/datafold_node/static"));
             
+        // Serve app files from the apps directory
+        let app_files = warp::path("apps")
+            .and(warp::fs::dir("apps"));
+            
 
         let routes = api
             .or(index)
             .or(css_files)
             .or(js_files)
             .or(components_files)
-            .or(static_files);
+            .or(static_files)
+            .or(app_files);
 
         // Try ports in sequence until we find one that works
         let mut current_port = port;
@@ -150,9 +155,47 @@ impl WebServer {
 
         let list_nodes = warp::path!("api" / "network" / "nodes")
             .and(warp::get())
-            .and(with_node(node))
+            .and(with_node(node.clone()))
             .and_then(handle_list_nodes);
 
+        // App routes
+        let list_apps = warp::path!("api" / "apps")
+            .and(warp::get())
+            .and(with_node(node.clone()))
+            .and_then(handle_list_apps);
+            
+        let register_app = warp::path!("api" / "apps")
+            .and(warp::post())
+            .and(warp::body::json())
+            .and(with_node(node.clone()))
+            .and_then(handle_register_app);
+            
+        let start_app = warp::path!("api" / "apps" / String / "start")
+            .and(warp::post())
+            .and(with_node(node.clone()))
+            .and_then(handle_start_app);
+            
+        let stop_app = warp::path!("api" / "apps" / String / "stop")
+            .and(warp::post())
+            .and(with_node(node.clone()))
+            .and_then(handle_stop_app);
+            
+        let unload_app = warp::path!("api" / "apps" / String)
+            .and(warp::delete())
+            .and(with_node(node.clone()))
+            .and_then(handle_unload_app);
+            
+        let list_apis = warp::path!("api" / "apis")
+            .and(warp::get())
+            .and(with_node(node.clone()))
+            .and_then(handle_list_apis);
+            
+        let register_api = warp::path!("api" / "apis")
+            .and(warp::post())
+            .and(warp::body::json())
+            .and(with_node(node.clone()))
+            .and_then(handle_register_api);
+            
         // Combine all routes
         list_schemas
             .or(schema)
@@ -165,5 +208,12 @@ impl WebServer {
             .or(discover_nodes)
             .or(connect_to_node)
             .or(list_nodes)
+            .or(list_apps)
+            .or(register_app)
+            .or(start_app)
+            .or(stop_app)
+            .or(unload_app)
+            .or(list_apis)
+            .or(register_api)
     }
 }

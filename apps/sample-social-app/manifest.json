@@ -1,0 +1,27 @@
+{
+  "name": "social-app",
+  "version": "1.0.0",
+  "description": "Social networking app for Datafold",
+  "entry": "apps/sample-social-app/index.html",
+  "schemas": [
+    "user-profile",
+    "post",
+    "comment"
+  ],
+  "window": {
+    "default_size": { "width": 800, "height": 600 },
+    "min_size": { "width": 400, "height": 300 },
+    "title": "Social App",
+    "resizable": true
+  },
+  "permissions": {
+    "required": [
+      "read:profiles",
+      "write:posts"
+    ]
+  },
+  "apis": {
+    "required": ["data", "schema"],
+    "optional": ["network"]
+  }
+}

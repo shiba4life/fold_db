@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -10,6 +11,7 @@ use crate::schema::{Schema, SchemaError};
 use crate::datafold_node::{
     config::NodeConfig,
     network::{NetworkManager, NetworkConfig, NodeId, SchemaInfo},
+    app::{AppRegistry, AppManifest, AppLoader, AppResourceManager, ApiManager},
 };
 use crate::datafold_node::config::NodeInfo;
 
@@ -26,6 +28,14 @@ pub struct DataFoldNode {
     network: Option<Arc<Mutex<NetworkManager>>>,
     /// Unique identifier for this node
     node_id: String,
+    /// App registry for managing apps
+    app_registry: Option<Arc<Mutex<AppRegistry>>>,
+    /// App loader for loading apps
+    app_loader: Option<Arc<Mutex<AppLoader>>>,
+    /// API manager for app API access
+    api_manager: Option<Arc<Mutex<ApiManager>>>,
+    /// Resource manager for app resource allocation
+    resource_manager: Option<Arc<Mutex<AppResourceManager>>>,
 }
 
 impl std::fmt::Debug for DataFoldNode {
@@ -36,6 +46,10 @@ impl std::fmt::Debug for DataFoldNode {
             .field("node_id", &self.node_id)
             .field("db", &"<FoldDB>")
             .field("network", &format!("<NetworkManager: {}>", self.network.is_some()))
+            .field("app_registry", &format!("<AppRegistry: {}>", self.app_registry.is_some()))
+            .field("app_loader", &format!("<AppLoader: {}>", self.app_loader.is_some()))
+            .field("api_manager", &format!("<ApiManager: {}>", self.api_manager.is_some()))
+            .field("resource_manager", &format!("<AppResourceManager: {}>", self.resource_manager.is_some()))
             .finish()
     }
 }
@@ -59,6 +73,10 @@ impl DataFoldNode {
             trusted_nodes: HashMap::new(),
             network: None,
             node_id,
+            app_registry: None,
+            app_loader: None,
+            api_manager: None,
+            resource_manager: None,
         })
     }
 
@@ -419,6 +437,166 @@ impl DataFoldNode {
         &self.node_id
     }
 
-    // Plugin-related methods
-
+    // App-related methods
+    
+    /// Initializes the app system
+    pub fn init_app_system(&mut self, apps_dir: &Path) -> FoldDbResult<()> {
+        // Create app registry
+        let registry = AppRegistry::new();
+        
+        // Create resource manager
+        let resource_manager = AppResourceManager::new();
+        
+        // Create API manager
+        let api_manager = ApiManager::new();
+        
+        // Create app loader
+        let loader = AppLoader::new(apps_dir, registry.clone(), resource_manager.clone());
+        
+        // Store components
+        self.app_registry = Some(Arc::new(Mutex::new(registry)));
+        self.app_loader = Some(Arc::new(Mutex::new(loader)));
+        self.api_manager = Some(Arc::new(Mutex::new(api_manager)));
+        self.resource_manager = Some(Arc::new(Mutex::new(resource_manager)));
+        
+        Ok(())
+    }
+    
+    /// Registers an app with the node
+    pub fn register_app(&self, manifest: AppManifest) -> FoldDbResult<()> {
+        // Check if app registry is initialized
+        let registry = self.app_registry.as_ref()
+            .ok_or_else(|| FoldDbError::Config("App registry not initialized".to_string()))?;
+        
+        // Get lock on registry
+        let mut registry = registry.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock app registry".to_string()))?;
+        
+        // Register app
+        registry.register_app(manifest)?;
+        
+        Ok(())
+    }
+    
+    /// Loads an app from a directory
+    pub fn load_app(&self, app_dir: &Path) -> FoldDbResult<()> {
+        // Check if app loader is initialized
+        let loader = self.app_loader.as_ref()
+            .ok_or_else(|| FoldDbError::Config("App loader not initialized".to_string()))?;
+        
+        // Get lock on loader
+        let mut loader = loader.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock app loader".to_string()))?;
+        
+        // Load app
+        loader.load_app(app_dir)?;
+        
+        Ok(())
+    }
+    
+    /// Loads all apps from the apps directory
+    pub fn load_all_apps(&self) -> FoldDbResult<Vec<String>> {
+        // Check if app loader is initialized
+        let loader = self.app_loader.as_ref()
+            .ok_or_else(|| FoldDbError::Config("App loader not initialized".to_string()))?;
+        
+        // Get lock on loader
+        let mut loader = loader.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock app loader".to_string()))?;
+        
+        // Load all apps
+        loader.load_all_apps()
+    }
+    
+    /// Starts an app
+    pub fn start_app(&self, app_name: &str) -> FoldDbResult<()> {
+        // Check if app registry is initialized
+        let registry = self.app_registry.as_ref()
+            .ok_or_else(|| FoldDbError::Config("App registry not initialized".to_string()))?;
+        
+        // Get lock on registry
+        let mut registry = registry.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock app registry".to_string()))?;
+        
+        // Start app
+        registry.start_app(app_name)?;
+        
+        Ok(())
+    }
+    
+    /// Stops an app
+    pub fn stop_app(&self, app_name: &str) -> FoldDbResult<()> {
+        // Check if app registry is initialized
+        let registry = self.app_registry.as_ref()
+            .ok_or_else(|| FoldDbError::Config("App registry not initialized".to_string()))?;
+        
+        // Get lock on registry
+        let mut registry = registry.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock app registry".to_string()))?;
+        
+        // Stop app
+        registry.stop_app(app_name)?;
+        
+        Ok(())
+    }
+    
+    /// Unloads an app
+    pub fn unload_app(&self, app_name: &str) -> FoldDbResult<()> {
+        // Check if app loader is initialized
+        let loader = self.app_loader.as_ref()
+            .ok_or_else(|| FoldDbError::Config("App loader not initialized".to_string()))?;
+        
+        // Get lock on loader
+        let mut loader = loader.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock app loader".to_string()))?;
+        
+        // Unload app
+        loader.unload_app(app_name)?;
+        
+        Ok(())
+    }
+    
+    /// Lists all registered apps
+    pub fn list_apps(&self) -> FoldDbResult<Vec<String>> {
+        // Check if app registry is initialized
+        let registry = self.app_registry.as_ref()
+            .ok_or_else(|| FoldDbError::Config("App registry not initialized".to_string()))?;
+        
+        // Get lock on registry
+        let registry = registry.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock app registry".to_string()))?;
+        
+        // List apps
+        Ok(registry.list_apps())
+    }
+    
+    /// Registers an API for apps to use
+    pub fn register_api(&self, name: &str, version: &str, description: &str) -> FoldDbResult<()> {
+        // Check if API manager is initialized
+        let api_manager = self.api_manager.as_ref()
+            .ok_or_else(|| FoldDbError::Config("API manager not initialized".to_string()))?;
+        
+        // Get lock on API manager
+        let mut api_manager = api_manager.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock API manager".to_string()))?;
+        
+        // Register API
+        api_manager.register_api(name, version, description)?;
+        
+        Ok(())
+    }
+    
+    /// Lists all available APIs
+    pub fn list_apis(&self) -> FoldDbResult<Vec<crate::datafold_node::app::api::ApiInfo>> {
+        // Check if API manager is initialized
+        let api_manager = self.api_manager.as_ref()
+            .ok_or_else(|| FoldDbError::Config("API manager not initialized".to_string()))?;
+        
+        // Get lock on API manager
+        let api_manager = api_manager.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock API manager".to_string()))?;
+        
+        // List APIs
+        Ok(api_manager.list_available_apis())
+    }
 }

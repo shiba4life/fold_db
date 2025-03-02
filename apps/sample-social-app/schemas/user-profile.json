@@ -1,0 +1,9 @@
+{
+  "name": "user-profile",
+  "fields": {
+    "username": {"type": "string", "unique": true},
+    "bio": {"type": "string"},
+    "friends": {"type": "array", "items": {"type": "ref", "schema": "user-profile"}},
+    "posts": {"type": "array", "items": {"type": "ref", "schema": "post"}}
+  }
+}

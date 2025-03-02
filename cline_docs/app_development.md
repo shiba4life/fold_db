@@ -4,6 +4,7 @@
 1. [App Architecture Implementation](#app-architecture-implementation)
 2. [Building a Sample Social App](#building-a-sample-social-app)
 3. [Cross-App Communication](#cross-app-communication)
+4. [App System Implementation](#app-system-implementation)
 
 ## App Architecture Implementation
 
@@ -644,6 +645,144 @@ class AnalyticsApp {
         this.updateAnalyticsDashboard();
     }
 }
+```
+
+## App System Implementation
+
+The app system has been implemented in the DataFold Node with the following components:
+
+### 1. App Module Structure
+
+```
+src/datafold_node/app/
+├── mod.rs                 # Main module definition
+├── manifest.rs            # App manifest definitions
+├── registry.rs            # App registry for managing apps
+├── loader.rs              # App loader for loading apps from disk
+├── window.rs              # Window management for apps
+├── api.rs                 # API management for apps
+└── resource.rs            # Resource management for apps
+```
+
+### 2. App Manifest
+
+The app manifest defines the app's metadata, requirements, and capabilities:
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppManifest {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub entry: String,
+    pub schemas: Vec<String>,
+    pub window: WindowConfig,
+    pub permissions: AppPermissions,
+    pub apis: ApiRequirements,
+    pub payments: Option<PaymentConfig>,
+}
+```
+
+### 3. App Registry
+
+The app registry manages the lifecycle of apps:
+
+```rust
+#[derive(Clone)]
+pub struct AppRegistry {
+    apps: HashMap<String, RegisteredApp>,
+    resource_manager: Arc<Mutex<AppResourceManager>>,
+    api_manager: Arc<Mutex<ApiManager>>,
+}
+
+impl AppRegistry {
+    pub fn register_app(&mut self, manifest: AppManifest) -> FoldDbResult<()> { ... }
+    pub fn unregister_app(&mut self, app_name: &str) -> FoldDbResult<()> { ... }
+    pub fn start_app(&mut self, app_name: &str) -> FoldDbResult<()> { ... }
+    pub fn stop_app(&mut self, app_name: &str) -> FoldDbResult<()> { ... }
+    pub fn list_apps(&self) -> Vec<String> { ... }
+}
+```
+
+### 4. App Loader
+
+The app loader loads apps from disk:
+
+```rust
+pub struct AppLoader {
+    base_dir: PathBuf,
+    registry: AppRegistry,
+    resource_manager: AppResourceManager,
+}
+
+impl AppLoader {
+    pub fn load_app(&mut self, app_dir: &Path) -> FoldDbResult<()> { ... }
+    pub fn load_all_apps(&mut self) -> FoldDbResult<Vec<String>> { ... }
+    pub fn unload_app(&mut self, app_name: &str) -> FoldDbResult<()> { ... }
+}
+```
+
+### 5. API Management
+
+The API manager provides APIs for apps to use:
+
+```rust
+pub struct ApiManager {
+    available_apis: HashMap<String, ApiDefinition>,
+    app_contexts: HashMap<String, ApiContext>,
+}
+
+impl ApiManager {
+    pub fn register_api(&mut self, name: &str, version: &str, description: &str) -> FoldDbResult<()> { ... }
+    pub fn create_app_api_context(&mut self, app_name: &str, apis: &ApiRequirements) -> FoldDbResult<ApiContext> { ... }
+    pub fn list_available_apis(&self) -> Vec<ApiInfo> { ... }
+}
+```
+
+### 6. Resource Management
+
+The resource manager allocates and manages resources for apps:
+
+```rust
+#[derive(Clone)]
+pub struct AppResourceManager {
+    allocations: HashMap<String, ResourceAllocation>,
+    limits: HashMap<String, ResourceLimits>,
+    system_capacity: SystemCapacity,
+}
+
+impl AppResourceManager {
+    pub fn allocate_resources(&mut self, app_name: &str, resources: ResourceAllocation) -> FoldDbResult<()> { ... }
+    pub fn release_resources(&mut self, app_name: &str) -> FoldDbResult<()> { ... }
+}
+```
+
+### 7. Web API
+
+The app system is exposed through a REST API:
+
+```
+GET    /api/apps                  # List all apps
+POST   /api/apps                  # Register an app
+POST   /api/apps/{name}/start     # Start an app
+POST   /api/apps/{name}/stop      # Stop an app
+DELETE /api/apps/{name}           # Unload an app
+GET    /api/apis                  # List all APIs
+POST   /api/apis                  # Register an API
+```
+
+### 8. Sample App
+
+A sample social app has been implemented to demonstrate the app system:
+
+```
+apps/sample-social-app/
+├── manifest.json               # App manifest
+├── index.html                  # Main HTML file
+└── schemas/                    # Schema definitions
+    ├── user-profile.json
+    ├── post.json
+    └── comment.json
 ```
 
 ## App Architecture Benefits
