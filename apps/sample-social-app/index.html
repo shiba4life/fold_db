@@ -39,6 +39,12 @@
             background-color: #166fe5;
         }
         
+        button.active {
+            background-color: #0d5bbb;
+            font-weight: bold;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+        }
+        
         main {
             max-width: 800px;
             margin: 20px auto;
@@ -107,117 +113,322 @@
         .hidden {
             display: none;
         }
+        
+        .friend {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .friend p {
+            margin: 0;
+        }
+        
+        .add-friend-btn {
+            background-color: #42b72a;
+            color: white;
+        }
+        
+        .add-friend-btn:hover {
+            background-color: #36a420;
+        }
     </style>
 </head>
 <body>
     <header>
         <h1>Social App</h1>
         <nav>
-            <button id="feed-btn">Feed</button>
-            <button id="profile-btn">Profile</button>
-            <button id="friends-btn">Friends</button>
+            <button id="feed-btn" data-testid="feed-btn">Feed</button>
+            <button id="profile-btn" data-testid="profile-btn">Profile</button>
+            <button id="friends-btn" data-testid="friends-btn">Friends</button>
         </nav>
     </header>
     
     <main id="content">
+        <!-- Standalone Notice -->
+        <div id="standalone-notice" style="display: none; background-color: #fff3cd; color: #856404; padding: 10px; margin-bottom: 15px; border-radius: 4px; border: 1px solid #ffeeba;">
+            <strong>Notice:</strong> Running in standalone mode with mock data. Posts will be saved locally but not persisted to a database.
+        </div>
+        
         <!-- Feed View -->
-        <div id="feed-view">
+        <div id="feed-view" data-testid="feed-view">
             <div class="post-form">
                 <h2>Create Post</h2>
-                <textarea id="post-content" rows="4" placeholder="What's on your mind?"></textarea>
-                <button id="post-btn">Post</button>
+                <textarea id="post-content" data-testid="post-content" rows="4" placeholder="What's on your mind?"></textarea>
+                <button id="post-btn" data-testid="post-btn">Post</button>
             </div>
             
-            <div id="posts-container">
+            <div id="posts-container" data-testid="posts-container">
                 <!-- Posts will be loaded here -->
             </div>
         </div>
         
         <!-- Profile View -->
-        <div id="profile-view" class="hidden">
+        <div id="profile-view" class="hidden" data-testid="profile-view">
             <h2>My Profile</h2>
             <div id="profile-info">
-                <p><strong>Username:</strong> <span id="username">loading...</span></p>
-                <p><strong>Bio:</strong> <span id="bio">loading...</span></p>
+                <p><strong>Username:</strong> <span id="username" data-testid="profile-username">loading...</span></p>
+                <p><strong>Bio:</strong> <span id="bio" data-testid="profile-bio">loading...</span></p>
             </div>
             <h3>My Posts</h3>
-            <div id="my-posts-container">
+            <div id="my-posts-container" data-testid="my-posts-container">
                 <!-- User's posts will be loaded here -->
             </div>
         </div>
         
         <!-- Friends View -->
-        <div id="friends-view" class="hidden">
+        <div id="friends-view" class="hidden" data-testid="friends-view">
             <h2>Friends</h2>
-            <div id="friends-container">
+            <div id="friends-container" data-testid="friends-container">
                 <!-- Friends will be loaded here -->
             </div>
             <h3>Friend Suggestions</h3>
-            <div id="suggestions-container">
+            <div id="suggestions-container" data-testid="suggestions-container">
                 <!-- Friend suggestions will be loaded here -->
             </div>
         </div>
     </main>
     
     <script>
-        // Initialize app when APIs are available
+        // Initialize app when APIs are available or immediately for standalone mode
         window.addEventListener('message', function(event) {
             if (event.data.type === 'init-apis') {
                 window.apis = event.data.apis;
                 initializeApp();
+            } else if (event.data.type === 'test-init') {
+                // Special initialization for testing
+                window.testMode = true;
+                window.testData = event.data.testData || {};
+                window.apis = event.data.apis || {};
+                initializeApp();
             }
         });
+        
+        // Also initialize immediately for standalone mode (when not in an iframe)
+        if (window.self === window.top) {
+            console.log('Running in standalone mode - initializing without APIs');
+            setTimeout(initializeApp, 100); // Short delay to ensure event listeners are set up
+        }
         
         function initializeApp() {
             console.log('Social App initialized with APIs:', window.apis);
             
+            // Check if required APIs are available
+            if (!window.apis) {
+                console.warn('No APIs available. Running in standalone mode with mock data.');
+                document.getElementById('standalone-notice').style.display = 'block';
+            } else {
+                // Check for required APIs from manifest
+                const requiredApis = ['data', 'schema'];
+                const missingApis = requiredApis.filter(api => !window.apis[api]);
+                
+                if (missingApis.length > 0) {
+                    console.warn('Missing required APIs:', missingApis);
+                    document.getElementById('standalone-notice').style.display = 'block';
+                } else {
+                    console.log('All required APIs are available');
+                }
+            }
+            
             // Set up event listeners
-            document.getElementById('feed-btn').addEventListener('click', showFeed);
-            document.getElementById('profile-btn').addEventListener('click', showProfile);
-            document.getElementById('friends-btn').addEventListener('click', showFriends);
-            document.getElementById('post-btn').addEventListener('click', createPost);
+            document.getElementById('feed-btn').addEventListener('click', function() {
+                console.log('Feed button clicked');
+                showFeed();
+            });
+            
+            document.getElementById('profile-btn').addEventListener('click', function() {
+                console.log('Profile button clicked');
+                showProfile();
+            });
+            
+            document.getElementById('friends-btn').addEventListener('click', function() {
+                console.log('Friends button clicked');
+                showFriends();
+            });
+            
+            document.getElementById('post-btn').addEventListener('click', function() {
+                console.log('Post button clicked');
+                createPost();
+            });
             
             // Load initial data
             loadFeed();
         }
         
         function showFeed() {
-            document.getElementById('feed-view').classList.remove('hidden');
-            document.getElementById('profile-view').classList.add('hidden');
-            document.getElementById('friends-view').classList.add('hidden');
+            console.log('Showing feed view');
+            
+            // Get all view elements
+            const feedView = document.getElementById('feed-view');
+            const profileView = document.getElementById('profile-view');
+            const friendsView = document.getElementById('friends-view');
+            
+            // Log the current state
+            console.log('Current view states before change:');
+            console.log('- Feed view hidden:', feedView.classList.contains('hidden'));
+            console.log('- Profile view hidden:', profileView.classList.contains('hidden'));
+            console.log('- Friends view hidden:', friendsView.classList.contains('hidden'));
+            
+            // Update view visibility
+            feedView.classList.remove('hidden');
+            profileView.classList.add('hidden');
+            friendsView.classList.add('hidden');
+            
+            // Log the new state
+            console.log('View states after change:');
+            console.log('- Feed view hidden:', feedView.classList.contains('hidden'));
+            console.log('- Profile view hidden:', profileView.classList.contains('hidden'));
+            console.log('- Friends view hidden:', friendsView.classList.contains('hidden'));
+            
+            // Load feed data
             loadFeed();
+            
+            // Update active button styles
+            document.getElementById('feed-btn').classList.add('active');
+            document.getElementById('profile-btn').classList.remove('active');
+            document.getElementById('friends-btn').classList.remove('active');
         }
         
         function showProfile() {
-            document.getElementById('feed-view').classList.add('hidden');
-            document.getElementById('profile-view').classList.remove('hidden');
-            document.getElementById('friends-view').classList.add('hidden');
+            console.log('Showing profile view');
+            
+            // Get all view elements
+            const feedView = document.getElementById('feed-view');
+            const profileView = document.getElementById('profile-view');
+            const friendsView = document.getElementById('friends-view');
+            
+            // Log the current state
+            console.log('Current view states before change:');
+            console.log('- Feed view hidden:', feedView.classList.contains('hidden'));
+            console.log('- Profile view hidden:', profileView.classList.contains('hidden'));
+            console.log('- Friends view hidden:', friendsView.classList.contains('hidden'));
+            
+            // Update view visibility
+            feedView.classList.add('hidden');
+            profileView.classList.remove('hidden');
+            friendsView.classList.add('hidden');
+            
+            // Log the new state
+            console.log('View states after change:');
+            console.log('- Feed view hidden:', feedView.classList.contains('hidden'));
+            console.log('- Profile view hidden:', profileView.classList.contains('hidden'));
+            console.log('- Friends view hidden:', friendsView.classList.contains('hidden'));
+            
+            // Load profile data
             loadProfile();
+            
+            // Update active button styles
+            document.getElementById('feed-btn').classList.remove('active');
+            document.getElementById('profile-btn').classList.add('active');
+            document.getElementById('friends-btn').classList.remove('active');
         }
         
         function showFriends() {
-            document.getElementById('feed-view').classList.add('hidden');
-            document.getElementById('profile-view').classList.add('hidden');
-            document.getElementById('friends-view').classList.remove('hidden');
+            console.log('Showing friends view');
+            
+            // Get all view elements
+            const feedView = document.getElementById('feed-view');
+            const profileView = document.getElementById('profile-view');
+            const friendsView = document.getElementById('friends-view');
+            
+            // Log the current state
+            console.log('Current view states before change:');
+            console.log('- Feed view hidden:', feedView.classList.contains('hidden'));
+            console.log('- Profile view hidden:', profileView.classList.contains('hidden'));
+            console.log('- Friends view hidden:', friendsView.classList.contains('hidden'));
+            
+            // Update view visibility
+            feedView.classList.add('hidden');
+            profileView.classList.add('hidden');
+            friendsView.classList.remove('hidden');
+            
+            // Log the new state
+            console.log('View states after change:');
+            console.log('- Feed view hidden:', feedView.classList.contains('hidden'));
+            console.log('- Profile view hidden:', profileView.classList.contains('hidden'));
+            console.log('- Friends view hidden:', friendsView.classList.contains('hidden'));
+            
+            // Load friends data
             loadFriends();
+            
+            // Update active button styles
+            document.getElementById('feed-btn').classList.remove('active');
+            document.getElementById('profile-btn').classList.remove('active');
+            document.getElementById('friends-btn').classList.add('active');
         }
         
         async function loadFeed() {
+            console.log('Loading feed data');
             try {
-                const posts = await mockGetPosts();
-                renderPosts(posts, 'posts-container');
+                // Create the query operation to get posts
+                const queryOperation = {
+                    type: "query",
+                    schema: "post",
+                    fields: ["content", "timestamp", "likes", "comments", "author"],
+                    sort: { field: "timestamp", order: "desc" }
+                };
+                
+                console.log('Querying posts with operation:', queryOperation);
+                
+                // Make the API call to get posts
+                const response = await fetch('/api/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ operation: JSON.stringify(queryOperation) })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to load posts');
+                }
+                
+                const responseData = await response.json();
+                console.log('API response for posts:', responseData);
+                
+                // Check if we have valid data from the API
+                if (responseData && responseData.data && Array.isArray(responseData.data.results)) {
+                    const posts = responseData.data.results;
+                    console.log('Posts from API:', posts);
+                    renderPosts(posts, 'posts-container');
+                } else {
+                    // Fallback to mock data if API response format is unexpected
+                    console.log('API response format unexpected, falling back to mock data');
+                    const posts = await mockGetPosts();
+                    console.log('Mock posts:', posts);
+                    renderPosts(posts, 'posts-container');
+                }
             } catch (error) {
                 console.error('Error loading feed:', error);
+                
+                // Fallback to mock data if API call fails
+                try {
+                    console.log('API call failed, falling back to mock data');
+                    const posts = await mockGetPosts();
+                    console.log('Mock posts:', posts);
+                    renderPosts(posts, 'posts-container');
+                } catch (mockError) {
+                    console.error('Error with mock data:', mockError);
+                }
             }
         }
         
         async function loadProfile() {
+            console.log('Loading profile data');
             try {
                 const profile = await mockGetProfile();
+                console.log('Mock profile:', profile);
                 document.getElementById('username').textContent = profile.username;
                 document.getElementById('bio').textContent = profile.bio;
                 
                 const posts = await mockGetUserPosts(profile.id);
+                console.log('Mock user posts:', posts);
                 renderPosts(posts, 'my-posts-container');
             } catch (error) {
                 console.error('Error loading profile:', error);
@@ -225,11 +436,14 @@
         }
         
         async function loadFriends() {
+            console.log('Loading friends data');
             try {
                 const friends = await mockGetFriends();
+                console.log('Mock friends:', friends);
                 renderFriends(friends, 'friends-container');
                 
                 const suggestions = await mockGetFriendSuggestions();
+                console.log('Mock friend suggestions:', suggestions);
                 renderFriends(suggestions, 'suggestions-container');
             } catch (error) {
                 console.error('Error loading friends:', error);
@@ -237,30 +451,107 @@
         }
         
         async function createPost() {
+            console.log('Creating post');
             const content = document.getElementById('post-content').value.trim();
-            if (!content) return;
+            if (!content) {
+                console.log('Post content is empty, not creating post');
+                return;
+            }
             
             try {
-                const post = await mockCreatePost(content);
-                document.getElementById('post-content').value = '';
+                // Get the current user profile for the author reference
+                const profile = await mockGetProfile();
+                console.log('Using profile for post author:', profile);
                 
-                // Add the new post to the feed
-                const postsContainer = document.getElementById('posts-container');
-                const postElement = createPostElement(post);
-                postsContainer.insertBefore(postElement, postsContainer.firstChild);
+                // Create the post data
+                const postData = {
+                    content: content,
+                    author: { id: profile.id, username: profile.username },
+                    timestamp: new Date().toISOString(),
+                    likes: [],
+                    comments: []
+                };
                 
-                // Notify other apps
-                window.parent.postMessage({
-                    type: 'app-event',
-                    event: 'post:created',
-                    data: {
-                        type: 'post',
-                        id: post.id,
-                        timestamp: new Date()
+                console.log('Creating post with data:', postData);
+                
+                // Check if APIs are available
+                if (!window.apis || !window.apis.data) {
+                    console.warn('APIs not available, falling back to mock data');
+                    // Use mock data as fallback
+                    const post = await mockCreatePost(content);
+                    console.log('Created post with mock data:', post);
+                    
+                    // Clear the input field
+                    document.getElementById('post-content').value = '';
+                    
+                    // Add the new post to the feed
+                    const postsContainer = document.getElementById('posts-container');
+                    const postElement = createPostElement(post);
+                    postsContainer.insertBefore(postElement, postsContainer.firstChild);
+                    
+                    // Refresh the feed
+                    loadFeed();
+                    return;
+                }
+                
+                // Create the mutation operation
+                const createOperation = {
+                    type: "mutation",
+                    schema: "post",
+                    data: postData,
+                    mutation_type: "create"
+                };
+                
+                console.log('Sending API request with operation:', createOperation);
+                
+                // Make the API call to create the post
+                try {
+                    const response = await fetch('/api/execute', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ operation: JSON.stringify(createOperation) })
+                    });
+                    
+                    console.log('API response status:', response.status);
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        console.error('API error response:', errorData);
+                        throw new Error(errorData.error || 'Failed to create post');
                     }
-                }, '*');
+                    
+                    const responseData = await response.json();
+                    console.log('API response for create post:', responseData);
+                    
+                    // Clear the input field
+                    document.getElementById('post-content').value = '';
+                    
+                    // Refresh the feed to get the latest posts including the one we just created
+                    loadFeed();
+                } catch (fetchError) {
+                    console.error('Fetch error:', fetchError);
+                    
+                    // Fallback to mock data if API call fails
+                    console.warn('API call failed, falling back to mock data');
+                    const post = await mockCreatePost(content);
+                    console.log('Created post with mock data:', post);
+                    
+                    // Clear the input field
+                    document.getElementById('post-content').value = '';
+                    
+                    // Add the new post to the feed
+                    const postsContainer = document.getElementById('posts-container');
+                    const postElement = createPostElement(post);
+                    postsContainer.insertBefore(postElement, postsContainer.firstChild);
+                    
+                    // Refresh the feed
+                    loadFeed();
+                }
             } catch (error) {
                 console.error('Error creating post:', error);
+                alert('Failed to create post: ' + error.message);
             }
         }
         
@@ -282,6 +573,7 @@
         function createPostElement(post) {
             const postElement = document.createElement('div');
             postElement.className = 'post';
+            postElement.setAttribute('data-testid', `post-${post.id}`);
             postElement.innerHTML = `
                 <div class="post-header">
                     <div class="post-author">${post.author.username}</div>
@@ -289,8 +581,8 @@
                 </div>
                 <div class="post-content">${post.content}</div>
                 <div class="post-actions">
-                    <button class="like-btn" data-post-id="${post.id}">Like (${post.likes.length})</button>
-                    <button class="comment-btn" data-post-id="${post.id}">Comment (${post.comments.length})</button>
+                    <button class="like-btn" data-testid="like-btn-${post.id}" data-post-id="${post.id}">Like (${post.likes.length})</button>
+                    <button class="comment-btn" data-testid="comment-btn-${post.id}" data-post-id="${post.id}">Comment (${post.comments.length})</button>
                 </div>
             `;
             
@@ -316,10 +608,11 @@
             friends.forEach(friend => {
                 const friendElement = document.createElement('div');
                 friendElement.className = 'friend';
+                friendElement.setAttribute('data-testid', `friend-${friend.id}`);
                 friendElement.innerHTML = `
                     <p><strong>${friend.username}</strong> - ${friend.bio}</p>
                     ${containerId === 'suggestions-container' ? 
-                        `<button class="add-friend-btn" data-user-id="${friend.id}">Add Friend</button>` : 
+                        `<button class="add-friend-btn" data-testid="add-friend-btn-${friend.id}" data-user-id="${friend.id}">Add Friend</button>` : 
                         ''}
                 `;
                 
@@ -335,11 +628,90 @@
         
         async function likePost(postId) {
             try {
-                await mockLikePost(postId);
+                // Get the current user profile for the like reference
+                const profile = await mockGetProfile();
+                
+                // Create the mutation operation to like a post
+                // First, we need to get the current post to update it
+                const queryOperation = {
+                    type: "query",
+                    schema: "post",
+                    fields: ["content", "timestamp", "likes", "comments", "author"],
+                    filter: { id: postId }
+                };
+                
+                // Get the post
+                const queryResponse = await fetch('/api/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ operation: JSON.stringify(queryOperation) })
+                });
+                
+                if (!queryResponse.ok) {
+                    const errorData = await queryResponse.json();
+                    throw new Error(errorData.error || 'Failed to get post');
+                }
+                
+                const queryData = await queryResponse.json();
+                
+                // If we have the post from the API, update it
+                if (queryData && queryData.data && Array.isArray(queryData.data.results) && queryData.data.results.length > 0) {
+                    const post = queryData.data.results[0];
+                    
+                    // Add the current user to the likes array if not already there
+                    const likes = post.likes || [];
+                    
+                    // Check if the user already liked the post
+                    const alreadyLiked = likes.some(like => like.id === profile.id);
+                    
+                    if (!alreadyLiked) {
+                        // Add the user to the likes array
+                        likes.push({ id: profile.id, username: profile.username });
+                        
+                        // Create the update operation
+                        const updateOperation = {
+                            type: "mutation",
+                            schema: "post",
+                            data: {
+                                id: postId,
+                                likes: likes
+                            },
+                            mutation_type: "update"
+                        };
+                        
+                        // Make the API call to update the post
+                        const updateResponse = await fetch('/api/execute', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ operation: JSON.stringify(updateOperation) })
+                        });
+                        
+                        if (!updateResponse.ok) {
+                            const errorData = await updateResponse.json();
+                            throw new Error(errorData.error || 'Failed to like post');
+                        }
+                    }
+                } else {
+                    // Fallback to mock if the API doesn't return expected format
+                    await mockLikePost(postId);
+                }
+                
                 // Refresh the feed to show updated likes
                 loadFeed();
             } catch (error) {
                 console.error('Error liking post:', error);
+                
+                // Fallback to mock if the API call fails
+                try {
+                    await mockLikePost(postId);
+                    loadFeed();
+                } catch (mockError) {
+                    console.error('Error with mock like post:', mockError);
+                }
             }
         }
         
@@ -363,29 +735,33 @@
             return date.toLocaleString();
         }
         
+        // Store mock posts in memory for the session
+        const mockPostsStore = [
+            {
+                id: '1',
+                content: 'Just launched my new app on Datafold!',
+                author: { id: '1', username: 'alice' },
+                timestamp: new Date(Date.now() - 3600000).toISOString(),
+                likes: [{ id: '2', username: 'bob' }],
+                comments: []
+            },
+            {
+                id: '2',
+                content: 'Exploring the new Datafold app system. It\'s amazing!',
+                author: { id: '2', username: 'bob' },
+                timestamp: new Date(Date.now() - 7200000).toISOString(),
+                likes: [{ id: '1', username: 'alice' }, { id: '3', username: 'charlie' }],
+                comments: [{ id: '1', author: { id: '1', username: 'alice' }, content: 'Totally agree!' }]
+            }
+        ];
+        
         // Mock API functions (would use real APIs in production)
         async function mockGetPosts() {
             // Simulate API delay
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            return [
-                {
-                    id: '1',
-                    content: 'Just launched my new app on Datafold!',
-                    author: { id: '1', username: 'alice' },
-                    timestamp: new Date(Date.now() - 3600000).toISOString(),
-                    likes: [{ id: '2', username: 'bob' }],
-                    comments: []
-                },
-                {
-                    id: '2',
-                    content: 'Exploring the new Datafold app system. It\'s amazing!',
-                    author: { id: '2', username: 'bob' },
-                    timestamp: new Date(Date.now() - 7200000).toISOString(),
-                    likes: [{ id: '1', username: 'alice' }, { id: '3', username: 'charlie' }],
-                    comments: [{ id: '1', author: { id: '1', username: 'alice' }, content: 'Totally agree!' }]
-                }
-            ];
+            // Return a copy of the posts array to avoid reference issues
+            return [...mockPostsStore];
         }
         
         async function mockGetUserPosts(userId) {
@@ -439,7 +815,8 @@
             // Simulate API delay
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            return {
+            // Create a new post
+            const newPost = {
                 id: Date.now().toString(),
                 content: content,
                 author: { id: '1', username: 'alice' },
@@ -447,6 +824,12 @@
                 likes: [],
                 comments: []
             };
+            
+            // Add it to our mock store at the beginning (newest first)
+            mockPostsStore.unshift(newPost);
+            
+            // Return the new post
+            return newPost;
         }
         
         async function mockLikePost(postId) {

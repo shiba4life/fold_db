@@ -1,0 +1,17 @@
+[
+  {
+    "id": "1",
+    "username": "alice",
+    "bio": "Software developer and Datafold enthusiast"
+  },
+  {
+    "id": "2",
+    "username": "bob",
+    "bio": "Tech enthusiast"
+  },
+  {
+    "id": "3",
+    "username": "charlie",
+    "bio": "Data scientist"
+  }
+]

@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social App Test Harness</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        
+        .test-controls {
+            background-color: #333;
+            color: white;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+        
+        .test-controls h2 {
+            margin-top: 0;
+        }
+        
+        .test-controls button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .test-controls button:hover {
+            background-color: #45a049;
+        }
+        
+        .test-status {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+        }
+        
+        .test-status h3 {
+            margin-top: 0;
+        }
+        
+        .test-status pre {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        
+        .test-frame {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: white;
+        }
+        
+        iframe {
+            width: 100%;
+            height: 600px;
+            border: none;
+        }
+        
+        .success {
+            color: green;
+        }
+        
+        .failure {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-controls">
+        <h2>Social App Test Harness</h2>
+        <div>
+            <button id="run-navigation-tests">Run Navigation Tests</button>
+            <button id="run-post-tests">Run Post Tests</button>
+            <button id="run-profile-tests">Run Profile Tests</button>
+            <button id="run-friend-tests">Run Friend Tests</button>
+            <button id="run-all-tests">Run All Tests</button>
+        </div>
+    </div>
+    
+    <div class="test-status">
+        <h3>Test Status</h3>
+        <div id="test-results">Select a test suite to run</div>
+    </div>
+    
+    <div class="test-frame">
+        <iframe id="app-frame" src="about:blank"></iframe>
+    </div>
+    
+    <script>
+        // Test data
+        const testData = {
+            profile: {
+                id: '1',
+                username: 'alice',
+                bio: 'Software developer and Datafold enthusiast'
+            },
+            posts: [
+                {
+                    id: '1',
+                    content: 'Test post 1',
+                    author: { id: '1', username: 'testuser' },
+                    timestamp: new Date().toISOString(),
+                    likes: [],
+                    comments: []
+                },
+                {
+                    id: '2',
+                    content: 'Test post 2',
+                    author: { id: '2', username: 'otheruser' },
+                    timestamp: new Date().toISOString(),
+                    likes: [{ id: '1', username: 'testuser' }],
+                    comments: []
+                }
+            ],
+            friends: [
+                { id: '2', username: 'friend1', bio: 'Test friend 1' },
+                { id: '3', username: 'friend2', bio: 'Test friend 2' }
+            ],
+            suggestions: [
+                { id: '4', username: 'suggestion1', bio: 'Test suggestion 1' },
+                { id: '5', username: 'suggestion2', bio: 'Test suggestion 2' }
+            ]
+        };
+        
+        // Mock APIs for testing
+        const mockApis = {
+            data: {
+                query: async (schema, filter, fields) => {
+                    console.log('Mock API query:', { schema, filter, fields });
+                    
+                    if (schema === 'user-profile') {
+                        return { results: [testData.profile] };
+                    } else if (schema === 'post') {
+                        if (filter && filter.author && filter.author.id === testData.profile.id) {
+                            return { 
+                                results: testData.posts.filter(p => p.author.id === testData.profile.id) 
+                            };
+                        } else {
+                            return { results: testData.posts };
+                        }
+                    }
+                    
+                    return { results: [] };
+                },
+                mutate: async (schema, data, mutationType) => {
+                    console.log('Mock API mutate:', { schema, data, mutationType });
+                    
+                    if (schema === 'post' && mutationType === 'create') {
+                        const newPost = {
+                            id: Date.now().toString(),
+                            content: data.content,
+                            author: testData.profile,
+                            timestamp: new Date().toISOString(),
+                            likes: [],
+                            comments: []
+                        };
+                        
+                        testData.posts.unshift(newPost);
+                        return { success: true, data: newPost };
+                    }
+                    
+                    return { success: true };
+                }
+            }
+        };
+        
+        // Test runner
+        class TestRunner {
+            constructor() {
+                this.results = [];
+                this.iframe = document.getElementById('app-frame');
+                this.resultsElement = document.getElementById('test-results');
+            }
+            
+            async setup() {
+                // Load the app in the iframe
+                this.iframe.src = 'index.html';
+                
+                // Wait for iframe to load
+                await new Promise(resolve => {
+                    this.iframe.onload = resolve;
+                });
+                
+                // Initialize the app with test data
+                this.iframe.contentWindow.testData = testData;
+                
+                // Use a simpler approach to initialize the app
+                this.iframe.contentWindow.postMessage({
+                    type: 'test-init',
+                    testData: testData
+                }, '*');
+                
+                // Directly set the APIs on the window object
+                this.iframe.contentWindow.apis = {
+                    data: {
+                        query: async (schema, filter, fields) => {
+                            console.log('Mock API query:', { schema, filter, fields });
+                            
+                            if (schema === 'user-profile') {
+                                return { results: [testData.profile] };
+                            } else if (schema === 'post') {
+                                if (filter && filter.author && filter.author.id === testData.profile.id) {
+                                    return { 
+                                        results: testData.posts.filter(p => p.author.id === testData.profile.id) 
+                                    };
+                                } else {
+                                    return { results: testData.posts };
+                                }
+                            }
+                            
+                            return { results: [] };
+                        },
+                        mutate: async (schema, data, mutationType) => {
+                            console.log('Mock API mutate:', { schema, data, mutationType });
+                            
+                            if (schema === 'post' && mutationType === 'create') {
+                                const newPost = {
+                                    id: Date.now().toString(),
+                                    content: data.content,
+                                    author: testData.profile,
+                                    timestamp: new Date().toISOString(),
+                                    likes: [],
+                                    comments: []
+                                };
+                                
+                                testData.posts.unshift(newPost);
+                                return { success: true, data: newPost };
+                            }
+                            
+                            return { success: true };
+                        }
+                    }
+                };
+                
+                // Call initializeApp directly
+                if (typeof this.iframe.contentWindow.initializeApp === 'function') {
+                    this.iframe.contentWindow.initializeApp();
+                }
+                
+                // Wait for app to initialize
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            async runTest(name, testFn) {
+                try {
+                    this.log(`Running test: ${name}`);
+                    
+                    // Add a timeout to the test
+                    const timeoutPromise = new Promise((_, reject) => {
+                        setTimeout(() => reject(new Error(`Test timed out after 10 seconds`)), 10000);
+                    });
+                    
+                    // Race the test function against the timeout
+                    await Promise.race([
+                        testFn(),
+                        timeoutPromise
+                    ]);
+                    
+                    this.results.push({ name, passed: true });
+                    this.log(`✅ Test passed: ${name}`);
+                    return true;
+                } catch (error) {
+                    this.results.push({ name, passed: false, error: error.message });
+                    this.log(`❌ Test failed: ${name}`);
+                    this.log(`Error: ${error.message}`);
+                    
+                    // Always continue with the next test
+                    return false;
+                }
+            }
+            
+            log(message) {
+                console.log(message);
+                const resultDiv = document.getElementById('test-results');
+                const messageElement = document.createElement('div');
+                messageElement.textContent = message;
+                
+                if (message.includes('✅')) {
+                    messageElement.classList.add('success');
+                } else if (message.includes('❌')) {
+                    messageElement.classList.add('failure');
+                }
+                
+                resultDiv.appendChild(messageElement);
+            }
+            
+            clearResults() {
+                this.results = [];
+                this.resultsElement.innerHTML = '';
+            }
+            
+            summarize() {
+                const total = this.results.length;
+                const passed = this.results.filter(r => r.passed).length;
+                const failed = total - passed;
+                
+                this.log(`\nTest Summary:`);
+                this.log(`Total: ${total}`);
+                this.log(`Passed: ${passed}`);
+                this.log(`Failed: ${failed}`);
+                
+                if (failed > 0) {
+                    this.log('\nFailed Tests:');
+                    this.results.filter(r => !r.passed).forEach(result => {
+                        this.log(`- ${result.name}: ${result.error}`);
+                    });
+                }
+                
+                // Add a marker element that the test runner can look for
+                const marker = document.createElement('div');
+                marker.id = 'test-summary-complete';
+                marker.style.display = 'none';
+                this.resultsElement.appendChild(marker);
+            }
+            
+            // Helper methods for assertions
+            async assertElementVisible(selector) {
+                const element = this.iframe.contentDocument.querySelector(selector);
+                if (!element) {
+                    throw new Error(`Element not found: ${selector}`);
+                }
+                
+                if (element.classList.contains('hidden')) {
+                    throw new Error(`Element is hidden: ${selector}`);
+                }
+                
+                return element;
+            }
+            
+            async assertElementHidden(selector) {
+                const element = this.iframe.contentDocument.querySelector(selector);
+                if (!element) {
+                    throw new Error(`Element not found: ${selector}`);
+                }
+                
+                if (!element.classList.contains('hidden')) {
+                    throw new Error(`Element is visible but should be hidden: ${selector}`);
+                }
+                
+                return element;
+            }
+            
+            async assertElementExists(selector) {
+                const element = this.iframe.contentDocument.querySelector(selector);
+                if (!element) {
+                    throw new Error(`Element not found: ${selector}`);
+                }
+                return element;
+            }
+            
+            async assertElementText(selector, expectedText) {
+                const element = this.iframe.contentDocument.querySelector(selector);
+                if (!element) {
+                    throw new Error(`Element not found: ${selector}`);
+                }
+                
+                const actualText = element.textContent.trim();
+                if (actualText !== expectedText) {
+                    throw new Error(`Element text mismatch for ${selector}. Expected: "${expectedText}", Actual: "${actualText}"`);
+                }
+                
+                return element;
+            }
+            
+            async clickElement(selector) {
+                const element = this.iframe.contentDocument.querySelector(selector);
+                if (!element) {
+                    throw new Error(`Element not found for click: ${selector}`);
+                }
+                
+                element.click();
+                // Wait for any UI updates
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+            
+            async typeInElement(selector, text) {
+                const element = this.iframe.contentDocument.querySelector(selector);
+                if (!element) {
+                    throw new Error(`Element not found for typing: ${selector}`);
+                }
+                
+                element.value = text;
+                // Trigger input event
+                const event = new Event('input', { bubbles: true });
+                element.dispatchEvent(event);
+                
+                // Wait for any UI updates
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+        
+        // Test suites
+        async function runNavigationTests() {
+            const runner = new TestRunner();
+            runner.clearResults();
+            await runner.setup();
+            
+            await runner.runTest('Initial view should be feed', async () => {
+                await runner.assertElementVisible('[data-testid="feed-view"]');
+                await runner.assertElementHidden('[data-testid="profile-view"]');
+                await runner.assertElementHidden('[data-testid="friends-view"]');
+            });
+            
+            await runner.runTest('Should switch to profile view', async () => {
+                await runner.clickElement('[data-testid="profile-btn"]');
+                await runner.assertElementHidden('[data-testid="feed-view"]');
+                await runner.assertElementVisible('[data-testid="profile-view"]');
+                await runner.assertElementHidden('[data-testid="friends-view"]');
+            });
+            
+            await runner.runTest('Should switch to friends view', async () => {
+                await runner.clickElement('[data-testid="friends-btn"]');
+                await runner.assertElementHidden('[data-testid="feed-view"]');
+                await runner.assertElementHidden('[data-testid="profile-view"]');
+                await runner.assertElementVisible('[data-testid="friends-view"]');
+            });
+            
+            await runner.runTest('Should switch back to feed view', async () => {
+                await runner.clickElement('[data-testid="feed-btn"]');
+                await runner.assertElementVisible('[data-testid="feed-view"]');
+                await runner.assertElementHidden('[data-testid="profile-view"]');
+                await runner.assertElementHidden('[data-testid="friends-view"]');
+            });
+            
+            runner.summarize();
+        }
+        
+        async function runPostTests() {
+            const runner = new TestRunner();
+            runner.clearResults();
+            await runner.setup();
+            
+            await runner.runTest('Should display posts in feed', async () => {
+                const postsContainer = await runner.assertElementExists('[data-testid="posts-container"]');
+                const posts = postsContainer.querySelectorAll('.post');
+                if (posts.length !== 2) {
+                    throw new Error(`Expected 2 posts, found ${posts.length}`);
+                }
+            });
+            
+            await runner.runTest('Should create a new post', async () => {
+                const testContent = 'This is a test post ' + Date.now();
+                await runner.typeInElement('[data-testid="post-content"]', testContent);
+                await runner.clickElement('[data-testid="post-btn"]');
+                
+                // Wait for post creation and refresh
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Check if the new post appears at the top
+                const postsContainer = await runner.assertElementExists('[data-testid="posts-container"]');
+                const firstPost = postsContainer.querySelector('.post');
+                const postContent = firstPost.querySelector('.post-content').textContent;
+                
+                if (!postContent.includes(testContent)) {
+                    throw new Error(`New post content not found. Expected: "${testContent}", Found: "${postContent}"`);
+                }
+            });
+            
+            runner.summarize();
+        }
+        
+        async function runProfileTests() {
+            const runner = new TestRunner();
+            runner.clearResults();
+            await runner.setup();
+            
+            await runner.runTest('Should display profile information', async () => {
+                await runner.clickElement('[data-testid="profile-btn"]');
+                
+                // Wait for profile data to load
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                await runner.assertElementText('[data-testid="profile-username"]', testData.profile.username);
+                await runner.assertElementText('[data-testid="profile-bio"]', testData.profile.bio);
+            });
+            
+            await runner.runTest('Should display user posts in profile', async () => {
+                const postsContainer = await runner.assertElementExists('[data-testid="my-posts-container"]');
+                const posts = postsContainer.querySelectorAll('.post');
+                
+                // We expect at least one post from the test user
+                if (posts.length < 1) {
+                    throw new Error(`Expected at least 1 user post, found ${posts.length}`);
+                }
+            });
+            
+            runner.summarize();
+        }
+        
+        async function runFriendTests() {
+            const runner = new TestRunner();
+            runner.clearResults();
+            await runner.setup();
+            
+            await runner.runTest('Should display friends list', async () => {
+                await runner.clickElement('[data-testid="friends-btn"]');
+                
+                // Wait for friends data to load
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                const friendsContainer = await runner.assertElementExists('[data-testid="friends-container"]');
+                const friends = friendsContainer.querySelectorAll('.friend');
+                
+                if (friends.length !== 2) {
+                    throw new Error(`Expected 2 friends, found ${friends.length}`);
+                }
+            });
+            
+            await runner.runTest('Should display friend suggestions', async () => {
+                const suggestionsContainer = await runner.assertElementExists('[data-testid="suggestions-container"]');
+                const suggestions = suggestionsContainer.querySelectorAll('.friend');
+                
+                if (suggestions.length !== 2) {
+                    throw new Error(`Expected 2 friend suggestions, found ${suggestions.length}`);
+                }
+            });
+            
+            runner.summarize();
+        }
+        
+        async function runAllTests() {
+            const runner = new TestRunner();
+            runner.clearResults();
+            runner.log('Running all test suites...\n');
+            
+            await runNavigationTests();
+            await runPostTests();
+            await runProfileTests();
+            await runFriendTests();
+            
+            runner.log('\nAll test suites completed.');
+        }
+        
+        // Set up event listeners for test buttons
+        document.getElementById('run-navigation-tests').addEventListener('click', runNavigationTests);
+        document.getElementById('run-post-tests').addEventListener('click', runPostTests);
+        document.getElementById('run-profile-tests').addEventListener('click', runProfileTests);
+        document.getElementById('run-friend-tests').addEventListener('click', runFriendTests);
+        document.getElementById('run-all-tests').addEventListener('click', runAllTests);
+    </script>
+</body>
+</html>

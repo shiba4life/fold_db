@@ -1,6 +1,10 @@
 use crate::error::{FoldDbError, FoldDbResult};
 use crate::datafold_node::app::manifest::WindowConfig;
+use crate::datafold_node::app::api::ApiContext;
 use std::path::Path;
+use std::process::Command;
+use std::thread;
+use std::time::Duration;
 
 /// Manages app windows
 #[derive(Debug, Clone)]
@@ -16,6 +20,9 @@ pub struct AppWindow {
     
     /// Whether the window is open
     pub is_open: bool,
+    
+    /// API context for the app
+    pub api_context: Option<ApiContext>,
 }
 
 impl AppWindow {
@@ -35,6 +42,7 @@ impl AppWindow {
             title: config.title.clone(),
             url: entry_path.to_string(),
             is_open: false,
+            api_context: None,
         })
     }
     
@@ -46,7 +54,10 @@ impl AppWindow {
         }
         
         // In a real implementation, this would open a browser window or WebView
-        // For now, we'll just set the is_open flag
+        // For now, we'll simulate it by injecting the necessary JavaScript into the app's HTML
+        self.inject_api_initialization()?;
+        
+        // Set the window as open
         self.is_open = true;
         
         Ok(())
@@ -61,6 +72,250 @@ impl AppWindow {
         
         // In a real implementation, this would close the browser window or WebView
         // For now, we'll just return Ok
+        
+        Ok(())
+    }
+    
+    /// Injects API initialization code into the app's HTML
+    fn inject_api_initialization(&self) -> FoldDbResult<()> {
+        // In a real implementation, this would inject JavaScript into the app's window
+        // For now, we'll simulate it by modifying the app's HTML to include our initialization code
+        
+        // Create a mock API object that will be passed to the app
+        let mock_apis = r#"
+        {
+            "data": {
+                "execute": async function(params) {
+                    console.log("Mock API call: data.execute", params);
+                    
+                    // Simulate API response based on operation type
+                    if (params.type === "query" || params.operation === "query") {
+                        // For queries, return mock data
+                        if (params.schema === "post" || params.schema === "social-post") {
+                            return {
+                                results: [
+                                    {
+                                        id: "1",
+                                        content: "Just launched my new app on Datafold!",
+                                        author: { id: "1", username: "alice" },
+                                        timestamp: new Date(Date.now() - 3600000).toISOString(),
+                                        likes: [{ id: "2", username: "bob" }],
+                                        comments: []
+                                    },
+                                    {
+                                        id: "2",
+                                        content: "Exploring the new Datafold app system. It's amazing!",
+                                        author: { id: "2", username: "bob" },
+                                        timestamp: new Date(Date.now() - 7200000).toISOString(),
+                                        likes: [{ id: "1", username: "alice" }, { id: "3", username: "charlie" }],
+                                        comments: [{ id: "1", author: { id: "1", username: "alice" }, content: "Totally agree!" }]
+                                    }
+                                ]
+                            };
+                        } else if (params.schema === "user-profile") {
+                            return {
+                                results: [
+                                    {
+                                        id: "1",
+                                        username: "alice",
+                                        bio: "Software developer and Datafold enthusiast"
+                                    }
+                                ]
+                            };
+                        }
+                    } else if (params.type === "mutation" || params.operation === "create" || params.mutation_type === "create") {
+                        // For mutations, return success with the created object
+                        return {
+                            id: Date.now().toString(),
+                            ...params.data
+                        };
+                    }
+                    
+                    return { results: [] };
+                }
+            },
+            "schema": {
+                "list": async function() {
+                    console.log("Mock API call: schema.list");
+                    return ["post", "user-profile", "comment"];
+                },
+                "get": async function(name) {
+                    console.log("Mock API call: schema.get", name);
+                    return { name, fields: {} };
+                }
+            },
+            "network": {
+                "getNodes": async function() {
+                    console.log("Mock API call: network.getNodes");
+                    return [];
+                }
+            }
+        }
+        "#;
+        
+        // Simulate sending the init-apis message to the app
+        // In a real implementation, this would be done through window.postMessage
+        // For now, we'll add a script tag to the app's HTML that initializes the APIs
+        
+        // Read the app's HTML
+        let html_path = Path::new(&self.url);
+        let html_content = std::fs::read_to_string(html_path)
+            .map_err(|e| FoldDbError::Config(format!("Failed to read app HTML: {}", e)))?;
+        
+        // Check if we've already injected the APIs
+        if html_content.contains("// DataFold API Initialization") {
+            return Ok(());
+        }
+        
+        // Create the initialization script
+        let init_script = format!(r#"
+        <script>
+        // DataFold API Initialization
+        (function() {{
+            // Initialize mock APIs
+            window.apis = {};
+            
+            // Define the initialization function
+            function initializeApis() {{
+                console.log('Initializing DataFold APIs');
+                
+                // Directly set the APIs on the window object
+                window.apis = {mock_apis};
+                
+                // Simulate receiving the init-apis message
+                const event = new MessageEvent('message', {{
+                    data: {{
+                        type: 'init-apis',
+                        apis: {mock_apis}
+                    }}
+                }});
+                
+                // Dispatch the event to initialize the app
+                window.dispatchEvent(event);
+                
+                console.log('DataFold APIs initialized');
+                
+                // Check if the app was initialized
+                setTimeout(function() {{
+                    if (typeof window.initializeApp === 'function') {{
+                        console.log('App has initializeApp function');
+                    }} else {{
+                        console.log('App does not have initializeApp function');
+                    }}
+                    
+                    // Override the app's functions to add debugging
+                    if (typeof window.showFeed === 'function') {{
+                        const originalShowFeed = window.showFeed;
+                        window.showFeed = function() {{
+                            console.log('Overridden showFeed called');
+                            return originalShowFeed.apply(this, arguments);
+                        }};
+                    }}
+                    
+                    if (typeof window.showProfile === 'function') {{
+                        const originalShowProfile = window.showProfile;
+                        window.showProfile = function() {{
+                            console.log('Overridden showProfile called');
+                            return originalShowProfile.apply(this, arguments);
+                        }};
+                    }}
+                    
+                    if (typeof window.showFriends === 'function') {{
+                        const originalShowFriends = window.showFriends;
+                        window.showFriends = function() {{
+                            console.log('Overridden showFriends called');
+                            return originalShowFriends.apply(this, arguments);
+                        }};
+                    }}
+                    
+                    if (typeof window.createPost === 'function') {{
+                        const originalCreatePost = window.createPost;
+                        window.createPost = function() {{
+                            console.log('Overridden createPost called');
+                            return originalCreatePost.apply(this, arguments);
+                        }};
+                    }}
+                    
+                    // Force the app to load the feed
+                    if (typeof window.loadFeed === 'function') {{
+                        console.log('Calling loadFeed directly');
+                        window.loadFeed();
+                    }}
+                }}, 1000);
+            }}
+            
+            // Call the initialization function immediately
+            initializeApis();
+            
+            // Also wait for DOMContentLoaded to ensure the app's code is loaded
+            document.addEventListener('DOMContentLoaded', function() {{
+                console.log('DOMContentLoaded event fired');
+                
+                // Call the initialization function again to make sure it runs after the app's code is loaded
+                initializeApis();
+                
+                // Add event listeners directly to the buttons
+                setTimeout(function() {{
+                    console.log('Adding event listeners directly to buttons');
+                    
+                    const feedBtn = document.getElementById('feed-btn');
+                    if (feedBtn) {{
+                        feedBtn.addEventListener('click', function() {{
+                            console.log('Feed button clicked (direct)');
+                            if (typeof window.showFeed === 'function') {{
+                                window.showFeed();
+                            }}
+                        }});
+                    }}
+                    
+                    const profileBtn = document.getElementById('profile-btn');
+                    if (profileBtn) {{
+                        profileBtn.addEventListener('click', function() {{
+                            console.log('Profile button clicked (direct)');
+                            if (typeof window.showProfile === 'function') {{
+                                window.showProfile();
+                            }}
+                        }});
+                    }}
+                    
+                    const friendsBtn = document.getElementById('friends-btn');
+                    if (friendsBtn) {{
+                        friendsBtn.addEventListener('click', function() {{
+                            console.log('Friends button clicked (direct)');
+                            if (typeof window.showFriends === 'function') {{
+                                window.showFriends();
+                            }}
+                        }});
+                    }}
+                    
+                    const postBtn = document.getElementById('post-btn');
+                    if (postBtn) {{
+                        postBtn.addEventListener('click', function() {{
+                            console.log('Post button clicked (direct)');
+                            if (typeof window.createPost === 'function') {{
+                                window.createPost();
+                            }}
+                        }});
+                    }}
+                }}, 2000);
+            }});
+        }})();
+        </script>
+        "#, mock_apis);
+        
+        // Inject the initialization script into the HTML
+        let modified_html = if let Some(head_end) = html_content.find("</head>") {
+            // Insert before </head>
+            let (before, after) = html_content.split_at(head_end);
+            format!("{}{}{}", before, init_script, after)
+        } else {
+            // If no </head>, insert at the beginning
+            format!("{}{}", init_script, html_content)
+        };
+        
+        // Write the modified HTML back to the file
+        std::fs::write(html_path, modified_html)
+            .map_err(|e| FoldDbError::Config(format!("Failed to write modified app HTML: {}", e)))?;
         
         Ok(())
     }
@@ -252,5 +507,41 @@ impl AppWindow {
                 }});
             }}
         "#, api_list)
+    }
+    
+    /// Opens the app in a browser
+    pub fn open_in_browser(&self) -> FoldDbResult<()> {
+        // Get the full URL
+        let url = format!("http://127.0.0.1:8080/{}", self.url);
+        
+        // Open the URL in the default browser
+        #[cfg(target_os = "windows")]
+        {
+            Command::new("cmd")
+                .args(&["/c", "start", &url])
+                .spawn()
+                .map_err(|e| FoldDbError::Config(format!("Failed to open browser: {}", e)))?;
+        }
+        
+        #[cfg(target_os = "macos")]
+        {
+            Command::new("open")
+                .arg(&url)
+                .spawn()
+                .map_err(|e| FoldDbError::Config(format!("Failed to open browser: {}", e)))?;
+        }
+        
+        #[cfg(target_os = "linux")]
+        {
+            Command::new("xdg-open")
+                .arg(&url)
+                .spawn()
+                .map_err(|e| FoldDbError::Config(format!("Failed to open browser: {}", e)))?;
+        }
+        
+        // Give the browser time to open
+        thread::sleep(Duration::from_millis(500));
+        
+        Ok(())
     }
 }

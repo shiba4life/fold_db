@@ -1,0 +1,47 @@
+[
+  {
+    "id": "1",
+    "content": "Just launched my new app on Datafold!",
+    "author": {
+      "id": "1",
+      "username": "alice"
+    },
+    "timestamp": "2025-03-04T17:30:08.429Z",
+    "likes": [
+      {
+        "id": "2",
+        "username": "bob"
+      }
+    ],
+    "comments": []
+  },
+  {
+    "id": "2",
+    "content": "Exploring the new Datafold app system. It's amazing!",
+    "author": {
+      "id": "2",
+      "username": "bob"
+    },
+    "timestamp": "2025-03-04T16:30:08.430Z",
+    "likes": [
+      {
+        "id": "1",
+        "username": "alice"
+      },
+      {
+        "id": "3",
+        "username": "charlie"
+      }
+    ],
+    "comments": [
+      {
+        "id": "1",
+        "author": {
+          "id": "1",
+          "username": "alice"
+        },
+        "content": "Totally agree!"
+      }
+    ]
+  }
+]

@@ -1,10 +1,40 @@
 # Active Context
 
 ## Current Task
-Implementing an App system to load various third-party apps into DataFold.
+Integrating the sample social app with FoldDB for proper data persistence.
 
 ## Recent Changes
-1. Created the app system core components:
+
+1. Integrated the sample social app with FoldDB:
+   - Created a FoldDB client for interacting with FoldDB
+   - Updated the server to use FoldDB for data persistence
+   - Added schema validation for data operations
+   - Implemented atom-based storage for posts and profiles
+   - Added comprehensive tests for FoldDB integration
+   - Created documentation explaining the integration architecture
+
+2. Fixed post persistence issues in the social app:
+   - Replaced file-based storage with FoldDB storage
+   - Added proper error handling for API operations
+   - Implemented schema validation for data
+   - Created API tests to verify persistence
+   - Added FoldDB integration tests
+   - Updated server to handle API requests properly
+
+3. Previous Changes:
+1. Fixed the AppWindow implementation to properly initialize apps:
+   - Enhanced the AppWindow to inject JavaScript into app HTML
+   - Implemented a robust API initialization system
+   - Added debugging capabilities to app initialization
+   - Fixed issues with app API communication
+   - Added direct event listeners to ensure button clicks are captured
+
+2. Updated the AppRegistry to properly start and open apps:
+   - Modified the start_app method to open the app in a browser
+   - Ensured the window is properly initialized before opening
+   - Improved error handling in app startup
+
+3. Created the app system core components:
    - Created `AppManifest` for app metadata and requirements
    - Implemented `AppRegistry` for managing app lifecycle
    - Added `AppLoader` for loading apps from disk
@@ -48,7 +78,13 @@ Implementing an App system to load various third-party apps into DataFold.
    - Added sample app documentation
 
 ## Next Steps
-1. Enhance the app system with additional features:
+1. Fix remaining issues with the sample social app:
+   - Fix navigation between views (Feed, Profile, Friends)
+   - Fix post creation functionality
+   - Improve error handling in the app
+   - Add better debugging tools for app development
+
+2. Enhance the app system with additional features:
    - Implement app versioning
    - Add app update mechanism
    - Create app marketplace

@@ -28,3 +28,19 @@ src/datafold_node/data/db/
 
 # Debug files
 *.pdb
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.npm/
+.yarn/
+
+# Test results
+apps/sample-social-app/test-results/
+
+# Build outputs
+dist/
+build/
+out/

@@ -59,6 +59,64 @@ const exampleSchema = {
 };
 
 /**
+ * Create a query for all fields in a schema
+ * @param {string} schemaName - The name of the schema to query
+ * @param {object} schema - The schema object
+ * @returns {object} - The query operation
+ */
+function createQueryAllFieldsOperation(schemaName, schema) {
+    // Extract all field names from the schema
+    const fields = Object.keys(schema.fields || {});
+    
+    // Create a query operation
+    return {
+        type: "query",
+        schema: schemaName,
+        fields: fields.length > 0 ? fields : ["*"], // Use all fields or wildcard if no fields
+        filter: null
+    };
+}
+
+/**
+ * Execute a query for all fields in a schema
+ * @param {string} schemaName - The name of the schema to query
+ * @param {object} schema - The schema object
+ * @param {Event} event - The click event
+ */
+async function queryAllFields(schemaName, schema, event) {
+    event.stopPropagation(); // Prevent schema toggle
+    
+    try {
+        const query = createQueryAllFieldsOperation(schemaName, schema);
+        const queryStr = JSON.stringify(query);
+        
+        const resultsDiv = document.getElementById('results');
+        utils.showLoading(resultsDiv, `Querying all fields in schema "${schemaName}"...`);
+        
+        // Switch to the results tab
+        utils.switchTab('query');
+        
+        // Set the query in the query input
+        document.getElementById('queryInput').value = JSON.stringify(query, null, 2);
+        
+        // Execute the query
+        const response = await utils.apiRequest('/api/execute', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                operation: queryStr
+            })
+        });
+        
+        utils.displayResult(response.data);
+    } catch (error) {
+        utils.displayResult(error.message, true);
+    }
+}
+
+/**
  * Load the list of schemas from the API
  */
 async function loadSchemaList() {
@@ -84,7 +142,10 @@ async function loadSchemaList() {
                 <div class="schema-item collapsed" onclick="utils.toggleSchema(this)">
                     <h3>
                         <span>${schema.name}</span>
-                        <button class="remove-schema" onclick="removeSchema('${schema.name}', event)">Remove</button>
+                        <div class="schema-buttons">
+                            <button class="query-all-fields" onclick="schemaModule.queryAllFields('${schema.name}', ${JSON.stringify(schema).replace(/"/g, '&quot;')}, event)">Query All Fields</button>
+                            <button class="remove-schema" onclick="removeSchema('${schema.name}', event)">Remove</button>
+                        </div>
                     </h3>
                     <pre>${JSON.stringify(schema, null, 2)}</pre>
                 </div>
@@ -165,5 +226,7 @@ window.schemaModule = {
     loadSchemaList,
     removeSchema,
     loadSchema,
-    loadExampleSchema
+    loadExampleSchema,
+    queryAllFields,
+    createQueryAllFieldsOperation
 };

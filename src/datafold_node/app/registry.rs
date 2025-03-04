@@ -112,7 +112,15 @@ impl AppRegistry {
             .map_err(|_| FoldDbError::Config("Failed to lock resource manager".to_string()))?;
         
         // Create app window
-        let window = AppWindow::new(&app.manifest.window, &app.manifest.entry)?;
+        let mut window = AppWindow::new(&app.manifest.window, &app.manifest.entry)?;
+        
+        // Open the window
+        window.open()?;
+        
+        // Open the app in a browser
+        window.open_in_browser()?;
+        
+        // Store the window
         app.window = Some(window);
         
         // Set app as running

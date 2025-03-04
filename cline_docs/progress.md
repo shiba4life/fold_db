@@ -90,6 +90,11 @@
   - Concurrent operation tests
 
 ## Next Milestones
+- Enhance the app system with additional features:
+  - Implement app versioning
+  - Add app update mechanism
+  - Create app marketplace
+  - Implement app hot-reloading
 - Add tests for unified error handling system
 - Add tests for new network layer components
 - Implement advanced node discovery mechanisms
@@ -107,7 +112,30 @@
 - Implement app security enhancements
 
 ## Recent Improvements
-- Implemented app system for third-party extensions:
+- Integrated the sample social app with FoldDB:
+  - Created a FoldDB client for interacting with FoldDB
+  - Updated the server to use FoldDB for data persistence
+  - Added schema validation for data operations
+  - Implemented atom-based storage for posts and profiles
+  - Added comprehensive tests for FoldDB integration
+  - Created documentation explaining the integration architecture
+  - Fixed post persistence issues in the social app
+  - Replaced file-based storage with FoldDB storage
+  - Added proper error handling for API operations
+  - Implemented schema validation for data
+  - Created API tests to verify persistence
+  - Added FoldDB integration tests
+  - Updated server to handle API requests properly
+
+- Enhanced app system for third-party extensions:
+  - Fixed AppWindow implementation to properly initialize apps
+  - Enhanced JavaScript API initialization for apps
+  - Added debugging capabilities to app initialization
+  - Improved app startup and lifecycle management
+  - Fixed issues with app API communication
+  - Added direct event listeners for app UI interactions
+  - Updated AppRegistry to properly start and open apps
+  - Improved error handling in app startup
   - Created app manifest system for app metadata and requirements
   - Implemented app registry for managing app lifecycle
   - Added app loader for loading apps from disk

@@ -94,7 +94,7 @@ button:disabled {
     cursor: pointer;
 }
 
-.tab-button.active {
+.tab-button.active { 
     background: #007bff;
     color: white;
     border-color: #007bff;
@@ -131,6 +131,25 @@ button:disabled {
     align-items: center;
 }
 
+.schema-buttons {
+    display: flex;
+    gap: 5px;
+}
+
+.query-all-fields {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.query-all-fields:hover {
+    background: #218838;
+}
+
 .remove-schema {
     background: #dc3545;
     color: white;
@@ -138,7 +157,7 @@ button:disabled {
     padding: 5px 10px;
     border-radius: 4px;
     cursor: pointer;
-    margin-left: 10px;
+    font-size: 0.9em;
 }
 
 .remove-schema:hover {
