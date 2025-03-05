@@ -1,140 +1,108 @@
-# Sample Social App
+# Social App
 
-A demonstration social networking application for Datafold.
+A sample social media application that demonstrates integration with FoldDB.
 
-## Overview
+## Features
 
-This application provides a simple social networking interface with features like:
+- Post creation and display
 - User profiles
-- Post creation and viewing
-- Friend management
-- Feed display
-
-## Testing Infrastructure
-
-This project includes a comprehensive testing infrastructure designed to efficiently test the app without consuming excessive context window space.
-
-### Key Components
-
-#### 1. Test Hooks in the App
-Added data-testid attributes to key UI elements in index.html, making selectors more reliable and easier to maintain.
-
-#### 2. Test Harness (test-harness.html)
-A standalone HTML page that:
-- Loads the app in an iframe
-- Initializes it with test-specific mock data
-- Provides a UI to run specific test suites
-- Displays test results in real-time
-
-#### 3. Focused Test Suites
-Tests are organized into focused suites:
-- Navigation Tests: View switching (Feed, Profile, Friends)
-- Post Tests: Post creation and display
-- Profile Tests: Profile information display
-- Friend Tests: Friends list and suggestions
-
-#### 4. Automated Test Runner (test-runner.js)
-A Node.js script that:
-- Runs tests using Puppeteer
-- Supports headless mode for CI/CD
-- Generates HTML reports and screenshots
-- Can run specific test suites
-
-#### 5. Single Test Runner (run-single-test.js)
-A script for running individual test cases:
-- Useful for debugging specific issues
-- Provides detailed error messages
-- Runs faster than the full test suite
-
-#### 6. Shell Script and npm Integration
-Convenience scripts:
-- run-tests.sh for command-line execution
-- npm scripts for different test scenarios
-- GitHub Actions workflow for CI/CD integration
-
-### Benefits of This Approach
-
-1. **Efficiency**: Tests run in isolation without consuming API context window
-   - Uses mock data instead of real API calls
-   - Focused test suites target specific functionality
-   - Single test runner for debugging specific issues
-
-2. **Speed**: Tests run quickly with minimal setup
-   - No need to initialize the full database
-   - Reduced API call overhead
-   - Faster feedback loop during development
-
-3. **Reliability**: Test hooks make selectors more reliable
-   - data-testid attributes for stable element selection
-   - Isolated test environment prevents cross-test interference
-   - Consistent test data for predictable results
-
-4. **Visibility**: Clear test results with pass/fail indicators
-   - Real-time test status in the UI
-   - Detailed error messages for failed tests
-   - HTML reports and screenshots for documentation
+- Friends list
+- Post likes
+- Comments
 
 ## Getting Started
 
-### Installation
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Start the server:
+   ```bash
+   node server.js
+   ```
+
+3. Open the app in your browser:
+   ```bash
+   open http://localhost:3002
+   ```
+
+## Testing
+
+The app includes several types of tests to ensure proper functionality:
+
+### API Tests
+
+Tests the API endpoints directly:
 
 ```bash
-# Install dependencies
-npm install
+node run-api-tests.js [--verbose]
 ```
 
-### Running the App
+### FoldDB Integration Tests
+
+Tests the integration with FoldDB:
 
 ```bash
-# Serve the app locally
-npm run serve
+node test-folddb.js [--verbose]
 ```
 
-### Running Tests
+### UI Tests
+
+Tests the UI components using the test harness:
 
 ```bash
-# Run all tests
-npm test
-
-# Run specific test suites
-npm run test:navigation
-npm run test:post
-npm run test:profile
-npm run test:friend
-
-# Run a single test case
-npm run test:single -- --test="Should switch to profile view"
-
-# Run in headless mode (for CI/CD)
-npm run test:headless
+./run-tests.sh [--headless] [--suite=SUITE]
 ```
 
-### Using the Shell Script
+Where `SUITE` can be one of: `navigation`, `post`, `profile`, `friend`, or `all`.
+
+### End-to-End Integration Tests
+
+There are two types of integration tests:
+
+#### 1. With Simulated FoldDB Client
+
+Tests the entire flow from UI to API to the simulated FoldDB client:
 
 ```bash
-# Make the script executable (if not already)
-chmod +x run-tests.sh
-
-# Run all tests
-./run-tests.sh
-
-# Run in headless mode
-./run-tests.sh --headless
-
-# Run a specific suite
-./run-tests.sh --suite=navigation
+npm run test:integration [-- --verbose] [-- --headless]
 ```
 
-## Troubleshooting
+#### 2. With Real DataFold Node
 
-If you encounter issues with the test runner:
+Tests the entire flow from UI to API to a real DataFold node:
 
-1. **404 Errors**: These are normal for some static assets and can be ignored
-2. **Timeout Errors**: Try increasing the TEST_TIMEOUT value in test-runner.js
-3. **Element Not Found**: Check that the data-testid attributes match between tests and HTML
+```bash
+npm run test:integration:datafold [-- --verbose] [-- --headless]
+```
 
-## Additional Documentation
+These comprehensive test suites:
+1. Start the necessary services (server and DataFold node for the second test)
+2. Launch a browser to interact with the UI
+3. Create and interact with posts
+4. Verify data is properly persisted
+5. Test navigation between views
+6. Clean up test data
 
-For more detailed information, see:
-- [TESTING.md](./TESTING.md) - Detailed testing documentation
-- [GitHub Actions Workflow](./.github/workflows/tests.yml) - CI/CD configuration
+## Architecture
+
+The app follows a client-server architecture:
+
+```
++----------------+      +----------------+      +----------------+
+|                |      |                |      |                |
+|  Social App UI |----->| FoldDB Client  |----->|    FoldDB     |
+|                |      |                |      |                |
++----------------+      +----------------+      +----------------+
+```
+
+1. The Social App UI makes API requests to the server
+2. The server uses the FoldDB Client to interact with FoldDB
+3. FoldDB handles data storage, validation, and retrieval
+
+For more details on the FoldDB integration, see [FOLDDB_INTEGRATION.md](./FOLDDB_INTEGRATION.md).
+
+## Development
+
+For information on the testing infrastructure, see [TESTING.md](./TESTING.md).

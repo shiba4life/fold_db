@@ -9,7 +9,14 @@ const http = require('http');
 const path = require('path');
 const url = require('url');
 const handler = require('serve-handler');
-const foldDBClient = require('./fold_db_client');
+
+// Use real FoldDB client if specified in environment variable
+const useRealFoldDB = process.env.USE_REAL_FOLDDB === 'true';
+const foldDBClient = useRealFoldDB 
+  ? require('./real_fold_db_client')
+  : require('./fold_db_client');
+
+console.log(`Using ${useRealFoldDB ? 'real' : 'simulated'} FoldDB client`);
 
 // Configuration
 const PORT = process.env.PORT || 3002; // Use port 3002 to avoid conflicts

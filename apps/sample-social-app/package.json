@@ -15,6 +15,12 @@
     "test:api:verbose": "node run-api-tests.js --verbose",
     "test:folddb": "node test-folddb.js",
     "test:folddb:verbose": "node test-folddb.js --verbose",
+    "test:integration": "node run-integration-tests.js",
+    "test:integration:verbose": "node run-integration-tests.js --verbose",
+    "test:integration:headless": "node run-integration-tests.js --headless",
+    "test:integration:datafold": "node run-integration-tests-with-datafold.js",
+    "test:integration:datafold:verbose": "node run-integration-tests-with-datafold.js --verbose",
+    "test:integration:datafold:headless": "node run-integration-tests-with-datafold.js --headless",
     "serve": "serve .",
     "server": "node server.js"
   },
