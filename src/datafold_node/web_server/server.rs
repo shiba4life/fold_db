@@ -1,14 +1,17 @@
 use std::sync::Arc;
 use std::path::PathBuf;
 use warp::{Filter, Rejection, Reply};
+use tokio::sync::Mutex;
 use crate::datafold_node::node::DataFoldNode;
 use crate::datafold_node::web_server::types::with_node;
 use crate::datafold_node::web_server::handlers::*;
 use crate::datafold_node::web_server::unix_socket;
+use crate::datafold_node::web_server::auth::{WebAuthManager, WebAuthConfig, with_auth};
 
 pub struct WebServer {
     node: Arc<tokio::sync::Mutex<DataFoldNode>>,
     unix_socket_path: Option<PathBuf>,
+    auth_manager: Arc<Mutex<WebAuthManager>>,
 }
 
 impl WebServer {
@@ -16,7 +19,13 @@ impl WebServer {
         Self { 
             node,
             unix_socket_path: None,
+            auth_manager: Arc::new(Mutex::new(WebAuthManager::default())),
         }
+    }
+    
+    pub fn with_auth_config(mut self, config: WebAuthConfig) -> Self {
+        self.auth_manager = Arc::new(Mutex::new(WebAuthManager::new(config)));
+        self
     }
     
     pub fn with_unix_socket(mut self, socket_path: impl Into<PathBuf>) -> Self {
@@ -114,104 +123,174 @@ impl WebServer {
         &self,
         node: Arc<tokio::sync::Mutex<DataFoldNode>>,
     ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+        // Get auth manager
+        let auth_manager = Arc::clone(&self.auth_manager);
+        
+        // Public routes (no authentication required)
         // Schema routes
         let list_schemas = warp::path!("api" / "schemas")
             .and(warp::get())
             .and(with_node(node.clone()))
             .and_then(handle_list_schemas);
-
-        let schema = warp::path!("api" / "schema")
-            .and(warp::post())
-            .and(warp::body::json())
-            .and(with_node(node.clone()))
-            .and_then(handle_schema);
-
-        let execute = warp::path!("api" / "execute")
-            .and(warp::post())
-            .and(warp::body::json())
-            .and(with_node(node.clone()))
-            .and_then(handle_execute);
-
-        let delete_schema = warp::path!("api" / "schema" / String)
-            .and(warp::delete())
-            .and(with_node(node.clone()))
-            .and_then(handle_delete_schema);
-
-        // Network API routes
-        let init_network = warp::path!("api" / "network" / "init")
-            .and(warp::post())
-            .and(warp::body::json())
-            .and(with_node(node.clone()))
-            .and_then(handle_init_network);
-
-        let start_network = warp::path!("api" / "network" / "start")
-            .and(warp::post())
-            .and(with_node(node.clone()))
-            .and_then(handle_start_network);
-
-        let stop_network = warp::path!("api" / "network" / "stop")
-            .and(warp::post())
-            .and(with_node(node.clone()))
-            .and_then(handle_stop_network);
-
+            
         let network_status = warp::path!("api" / "network" / "status")
             .and(warp::get())
             .and(with_node(node.clone()))
             .and_then(handle_network_status);
-
-        let discover_nodes = warp::path!("api" / "network" / "discover")
-            .and(warp::post())
-            .and(with_node(node.clone()))
-            .and_then(handle_discover_nodes);
-
-        let connect_to_node = warp::path!("api" / "network" / "connect")
-            .and(warp::post())
-            .and(warp::body::json())
-            .and(with_node(node.clone()))
-            .and_then(handle_connect_to_node);
-
+            
         let list_nodes = warp::path!("api" / "network" / "nodes")
             .and(warp::get())
             .and(with_node(node.clone()))
             .and_then(handle_list_nodes);
-
-        // App routes
+            
         let list_apps = warp::path!("api" / "apps")
             .and(warp::get())
             .and(with_node(node.clone()))
             .and_then(handle_list_apps);
-            
-        let register_app = warp::path!("api" / "apps")
-            .and(warp::post())
-            .and(warp::body::json())
-            .and(with_node(node.clone()))
-            .and_then(handle_register_app);
-            
-        let start_app = warp::path!("api" / "apps" / String / "start")
-            .and(warp::post())
-            .and(with_node(node.clone()))
-            .and_then(handle_start_app);
-            
-        let stop_app = warp::path!("api" / "apps" / String / "stop")
-            .and(warp::post())
-            .and(with_node(node.clone()))
-            .and_then(handle_stop_app);
-            
-        let unload_app = warp::path!("api" / "apps" / String)
-            .and(warp::delete())
-            .and(with_node(node.clone()))
-            .and_then(handle_unload_app);
             
         let list_apis = warp::path!("api" / "apis")
             .and(warp::get())
             .and(with_node(node.clone()))
             .and_then(handle_list_apis);
             
+        // Authenticated routes (require public key authentication)
+        // Schema modification routes
+        let schema = warp::path!("api" / "schema")
+            .and(warp::post())
+            .and(with_auth(auth_manager.clone()))
+            .and(warp::body::json())
+            .and(with_node(node.clone()))
+            .and_then(|trust_level, body, node| {
+                // Pass trust level to handler
+                handle_schema_with_auth(trust_level, body, node)
+            });
+
+        let execute = warp::path!("api" / "execute")
+            .and(warp::post())
+            .and(with_auth(auth_manager.clone()))
+            .and(warp::body::json())
+            .and(with_node(node.clone()))
+            .and_then(|trust_level, body, node| {
+                // Pass trust level to handler
+                handle_execute_with_auth(trust_level, body, node)
+            });
+
+        let delete_schema = warp::path!("api" / "schema" / String)
+            .and(warp::delete())
+            .and(with_auth(auth_manager.clone()))
+            .and(with_node(node.clone()))
+            .and_then(|name, trust_level, node| {
+                // Pass trust level to handler
+                handle_delete_schema_with_auth(name, trust_level, node)
+            });
+
+        // Network API routes
+        let init_network = warp::path!("api" / "network" / "init")
+            .and(warp::post())
+            .and(with_auth(auth_manager.clone()))
+            .and(warp::body::json())
+            .and(with_node(node.clone()))
+            .and_then(|trust_level, body, node| {
+                // Pass trust level to handler
+                handle_init_network_with_auth(trust_level, body, node)
+            });
+
+        let start_network = warp::path!("api" / "network" / "start")
+            .and(warp::post())
+            .and(with_auth(auth_manager.clone()))
+            .and(with_node(node.clone()))
+            .and_then(|trust_level, node| {
+                // Pass trust level to handler
+                handle_start_network_with_auth(trust_level, node)
+            });
+
+        let stop_network = warp::path!("api" / "network" / "stop")
+            .and(warp::post())
+            .and(with_auth(auth_manager.clone()))
+            .and(with_node(node.clone()))
+            .and_then(|trust_level, node| {
+                // Pass trust level to handler
+                handle_stop_network_with_auth(trust_level, node)
+            });
+
+        let discover_nodes = warp::path!("api" / "network" / "discover")
+            .and(warp::post())
+            .and(with_auth(auth_manager.clone()))
+            .and(with_node(node.clone()))
+            .and_then(|trust_level, node| {
+                // Pass trust level to handler
+                handle_discover_nodes_with_auth(trust_level, node)
+            });
+
+        let connect_to_node = warp::path!("api" / "network" / "connect")
+            .and(warp::post())
+            .and(with_auth(auth_manager.clone()))
+            .and(warp::body::json())
+            .and(with_node(node.clone()))
+            .and_then(|trust_level, body, node| {
+                // Pass trust level to handler
+                handle_connect_to_node_with_auth(trust_level, body, node)
+            });
+
+        // App routes
+        let register_app = warp::path!("api" / "apps")
+            .and(warp::post())
+            .and(with_auth(auth_manager.clone()))
+            .and(warp::body::json())
+            .and(with_node(node.clone()))
+            .and_then(|trust_level, body, node| {
+                // Pass trust level to handler
+                handle_register_app_with_auth(trust_level, body, node)
+            });
+            
+        let start_app = warp::path!("api" / "apps" / String / "start")
+            .and(warp::post())
+            .and(with_auth(auth_manager.clone()))
+            .and(with_node(node.clone()))
+            .and_then(|name, trust_level, node| {
+                // Pass trust level to handler
+                handle_start_app_with_auth(name, trust_level, node)
+            });
+            
+        let stop_app = warp::path!("api" / "apps" / String / "stop")
+            .and(warp::post())
+            .and(with_auth(auth_manager.clone()))
+            .and(with_node(node.clone()))
+            .and_then(|name, trust_level, node| {
+                // Pass trust level to handler
+                handle_stop_app_with_auth(name, trust_level, node)
+            });
+            
+        let unload_app = warp::path!("api" / "apps" / String)
+            .and(warp::delete())
+            .and(with_auth(auth_manager.clone()))
+            .and(with_node(node.clone()))
+            .and_then(|name, trust_level, node| {
+                // Pass trust level to handler
+                handle_unload_app_with_auth(name, trust_level, node)
+            });
+            
         let register_api = warp::path!("api" / "apis")
+            .and(warp::post())
+            .and(with_auth(auth_manager.clone()))
+            .and(warp::body::json())
+            .and(with_node(node.clone()))
+            .and_then(|trust_level, body, node| {
+                // Pass trust level to handler
+                handle_register_api_with_auth(trust_level, body, node)
+            });
+            
+        // Authentication routes
+        let register_key = warp::path!("api" / "auth" / "register")
             .and(warp::post())
             .and(warp::body::json())
             .and(with_node(node.clone()))
-            .and_then(handle_register_api);
+            .and_then(move |body, node| {
+                let auth_manager = Arc::clone(&auth_manager);
+                async move {
+                    handle_register_key(body, node, auth_manager).await
+                }
+            });
             
         // Combine all routes
         list_schemas
@@ -232,5 +311,6 @@ impl WebServer {
             .or(unload_app)
             .or(list_apis)
             .or(register_api)
+            .or(register_key)
     }
 }

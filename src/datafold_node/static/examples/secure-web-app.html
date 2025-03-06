@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure FoldDB Web App Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .panel {
+            flex: 1;
+            min-width: 300px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .error {
+            color: #d9534f;
+            font-weight: bold;
+        }
+        .success {
+            color: #5cb85c;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Secure FoldDB Web App Example</h1>
+    <p>This example demonstrates how to securely interact with FoldDB using public key authentication.</p>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>Authentication</h2>
+            <div class="form-group">
+                <label for="node-url">DataFold Node URL:</label>
+                <input type="text" id="node-url" value="http://localhost:8080" />
+            </div>
+            <div class="form-group">
+                <label for="public-key">Public Key:</label>
+                <input type="text" id="public-key" placeholder="Your public key" />
+            </div>
+            <div class="form-group">
+                <label for="private-key">Private Key:</label>
+                <input type="password" id="private-key" placeholder="Your private key" />
+            </div>
+            <button id="generate-keys">Generate Keys</button>
+            <button id="connect">Connect</button>
+            <div id="auth-status"></div>
+        </div>
+        
+        <div class="panel">
+            <h2>Register New Key</h2>
+            <div class="form-group">
+                <label for="reg-public-key">Public Key:</label>
+                <input type="text" id="reg-public-key" placeholder="Public key to register" />
+            </div>
+            <div class="form-group">
+                <label for="trust-level">Trust Level:</label>
+                <input type="number" id="trust-level" min="0" max="10" value="5" />
+            </div>
+            <div class="form-group">
+                <label for="admin-token">Admin Token (optional):</label>
+                <input type="password" id="admin-token" placeholder="For trust level < 5" />
+            </div>
+            <button id="register-key">Register Key</button>
+            <div id="register-status"></div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>Query Data</h2>
+            <div class="form-group">
+                <label for="query-schema">Schema:</label>
+                <input type="text" id="query-schema" placeholder="e.g., user-profile" />
+            </div>
+            <div class="form-group">
+                <label for="query-fields">Fields (comma-separated):</label>
+                <input type="text" id="query-fields" placeholder="e.g., name,email,age" />
+            </div>
+            <div class="form-group">
+                <label for="query-where">Where Conditions (JSON):</label>
+                <textarea id="query-where" rows="3" placeholder='e.g., {"id": "123"}'></textarea>
+            </div>
+            <button id="execute-query">Execute Query</button>
+            <h3>Results:</h3>
+            <pre id="query-results">No results yet</pre>
+        </div>
+        
+        <div class="panel">
+            <h2>Create Data</h2>
+            <div class="form-group">
+                <label for="create-schema">Schema:</label>
+                <input type="text" id="create-schema" placeholder="e.g., user-profile" />
+            </div>
+            <div class="form-group">
+                <label for="create-data">Data (JSON):</label>
+                <textarea id="create-data" rows="5" placeholder='e.g., {"name": "John Doe", "email": "john@example.com"}'></textarea>
+            </div>
+            <button id="execute-create">Create Data</button>
+            <h3>Results:</h3>
+            <pre id="create-results">No results yet</pre>
+        </div>
+    </div>
+    
+    <h2>Field-Level Access Control Example</h2>
+    <p>This demonstrates how FoldDB enforces field-level access control based on trust distance:</p>
+    
+    <div class="container">
+        <div class="panel">
+            <h3>User with Full Access (Trust Level 1)</h3>
+            <pre id="full-access-example">
+{
+  "username": "Alice",
+  "email": "alice@example.com",
+  "phone": "+1234567890",
+  "payment_info": {
+    "card_type": "Visa",
+    "last_four": "1234"
+  }
+}
+            </pre>
+            <button id="simulate-full-access">Simulate Full Access</button>
+        </div>
+        
+        <div class="panel">
+            <h3>User with Limited Access (Trust Level 5)</h3>
+            <pre id="limited-access-example">
+{
+  "username": "Alice",
+  "email": "REDACTED",
+  "phone": "REDACTED",
+  "payment_info": "REDACTED"
+}
+            </pre>
+            <button id="simulate-limited-access">Simulate Limited Access</button>
+        </div>
+    </div>
+    
+    <script src="/js/folddb-client.js"></script>
+    <script>
+        // Global client instance
+        let client = null;
+        
+        // DOM elements
+        const nodeUrlInput = document.getElementById('node-url');
+        const publicKeyInput = document.getElementById('public-key');
+        const privateKeyInput = document.getElementById('private-key');
+        const authStatusDiv = document.getElementById('auth-status');
+        const connectButton = document.getElementById('connect');
+        const generateKeysButton = document.getElementById('generate-keys');
+        
+        const regPublicKeyInput = document.getElementById('reg-public-key');
+        const trustLevelInput = document.getElementById('trust-level');
+        const adminTokenInput = document.getElementById('admin-token');
+        const registerKeyButton = document.getElementById('register-key');
+        const registerStatusDiv = document.getElementById('register-status');
+        
+        const querySchemaInput = document.getElementById('query-schema');
+        const queryFieldsInput = document.getElementById('query-fields');
+        const queryWhereInput = document.getElementById('query-where');
+        const executeQueryButton = document.getElementById('execute-query');
+        const queryResultsPre = document.getElementById('query-results');
+        
+        const createSchemaInput = document.getElementById('create-schema');
+        const createDataInput = document.getElementById('create-data');
+        const executeCreateButton = document.getElementById('execute-create');
+        const createResultsPre = document.getElementById('create-results');
+        
+        const simulateFullAccessButton = document.getElementById('simulate-full-access');
+        const simulateLimitedAccessButton = document.getElementById('simulate-limited-access');
+        
+        // Connect to FoldDB
+        connectButton.addEventListener('click', () => {
+            const nodeUrl = nodeUrlInput.value.trim();
+            const publicKey = publicKeyInput.value.trim();
+            const privateKey = privateKeyInput.value.trim();
+            
+            if (!nodeUrl || !publicKey || !privateKey) {
+                authStatusDiv.innerHTML = '<span class="error">Please fill in all fields</span>';
+                return;
+            }
+            
+            try {
+                client = new FoldDBClient({
+                    nodeUrl,
+                    publicKey,
+                    privateKey
+                });
+                
+                authStatusDiv.innerHTML = '<span class="success">Connected successfully!</span>';
+                
+                // Enable other buttons
+                executeQueryButton.disabled = false;
+                executeCreateButton.disabled = false;
+                registerKeyButton.disabled = false;
+            } catch (error) {
+                authStatusDiv.innerHTML = `<span class="error">Connection error: ${error.message}</span>`;
+            }
+        });
+        
+        // Generate key pair
+        generateKeysButton.addEventListener('click', async () => {
+            try {
+                // In a real implementation, this would use the Web Crypto API
+                // to generate a key pair
+                
+                // For this example, we'll just generate random strings
+                const publicKey = `pk_${Math.random().toString(36).substring(2, 15)}`;
+                const privateKey = `sk_${Math.random().toString(36).substring(2, 15)}`;
+                
+                publicKeyInput.value = publicKey;
+                privateKeyInput.value = privateKey;
+                regPublicKeyInput.value = publicKey;
+                
+                authStatusDiv.innerHTML = '<span class="success">Keys generated! (Note: These are not real cryptographic keys)</span>';
+            } catch (error) {
+                authStatusDiv.innerHTML = `<span class="error">Key generation error: ${error.message}</span>`;
+            }
+        });
+        
+        // Register a new key
+        registerKeyButton.addEventListener('click', async () => {
+            if (!client) {
+                registerStatusDiv.innerHTML = '<span class="error">Please connect first</span>';
+                return;
+            }
+            
+            const publicKey = regPublicKeyInput.value.trim();
+            const trustLevel = parseInt(trustLevelInput.value, 10);
+            const adminToken = adminTokenInput.value.trim() || undefined;
+            
+            if (!publicKey) {
+                registerStatusDiv.innerHTML = '<span class="error">Please enter a public key</span>';
+                return;
+            }
+            
+            try {
+                const result = await client.registerKey({
+                    publicKey,
+                    trustLevel,
+                    adminToken
+                });
+                
+                registerStatusDiv.innerHTML = '<span class="success">Key registered successfully!</span>';
+                console.log('Registration result:', result);
+            } catch (error) {
+                registerStatusDiv.innerHTML = `<span class="error">Registration error: ${error.message}</span>`;
+            }
+        });
+        
+        // Execute query
+        executeQueryButton.addEventListener('click', async () => {
+            if (!client) {
+                queryResultsPre.textContent = 'Please connect first';
+                return;
+            }
+            
+            const schema = querySchemaInput.value.trim();
+            const fieldsStr = queryFieldsInput.value.trim();
+            const whereStr = queryWhereInput.value.trim();
+            
+            if (!schema || !fieldsStr) {
+                queryResultsPre.textContent = 'Please enter schema and fields';
+                return;
+            }
+            
+            const fields = fieldsStr.split(',').map(f => f.trim());
+            let where = {};
+            
+            if (whereStr) {
+                try {
+                    where = JSON.parse(whereStr);
+                } catch (error) {
+                    queryResultsPre.textContent = `Invalid JSON in where conditions: ${error.message}`;
+                    return;
+                }
+            }
+            
+            try {
+                const result = await client.query({
+                    schema,
+                    fields,
+                    where
+                });
+                
+                queryResultsPre.textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                queryResultsPre.textContent = `Query error: ${error.message}`;
+            }
+        });
+        
+        // Create data
+        executeCreateButton.addEventListener('click', async () => {
+            if (!client) {
+                createResultsPre.textContent = 'Please connect first';
+                return;
+            }
+            
+            const schema = createSchemaInput.value.trim();
+            const dataStr = createDataInput.value.trim();
+            
+            if (!schema || !dataStr) {
+                createResultsPre.textContent = 'Please enter schema and data';
+                return;
+            }
+            
+            let data = {};
+            
+            try {
+                data = JSON.parse(dataStr);
+            } catch (error) {
+                createResultsPre.textContent = `Invalid JSON in data: ${error.message}`;
+                return;
+            }
+            
+            try {
+                const result = await client.create({
+                    schema,
+                    data
+                });
+                
+                createResultsPre.textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                createResultsPre.textContent = `Create error: ${error.message}`;
+            }
+        });
+        
+        // Simulate full access
+        simulateFullAccessButton.addEventListener('click', () => {
+            const fullAccessExample = document.getElementById('full-access-example');
+            const data = {
+                username: "Alice",
+                email: "alice@example.com",
+                phone: "+1234567890",
+                payment_info: {
+                    card_type: "Visa",
+                    last_four: "1234"
+                }
+            };
+            
+            fullAccessExample.textContent = JSON.stringify(data, null, 2);
+        });
+        
+        // Simulate limited access
+        simulateLimitedAccessButton.addEventListener('click', () => {
+            const limitedAccessExample = document.getElementById('limited-access-example');
+            const data = {
+                username: "Alice",
+                email: "REDACTED",
+                phone: "REDACTED",
+                payment_info: "REDACTED"
+            };
+            
+            limitedAccessExample.textContent = JSON.stringify(data, null, 2);
+        });
+        
+        // Initialize
+        executeQueryButton.disabled = true;
+        executeCreateButton.disabled = true;
+        registerKeyButton.disabled = true;
+    </script>
+</body>
+</html>

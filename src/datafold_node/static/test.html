@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test FoldDB Client</title>
+</head>
+<body>
+    <h1>Test FoldDB Client</h1>
+    <p>This page tests if the folddb-client.js file is loaded correctly.</p>
+    <script src="/js/folddb-client.js"></script>
+    <script>
+        // Check if FoldDBClient is defined
+        if (typeof FoldDBClient === 'function') {
+            document.write('<p style="color: green;">FoldDBClient loaded successfully!</p>');
+        } else {
+            document.write('<p style="color: red;">FoldDBClient failed to load!</p>');
+        }
+    </script>
+</body>
+</html>

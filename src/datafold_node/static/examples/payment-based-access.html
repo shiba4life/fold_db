@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment-Based Access Control Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .panel {
+            flex: 1;
+            min-width: 300px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .error {
+            color: #d9534f;
+            font-weight: bold;
+        }
+        .success {
+            color: #5cb85c;
+            font-weight: bold;
+        }
+        .invoice {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .qr-code {
+            text-align: center;
+            margin: 15px 0;
+        }
+        .qr-code img {
+            max-width: 200px;
+        }
+        .payment-tiers {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .payment-tier {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .payment-tier:hover {
+            background-color: #f0f0f0;
+        }
+        .payment-tier.selected {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .payment-tier h3 {
+            margin-top: 0;
+        }
+        .payment-tier .price {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <h1>Payment-Based Access Control Example</h1>
+    <p>This example demonstrates how FoldDB uses the Lightning Network for payment-based access control to prevent unauthorized data access.</p>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>Authentication</h2>
+            <div class="form-group">
+                <label for="node-url">DataFold Node URL:</label>
+                <input type="text" id="node-url" value="http://localhost:8080" />
+            </div>
+            <div class="form-group">
+                <label for="public-key">Public Key:</label>
+                <input type="text" id="public-key" placeholder="Your public key" />
+            </div>
+            <div class="form-group">
+                <label for="private-key">Private Key:</label>
+                <input type="password" id="private-key" placeholder="Your private key" />
+            </div>
+            <button id="generate-keys">Generate Keys</button>
+            <button id="connect">Connect</button>
+            <div id="auth-status"></div>
+        </div>
+        
+        <div class="panel">
+            <h2>Lightning Wallet</h2>
+            <div class="form-group">
+                <label for="wallet-balance">Wallet Balance:</label>
+                <input type="text" id="wallet-balance" value="1,000,000 sats" readonly />
+            </div>
+            <div class="form-group">
+                <label for="wallet-address">Lightning Address:</label>
+                <input type="text" id="wallet-address" value="user@lightning.wallet" readonly />
+            </div>
+            <button id="refresh-wallet">Refresh Wallet</button>
+            <div id="wallet-status"></div>
+        </div>
+    </div>
+    
+    <h2>Data Access Tiers</h2>
+    <p>Choose a payment tier to access different levels of data:</p>
+    
+    <div class="payment-tiers">
+        <div class="payment-tier" data-tier="basic">
+            <h3>Basic</h3>
+            <div class="price">10 sats</div>
+            <p>Access to public data only</p>
+            <ul>
+                <li>Username</li>
+                <li>Public profile</li>
+            </ul>
+        </div>
+        
+        <div class="payment-tier" data-tier="standard">
+            <h3>Standard</h3>
+            <div class="price">100 sats</div>
+            <p>Access to standard data</p>
+            <ul>
+                <li>All basic data</li>
+                <li>Email address</li>
+                <li>Activity history</li>
+            </ul>
+        </div>
+        
+        <div class="payment-tier" data-tier="premium">
+            <h3>Premium</h3>
+            <div class="price">1,000 sats</div>
+            <p>Access to premium data</p>
+            <ul>
+                <li>All standard data</li>
+                <li>Phone number</li>
+                <li>Payment history</li>
+                <li>Full transaction logs</li>
+            </ul>
+        </div>
+    </div>
+    
+    <button id="request-access" disabled>Request Data Access</button>
+    
+    <div id="invoice-container" style="display: none;">
+        <h3>Lightning Invoice</h3>
+        <div class="invoice">
+            <div class="form-group">
+                <label for="invoice-amount">Amount:</label>
+                <input type="text" id="invoice-amount" readonly />
+            </div>
+            <div class="form-group">
+                <label for="invoice-description">Description:</label>
+                <input type="text" id="invoice-description" readonly />
+            </div>
+            <div class="form-group">
+                <label for="invoice-code">Payment Request:</label>
+                <input type="text" id="invoice-code" readonly />
+            </div>
+            <div class="qr-code">
+                <img id="invoice-qr" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAAEsklEQVR4nO3dQW4bMRAFUd//0vGmgA0DkWZ6/qiqXRZvMdJnRvLX7+/v7y+o8qf6BPA/EzBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAICFgkBAwSAgYJAQMEgIGCQGDhIBBQsAgIWCQEDBICBgkBAwSAgYJAYOEgEFCwCAhYJAQMEgIGCQEDBICBgkBg4SAQULAIPEPFCk+JBar/xQAAAAASUVORK5CYII=" alt="QR Code" />
+            </div>
+            <button id="pay-invoice">Pay Invoice</button>
+        </div>
+    </div>
+    
+    <div id="data-container" style="display: none;">
+        <h2>Retrieved Data</h2>
+        <pre id="data-results">No data yet</pre>
+    </div>
+    
+    <script src="/js/folddb-client.js"></script>
+    <script>
+        // Global client instance
+        let client = null;
+        let selectedTier = null;
+        
+        // DOM elements
+        const nodeUrlInput = document.getElementById('node-url');
+        const publicKeyInput = document.getElementById('public-key');
+        const privateKeyInput = document.getElementById('private-key');
+        const authStatusDiv = document.getElementById('auth-status');
+        const connectButton = document.getElementById('connect');
+        const generateKeysButton = document.getElementById('generate-keys');
+        
+        const walletBalanceInput = document.getElementById('wallet-balance');
+        const walletAddressInput = document.getElementById('wallet-address');
+        const refreshWalletButton = document.getElementById('refresh-wallet');
+        const walletStatusDiv = document.getElementById('wallet-status');
+        
+        const paymentTiers = document.querySelectorAll('.payment-tier');
+        const requestAccessButton = document.getElementById('request-access');
+        
+        const invoiceContainer = document.getElementById('invoice-container');
+        const invoiceAmountInput = document.getElementById('invoice-amount');
+        const invoiceDescriptionInput = document.getElementById('invoice-description');
+        const invoiceCodeInput = document.getElementById('invoice-code');
+        const invoiceQrImg = document.getElementById('invoice-qr');
+        const payInvoiceButton = document.getElementById('pay-invoice');
+        
+        const dataContainer = document.getElementById('data-container');
+        const dataResultsPre = document.getElementById('data-results');
+        
+        // Connect to FoldDB
+        connectButton.addEventListener('click', () => {
+            const nodeUrl = nodeUrlInput.value.trim();
+            const publicKey = publicKeyInput.value.trim();
+            const privateKey = privateKeyInput.value.trim();
+            
+            if (!nodeUrl || !publicKey || !privateKey) {
+                authStatusDiv.innerHTML = '<span class="error">Please fill in all fields</span>';
+                return;
+            }
+            
+            try {
+                client = new FoldDBClient({
+                    nodeUrl,
+                    publicKey,
+                    privateKey
+                });
+                
+                authStatusDiv.innerHTML = '<span class="success">Connected successfully!</span>';
+                
+                // Enable access request button
+                requestAccessButton.disabled = false;
+            } catch (error) {
+                authStatusDiv.innerHTML = `<span class="error">Connection error: ${error.message}</span>`;
+            }
+        });
+        
+        // Generate key pair
+        generateKeysButton.addEventListener('click', async () => {
+            try {
+                // In a real implementation, this would use the Web Crypto API
+                // to generate a key pair
+                
+                // For this example, we'll just generate random strings
+                const publicKey = `pk_${Math.random().toString(36).substring(2, 15)}`;
+                const privateKey = `sk_${Math.random().toString(36).substring(2, 15)}`;
+                
+                publicKeyInput.value = publicKey;
+                privateKeyInput.value = privateKey;
+                
+                authStatusDiv.innerHTML = '<span class="success">Keys generated! (Note: These are not real cryptographic keys)</span>';
+            } catch (error) {
+                authStatusDiv.innerHTML = `<span class="error">Key generation error: ${error.message}</span>`;
+            }
+        });
+        
+        // Refresh wallet
+        refreshWalletButton.addEventListener('click', () => {
+            // In a real implementation, this would connect to a Lightning wallet
+            // and get the current balance
+            
+            // For this example, we'll just update the UI
+            const balance = Math.floor(Math.random() * 1000000) + 500000;
+            walletBalanceInput.value = `${balance.toLocaleString()} sats`;
+            
+            walletStatusDiv.innerHTML = '<span class="success">Wallet refreshed!</span>';
+            
+            // Clear status after 3 seconds
+            setTimeout(() => {
+                walletStatusDiv.innerHTML = '';
+            }, 3000);
+        });
+        
+        // Select payment tier
+        paymentTiers.forEach(tier => {
+            tier.addEventListener('click', () => {
+                // Remove selected class from all tiers
+                paymentTiers.forEach(t => t.classList.remove('selected'));
+                
+                // Add selected class to clicked tier
+                tier.classList.add('selected');
+                
+                // Store selected tier
+                selectedTier = tier.dataset.tier;
+            });
+        });
+        
+        // Request data access
+        requestAccessButton.addEventListener('click', () => {
+            if (!client) {
+                alert('Please connect first');
+                return;
+            }
+            
+            if (!selectedTier) {
+                alert('Please select a payment tier');
+                return;
+            }
+            
+            // Generate invoice based on selected tier
+            let amount = 10; // Default to basic tier
+            let description = 'Access to basic data';
+            
+            if (selectedTier === 'standard') {
+                amount = 100;
+                description = 'Access to standard data';
+            } else if (selectedTier === 'premium') {
+                amount = 1000;
+                description = 'Access to premium data';
+            }
+            
+            // Display invoice
+            invoiceAmountInput.value = `${amount} sats`;
+            invoiceDescriptionInput.value = description;
+            invoiceCodeInput.value = `lnbc${amount}n1p38qrgxpp5yztkwjcz5m4mzp5lw9h7qmzlzwu9knlp0tq9q7mhgxs89sdqqxqyjw5qcqp2rzjqtk3zn9w8q3qy8x4qk4phnl3w9n989gvj94fn4ntlwxs8xxyt8cgcqqqqqqqqlgqqqqqeqqjqrzjqd4yx3cmmvm3h4n08elwr837xvj6x8zt0gr9ee5nw36waee0qcqqqqqqqqlgqqqqqeqqjqrz`;
+            
+            // Show invoice container
+            invoiceContainer.style.display = 'block';
+            
+            // Hide data container
+            dataContainer.style.display = 'none';
+        });
+        
+        // Pay invoice
+        payInvoiceButton.addEventListener('click', () => {
+            // In a real implementation, this would send the payment to the Lightning Network
+            
+            // For this example, we'll just simulate a successful payment
+            setTimeout(() => {
+                // Hide invoice container
+                invoiceContainer.style.display = 'none';
+                
+                // Show data container
+                dataContainer.style.display = 'block';
+                
+                // Display data based on selected tier
+                let data = {};
+                
+                if (selectedTier === 'basic') {
+                    data = {
+                        username: 'alice',
+                        public_profile: {
+                            display_name: 'Alice',
+                            bio: 'I love FoldDB!',
+                            avatar_url: 'https://example.com/avatar.jpg'
+                        }
+                    };
+                } else if (selectedTier === 'standard') {
+                    data = {
+                        username: 'alice',
+                        public_profile: {
+                            display_name: 'Alice',
+                            bio: 'I love FoldDB!',
+                            avatar_url: 'https://example.com/avatar.jpg'
+                        },
+                        email: 'alice@example.com',
+                        activity_history: [
+                            { action: 'login', timestamp: '2025-03-05T12:34:56Z' },
+                            { action: 'update_profile', timestamp: '2025-03-04T10:22:33Z' },
+                            { action: 'create_post', timestamp: '2025-03-03T08:11:22Z' }
+                        ]
+                    };
+                } else if (selectedTier === 'premium') {
+                    data = {
+                        username: 'alice',
+                        public_profile: {
+                            display_name: 'Alice',
+                            bio: 'I love FoldDB!',
+                            avatar_url: 'https://example.com/avatar.jpg'
+                        },
+                        email: 'alice@example.com',
+                        phone: '+1234567890',
+                        activity_history: [
+                            { action: 'login', timestamp: '2025-03-05T12:34:56Z' },
+                            { action: 'update_profile', timestamp: '2025-03-04T10:22:33Z' },
+                            { action: 'create_post', timestamp: '2025-03-03T08:11:22Z' }
+                        ],
+                        payment_history: [
+                            { amount: 1000, currency: 'sats', timestamp: '2025-03-05T12:00:00Z' },
+                            { amount: 500, currency: 'sats', timestamp: '2025-03-04T09:00:00Z' },
+                            { amount: 2000, currency: 'sats', timestamp: '2025-03-03T15:00:00Z' }
+                        ],
+                        transaction_logs: [
+                            { id: 'tx1', type: 'deposit', amount: 5000, timestamp: '2025-03-02T14:30:00Z' },
+                            { id: 'tx2', type: 'withdrawal', amount: 2000, timestamp: '2025-03-01T11:45:00Z' },
+                            { id: 'tx3', type: 'transfer', amount: 1000, recipient: 'bob', timestamp: '2025-02-28T09:15:00Z' }
+                        ]
+                    };
+                }
+                
+                // Display data
+                dataResultsPre.textContent = JSON.stringify(data, null, 2);
+                
+                // Update wallet balance
+                const currentBalance = parseInt(walletBalanceInput.value.replace(/[^\d]/g, ''), 10);
+                const amount = selectedTier === 'basic' ? 10 : (selectedTier === 'standard' ? 100 : 1000);
+                const newBalance = currentBalance - amount;
+                walletBalanceInput.value = `${newBalance.toLocaleString()} sats`;
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

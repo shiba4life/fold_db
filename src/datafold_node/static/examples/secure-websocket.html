@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure WebSocket Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .panel {
+            flex: 1;
+            min-width: 300px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .error {
+            color: #d9534f;
+            font-weight: bold;
+        }
+        .success {
+            color: #5cb85c;
+            font-weight: bold;
+        }
+        #events-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .event-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #6c757d;
+        }
+        .event-item.update {
+            border-left-color: #28a745;
+        }
+        .event-item.delete {
+            border-left-color: #dc3545;
+        }
+        .event-item.create {
+            border-left-color: #007bff;
+        }
+        .event-item .timestamp {
+            color: #6c757d;
+            font-size: 0.8em;
+        }
+        .event-item .event-type {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .event-item .event-data {
+            margin-top: 5px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-indicator.connected {
+            background-color: #28a745;
+        }
+        .status-indicator.disconnected {
+            background-color: #dc3545;
+        }
+        .status-indicator.connecting {
+            background-color: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <h1>Secure WebSocket Example</h1>
+    <p>This example demonstrates how to use secure WebSockets with FoldDB for real-time updates.</p>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>Authentication</h2>
+            <div class="form-group">
+                <label for="node-url">DataFold Node URL:</label>
+                <input type="text" id="node-url" value="http://localhost:8080" />
+            </div>
+            <div class="form-group">
+                <label for="ws-url">WebSocket URL:</label>
+                <input type="text" id="ws-url" value="ws://localhost:8080/realtime" />
+            </div>
+            <div class="form-group">
+                <label for="public-key">Public Key:</label>
+                <input type="text" id="public-key" placeholder="Your public key" />
+            </div>
+            <div class="form-group">
+                <label for="private-key">Private Key:</label>
+                <input type="password" id="private-key" placeholder="Your private key" />
+            </div>
+            <button id="generate-keys">Generate Keys</button>
+            <button id="connect">Connect</button>
+            <div id="auth-status"></div>
+        </div>
+        
+        <div class="panel">
+            <h2>WebSocket Connection</h2>
+            <div class="form-group">
+                <label for="connection-status">Status:</label>
+                <div>
+                    <span class="status-indicator disconnected" id="status-indicator"></span>
+                    <span id="connection-status">Disconnected</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="subscription-schema">Subscribe to Schema:</label>
+                <input type="text" id="subscription-schema" placeholder="e.g., user-profile" />
+            </div>
+            <button id="subscribe">Subscribe</button>
+            <button id="unsubscribe">Unsubscribe</button>
+            <button id="disconnect">Disconnect</button>
+            <div id="subscription-status"></div>
+        </div>
+    </div>
+    
+    <h2>Real-time Events</h2>
+    <div class="panel">
+        <div class="form-group">
+            <label for="event-filter">Filter by Event Type:</label>
+            <select id="event-filter">
+                <option value="all">All Events</option>
+                <option value="create">Create Events</option>
+                <option value="update">Update Events</option>
+                <option value="delete">Delete Events</option>
+            </select>
+        </div>
+        <button id="clear-events">Clear Events</button>
+        <div id="events-container"></div>
+    </div>
+    
+    <h2>Create Test Event</h2>
+    <div class="panel">
+        <div class="form-group">
+            <label for="test-schema">Schema:</label>
+            <input type="text" id="test-schema" placeholder="e.g., user-profile" />
+        </div>
+        <div class="form-group">
+            <label for="test-event-type">Event Type:</label>
+            <select id="test-event-type">
+                <option value="create">Create</option>
+                <option value="update">Update</option>
+                <option value="delete">Delete</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="test-data">Data (JSON):</label>
+            <textarea id="test-data" rows="5" placeholder='e.g., {"id": "123", "name": "John Doe"}'></textarea>
+        </div>
+        <button id="send-test-event">Send Test Event</button>
+        <div id="test-status"></div>
+    </div>
+    
+    <script src="/js/folddb-client.js"></script>
+    <script>
+        // Global variables
+        let client = null;
+        let socket = null;
+        let subscriptions = new Set();
+        
+        // DOM elements
+        const nodeUrlInput = document.getElementById('node-url');
+        const wsUrlInput = document.getElementById('ws-url');
+        const publicKeyInput = document.getElementById('public-key');
+        const privateKeyInput = document.getElementById('private-key');
+        const authStatusDiv = document.getElementById('auth-status');
+        const generateKeysButton = document.getElementById('generate-keys');
+        const connectButton = document.getElementById('connect');
+        
+        const statusIndicator = document.getElementById('status-indicator');
+        const connectionStatusSpan = document.getElementById('connection-status');
+        const subscriptionSchemaInput = document.getElementById('subscription-schema');
+        const subscribeButton = document.getElementById('subscribe');
+        const unsubscribeButton = document.getElementById('unsubscribe');
+        const disconnectButton = document.getElementById('disconnect');
+        const subscriptionStatusDiv = document.getElementById('subscription-status');
+        
+        const eventFilterSelect = document.getElementById('event-filter');
+        const clearEventsButton = document.getElementById('clear-events');
+        const eventsContainer = document.getElementById('events-container');
+        
+        const testSchemaInput = document.getElementById('test-schema');
+        const testEventTypeSelect = document.getElementById('test-event-type');
+        const testDataTextarea = document.getElementById('test-data');
+        const sendTestEventButton = document.getElementById('send-test-event');
+        const testStatusDiv = document.getElementById('test-status');
+        
+        // Generate key pair
+        generateKeysButton.addEventListener('click', async () => {
+            try {
+                // In a real implementation, this would use the Web Crypto API
+                // to generate a key pair
+                
+                // For this example, we'll just generate random strings
+                const publicKey = `pk_${Math.random().toString(36).substring(2, 15)}`;
+                const privateKey = `sk_${Math.random().toString(36).substring(2, 15)}`;
+                
+                publicKeyInput.value = publicKey;
+                privateKeyInput.value = privateKey;
+                
+                authStatusDiv.innerHTML = '<span class="success">Keys generated! (Note: These are not real cryptographic keys)</span>';
+            } catch (error) {
+                authStatusDiv.innerHTML = `<span class="error">Key generation error: ${error.message}</span>`;
+            }
+        });
+        
+        // Connect to FoldDB
+        connectButton.addEventListener('click', () => {
+            const nodeUrl = nodeUrlInput.value.trim();
+            const publicKey = publicKeyInput.value.trim();
+            const privateKey = privateKeyInput.value.trim();
+            
+            if (!nodeUrl || !publicKey || !privateKey) {
+                authStatusDiv.innerHTML = '<span class="error">Please fill in all fields</span>';
+                return;
+            }
+            
+            try {
+                // Create FoldDB client
+                client = new FoldDBClient({
+                    nodeUrl,
+                    publicKey,
+                    privateKey
+                });
+                
+                authStatusDiv.innerHTML = '<span class="success">Connected to FoldDB successfully!</span>';
+                
+                // Enable WebSocket buttons
+                subscribeButton.disabled = false;
+                unsubscribeButton.disabled = false;
+                disconnectButton.disabled = false;
+                sendTestEventButton.disabled = false;
+                
+                // Connect to WebSocket
+                connectWebSocket();
+            } catch (error) {
+                authStatusDiv.innerHTML = `<span class="error">Connection error: ${error.message}</span>`;
+            }
+        });
+        
+        // Connect to WebSocket
+        function connectWebSocket() {
+            const wsUrl = wsUrlInput.value.trim();
+            const publicKey = publicKeyInput.value.trim();
+            const privateKey = privateKeyInput.value.trim();
+            
+            if (!wsUrl || !publicKey || !privateKey) {
+                connectionStatusSpan.textContent = 'Missing connection details';
+                return;
+            }
+            
+            try {
+                // Update status
+                statusIndicator.className = 'status-indicator connecting';
+                connectionStatusSpan.textContent = 'Connecting...';
+                
+                // Close existing socket if any
+                if (socket && socket.readyState !== WebSocket.CLOSED) {
+                    socket.close();
+                }
+                
+                // Create new WebSocket connection
+                socket = new WebSocket(wsUrl);
+                
+                // WebSocket event handlers
+                socket.onopen = () => {
+                    statusIndicator.className = 'status-indicator connected';
+                    connectionStatusSpan.textContent = 'Connected';
+                    
+                    // Authenticate the WebSocket connection
+                    authenticateWebSocket();
+                };
+                
+                socket.onclose = () => {
+                    statusIndicator.className = 'status-indicator disconnected';
+                    connectionStatusSpan.textContent = 'Disconnected';
+                    subscriptions.clear();
+                };
+                
+                socket.onerror = (error) => {
+                    statusIndicator.className = 'status-indicator disconnected';
+                    connectionStatusSpan.textContent = 'Error';
+                    console.error('WebSocket error:', error);
+                };
+                
+                socket.onmessage = (event) => {
+                    handleWebSocketMessage(event);
+                };
+            } catch (error) {
+                statusIndicator.className = 'status-indicator disconnected';
+                connectionStatusSpan.textContent = 'Error';
+                console.error('WebSocket connection error:', error);
+            }
+        }
+        
+        // Authenticate WebSocket connection
+        function authenticateWebSocket() {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                return;
+            }
+            
+            const publicKey = publicKeyInput.value.trim();
+            const timestamp = Math.floor(Date.now() / 1000);
+            const nonce = generateNonce();
+            
+            // In a real implementation, this would be signed with the private key
+            const signature = `signed-${publicKey}-${timestamp}-${nonce}`;
+            
+            // Send authentication message
+            socket.send(JSON.stringify({
+                type: 'authenticate',
+                public_key: publicKey,
+                signature,
+                timestamp,
+                nonce
+            }));
+        }
+        
+        // Subscribe to schema
+        subscribeButton.addEventListener('click', () => {
+            const schema = subscriptionSchemaInput.value.trim();
+            
+            if (!schema) {
+                subscriptionStatusDiv.innerHTML = '<span class="error">Please enter a schema name</span>';
+                return;
+            }
+            
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                subscriptionStatusDiv.innerHTML = '<span class="error">WebSocket not connected</span>';
+                return;
+            }
+            
+            // Send subscription message
+            socket.send(JSON.stringify({
+                type: 'subscribe',
+                schema
+            }));
+            
+            // Add to subscriptions set
+            subscriptions.add(schema);
+            
+            subscriptionStatusDiv.innerHTML = `<span class="success">Subscribed to ${schema}</span>`;
+        });
+        
+        // Unsubscribe from schema
+        unsubscribeButton.addEventListener('click', () => {
+            const schema = subscriptionSchemaInput.value.trim();
+            
+            if (!schema) {
+                subscriptionStatusDiv.innerHTML = '<span class="error">Please enter a schema name</span>';
+                return;
+            }
+            
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                subscriptionStatusDiv.innerHTML = '<span class="error">WebSocket not connected</span>';
+                return;
+            }
+            
+            // Send unsubscription message
+            socket.send(JSON.stringify({
+                type: 'unsubscribe',
+                schema
+            }));
+            
+            // Remove from subscriptions set
+            subscriptions.delete(schema);
+            
+            subscriptionStatusDiv.innerHTML = `<span class="success">Unsubscribed from ${schema}</span>`;
+        });
+        
+        // Disconnect WebSocket
+        disconnectButton.addEventListener('click', () => {
+            if (!socket) {
+                return;
+            }
+            
+            socket.close();
+            statusIndicator.className = 'status-indicator disconnected';
+            connectionStatusSpan.textContent = 'Disconnected';
+            subscriptions.clear();
+        });
+        
+        // Handle WebSocket messages
+        function handleWebSocketMessage(event) {
+            try {
+                const message = JSON.parse(event.data);
+                
+                // Handle different message types
+                switch (message.type) {
+                    case 'auth_success':
+                        handleAuthSuccess(message);
+                        break;
+                    case 'auth_error':
+                        handleAuthError(message);
+                        break;
+                    case 'subscription_success':
+                        handleSubscriptionSuccess(message);
+                        break;
+                    case 'subscription_error':
+                        handleSubscriptionError(message);
+                        break;
+                    case 'event':
+                        handleEvent(message);
+                        break;
+                    default:
+                        console.log('Unknown message type:', message);
+                }
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
+        }
+        
+        // Handle authentication success
+        function handleAuthSuccess(message) {
+            console.log('Authentication successful:', message);
+        }
+        
+        // Handle authentication error
+        function handleAuthError(message) {
+            console.error('Authentication error:', message);
+            statusIndicator.className = 'status-indicator disconnected';
+            connectionStatusSpan.textContent = 'Authentication Failed';
+        }
+        
+        // Handle subscription success
+        function handleSubscriptionSuccess(message) {
+            console.log('Subscription successful:', message);
+            subscriptionStatusDiv.innerHTML = `<span class="success">Subscribed to ${message.schema}</span>`;
+        }
+        
+        // Handle subscription error
+        function handleSubscriptionError(message) {
+            console.error('Subscription error:', message);
+            subscriptionStatusDiv.innerHTML = `<span class="error">Subscription error: ${message.error}</span>`;
+        }
+        
+        // Handle event
+        function handleEvent(message) {
+            console.log('Received event:', message);
+            
+            // Check if event matches current filter
+            const currentFilter = eventFilterSelect.value;
+            if (currentFilter !== 'all' && message.event_type !== currentFilter) {
+                return;
+            }
+            
+            // Create event element
+            const eventElement = document.createElement('div');
+            eventElement.className = `event-item ${message.event_type}`;
+            
+            // Format timestamp
+            const timestamp = new Date(message.timestamp).toLocaleString();
+            
+            // Create event content
+            eventElement.innerHTML = `
+                <div class="timestamp">${timestamp}</div>
+                <div>
+                    <span class="event-type">${message.event_type.toUpperCase()}</span>
+                    <span>${message.schema}</span>
+                </div>
+                <pre class="event-data">${JSON.stringify(message.data, null, 2)}</pre>
+            `;
+            
+            // Add to events container
+            eventsContainer.prepend(eventElement);
+        }
+        
+        // Filter events
+        eventFilterSelect.addEventListener('change', () => {
+            const filter = eventFilterSelect.value;
+            const events = eventsContainer.querySelectorAll('.event-item');
+            
+            events.forEach(event => {
+                if (filter === 'all') {
+                    event.style.display = 'block';
+                } else {
+                    event.style.display = event.classList.contains(filter) ? 'block' : 'none';
+                }
+            });
+        });
+        
+        // Clear events
+        clearEventsButton.addEventListener('click', () => {
+            eventsContainer.innerHTML = '';
+        });
+        
+        // Send test event
+        sendTestEventButton.addEventListener('click', async () => {
+            const schema = testSchemaInput.value.trim();
+            const eventType = testEventTypeSelect.value;
+            const dataStr = testDataTextarea.value.trim();
+            
+            if (!schema) {
+                testStatusDiv.innerHTML = '<span class="error">Please enter a schema name</span>';
+                return;
+            }
+            
+            if (!dataStr) {
+                testStatusDiv.innerHTML = '<span class="error">Please enter event data</span>';
+                return;
+            }
+            
+            let data;
+            try {
+                data = JSON.parse(dataStr);
+            } catch (error) {
+                testStatusDiv.innerHTML = `<span class="error">Invalid JSON: ${error.message}</span>`;
+                return;
+            }
+            
+            try {
+                // In a real implementation, this would send the event to the server
+                // For this example, we'll simulate receiving the event from the server
+                
+                // Simulate server processing time
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Simulate receiving the event
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    const event = {
+                        type: 'event',
+                        event_type: eventType,
+                        schema,
+                        data,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    // Simulate receiving the event
+                    handleEvent(event);
+                    
+                    testStatusDiv.innerHTML = '<span class="success">Test event sent successfully</span>';
+                } else {
+                    testStatusDiv.innerHTML = '<span class="error">WebSocket not connected</span>';
+                }
+            } catch (error) {
+                testStatusDiv.innerHTML = `<span class="error">Error sending test event: ${error.message}</span>`;
+            }
+        });
+        
+        // Generate a random nonce
+        function generateNonce() {
+            const array = new Uint8Array(16);
+            window.crypto.getRandomValues(array);
+            return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+        
+        // Initialize
+        subscribeButton.disabled = true;
+        unsubscribeButton.disabled = true;
+        disconnectButton.disabled = true;
+        sendTestEventButton.disabled = true;
+    </script>
+</body>
+</html>

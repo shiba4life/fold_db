@@ -21,6 +21,8 @@ log = "0.4"
 env_logger = "0.10"
 hyper = { version = "0.14", features = ["server", "http1", "stream"] }
 futures-util = "0.3"
+lru = "0.10"
+bytes = "1.0"
 
 [dev-dependencies]
 tempfile = "3.8"
