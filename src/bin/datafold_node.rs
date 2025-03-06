@@ -1,5 +1,5 @@
 use fold_db::{DataFoldNode, NodeConfig, datafold_node::{WebServer, load_schema_from_file}};
-use std::{fs, sync::Arc, path::Path};
+use std::{fs, sync::Arc, path::{Path, PathBuf}};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -59,11 +59,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Wrap in Arc<Mutex> and create web server
     println!("Creating web server...");
     let node = Arc::new(tokio::sync::Mutex::new(node));
-    let server = WebServer::new(node);
-    println!("Web server created, starting on port 8080...");
+    
+    // Check if we should use Unix socket
+    let use_unix_socket = std::env::var("USE_UNIX_SOCKET")
+        .map(|v| v.to_lowercase() == "true" || v == "1")
+        .unwrap_or(false);
+    
+    let unix_socket_path = std::env::var("UNIX_SOCKET_PATH")
+        .unwrap_or_else(|_| "/var/run/datafold.sock".to_string());
+    
+    let server = if use_unix_socket {
+        println!("Using Unix socket at: {}", unix_socket_path);
+        WebServer::new(node).with_unix_socket(PathBuf::from(unix_socket_path))
+    } else {
+        println!("Using TCP socket");
+        WebServer::new(node)
+    };
+    
+    let port = std::env::var("API_PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or(8080);
+    
+    println!("Web server created, starting on port {}...", port);
     
     // Run the server and handle any errors
-    match server.run(8080).await {
+    match server.run(port).await {
         Ok(_) => println!("Web server stopped normally"),
         Err(e) => {
             eprintln!("Web server error: {}", e);

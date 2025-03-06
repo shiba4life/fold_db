@@ -14,11 +14,13 @@ sled = "0.34"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "sync", "time", "fs", "signal"] }
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "sync", "time", "fs", "signal", "net"] }
 thiserror = "1.0"
 warp = "0.3"
 log = "0.4"
 env_logger = "0.10"
+hyper = { version = "0.14", features = ["server", "http1", "stream"] }
+futures-util = "0.3"
 
 [dev-dependencies]
 tempfile = "3.8"

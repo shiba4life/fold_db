@@ -1,0 +1,53 @@
+version: '3.8'
+
+networks:
+  datafold_internal_network:
+    driver: bridge
+    internal: true
+
+services:
+  datafold-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: datafold-api
+    networks:
+      - datafold_internal_network
+    ports:
+      - "8080:8080"  # Optional: expose API port externally
+    volumes:
+      - ./data:/data
+      - /var/run/datafold.sock:/var/run/datafold.sock
+    environment:
+      - RUST_LOG=info
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    command: ["datafold_node"]
+
+  # Example of a sandboxed third-party container
+  # This is just a template and would be created dynamically by the SandboxManager
+  sandboxed-app:
+    image: ${APP_IMAGE:-alpine}
+    container_name: sandboxed-app
+    networks:
+      - datafold_internal_network
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=default
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      - DATAFOLD_API_HOST=datafold-api
+      - DATAFOLD_API_PORT=8080
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 100
+    depends_on:
+      - datafold-api

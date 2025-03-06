@@ -1,160 +1,51 @@
-# Progress Status
+# Progress
 
 ## Completed Features
-- Core database operations (read/write)
-- Schema system
-  - [x] JSON schema definitions
-  - [x] Schema persistence with version control
-  - [x] Advanced field mapping system
-  - [x] Schema validation and transformation
-  - [x] Schema loading from disk
-  - [x] Thread-safe operations
-  - [x] Schema relationship tracking
-  - [x] Field-level mapping validation
-  - [x] Unified schema management and interpretation
-- Basic permissions system
-  - [x] Trust-based access control
-  - [x] Field-level permissions
-  - [x] Permission policies
-  - [x] Thread-safe permission checks
-- Network layer
-  - [x] Node discovery mechanism
-  - [x] Connection management
-  - [x] Message protocol
-  - [x] Schema listing between nodes
-  - [x] Remote querying
-  - [x] Integration with DataFoldNode
-- Error handling system
-  - [x] Centralized error types
-  - [x] Error categorization
-  - [x] Direct error handling without legacy types
-  - [x] Simplified error propagation
-- Atom and AtomRef implementation
-- Version history tracking
-- Schema interpreter implementation
-- Lightning Network payment integration
-- Payment calculation system
-- Hold invoice support
-- Permission check wrapper implementation
 
-## Project Status
-- Core functionality: Complete
-- Schema System: 
-  - Basic Features: Complete
-  - Advanced Features: 80% Complete
-  - Transformation System: In Progress
-- Permission System: Complete
-- Payment System: Complete
-- Error Handling System:
-  - Basic Features: Complete
-  - Advanced Features (recovery mechanisms): Planned
-- Network Layer:
-  - Basic Features: Complete
-  - Advanced Features: In Progress
-  - Security Features: Planned
-- Testing: 
-  - Unit Tests: Complete
-  - Integration Tests: 90% Complete
-  - Schema Transformation Tests: In Progress
-  - Network Layer Tests: Planned
-  - Error Handling Tests: Planned
-- Documentation: Complete
+### Core Database
+- Schema management
+- Query execution
+- Mutation handling
+- Atom-based storage
+- Permission system
 
-## Recent Additions
-- Unified error handling system
-  - Centralized FoldDbError type
-  - Specific error categories
-  - Direct error propagation
-  - Removed legacy error types
-- Network layer implementation
-  - Node discovery with UDP broadcasts
-  - TCP-based connections with message protocol
-  - Schema listing between nodes
-  - Remote querying capabilities
-  - Integration with DataFoldNode
-- Unified schema system
-  - Combined SchemaManager and SchemaInterpreter
-  - Simplified API
-  - Improved error handling
-- Enhanced schema persistence system
-  - Version control support
-  - Robust error handling
-  - Thread safety improvements
-- Advanced field mapping capabilities
-  - Validation rules
-  - Relationship tracking
-  - Automatic updates
-- Improved testing infrastructure
-  - Schema mapping tests
-  - Transformation tests
-  - Concurrent operation tests
+### Network Layer
+- Node discovery
+- Peer-to-peer communication
+- Schema synchronization
+- Query routing
 
-## Next Milestones
-- Enhance the app system with additional features:
-  - Implement app versioning
-  - Add app update mechanism
-  - Create app marketplace
-  - Implement app hot-reloading
-- Add tests for unified error handling system
-- Add tests for new network layer components
-- Implement advanced node discovery mechanisms
-- Add security enhancements for node communication
-- Implement NAT traversal for better connectivity
-- Add node reputation tracking
-- Complete schema transformation system
-- Implement advanced field validations
-- Optimize schema operations
-- Expand transformation test coverage
-- Enhance error recovery mechanisms
-- Simplify permission system
-- Expand app system with more features
-- Add app communication mechanisms
-- Implement app security enhancements
+### Sandbox Environment
+- Docker-based sandbox for third-party containers
+- Network isolation with internal Docker network
+- Security measures (capability restrictions, privilege escalation prevention)
+- Resource limits (CPU, memory, process limits)
+- Sandboxed API Docker access
+- Network-based communication between sandboxed containers and Datafold API
+- Unix socket communication for maximum isolation
 
-## Recent Improvements
-- Integrated the sample social app with FoldDB:
-  - Created a FoldDB client for interacting with FoldDB
-  - Updated the server to use FoldDB for data persistence
-  - Added schema validation for data operations
-  - Implemented atom-based storage for posts and profiles
-  - Added comprehensive tests for FoldDB integration
-  - Created documentation explaining the integration architecture
-  - Fixed post persistence issues in the social app
-  - Replaced file-based storage with FoldDB storage
-  - Added proper error handling for API operations
-  - Implemented schema validation for data
-  - Created API tests to verify persistence
-  - Added FoldDB integration tests
-  - Updated server to handle API requests properly
+## In Progress
 
-- Enhanced app system for third-party extensions:
-  - Fixed AppWindow implementation to properly initialize apps
-  - Enhanced JavaScript API initialization for apps
-  - Added debugging capabilities to app initialization
-  - Improved app startup and lifecycle management
-  - Fixed issues with app API communication
-  - Added direct event listeners for app UI interactions
-  - Updated AppRegistry to properly start and open apps
-  - Improved error handling in app startup
-  - Created app manifest system for app metadata and requirements
-  - Implemented app registry for managing app lifecycle
-  - Added app loader for loading apps from disk
-  - Created window management for app UI
-  - Implemented API management for app API access
-  - Added resource management for app resource allocation
-  - Created web API for app management
-  - Implemented sample social app to demonstrate the system
-  - Added cross-app communication mechanisms
-  - Integrated app system with DataFold Node
+### Sandbox Environment
+- Improved error handling and logging
+- Volume mount support for sandboxed containers
 
-- Streamlined network layer components:
-  - Split NetworkManager into smaller, focused components
-  - Created ConnectionManager for handling connections
-  - Created MessageRouter for routing messages to handlers
-  - Created QueryService and SchemaService for handling specific operations
-  - Improved error recovery in network operations
-  - Simplified message handling with a handler registry pattern
-  - Unified client and server components (QueryService, SchemaService)
-  - Simplified NetworkCore to use unified services
-  - Reduced code duplication and improved maintainability
-  - Fixed warnings and improved code quality
+### API Layer
+- Additional API endpoints
+- API versioning
+- Rate limiting
+- Authentication and authorization
+
+## Planned Features
+
+### Sandbox Environment
+- Fine-grained permission system for API access
+- Audit logging for all API requests
+- Resource usage monitoring and reporting
+- Automatic container cleanup
+
+### API Layer
+- GraphQL support
+- Websocket support for real-time updates
+- Batch operations
+- Query caching

@@ -9,6 +9,7 @@ FoldDB is a schema-based database system that provides atomic operations, fine-g
 - **Trust-Based Access**: Flexible permissions model using trust distance and explicit policies
 - **Atomic Operations**: All data changes are atomic and create new versions
 - **Version History**: Track and access the complete history of data changes
+- **Secure Sandbox Environment**: Run third-party applications in isolated Docker containers with controlled API access
 
 ## Core Concepts
 
@@ -75,6 +76,26 @@ db.write("user_profile", data, public_key)?;
 let user = db.read("user_profile", "user123")?;
 ```
 
+### Sandbox Environment
+
+FoldDB includes a secure sandbox environment for running third-party applications:
+
+```bash
+# Set up the sandbox environment
+./setup_sandbox.sh
+
+# Run a third-party container in the sandbox
+docker run --rm \
+  --network=datafold_internal_network \
+  --cap-drop=ALL \
+  --security-opt no-new-privileges \
+  --env DATAFOLD_API_HOST=datafold-api \
+  --env DATAFOLD_API_PORT=8080 \
+  your-image-name
+```
+
+For more details, see [SANDBOX.md](SANDBOX.md).
+
 ## Architecture
 
 FoldDB follows a modular design with clear separation of concerns:
@@ -83,6 +104,7 @@ FoldDB follows a modular design with clear separation of concerns:
 - **SchemaManager**: Handles schema validation and management
 - **PermissionManager**: Controls access and trust calculations
 - **Atom Storage**: Manages immutable data storage and versioning
+- **SandboxManager**: Manages secure Docker containers for third-party applications
 
 ## Technical Constraints
 

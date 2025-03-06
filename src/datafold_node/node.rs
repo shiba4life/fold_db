@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use serde_json::Value;
 use uuid::Uuid;
+use std::io::Read;
 
 use crate::error::{FoldDbError, FoldDbResult};
 use crate::fold_db_core::FoldDB;
@@ -12,6 +13,7 @@ use crate::datafold_node::{
     config::NodeConfig,
     network::{NetworkManager, NetworkConfig, NodeId, SchemaInfo},
     app::{AppRegistry, AppManifest, AppLoader, AppResourceManager, ApiManager},
+    sandbox::{SandboxManager, SandboxConfig, SecurityMiddleware},
 };
 use crate::datafold_node::config::NodeInfo;
 
@@ -36,6 +38,8 @@ pub struct DataFoldNode {
     api_manager: Option<Arc<Mutex<ApiManager>>>,
     /// Resource manager for app resource allocation
     resource_manager: Option<Arc<Mutex<AppResourceManager>>>,
+    /// Sandbox manager for secure Docker containers
+    sandbox_manager: Option<Arc<Mutex<SandboxManager>>>,
 }
 
 impl std::fmt::Debug for DataFoldNode {
@@ -50,6 +54,7 @@ impl std::fmt::Debug for DataFoldNode {
             .field("app_loader", &format!("<AppLoader: {}>", self.app_loader.is_some()))
             .field("api_manager", &format!("<ApiManager: {}>", self.api_manager.is_some()))
             .field("resource_manager", &format!("<AppResourceManager: {}>", self.resource_manager.is_some()))
+            .field("sandbox_manager", &format!("<SandboxManager: {}>", self.sandbox_manager.is_some()))
             .finish()
     }
 }
@@ -77,6 +82,7 @@ impl DataFoldNode {
             app_loader: None,
             api_manager: None,
             resource_manager: None,
+            sandbox_manager: None,
         })
     }
 
@@ -598,5 +604,139 @@ impl DataFoldNode {
         
         // List APIs
         Ok(api_manager.list_available_apis())
+    }
+
+    // Sandbox-related methods
+
+    /// Initializes the sandbox system
+    pub fn init_sandbox(&mut self, config: SandboxConfig) -> FoldDbResult<()> {
+        // Create sandbox manager
+        let sandbox_manager = SandboxManager::new(config)
+            .map_err(|e| FoldDbError::Config(format!("Failed to initialize sandbox: {}", e)))?;
+        
+        // Store sandbox manager
+        self.sandbox_manager = Some(Arc::new(Mutex::new(sandbox_manager)));
+        
+        Ok(())
+    }
+    
+    /// Registers a container with the sandbox
+    pub fn register_container(&self, container_id: &str, name: &str, image: &str) -> FoldDbResult<()> {
+        // Check if sandbox manager is initialized
+        let sandbox_manager = self.sandbox_manager.as_ref()
+            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
+        
+        // Get lock on sandbox manager
+        let sandbox_manager = sandbox_manager.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
+        
+        // Register container
+        sandbox_manager.register_container(container_id, name, image, None)
+            .map_err(|e| FoldDbError::Config(format!("Failed to register container: {}", e)))
+    }
+    
+    /// Starts a container
+    pub fn start_container(&self, container_id: &str) -> FoldDbResult<()> {
+        // Check if sandbox manager is initialized
+        let sandbox_manager = self.sandbox_manager.as_ref()
+            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
+        
+        // Get lock on sandbox manager
+        let sandbox_manager = sandbox_manager.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
+        
+        // Start container
+        sandbox_manager.start_container(container_id)
+            .map_err(|e| FoldDbError::Config(format!("Failed to start container: {}", e)))
+    }
+    
+    /// Stops a container
+    pub fn stop_container(&self, container_id: &str) -> FoldDbResult<()> {
+        // Check if sandbox manager is initialized
+        let sandbox_manager = self.sandbox_manager.as_ref()
+            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
+        
+        // Get lock on sandbox manager
+        let sandbox_manager = sandbox_manager.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
+        
+        // Stop container
+        sandbox_manager.stop_container(container_id)
+            .map_err(|e| FoldDbError::Config(format!("Failed to stop container: {}", e)))
+    }
+    
+    /// Removes a container
+    pub fn remove_container(&self, container_id: &str) -> FoldDbResult<()> {
+        // Check if sandbox manager is initialized
+        let sandbox_manager = self.sandbox_manager.as_ref()
+            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
+        
+        // Get lock on sandbox manager
+        let sandbox_manager = sandbox_manager.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
+        
+        // Remove container
+        sandbox_manager.remove_container(container_id)
+            .map_err(|e| FoldDbError::Config(format!("Failed to remove container: {}", e)))
+    }
+    
+    /// Lists all containers
+    pub fn list_containers(&self) -> FoldDbResult<Vec<crate::datafold_node::sandbox::ContainerInfo>> {
+        // Check if sandbox manager is initialized
+        let sandbox_manager = self.sandbox_manager.as_ref()
+            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
+        
+        // Get lock on sandbox manager
+        let sandbox_manager = sandbox_manager.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
+        
+        // List containers
+        sandbox_manager.list_containers()
+            .map_err(|e| FoldDbError::Config(format!("Failed to list containers: {}", e)))
+    }
+    
+    /// Gets information about a container
+    pub fn get_container_info(&self, container_id: &str) -> FoldDbResult<crate::datafold_node::sandbox::ContainerInfo> {
+        // Check if sandbox manager is initialized
+        let sandbox_manager = self.sandbox_manager.as_ref()
+            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
+        
+        // Get lock on sandbox manager
+        let sandbox_manager = sandbox_manager.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
+        
+        // Get container info
+        sandbox_manager.get_container_info(container_id)
+            .map_err(|e| FoldDbError::Config(format!("Failed to get container info: {}", e)))
+    }
+    
+    /// Proxies a request from a container to the Datafold API
+    pub fn proxy_container_request(&self, 
+        container_id: &str, 
+        path: &str, 
+        method: &str, 
+        headers: HashMap<String, String>, 
+        body: Option<Vec<u8>>
+    ) -> FoldDbResult<crate::datafold_node::sandbox::Response> {
+        // Check if sandbox manager is initialized
+        let sandbox_manager = self.sandbox_manager.as_ref()
+            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
+        
+        // Get lock on sandbox manager
+        let sandbox_manager = sandbox_manager.lock()
+            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
+        
+        // Create request
+        let request = crate::datafold_node::sandbox::Request {
+            container_id: container_id.to_string(),
+            path: path.to_string(),
+            method: method.to_string(),
+            headers,
+            body,
+        };
+        
+        // Proxy request
+        sandbox_manager.proxy_request(request)
+            .map_err(|e| FoldDbError::Config(format!("Failed to proxy request: {}", e)))
     }
 }

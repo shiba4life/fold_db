@@ -1,16 +1,27 @@
 use std::sync::Arc;
+use std::path::PathBuf;
 use warp::{Filter, Rejection, Reply};
 use crate::datafold_node::node::DataFoldNode;
 use crate::datafold_node::web_server::types::with_node;
 use crate::datafold_node::web_server::handlers::*;
+use crate::datafold_node::web_server::unix_socket;
 
 pub struct WebServer {
     node: Arc<tokio::sync::Mutex<DataFoldNode>>,
+    unix_socket_path: Option<PathBuf>,
 }
 
 impl WebServer {
     pub fn new(node: Arc<tokio::sync::Mutex<DataFoldNode>>) -> Self {
-        Self { node }
+        Self { 
+            node,
+            unix_socket_path: None,
+        }
+    }
+    
+    pub fn with_unix_socket(mut self, socket_path: impl Into<PathBuf>) -> Self {
+        self.unix_socket_path = Some(socket_path.into());
+        self
     }
 
     pub async fn run(&self, port: u16) -> Result<(), Box<dyn std::error::Error>> {
@@ -41,7 +52,6 @@ impl WebServer {
         let app_files = warp::path("apps")
             .and(warp::fs::dir("apps"));
             
-
         let routes = api
             .or(index)
             .or(css_files)
@@ -49,13 +59,20 @@ impl WebServer {
             .or(components_files)
             .or(static_files)
             .or(app_files);
+            
+        // Check if we should use Unix socket
+        if let Some(socket_path) = &self.unix_socket_path {
+            println!("Starting web server on Unix socket: {}", socket_path.display());
+            return unix_socket::run_unix_socket_server(socket_path, routes).await;
+        }
 
+        // Otherwise, use TCP socket
         // Try ports in sequence until we find one that works
         let mut current_port = port;
         let max_port = port + 10; // Try up to 10 ports
         
         while current_port <= max_port {
-            let socket_addr = std::net::SocketAddr::from((std::net::Ipv4Addr::new(127, 0, 0, 1), current_port));
+            let socket_addr = std::net::SocketAddr::from((std::net::Ipv4Addr::new(0, 0, 0, 0), current_port));
             println!("Attempting to start web server on port {}", current_port);
             
             // Try to bind to the port using a standard TcpListener first
@@ -66,7 +83,7 @@ impl WebServer {
                     
                     println!("Successfully bound to port {}", current_port);
                     println!("Static files configured");
-                    println!("Web server running at http://127.0.0.1:{}", current_port);
+                    println!("Web server running at http://0.0.0.0:{}", current_port);
                     
                     // Start the warp server
                     warp::serve(routes.clone())
