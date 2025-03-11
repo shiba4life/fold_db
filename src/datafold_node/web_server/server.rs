@@ -164,6 +164,26 @@ impl WebServer {
                 // Pass trust level to handler
                 handle_schema_with_auth(trust_level, body, node)
             });
+            
+        let load_schema_from_file = warp::path!("api" / "schema" / "load" / "file")
+            .and(warp::post())
+            .and(with_auth(auth_manager.clone()))
+            .and(warp::body::json())
+            .and(with_node(node.clone()))
+            .and_then(|trust_level, body, node| {
+                // Pass trust level to handler
+                handle_load_schema_from_file_with_auth(trust_level, body, node)
+            });
+            
+        let load_schema_from_json = warp::path!("api" / "schema" / "load" / "json")
+            .and(warp::post())
+            .and(with_auth(auth_manager.clone()))
+            .and(warp::body::json())
+            .and(with_node(node.clone()))
+            .and_then(|trust_level, body, node| {
+                // Pass trust level to handler
+                handle_load_schema_from_json_with_auth(trust_level, body, node)
+            });
 
         let execute = warp::path!("api" / "execute")
             .and(warp::post())
@@ -295,6 +315,8 @@ impl WebServer {
         // Combine all routes
         list_schemas
             .or(schema)
+            .or(load_schema_from_file)
+            .or(load_schema_from_json)
             .or(execute)
             .or(delete_schema)
             .or(init_network)

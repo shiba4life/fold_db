@@ -48,6 +48,20 @@ export interface SchemaConfig {
   };
 }
 
+// Schema loading types
+export interface LoadSchemaFromFileRequest {
+  file_path: string;
+}
+
+export interface LoadSchemaFromJsonRequest {
+  schema_json: any;
+}
+
+export interface LoadSchemaResponse {
+  schema_name: string;
+  message: string;
+}
+
 // Query related types
 export interface QueryFilter {
   [key: string]: any;

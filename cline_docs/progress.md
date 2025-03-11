@@ -33,6 +33,12 @@
   - Data persistence using JSON files
   - Error handling for node connectivity
 
+### API Layer
+- HTTP endpoints for schema loading, querying, and mutation
+- Support for loading schemas from files and JSON content
+- Client library updated with schema loading methods
+- Documentation for schema loading API
+
 ## In Progress
 
 ### Sandbox Environment
@@ -40,7 +46,6 @@
 - Volume mount support for sandboxed containers
 
 ### API Layer
-- Additional API endpoints
 - API versioning
 - Rate limiting
 - Authentication and authorization

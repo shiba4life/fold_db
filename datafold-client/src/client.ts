@@ -8,7 +8,10 @@ import {
   NetworkConfig,
   NetworkStatus,
   NodeInfo,
-  DataFoldError
+  DataFoldError,
+  LoadSchemaResponse,
+  LoadSchemaFromFileRequest,
+  LoadSchemaFromJsonRequest
 } from './types';
 
 /**
@@ -85,6 +88,42 @@ export class DataFoldClient {
     } catch (error) {
       this.handleError(error);
       return false;
+    }
+  }
+
+  /**
+   * Load a schema from a file
+   * @param filePath Path to the schema file
+   * @returns Promise resolving to load schema response
+   */
+  async loadSchemaFromFile(filePath: string): Promise<LoadSchemaResponse> {
+    try {
+      const request: LoadSchemaFromFileRequest = {
+        file_path: filePath
+      };
+      const response = await this.client.post('/api/schema/load/file', request);
+      return response.data.data;
+    } catch (error) {
+      this.handleError(error);
+      return { schema_name: '', message: 'Failed to load schema' };
+    }
+  }
+
+  /**
+   * Load a schema from JSON
+   * @param schemaJson Schema JSON object
+   * @returns Promise resolving to load schema response
+   */
+  async loadSchemaFromJson(schemaJson: any): Promise<LoadSchemaResponse> {
+    try {
+      const request: LoadSchemaFromJsonRequest = {
+        schema_json: schemaJson
+      };
+      const response = await this.client.post('/api/schema/load/json', request);
+      return response.data.data;
+    } catch (error) {
+      this.handleError(error);
+      return { schema_name: '', message: 'Failed to load schema' };
     }
   }
 

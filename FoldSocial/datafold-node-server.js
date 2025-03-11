@@ -74,6 +74,108 @@ app.post('/api/schema', (req, res) => {
   res.json({ success: true });
 });
 
+// Load schema from file
+app.post('/api/schema/load/file', (req, res) => {
+  const { file_path } = req.body;
+  
+  if (!file_path) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'File path is required' 
+    });
+  }
+  
+  try {
+    // Check if file exists
+    if (!fs.existsSync(file_path)) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `Schema file not found: ${file_path}` 
+      });
+    }
+    
+    // Read and parse schema file
+    const schemaStr = fs.readFileSync(file_path, 'utf8');
+    const schema = JSON.parse(schemaStr);
+    
+    // Validate schema
+    if (!schema || !schema.name || !schema.fields) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid schema format. Schema must have name and fields.' 
+      });
+    }
+    
+    // Store schema
+    db.schemas[schema.name] = schema;
+    
+    // Initialize data collection for this schema if it doesn't exist
+    if (!db.data[schema.name]) {
+      db.data[schema.name] = [];
+    }
+    
+    saveData();
+    
+    res.json({ 
+      data: {
+        schema_name: schema.name,
+        message: 'Schema loaded successfully'
+      }
+    });
+  } catch (error) {
+    console.error('Error loading schema from file:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: `Failed to load schema: ${error.message}` 
+    });
+  }
+});
+
+// Load schema from JSON
+app.post('/api/schema/load/json', (req, res) => {
+  const { schema_json } = req.body;
+  
+  if (!schema_json) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Schema JSON is required' 
+    });
+  }
+  
+  try {
+    // Validate schema
+    if (!schema_json.name || !schema_json.fields) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid schema format. Schema must have name and fields.' 
+      });
+    }
+    
+    // Store schema
+    db.schemas[schema_json.name] = schema_json;
+    
+    // Initialize data collection for this schema if it doesn't exist
+    if (!db.data[schema_json.name]) {
+      db.data[schema_json.name] = [];
+    }
+    
+    saveData();
+    
+    res.json({ 
+      data: {
+        schema_name: schema_json.name,
+        message: 'Schema loaded successfully'
+      }
+    });
+  } catch (error) {
+    console.error('Error loading schema from JSON:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: `Failed to load schema: ${error.message}` 
+    });
+  }
+});
+
 // Delete a schema
 app.delete('/api/schema/:name', (req, res) => {
   const { name } = req.params;
