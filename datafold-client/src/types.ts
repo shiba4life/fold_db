@@ -54,7 +54,7 @@ export interface QueryFilter {
 }
 
 export interface QueryOperation {
-  type: "query";
+  type: 'query';
   schema: string;
   fields: string[];
   filter: QueryFilter | null;
@@ -62,24 +62,24 @@ export interface QueryOperation {
 
 // Mutation related types
 export interface CreateMutation {
-  type: "mutation";
+  type: 'mutation';
   schema: string;
-  operation: "create";
+  operation: 'create';
   data: Record<string, any>;
 }
 
 export interface UpdateMutation {
-  type: "mutation";
+  type: 'mutation';
   schema: string;
-  operation: "update";
+  operation: 'update';
   filter: QueryFilter;
   data: Record<string, any>;
 }
 
 export interface DeleteMutation {
-  type: "mutation";
+  type: 'mutation';
   schema: string;
-  operation: "delete";
+  operation: 'delete';
   filter: QueryFilter;
 }
 
@@ -112,7 +112,7 @@ export interface NodeInfo {
   addr: string;
   port: number;
   public_key: string;
-  status: "connected" | "disconnected" | "pending";
+  status: 'connected' | 'disconnected' | 'pending';
 }
 
 export interface NetworkStatus {
