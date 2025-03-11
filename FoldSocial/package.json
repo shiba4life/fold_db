@@ -1,0 +1,20 @@
+{
+  "name": "fold-social",
+  "version": "1.0.0",
+  "description": "A simple social media app using DataFold client",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
+    "ejs": "^3.1.9",
+    "datafold-client": "file:../datafold-client"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

@@ -36,6 +36,12 @@ yarn-debug.log
 yarn-error.log
 .npm/
 .yarn/
+package-lock.json
+
+# FoldSocial specific
+FoldSocial/data/*.json
+FoldSocial/node_modules/
+FoldSocial/datafold-node.log
 
 # Test results
 apps/sample-social-app/test-results/

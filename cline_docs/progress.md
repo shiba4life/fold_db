@@ -24,6 +24,15 @@
 - Network-based communication between sandboxed containers and Datafold API
 - Unix socket communication for maximum isolation
 
+### Applications
+- FoldSocial: A simple social media app using DataFold client
+  - Post creation and viewing
+  - Chronological timeline
+  - Responsive UI
+  - Simplified DataFold Node server with HTTP API
+  - Data persistence using JSON files
+  - Error handling for node connectivity
+
 ## In Progress
 
 ### Sandbox Environment

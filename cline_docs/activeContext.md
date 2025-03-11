@@ -1,18 +1,22 @@
 # Active Context
 
 ## Current Task
-Implementing sandboxed API Docker access for the Datafold database system.
+Implementing FoldSocial, a simple social media app that allows a single user to add posts and see previous posts using the DataFold client.
 
 ## Recent Changes
-- Created a new Dockerfile.local that uses the latest Rust version to build the Datafold API container
-- Created setup_sandbox_local.sh script to set up the sandbox environment with local socket directory
-- Created test_sandbox_api.sh script to test the sandboxed API access
-- Created run_sandbox_api_demo.sh script to run the entire sandbox demo
-- Created SANDBOX_API.md documentation for the sandboxed API Docker access
+- Created FoldSocial application structure
+- Implemented Post schema creation and management
+- Created UI for adding and viewing posts
+- Set up Express server with EJS templating
+- Integrated with DataFold client for database operations
+- Created a simplified DataFold Node server with HTTP API
+- Implemented data persistence using JSON files
+- Added scripts to start the DataFold Node and FoldSocial app
+- Added error handling for when the DataFold Node is not running
 
 ## Next Steps
-1. Test the sandbox environment with the new scripts
-2. Add more API endpoints to the Datafold API
-3. Improve error handling and logging in the sandbox environment
-4. Add support for volume mounts in sandboxed containers
-5. Enhance the Unix socket implementation with better error handling
+1. Add user authentication to support multiple users
+2. Add ability to edit and delete posts
+3. Implement comments on posts
+4. Add image upload support for posts
+5. Enhance the DataFold Node server with more features

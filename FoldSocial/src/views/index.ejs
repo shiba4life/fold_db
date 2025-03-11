@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FoldSocial</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>FoldSocial</h1>
+      <p>A simple social media app using DataFold</p>
+    </header>
+
+    <section class="post-form">
+      <h2>Create a New Post</h2>
+      <form action="/posts" method="POST">
+        <div class="form-group">
+          <label for="author">Your Name:</label>
+          <input type="text" id="author" name="author" required>
+        </div>
+        <div class="form-group">
+          <label for="content">Post Content:</label>
+          <textarea id="content" name="content" rows="4" required></textarea>
+        </div>
+        <button type="submit" class="btn">Post</button>
+      </form>
+    </section>
+
+    <section class="posts">
+      <h2>Recent Posts</h2>
+      <% if (typeof error !== 'undefined') { %>
+        <div class="error-message">
+          <p><%= error %></p>
+          <% if (error.includes('fetch')) { %>
+            <p class="error-details">
+              The DataFold node may not be running. Please start it using:<br>
+              <code>./setup_sandbox_local.sh</code>
+            </p>
+          <% } %>
+        </div>
+      <% } %>
+      
+      <% if (posts && posts.length > 0) { %>
+        <div class="post-list">
+          <% posts.forEach(post => { %>
+            <div class="post-card">
+              <div class="post-header">
+                <h3 class="post-author"><%= post.author %></h3>
+                <span class="post-time"><%= new Date(post.timestamp).toLocaleString() %></span>
+              </div>
+              <div class="post-content">
+                <p><%= post.content %></p>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <div class="no-posts">
+          <p>No posts yet. Be the first to share something!</p>
+        </div>
+      <% } %>
+    </section>
+  </div>
+</body>
+</html>
