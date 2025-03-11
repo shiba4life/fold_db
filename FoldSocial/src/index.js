@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
+const fs = require('fs');
 const { DataFoldClient } = require('datafold-client');
 
 // Initialize Express app
@@ -38,56 +39,69 @@ async function ensurePostSchema() {
     const schemas = await client.listSchemas();
     
     if (!schemas.includes('Post')) {
-      console.log('Creating Post schema...');
+      console.log('Loading Post schema...');
       
-      const postSchema = {
-        name: 'Post',
-        fields: {
-          id: {
-            permission_policy: {
-              read_policy: { NoRequirement: null },
-              write_policy: { NoRequirement: null }
+      // Using the new schema loading functionality
+      const schemaPath = path.join(__dirname, '../data/post-schema.json');
+      
+      // Check if the schema file exists
+      if (fs.existsSync(schemaPath)) {
+        // Load schema from file
+        const result = await client.loadSchemaFromFile(schemaPath);
+        console.log(`Schema loaded from file: ${result.schema_name} - ${result.message}`);
+      } else {
+        // Fallback to loading schema from JSON
+        console.log('Schema file not found, loading from JSON...');
+        
+        const postSchema = {
+          name: 'Post',
+          fields: {
+            id: {
+              permission_policy: {
+                read_policy: { NoRequirement: null },
+                write_policy: { NoRequirement: null }
+              },
+              payment_config: {
+                base_multiplier: 1.0
+              },
+              field_mappers: {}
             },
-            payment_config: {
-              base_multiplier: 1.0
+            content: {
+              permission_policy: {
+                read_policy: { NoRequirement: null },
+                write_policy: { NoRequirement: null }
+              },
+              payment_config: {
+                base_multiplier: 1.0
+              },
+              field_mappers: {}
             },
-            field_mappers: {}
-          },
-          content: {
-            permission_policy: {
-              read_policy: { NoRequirement: null },
-              write_policy: { NoRequirement: null }
+            author: {
+              permission_policy: {
+                read_policy: { NoRequirement: null },
+                write_policy: { NoRequirement: null }
+              },
+              payment_config: {
+                base_multiplier: 1.0
+              },
+              field_mappers: {}
             },
-            payment_config: {
-              base_multiplier: 1.0
-            },
-            field_mappers: {}
-          },
-          author: {
-            permission_policy: {
-              read_policy: { NoRequirement: null },
-              write_policy: { NoRequirement: null }
-            },
-            payment_config: {
-              base_multiplier: 1.0
-            },
-            field_mappers: {}
-          },
-          timestamp: {
-            permission_policy: {
-              read_policy: { NoRequirement: null },
-              write_policy: { NoRequirement: null }
-            },
-            payment_config: {
-              base_multiplier: 1.0
-            },
-            field_mappers: {}
+            timestamp: {
+              permission_policy: {
+                read_policy: { NoRequirement: null },
+                write_policy: { NoRequirement: null }
+              },
+              payment_config: {
+                base_multiplier: 1.0
+              },
+              field_mappers: {}
+            }
           }
-        }
-      };
-      
-      await client.createSchema(postSchema);
-      console.log('Post schema created successfully');
+        };
+        
+        const result = await client.loadSchemaFromJson(postSchema);
+        console.log(`Schema loaded from JSON: ${result.schema_name} - ${result.message}`);
+      }
     } else {
       console.log('Post schema already exists');
     }

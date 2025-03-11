@@ -38,6 +38,8 @@
 - Support for loading schemas from files and JSON content
 - Client library updated with schema loading methods
 - Documentation for schema loading API
+- FoldSocial application updated to use schema loading functionality
+- Test script for demonstrating schema loading
 
 ## In Progress
 

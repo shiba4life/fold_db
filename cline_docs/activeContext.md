@@ -18,6 +18,10 @@ Enhancing the DataFold Node with HTTP endpoints for schema loading, querying, an
 - Added unit tests for schema loading functionality
 - Created documentation for the schema loading API
 - Updated the FoldSocial's DataFold Node server to support schema loading
+- Updated FoldSocial to use the schema loading functionality
+- Created a Post schema file for testing schema loading
+- Added a test script for demonstrating schema loading
+- Updated documentation to include schema loading information
 
 ## Next Steps
 1. Add user authentication to support multiple users
@@ -26,3 +30,5 @@ Enhancing the DataFold Node with HTTP endpoints for schema loading, querying, an
 4. Add image upload support for posts
 5. Implement API versioning and rate limiting
 6. Enhance authentication and authorization mechanisms
+7. Add support for more complex schema relationships
+8. Implement schema versioning and migration
