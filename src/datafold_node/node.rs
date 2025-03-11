@@ -96,6 +96,11 @@ impl DataFoldNode {
         let db = Arc::get_mut(&mut self.db)
             .ok_or_else(|| FoldDbError::Config("Cannot get mutable reference to database".into()))?;
         db.load_schema(schema)?;
+        
+        // Explicitly flush the database to ensure changes are persisted to disk
+        db.atom_manager.flush_db()
+            .map_err(|e| FoldDbError::Database(format!("Failed to flush database: {}", e)))?;
+            
         Ok(())
     }
 
@@ -104,6 +109,7 @@ impl DataFoldNode {
         println!("Executing operation: {:?}", operation);
         match operation {
             Operation::Query { schema, fields, filter: _ } => {
+                println!("Processing query for schema: {}", schema);
                 let fields_clone = fields.clone();
                 let query = Query {
                     schema_name: schema,
@@ -112,7 +118,9 @@ impl DataFoldNode {
                     trust_distance: 0, // Set write distance to 0 for all queries
                 };
                 
+                println!("Executing query: {:?}", query);
                 let results = self.db.query_schema(query);
+                println!("Query results: {:?}", results);
                 
                 // Unwrap the Ok values from the results before serializing
                 let unwrapped_results: Vec<Value> = results.into_iter()
@@ -138,29 +146,57 @@ impl DataFoldNode {
                     })
                     .collect();
                 
+                println!("Unwrapped query results: {:?}", unwrapped_results);
                 Ok(serde_json::to_value(&unwrapped_results)?)
             },
             Operation::Mutation { schema, data, mutation_type } => {
+                println!("Processing mutation for schema: {}", schema);
+                println!("Mutation type: {:?}", mutation_type);
+                println!("Mutation data: {:?}", data);
+                
                 let fields_and_values = match data {
-                      Value::Object(map) => map.into_iter()
-                        .collect(),
+                    Value::Object(map) => {
+                        let fields = map.into_iter().collect();
+                        println!("Parsed fields and values: {:?}", fields);
+                        fields
+                    },
                     _ => return Err(FoldDbError::Config("Mutation data must be an object".into()))
                 };
 
-                println!("Mutation type: {:?}", mutation_type);
-
                 let mutation = Mutation {
-                    schema_name: schema,
+                    schema_name: schema.clone(),
                     fields_and_values,
                     pub_key: String::new(), // TODO: Get from auth context
                     trust_distance: 0, // Set write distance to 0 for all mutations
                     mutation_type,
                 };
 
+                println!("Created mutation object: {:?}", mutation);
+                
                 let db = Arc::get_mut(&mut self.db)
                     .ok_or_else(|| FoldDbError::Config("Cannot get mutable reference to database".into()))?;
-                db.write_schema(mutation)?;
+                
+                println!("Executing write_schema for mutation");
+                match db.write_schema(mutation) {
+                    Ok(_) => {
+                        println!("write_schema successful");
+                        // Explicitly flush the database to ensure changes are persisted to disk
+                        println!("Flushing database to disk");
+                        match db.atom_manager.flush_db() {
+                            Ok(_) => println!("Database flush successful"),
+                            Err(e) => {
+                                println!("Database flush error: {:?}", e);
+                                return Err(FoldDbError::Database(format!("Failed to flush database: {}", e)));
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        println!("write_schema error: {:?}", e);
+                        return Err(FoldDbError::Database(format!("Schema error: {}", e)));
+                    }
+                }
 
+                println!("Mutation for schema {} completed successfully", schema);
                 Ok(Value::Null)
             }
         }
@@ -196,6 +232,11 @@ impl DataFoldNode {
         let db = Arc::get_mut(&mut self.db)
             .ok_or_else(|| FoldDbError::Config("Cannot get mutable reference to database".into()))?;
         db.write_schema(mutation)?;
+        
+        // Explicitly flush the database to ensure changes are persisted to disk
+        db.atom_manager.flush_db()
+            .map_err(|e| FoldDbError::Database(format!("Failed to flush database: {}", e)))?;
+            
         Ok(())
     }
 
@@ -237,6 +278,11 @@ impl DataFoldNode {
         let db = Arc::get_mut(&mut self.db)
             .ok_or_else(|| FoldDbError::Config("Cannot get mutable reference to database".into()))?;
         db.allow_schema(schema_name)?;
+        
+        // Explicitly flush the database to ensure changes are persisted to disk
+        db.atom_manager.flush_db()
+            .map_err(|e| FoldDbError::Database(format!("Failed to flush database: {}", e)))?;
+            
         Ok(())
     }
 
@@ -246,7 +292,12 @@ impl DataFoldNode {
             .ok_or_else(|| FoldDbError::Config("Cannot get mutable reference to database".into()))?;
         
         match db.schema_manager.unload_schema(schema_name) {
-            Ok(true) => Ok(()),
+            Ok(true) => {
+                // Explicitly flush the database to ensure changes are persisted to disk
+                db.atom_manager.flush_db()
+                    .map_err(|e| FoldDbError::Database(format!("Failed to flush database: {}", e)))?;
+                Ok(())
+            },
             Ok(false) => Err(FoldDbError::Config(format!("Schema {} not found", schema_name))),
             Err(e) => Err(e.into())
         }
@@ -618,125 +669,5 @@ impl DataFoldNode {
         self.sandbox_manager = Some(Arc::new(Mutex::new(sandbox_manager)));
         
         Ok(())
-    }
-    
-    /// Registers a container with the sandbox
-    pub fn register_container(&self, container_id: &str, name: &str, image: &str) -> FoldDbResult<()> {
-        // Check if sandbox manager is initialized
-        let sandbox_manager = self.sandbox_manager.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
-        
-        // Get lock on sandbox manager
-        let sandbox_manager = sandbox_manager.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
-        
-        // Register container
-        sandbox_manager.register_container(container_id, name, image, None)
-            .map_err(|e| FoldDbError::Config(format!("Failed to register container: {}", e)))
-    }
-    
-    /// Starts a container
-    pub fn start_container(&self, container_id: &str) -> FoldDbResult<()> {
-        // Check if sandbox manager is initialized
-        let sandbox_manager = self.sandbox_manager.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
-        
-        // Get lock on sandbox manager
-        let sandbox_manager = sandbox_manager.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
-        
-        // Start container
-        sandbox_manager.start_container(container_id)
-            .map_err(|e| FoldDbError::Config(format!("Failed to start container: {}", e)))
-    }
-    
-    /// Stops a container
-    pub fn stop_container(&self, container_id: &str) -> FoldDbResult<()> {
-        // Check if sandbox manager is initialized
-        let sandbox_manager = self.sandbox_manager.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
-        
-        // Get lock on sandbox manager
-        let sandbox_manager = sandbox_manager.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
-        
-        // Stop container
-        sandbox_manager.stop_container(container_id)
-            .map_err(|e| FoldDbError::Config(format!("Failed to stop container: {}", e)))
-    }
-    
-    /// Removes a container
-    pub fn remove_container(&self, container_id: &str) -> FoldDbResult<()> {
-        // Check if sandbox manager is initialized
-        let sandbox_manager = self.sandbox_manager.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
-        
-        // Get lock on sandbox manager
-        let sandbox_manager = sandbox_manager.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
-        
-        // Remove container
-        sandbox_manager.remove_container(container_id)
-            .map_err(|e| FoldDbError::Config(format!("Failed to remove container: {}", e)))
-    }
-    
-    /// Lists all containers
-    pub fn list_containers(&self) -> FoldDbResult<Vec<crate::datafold_node::sandbox::ContainerInfo>> {
-        // Check if sandbox manager is initialized
-        let sandbox_manager = self.sandbox_manager.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
-        
-        // Get lock on sandbox manager
-        let sandbox_manager = sandbox_manager.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
-        
-        // List containers
-        sandbox_manager.list_containers()
-            .map_err(|e| FoldDbError::Config(format!("Failed to list containers: {}", e)))
-    }
-    
-    /// Gets information about a container
-    pub fn get_container_info(&self, container_id: &str) -> FoldDbResult<crate::datafold_node::sandbox::ContainerInfo> {
-        // Check if sandbox manager is initialized
-        let sandbox_manager = self.sandbox_manager.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
-        
-        // Get lock on sandbox manager
-        let sandbox_manager = sandbox_manager.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
-        
-        // Get container info
-        sandbox_manager.get_container_info(container_id)
-            .map_err(|e| FoldDbError::Config(format!("Failed to get container info: {}", e)))
-    }
-    
-    /// Proxies a request from a container to the Datafold API
-    pub fn proxy_container_request(&self, 
-        container_id: &str, 
-        path: &str, 
-        method: &str, 
-        headers: HashMap<String, String>, 
-        body: Option<Vec<u8>>
-    ) -> FoldDbResult<crate::datafold_node::sandbox::Response> {
-        // Check if sandbox manager is initialized
-        let sandbox_manager = self.sandbox_manager.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Sandbox manager not initialized".to_string()))?;
-        
-        // Get lock on sandbox manager
-        let sandbox_manager = sandbox_manager.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock sandbox manager".to_string()))?;
-        
-        // Create request
-        let request = crate::datafold_node::sandbox::Request {
-            container_id: container_id.to_string(),
-            path: path.to_string(),
-            method: method.to_string(),
-            headers,
-            body,
-        };
-        
-        // Proxy request
-        sandbox_manager.proxy_request(request)
-            .map_err(|e| FoldDbError::Config(format!("Failed to proxy request: {}", e)))
     }
 }

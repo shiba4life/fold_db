@@ -42,13 +42,16 @@ async function executeOperation(type) {
         
         console.log(`Sending operation to API: ${JSON.stringify(operation)}`);
         
+        // Send the operation object directly without double-stringifying
+        console.log(`Operation being sent: ${JSON.stringify(operation)}`);
+        
         const response = await utils.apiRequest('/api/execute', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                operation: operation
+                operation: JSON.stringify(operation)
             })
         });
         

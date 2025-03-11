@@ -74,6 +74,10 @@ impl FoldDB {
             ).map_err(|e| SchemaError::InvalidData(format!("Failed to persist atom ref: {}", e)))?;
         }
         
+        // Flush the database to ensure changes are persisted to disk
+        self.atom_manager.flush_db()
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush database: {}", e)))?;
+        
         Ok(())
     }
 
@@ -186,6 +190,11 @@ impl FoldDB {
                 }
             }
         }
+        
+        // Flush the database to ensure changes are persisted to disk
+        self.atom_manager.flush_db()
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush database: {}", e)))?;
+            
         Ok(())
     }
 

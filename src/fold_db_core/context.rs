@@ -106,6 +106,10 @@ impl<'a> AtomContext<'a> {
             }
         }
 
+        // Flush the database to ensure changes are persisted to disk
+        self.atom_manager.flush_db()
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush database: {}", e)))?;
+
         Ok(())
     }
 
@@ -132,6 +136,10 @@ impl<'a> AtomContext<'a> {
             id,
             self.source_pub_key.clone(),
         ).map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+
+        // Flush the database to ensure changes are persisted to disk
+        self.atom_manager.flush_db()
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush database: {}", e)))?;
 
         Ok(())
     }

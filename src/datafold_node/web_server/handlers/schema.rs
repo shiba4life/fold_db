@@ -64,17 +64,51 @@ pub async fn handle_execute(
     query: QueryRequest,
     node: Arc<tokio::sync::Mutex<DataFoldNode>>,
 ) -> Result<impl Reply, Rejection> {
-    // Parse the operation string into an Operation
+    // Parse the operation into an Operation
     println!("Operation Entry: {:?}", query);
     println!("Operation String: {}", query.operation);
+    
+    // Try to parse the operation directly
     let operation: Operation = match serde_json::from_str(&query.operation) {
-        Ok(op) => op,
-        Err(e) => {
-            println!("Error parsing operation: {:?}", e);
-            println!("Operation string that failed to parse: {}", query.operation);
-            return Err(warp::reject::custom(ApiErrorResponse::new(
-                format!("Invalid operation format: {}", e)
-            )));
+        Ok(op) => {
+            println!("Successfully parsed operation directly");
+            op
+        },
+        Err(e1) => {
+            println!("Failed to parse operation directly: {}", e1);
+            
+            // The operation might be a JSON string inside a JSON string, try to parse it
+            if query.operation.starts_with("\"") && query.operation.ends_with("\"") {
+                match serde_json::from_str::<String>(&query.operation) {
+                    Ok(inner_str) => {
+                        println!("Unescaped inner operation string: {}", inner_str);
+                        match serde_json::from_str(&inner_str) {
+                            Ok(op) => {
+                                println!("Successfully parsed inner operation");
+                                op
+                            },
+                            Err(e2) => {
+                                println!("Error parsing inner operation: {:?}", e2);
+                                println!("Inner operation string that failed to parse: {}", inner_str);
+                                return Err(warp::reject::custom(ApiErrorResponse::new(
+                                    format!("Invalid operation format: {}", e2)
+                                )));
+                            }
+                        }
+                    },
+                    Err(e3) => {
+                        println!("Error unescaping operation string: {:?}", e3);
+                        return Err(warp::reject::custom(ApiErrorResponse::new(
+                            format!("Invalid operation format: {}", e3)
+                        )));
+                    }
+                }
+            } else {
+                println!("Operation string that failed to parse: {}", query.operation);
+                return Err(warp::reject::custom(ApiErrorResponse::new(
+                    format!("Invalid operation format: {}", e1)
+                )));
+            }
         }
     };
 

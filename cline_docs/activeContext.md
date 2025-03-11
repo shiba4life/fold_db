@@ -12,6 +12,8 @@ Separated DataFold Node's web server into two distinct servers:
 - Configured the servers to run on different ports (UI on 8080, API on 8081 by default)
 - Made the ports configurable via environment variables (UI_PORT and API_PORT)
 - Fixed the "Missing X-Public-Key header" error by ensuring proper authentication in the API server
+- Added the execute endpoint to the UI server to support mutations from the UI interface
+- Fixed "Method Not Allowed" error when trying to perform mutations from the UI
 
 ## Next Steps
 1. Add user authentication to support multiple users

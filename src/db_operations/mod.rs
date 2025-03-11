@@ -34,6 +34,11 @@ impl DbOperations {
             .insert(key.as_bytes(), bytes)
             .map_err(|e| SchemaError::InvalidData(format!("Failed to store item: {}", e)))?;
 
+        // Flush the database to ensure changes are persisted to disk
+        self.db
+            .flush()
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush database: {}", e)))?;
+
         Ok(())
     }
 

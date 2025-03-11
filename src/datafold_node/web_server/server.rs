@@ -209,11 +209,19 @@ impl WebServer {
             .and(with_node(node.clone()))
             .and_then(handle_list_apis);
             
+        // Add execute endpoint for UI operations (no authentication required)
+        let execute = warp::path!("api" / "execute")
+            .and(warp::post())
+            .and(warp::body::json())
+            .and(with_node(node.clone()))
+            .and_then(handle_execute);
+            
         // Combine all routes
         list_schemas
             .or(network_status)
             .or(list_nodes)
             .or(list_apps)
             .or(list_apis)
+            .or(execute)
     }
 }

@@ -97,7 +97,8 @@ async function queryAllFields(schemaName, schema) {
         // Set the query in the query input
         document.getElementById('queryInput').value = JSON.stringify(query, null, 2);
         
-        // Execute the query
+        // Execute the query - send the operation object directly
+        console.log(`Querying all fields for schema ${schemaName}: ${JSON.stringify(query)}`);
         const response = await utils.apiRequest('/api/execute', {
             method: 'POST',
             headers: {

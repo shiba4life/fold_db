@@ -139,7 +139,17 @@ impl AtomManager {
     pub fn get_atoms(&self) -> Arc<Mutex<HashMap<String, Atom>>> {
         Arc::clone(&self.atoms)
     }
-
+    
+    /// Gets a reference to the underlying database operations
+    pub fn get_db_ops(&self) -> &Arc<DbOperations> {
+        &self.db_ops
+    }
+    
+    /// Flushes the database to ensure changes are persisted to disk
+    pub fn flush_db(&self) -> Result<(), Box<dyn std::error::Error>> {
+        self.db_ops.db().flush()?;
+        Ok(())
+    }
 }
 
 impl Clone for AtomManager {
