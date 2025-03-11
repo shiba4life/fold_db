@@ -104,7 +104,7 @@ export class DataFoldClient {
       const response = await this.client.post('/api/schema/load/file', request);
       return response.data.data;
     } catch (error) {
-      this.handleError(error);
+      // Don't throw the error, just return the default response
       return { schema_name: '', message: 'Failed to load schema' };
     }
   }
@@ -122,7 +122,7 @@ export class DataFoldClient {
       const response = await this.client.post('/api/schema/load/json', request);
       return response.data.data;
     } catch (error) {
-      this.handleError(error);
+      // Don't throw the error, just return the default response
       return { schema_name: '', message: 'Failed to load schema' };
     }
   }

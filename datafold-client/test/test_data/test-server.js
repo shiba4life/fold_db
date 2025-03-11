@@ -6,7 +6,8 @@
 
       // Initialize Express app for the DataFold Node
       const app = express();
-      const PORT = 8082;
+      // Use the port passed as a command-line argument or default to 8082
+      const PORT = process.argv[2] ? parseInt(process.argv[2]) : 8082;
 
       // Configure middleware
       app.use(bodyParser.json());
@@ -220,6 +221,96 @@
         }
         
         return res.status(400).json({ success: false, error: 'Unsupported operation type' });
+      });
+
+      // Load schema from file
+      app.post('/api/schema/load/file', (req, res) => {
+        const { file_path } = req.body;
+        
+        if (!file_path) {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'File path is required' 
+          });
+        }
+        
+        try {
+          // For testing purposes, we'll just create a dummy schema
+          const schemaName = path.basename(file_path, '.json');
+          const dummySchema = {
+            name: schemaName,
+            fields: {
+              id: {
+                permission_policy: {
+                  read_policy: { NoRequirement: null },
+                  write_policy: { NoRequirement: null }
+                },
+                payment_config: {
+                  base_multiplier: 1.0
+                },
+                field_mappers: {}
+              }
+            }
+          };
+          
+          db.schemas[schemaName] = dummySchema;
+          
+          // Initialize data collection for this schema if it doesn't exist
+          if (!db.data[schemaName]) {
+            db.data[schemaName] = [];
+          }
+          
+          saveData();
+          
+          return res.json({ 
+            data: {
+              schema_name: schemaName,
+              message: 'Schema loaded successfully'
+            }
+          });
+        } catch (error) {
+          return res.status(500).json({ 
+            success: false, 
+            error: `Failed to load schema: ${error.message}` 
+          });
+        }
+      });
+      
+      // Load schema from JSON
+      app.post('/api/schema/load/json', (req, res) => {
+        const { schema_json } = req.body;
+        
+        if (!schema_json || !schema_json.name || !schema_json.fields) {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'Invalid schema format. Schema must have name and fields.' 
+          });
+        }
+        
+        try {
+          const schemaName = schema_json.name;
+          
+          db.schemas[schemaName] = schema_json;
+          
+          // Initialize data collection for this schema if it doesn't exist
+          if (!db.data[schemaName]) {
+            db.data[schemaName] = [];
+          }
+          
+          saveData();
+          
+          return res.json({ 
+            data: {
+              schema_name: schemaName,
+              message: 'Schema loaded successfully'
+            }
+          });
+        } catch (error) {
+          return res.status(500).json({ 
+            success: false, 
+            error: `Failed to load schema: ${error.message}` 
+          });
+        }
       });
 
       // Network status endpoint (mock)

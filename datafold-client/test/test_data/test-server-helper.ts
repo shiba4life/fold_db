@@ -4,9 +4,17 @@ import { join } from 'path';
 import axios from 'axios';
 
 // Test configuration
-export const NODE_SERVER_PORT = 8082; // Use a different port than the default to avoid conflicts
-export const NODE_SERVER_URL = `http://localhost:${NODE_SERVER_PORT}`;
+// Use a function to get a random port in the range 8082-8999 to avoid conflicts
+export const getRandomPort = (): number => Math.floor(Math.random() * 918) + 8082;
 export const TEST_DATA_DIR = join(__dirname);
+
+// These will be set dynamically for each test run
+let NODE_SERVER_PORT: number;
+let NODE_SERVER_URL: string;
+
+// Getter functions to access the dynamic port and URL
+export const getNodeServerPort = (): number => NODE_SERVER_PORT;
+export const getNodeServerUrl = (): string => NODE_SERVER_URL;
 
 // Helper function to wait for the server to start
 export const waitForServer = async (url: string, maxRetries = 10, retryDelay = 500): Promise<boolean> => {
@@ -28,11 +36,15 @@ export const startTestServer = async (): Promise<ChildProcess> => {
     mkdirSync(TEST_DATA_DIR, { recursive: true });
   }
 
-  console.log('Starting DataFold Node server for integration tests...');
+  // Set a random port for this test run
+  NODE_SERVER_PORT = getRandomPort();
+  NODE_SERVER_URL = `http://localhost:${NODE_SERVER_PORT}`;
+
+  console.log(`Starting DataFold Node server for integration tests on port ${NODE_SERVER_PORT}...`);
   
-  // Start the server
+  // Start the server with the dynamic port
   const serverFilePath = join(TEST_DATA_DIR, 'test-server.js');
-  const nodeProcess = spawn('node', [serverFilePath], {
+  const nodeProcess = spawn('node', [serverFilePath, NODE_SERVER_PORT.toString()], {
     stdio: 'inherit',
     detached: true
   });

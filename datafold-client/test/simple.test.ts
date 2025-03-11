@@ -1,7 +1,7 @@
 import { DataFoldClient } from '../src';
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 import { 
-  NODE_SERVER_URL, 
+  getNodeServerUrl, 
   startTestServer, 
   stopTestServer, 
   cleanupTestData 

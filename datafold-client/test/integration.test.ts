@@ -2,7 +2,7 @@ import { DataFoldClient } from '../src';
 import { ChildProcess } from 'child_process';
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 import { 
-  NODE_SERVER_URL, 
+  getNodeServerUrl, 
   startTestServer, 
   stopTestServer, 
   cleanupTestData 
@@ -18,7 +18,7 @@ describe('DataFold Client Integration Tests', () => {
 
     // Create client
     client = new DataFoldClient({
-      baseUrl: NODE_SERVER_URL
+      baseUrl: getNodeServerUrl()
     });
   }, 30000); // Increase timeout for server startup
 
@@ -170,13 +170,23 @@ describe('DataFold Client Integration Tests', () => {
 
   test('should handle errors gracefully', async () => {
     // Try to find records in a non-existent schema
-    await expect(async () => {
+    let errorThrown = false;
+    try {
       await client.find('NonExistentSchema', ['id']);
-    }).rejects.toThrow();
+    } catch (error) {
+      errorThrown = true;
+      expect(error).toBeDefined();
+    }
+    expect(errorThrown).toBe(true);
 
     // Try to create a record in a non-existent schema
-    await expect(async () => {
+    errorThrown = false;
+    try {
       await client.create('NonExistentSchema', { id: '1' });
-    }).rejects.toThrow();
+    } catch (error) {
+      errorThrown = true;
+      expect(error).toBeDefined();
+    }
+    expect(errorThrown).toBe(true);
   });
 });
