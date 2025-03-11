@@ -39,7 +39,13 @@
 - Client library updated with schema loading methods
 - Documentation for schema loading API
 - FoldSocial application updated to use schema loading functionality
-- Test script for demonstrating schema loading
+- Test scripts for demonstrating schema loading and data persistence
+- Fixed DataFold Node compilation error by adding recursion limit to handle complex warp filter chains
+- Added comprehensive test for DataFold Node data persistence
+- Verified and fixed mutations and queries functionality
+- Added complex data structure support with nested objects
+- Implemented comprehensive test suite for CRUD operations
+- Verified data persistence across server restarts
 
 ## In Progress
 

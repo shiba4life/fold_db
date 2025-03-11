@@ -66,10 +66,12 @@ pub async fn handle_execute(
 ) -> Result<impl Reply, Rejection> {
     // Parse the operation string into an Operation
     println!("Operation Entry: {:?}", query);
+    println!("Operation String: {}", query.operation);
     let operation: Operation = match serde_json::from_str(&query.operation) {
         Ok(op) => op,
         Err(e) => {
             println!("Error parsing operation: {:?}", e);
+            println!("Operation string that failed to parse: {}", query.operation);
             return Err(warp::reject::custom(ApiErrorResponse::new(
                 format!("Invalid operation format: {}", e)
             )));
@@ -86,13 +88,18 @@ pub async fn handle_execute(
 
     match result {
         Ok(result) => {
+            // Debug: Print the raw result before processing
+            println!("Raw result before processing: {}", serde_json::to_string(&result).unwrap_or_else(|e| format!("Error serializing: {}", e)));
+            
             // Check if the result is actually an error wrapped in Ok
             if let serde_json::Value::Array(arr) = &result {
                 if arr.len() == 1 {
                     if let Some(serde_json::Value::Object(obj)) = arr.first() {
                         if let Some(err_obj) = obj.get("Err") {
+                            println!("Found Err object: {:?}", err_obj);
                             if let Some(not_found) = err_obj.as_object().and_then(|o| o.get("NotFound")) {
                                 let error_msg = not_found.as_str().unwrap_or("Schema not found").to_string();
+                                println!("Error message from NotFound: {}", error_msg);
                                 if error_msg.contains("Schema") {
                                     return Ok(warp::reply::json(&ApiErrorResponse::new("Schema not found")));
                                 }
@@ -107,21 +114,27 @@ pub async fn handle_execute(
             match result {
                 serde_json::Value::Object(obj) => {
                     // If it's already an object, return it directly
-                    Ok(warp::reply::json(&ApiSuccessResponse::new(obj)))
+                    println!("Returning object directly: {:?}", obj);
+                    let response = ApiSuccessResponse::new(obj);
+                    let json_response = serde_json::to_string(&response).unwrap_or_else(|e| format!("{{\"error\":\"Error serializing response: {}\"}}", e));
+                    println!("Final JSON response: {}", json_response);
+                    Ok(warp::reply::json(&response))
                 },
                 serde_json::Value::Array(arr) => {
                     if arr.len() == 1 {
                         match &arr[0] {
                             serde_json::Value::Object(obj) => {
+                                println!("Processing single object in array: {:?}", obj);
                                 // Check if this is an error object
                                 if obj.contains_key("error") {
-                                    return Ok(warp::reply::json(&ApiErrorResponse::new(
-                                        obj.get("error").and_then(|v| v.as_str()).unwrap_or("Unknown error").to_string()
-                                    )));
+                                    let error_msg = obj.get("error").and_then(|v| v.as_str()).unwrap_or("Unknown error").to_string();
+                                    println!("Found error object: {}", error_msg);
+                                    return Ok(warp::reply::json(&ApiErrorResponse::new(error_msg)));
                                 }
                                 
                                 // Check if this is a wrapped Ok value
                                 if let Some(ok_value) = obj.get("Ok") {
+                                    println!("Found Ok value: {:?}", ok_value);
                                     // Try to parse the operation to get field names
                                     if let Ok(Operation::Query { fields, .. }) = serde_json::from_str::<Operation>(&query.operation) {
                                         if !fields.is_empty() {
@@ -129,64 +142,109 @@ pub async fn handle_execute(
                                             
                                             // Get the first field name
                                             let field_name = fields[0].clone();
+                                            println!("Using field name from query: {}", field_name);
                                             
                                             // Handle string values
                                             if let Some(field_value) = ok_value.as_str() {
+                                                println!("Ok value is a string: {}", field_value);
                                                 // Try to parse as JSON first
                                                 if let Ok(parsed_value) = serde_json::from_str::<serde_json::Value>(field_value) {
+                                                    println!("Parsed string as JSON: {:?}", parsed_value);
                                                     result_obj.insert(field_name, parsed_value);
                                                 } else {
+                                                    println!("Using as plain string");
                                                     // Use as string if not valid JSON
                                                     result_obj.insert(field_name, serde_json::Value::String(field_value.to_string()));
                                                 }
                                             } else {
+                                                println!("Ok value is not a string, using directly");
                                                 // Handle non-string values directly
                                                 result_obj.insert(field_name, ok_value.clone());
                                             }
                                             
-                                            return Ok(warp::reply::json(&ApiSuccessResponse::new(result_obj)));
+                                            let response = ApiSuccessResponse::new(result_obj);
+                                            let json_response = serde_json::to_string(&response).unwrap_or_else(|e| format!("{{\"error\":\"Error serializing response: {}\"}}", e));
+                                            println!("Final JSON response with field name: {}", json_response);
+                                            return Ok(warp::reply::json(&response));
                                         }
                                     }
                                     
                                     // Fallback if we can't get field names
-                                    return Ok(warp::reply::json(&ApiSuccessResponse::new(json!({
+                                    println!("Using generic result key for Ok value");
+                                    let response = ApiSuccessResponse::new(json!({
                                         "result": ok_value
-                                    }))));
+                                    }));
+                                    let json_response = serde_json::to_string(&response).unwrap_or_else(|e| format!("{{\"error\":\"Error serializing response: {}\"}}", e));
+                                    println!("Final JSON response with generic result: {}", json_response);
+                                    return Ok(warp::reply::json(&response));
                                 }
                                 
                                 // Return the object directly if it's not a special case
-                                Ok(warp::reply::json(&ApiSuccessResponse::new(obj)))
+                                println!("Returning object from array directly: {:?}", obj);
+                                let response = ApiSuccessResponse::new(obj);
+                                let json_response = serde_json::to_string(&response).unwrap_or_else(|e| format!("{{\"error\":\"Error serializing response: {}\"}}", e));
+                                println!("Final JSON response for direct object: {}", json_response);
+                                Ok(warp::reply::json(&response))
                             },
                             serde_json::Value::String(s) => {
+                                println!("Processing string value in array: {}", s);
                                 // For string values, try to get the field name from the query
                                 if let Ok(Operation::Query { fields, .. }) = serde_json::from_str::<Operation>(&query.operation) {
                                     if !fields.is_empty() {
                                         let field_name = fields[0].clone();
-                                        return Ok(warp::reply::json(&ApiSuccessResponse::new(json!({
+                                        println!("Using field name from query for string: {}", field_name);
+                                        let response = ApiSuccessResponse::new(json!({
                                             field_name: s
-                                        }))));
+                                        }));
+                                        let json_response = serde_json::to_string(&response).unwrap_or_else(|e| format!("{{\"error\":\"Error serializing response: {}\"}}", e));
+                                        println!("Final JSON response for string with field name: {}", json_response);
+                                        return Ok(warp::reply::json(&response));
                                     }
                                 }
                                 
                                 // Fallback to generic result
-                                Ok(warp::reply::json(&ApiSuccessResponse::new(json!({ "result": s }))))
+                                println!("Using generic result key for string");
+                                let response = ApiSuccessResponse::new(json!({ "result": s }));
+                                let json_response = serde_json::to_string(&response).unwrap_or_else(|e| format!("{{\"error\":\"Error serializing response: {}\"}}", e));
+                                println!("Final JSON response for string with generic result: {}", json_response);
+                                Ok(warp::reply::json(&response))
                             },
                             _ => {
+                                println!("Processing other value type in array");
                                 // For other types, use a generic result key
-                                Ok(warp::reply::json(&ApiSuccessResponse::new(json!({ "result": arr[0] }))))
+                                let response = ApiSuccessResponse::new(json!({ "result": arr[0] }));
+                                let json_response = serde_json::to_string(&response).unwrap_or_else(|e| format!("{{\"error\":\"Error serializing response: {}\"}}", e));
+                                println!("Final JSON response for other type: {}", json_response);
+                                Ok(warp::reply::json(&response))
                             }
                         }
                     } else {
                         // For multiple results, wrap them in a results array
-                        Ok(warp::reply::json(&ApiSuccessResponse::new(json!({ "results": arr }))))
+                        println!("Processing multiple results in array: {:?}", arr);
+                        let response = ApiSuccessResponse::new(json!({ "results": arr }));
+                        let json_response = serde_json::to_string(&response).unwrap_or_else(|e| format!("{{\"error\":\"Error serializing response: {}\"}}", e));
+                        println!("Final JSON response for multiple results: {}", json_response);
+                        Ok(warp::reply::json(&response))
                     }
                 },
                 _ => {
                     // For any other type, use a generic result key
-                    Ok(warp::reply::json(&ApiSuccessResponse::new(json!({ "result": result }))))
+                    println!("Processing other value type: {:?}", result);
+                    let response = ApiSuccessResponse::new(json!({ "result": result }));
+                    let json_response = serde_json::to_string(&response).unwrap_or_else(|e| format!("{{\"error\":\"Error serializing response: {}\"}}", e));
+                    println!("Final JSON response for other type: {}", json_response);
+                    Ok(warp::reply::json(&response))
                 }
             }
         },
-        Err(e) => Ok(warp::reply::json(&ApiErrorResponse::new(e.to_string()))),
+        Err(e) => {
+            println!("Operation error: {:?}", e);
+            let error_msg = e.to_string();
+            println!("Error message: {}", error_msg);
+            let response = ApiErrorResponse::new(error_msg);
+            let json_response = serde_json::to_string(&response).unwrap_or_else(|e| format!("{{\"error\":\"Error serializing error response: {}\"}}", e));
+            println!("Final JSON error response: {}", json_response);
+            Ok(warp::reply::json(&response))
+        },
     }
 }

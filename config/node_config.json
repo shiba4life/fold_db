@@ -1,13 +1,18 @@
 {
-  "storage_path": "data",
+  "node_id": "default_node",
+  "storage_path": "data/node_storage",
   "default_trust_distance": 1,
-  "docker": {
-    "memory_limit": 536870912,
-    "cpu_limit": 1.0,
-    "environment": {},
-    "network_config": {
-      "network_isolated": true,
-      "exposed_ports": {}
-    }
+  "network": {
+    "listen_address": "0.0.0.0:9000",
+    "discovery_enabled": true,
+    "bootstrap_nodes": []
+  },
+  "web_server": {
+    "port": 8080,
+    "use_unix_socket": false
+  },
+  "security": {
+    "require_authentication": false,
+    "default_trust_level": 1
   }
 }

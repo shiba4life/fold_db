@@ -5,70 +5,464 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DataFold Node</title>
     <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-    <h1>DataFold Node</h1>
-    <div class="status success">
-        Node is running successfully
-    </div>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="logo">
+                <h1>DataFold</h1>
+            </div>
+            <nav class="main-nav">
+                <ul>
+                    <li class="nav-item active" data-page="dashboard">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </li>
+                    <li class="nav-item" data-page="schemas">
+                        <i class="fas fa-database"></i>
+                        <span>Schemas</span>
+                    </li>
+                    <li class="nav-item" data-page="operations">
+                        <i class="fas fa-code"></i>
+                        <span>Operations</span>
+                    </li>
+                    <li class="nav-item" data-page="network">
+                        <i class="fas fa-network-wired"></i>
+                        <span>Network</span>
+                    </li>
+                    <li class="nav-item" data-page="apps">
+                        <i class="fas fa-th-large"></i>
+                        <span>Apps</span>
+                    </li>
+                    <li class="nav-item" data-page="settings">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </li>
+                </ul>
+            </nav>
+            <div class="node-status">
+                <div class="status-indicator online">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Node Online</span>
+                </div>
+            </div>
+        </div>
 
-    <div class="section">
-        <h2>Operations</h2>
-        <div class="tab-container">
-            <div class="tab-buttons">
-                <button class="tab-button active" data-tab="schemas">Loaded Schemas</button>
-                <button class="tab-button" data-tab="schema">Schema</button>
-                <button class="tab-button" data-tab="query">Query</button>
-                <button class="tab-button" data-tab="mutation">Mutation</button>
-                <button class="tab-button" data-tab="network">Network</button>
-            </div>
-            
-            <!-- Include Schema Tab Components -->
-            <div id="schemaTabsContainer">
-                <script>
-                    fetch('/components/schema-tab.html')
-                        .then(response => response.text())
-                        .then(html => {
-                            document.getElementById('schemaTabsContainer').innerHTML = html;
-                        });
-                </script>
-            </div>
-            
-            <!-- Include Operations Tab Components -->
-            <div id="operationsTabsContainer">
-                <script>
-                    fetch('/components/operations-tab.html')
-                        .then(response => response.text())
-                        .then(html => {
-                            document.getElementById('operationsTabsContainer').innerHTML = html;
-                        });
-                </script>
-            </div>
-            
-            <!-- Include Network Tab Component -->
-            <div id="networkTabContainer">
-                <script>
-                    fetch('/components/network-tab.html')
-                        .then(response => response.text())
-                        .then(html => {
-                            document.getElementById('networkTabContainer').innerHTML = html;
-                        });
-                </script>
+        <div class="main-content">
+            <header class="top-bar">
+                <div class="page-title">Dashboard</div>
+                <div class="top-bar-actions">
+                    <button class="refresh-btn" id="refreshBtn">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- Dashboard Page -->
+                <div class="page active" id="dashboardPage">
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Node Status</h3>
+                            </div>
+                            <div class="card-body" id="nodeStatusCard">
+                                <div class="status-loading">Loading...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Schemas</h3>
+                            </div>
+                            <div class="card-body" id="schemaStatsCard">
+                                <div class="status-loading">Loading...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Network</h3>
+                            </div>
+                            <div class="card-body" id="networkStatsCard">
+                                <div class="status-loading">Loading...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Apps</h3>
+                            </div>
+                            <div class="card-body" id="appsStatsCard">
+                                <div class="status-loading">Loading...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="card wide">
+                            <div class="card-header">
+                                <h3>Recent Operations</h3>
+                            </div>
+                            <div class="card-body" id="recentOperationsCard">
+                                <div class="status-loading">Loading...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="card wide">
+                            <div class="card-header">
+                                <h3>Quick Actions</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="quick-actions">
+                                    <button class="action-btn" id="loadSchemaBtn">
+                                        <i class="fas fa-plus-circle"></i>
+                                        <span>Load Schema</span>
+                                    </button>
+                                    <button class="action-btn" id="runQueryBtn">
+                                        <i class="fas fa-search"></i>
+                                        <span>Run Query</span>
+                                    </button>
+                                    <button class="action-btn" id="runMutationBtn">
+                                        <i class="fas fa-edit"></i>
+                                        <span>Run Mutation</span>
+                                    </button>
+                                    <button class="action-btn" id="startNetworkBtn">
+                                        <i class="fas fa-play"></i>
+                                        <span>Start Network</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Schemas Page -->
+                <div class="page" id="schemasPage">
+                    <div class="page-header">
+                        <h2>Schemas</h2>
+                        <div class="page-actions">
+                            <button class="btn primary" id="newSchemaBtn">
+                                <i class="fas fa-plus"></i>
+                                <span>New Schema</span>
+                            </button>
+                            <button class="btn secondary" id="refreshSchemasBtn">
+                                <i class="fas fa-sync-alt"></i>
+                                <span>Refresh</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="schemas-container" id="schemasList">
+                        <div class="status-loading">Loading schemas...</div>
+                    </div>
+                    
+                    <!-- Schema Modal -->
+                    <div class="modal" id="schemaModal">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 id="schemaModalTitle">New Schema</h3>
+                                <button class="close-btn" id="closeSchemaModal">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                <textarea id="schemaInput" placeholder="Enter your schema JSON here..."></textarea>
+                                <div class="modal-actions">
+                                    <button class="btn secondary" id="loadExampleSchemaBtn">Load Example</button>
+                                    <button class="btn primary" id="saveSchemaBtn">Save Schema</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Operations Page -->
+                <div class="page" id="operationsPage">
+                    <div class="tabs">
+                        <div class="tab-header">
+                            <div class="tab active" data-tab="query">Query</div>
+                            <div class="tab" data-tab="mutation">Mutation</div>
+                        </div>
+                        <div class="tab-content">
+                            <div class="tab-pane active" id="queryTab">
+                                <textarea id="queryInput" placeholder="Enter your query operation JSON here..."></textarea>
+                                <div class="tab-actions">
+                                    <button class="btn secondary" id="loadExampleQueryBtn">Load Example</button>
+                                    <button class="btn primary" id="executeQueryBtn">Execute Query</button>
+                                </div>
+                            </div>
+                            <div class="tab-pane" id="mutationTab">
+                                <textarea id="mutationInput" placeholder="Enter your mutation operation JSON here..."></textarea>
+                                <div class="tab-actions">
+                                    <button class="btn secondary" id="loadExampleMutationBtn">Load Example</button>
+                                    <button class="btn primary" id="executeMutationBtn">Execute Mutation</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="results-container">
+                        <div class="results-header">
+                            <h3>Results</h3>
+                            <button class="btn small" id="clearResultsBtn">
+                                <i class="fas fa-trash"></i>
+                                <span>Clear</span>
+                            </button>
+                        </div>
+                        <div class="results-content" id="results">
+                            <div class="empty-results">No results to display</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Page -->
+                <div class="page" id="networkPage">
+                    <div class="page-header">
+                        <h2>Network</h2>
+                        <div class="page-actions">
+                            <button class="btn primary" id="initNetworkBtn">
+                                <i class="fas fa-cog"></i>
+                                <span>Initialize</span>
+                            </button>
+                            <button class="btn secondary" id="refreshNetworkBtn">
+                                <i class="fas fa-sync-alt"></i>
+                                <span>Refresh</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="network-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Network Status</h3>
+                            </div>
+                            <div class="card-body" id="networkStatus">
+                                <div class="status-loading">Loading network status...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Network Actions</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="network-actions">
+                                    <button class="action-btn" id="startNetworkPageBtn">
+                                        <i class="fas fa-play"></i>
+                                        <span>Start Network</span>
+                                    </button>
+                                    <button class="action-btn" id="stopNetworkBtn">
+                                        <i class="fas fa-stop"></i>
+                                        <span>Stop Network</span>
+                                    </button>
+                                    <button class="action-btn" id="discoverNodesBtn">
+                                        <i class="fas fa-search"></i>
+                                        <span>Discover Nodes</span>
+                                    </button>
+                                    <button class="action-btn" id="listNodesBtn">
+                                        <i class="fas fa-list"></i>
+                                        <span>List Nodes</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card wide">
+                            <div class="card-header">
+                                <h3>Connected Nodes</h3>
+                            </div>
+                            <div class="card-body" id="connectedNodes">
+                                <div class="status-loading">Loading connected nodes...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="card wide">
+                            <div class="card-header">
+                                <h3>Network Configuration</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="networkConfigForm">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="listenAddress">Listen Address</label>
+                                            <input type="text" id="listenAddress" value="127.0.0.1:8000">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="discoveryPort">Discovery Port</label>
+                                            <input type="number" id="discoveryPort" value="8001">
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="maxConnections">Max Connections</label>
+                                            <input type="number" id="maxConnections" value="10">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="connectionTimeout">Connection Timeout (seconds)</label>
+                                            <input type="number" id="connectionTimeout" value="30">
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="announcementInterval">Announcement Interval (seconds)</label>
+                                            <input type="number" id="announcementInterval" value="60">
+                                        </div>
+                                        <div class="form-group checkbox-group">
+                                            <label>
+                                                <input type="checkbox" id="enableDiscovery" checked>
+                                                <span>Enable Discovery</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="form-actions">
+                                        <button type="button" class="btn primary" id="saveNetworkConfigBtn">Save Configuration</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Connect to Node</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label for="nodeId">Node ID</label>
+                                    <input type="text" id="nodeId" placeholder="Enter node ID">
+                                </div>
+                                <div class="form-actions">
+                                    <button class="btn primary" id="connectToNodeBtn">Connect</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Apps Page -->
+                <div class="page" id="appsPage">
+                    <div class="page-header">
+                        <h2>Applications</h2>
+                        <div class="page-actions">
+                            <button class="btn primary" id="registerAppBtn">
+                                <i class="fas fa-plus"></i>
+                                <span>Register App</span>
+                            </button>
+                            <button class="btn secondary" id="refreshAppsBtn">
+                                <i class="fas fa-sync-alt"></i>
+                                <span>Refresh</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="apps-container" id="appsList">
+                        <div class="status-loading">Loading applications...</div>
+                    </div>
+                    
+                    <!-- App Modal -->
+                    <div class="modal" id="appModal">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 id="appModalTitle">Register Application</h3>
+                                <button class="close-btn" id="closeAppModal">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label for="appName">Application Name</label>
+                                    <input type="text" id="appName" placeholder="Enter application name">
+                                </div>
+                                <div class="form-group">
+                                    <label for="appPath">Application Path</label>
+                                    <input type="text" id="appPath" placeholder="Enter application path">
+                                </div>
+                                <div class="form-group">
+                                    <label for="appDescription">Description</label>
+                                    <textarea id="appDescription" placeholder="Enter application description"></textarea>
+                                </div>
+                                <div class="modal-actions">
+                                    <button class="btn primary" id="saveAppBtn">Register Application</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Page -->
+                <div class="page" id="settingsPage">
+                    <div class="page-header">
+                        <h2>Settings</h2>
+                    </div>
+                    
+                    <div class="settings-container">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>General Settings</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="generalSettingsForm">
+                                    <div class="form-group">
+                                        <label for="nodeName">Node Name</label>
+                                        <input type="text" id="nodeName" placeholder="Enter node name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="dataDirectory">Data Directory</label>
+                                        <input type="text" id="dataDirectory" placeholder="Enter data directory path">
+                                    </div>
+                                    <div class="form-group checkbox-group">
+                                        <label>
+                                            <input type="checkbox" id="enableLogging" checked>
+                                            <span>Enable Detailed Logging</span>
+                                        </label>
+                                    </div>
+                                    <div class="form-actions">
+                                        <button type="button" class="btn primary" id="saveGeneralSettingsBtn">Save Settings</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Authentication</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="authSettingsForm">
+                                    <div class="form-group">
+                                        <label for="publicKey">Public Key</label>
+                                        <input type="text" id="publicKey" placeholder="Enter public key">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="privateKey">Private Key</label>
+                                        <input type="password" id="privateKey" placeholder="Enter private key">
+                                    </div>
+                                    <div class="form-actions">
+                                        <button type="button" class="btn primary" id="saveAuthSettingsBtn">Save Authentication</button>
+                                        <button type="button" class="btn secondary" id="generateKeysBtn">Generate New Keys</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="section">
-        <h2>Results</h2>
-        <div id="results"></div>
-    </div>
+    <!-- Notification System -->
+    <div class="notification-container" id="notificationContainer"></div>
 
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-message">Loading...</div>
+    </div>
 
     <!-- Load JavaScript modules -->
     <script src="/js/utils.js"></script>
     <script src="/js/schema.js"></script>
     <script src="/js/operations.js"></script>
     <script src="/js/network.js"></script>
+    <script src="/js/apps.js"></script>
+    <script src="/js/dashboard.js"></script>
+    <script src="/js/settings.js"></script>
     <script src="/js/app.js"></script>
 </body>
 </html>

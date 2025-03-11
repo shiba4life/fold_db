@@ -1,5 +1,8 @@
-use fold_db::{DataFoldNode, NodeConfig, datafold_node::{WebServer, load_schema_from_file}};
+#![recursion_limit = "256"]
+
+use fold_db::{DataFoldNode, NodeConfig, datafold_node::{WebServer, web_server::ApiServer, load_schema_from_file}};
 use std::{fs, sync::Arc, path::{Path, PathBuf}};
+use tokio::task;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -56,8 +59,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Failed to load apps");
     }
     
-    // Wrap in Arc<Mutex> and create web server
-    println!("Creating web server...");
+    // Wrap in Arc<Mutex> and create servers
+    println!("Creating servers...");
     let node = Arc::new(tokio::sync::Mutex::new(node));
     
     // Check if we should use Unix socket
@@ -68,30 +71,56 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let unix_socket_path = std::env::var("UNIX_SOCKET_PATH")
         .unwrap_or_else(|_| "/var/run/datafold.sock".to_string());
     
-    let server = if use_unix_socket {
-        println!("Using Unix socket at: {}", unix_socket_path);
-        WebServer::new(node).with_unix_socket(PathBuf::from(unix_socket_path))
-    } else {
-        println!("Using TCP socket");
-        WebServer::new(node)
-    };
-    
-    let port = std::env::var("API_PORT")
+    // Get port configurations
+    let ui_port = std::env::var("UI_PORT")
         .ok()
         .and_then(|p| p.parse::<u16>().ok())
         .unwrap_or(8080);
+        
+    let api_port = std::env::var("API_PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or(8081);
     
-    println!("Web server created, starting on port {}...", port);
+    // Create UI server
+    let ui_server = if use_unix_socket {
+        println!("Using Unix socket for UI server at: {}", unix_socket_path);
+        WebServer::new(Arc::clone(&node)).with_unix_socket(PathBuf::from(unix_socket_path))
+    } else {
+        println!("Using TCP socket for UI server");
+        WebServer::new(Arc::clone(&node))
+    };
     
-    // Run the server and handle any errors
-    match server.run(port).await {
-        Ok(_) => println!("Web server stopped normally"),
-        Err(e) => {
-            eprintln!("Web server error: {}", e);
-            eprintln!("Error details: {:?}", e);
-            return Err(e);
+    // Create API server
+    let api_server = ApiServer::new(Arc::clone(&node));
+    
+    println!("UI server will start on port {}", ui_port);
+    println!("API server will start on port {}", api_port);
+    
+    // Run both servers concurrently
+    let ui_handle = task::spawn(async move {
+        match ui_server.run(ui_port).await {
+            Ok(_) => println!("UI server stopped normally"),
+            Err(e) => {
+                eprintln!("UI server error: {}", e);
+                eprintln!("Error details: {:?}", e);
+            }
         }
-    }
+    });
     
+    let api_handle = task::spawn(async move {
+        match api_server.run(api_port).await {
+            Ok(_) => println!("API server stopped normally"),
+            Err(e) => {
+                eprintln!("API server error: {}", e);
+                eprintln!("Error details: {:?}", e);
+            }
+        }
+    });
+    
+    // Wait for both servers to complete
+    let _ = tokio::try_join!(ui_handle, api_handle);
+    
+    println!("DataFold Node shutting down");
     Ok(())
 }

@@ -70,9 +70,11 @@ npm run dev
 
 The application will be available at http://localhost:3000
 
-## Testing Schema Loading
+## Testing
 
-FoldSocial now supports schema loading from files using the updated DataFold client. To test this functionality:
+### Schema Loading Test
+
+FoldSocial supports schema loading from files using the updated DataFold client. To test this functionality:
 
 ```bash
 # Run the schema loading test
@@ -86,6 +88,23 @@ This script will:
 4. Fetch and display all posts
 
 The schema file is located at `data/post-schema.json` and can be modified to test different schema configurations.
+
+### DataFold Node Persistence Test
+
+To verify that the DataFold Node correctly persists data to disk:
+
+```bash
+# Run the persistence test
+./run-persistence-test.sh
+```
+
+This test will:
+1. Start the DataFold Node if it's not running
+2. Create a Post schema if it doesn't exist
+3. Create test posts in the database
+4. Verify the posts were created in memory
+5. Verify the posts were saved to disk
+6. Clean up after the test
 
 ## How It Works
 

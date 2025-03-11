@@ -6,7 +6,25 @@ use crate::datafold_node::node::DataFoldNode;
 
 #[derive(Debug, Deserialize)]
 pub struct QueryRequest {
+    #[serde(with = "operation_string_or_object")]
     pub operation: String,
+}
+
+mod operation_string_or_object {
+    use serde::{self, Deserialize, Deserializer};
+    use serde_json::Value;
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match value {
+            Value::String(s) => Ok(s),
+            Value::Object(_) => Ok(serde_json::to_string(&value).unwrap_or_default()),
+            _ => Err(serde::de::Error::custom("Expected string or object")),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

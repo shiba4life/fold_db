@@ -1,27 +1,17 @@
 # Active Context
 
 ## Current Task
-Enhancing the DataFold Node with HTTP endpoints for schema loading, querying, and mutation.
+Separated DataFold Node's web server into two distinct servers:
+1. UI Server - For the DataFold Node's own web interface
+2. API Server - For other webapps to query and interact with DataFold
 
 ## Recent Changes
-- Created FoldSocial application structure
-- Implemented Post schema creation and management
-- Created UI for adding and viewing posts
-- Set up Express server with EJS templating
-- Integrated with DataFold client for database operations
-- Created a simplified DataFold Node server with HTTP API
-- Implemented data persistence using JSON files
-- Added scripts to start the DataFold Node and FoldSocial app
-- Added error handling for when the DataFold Node is not running
-- Added HTTP endpoints for loading schemas from files and JSON content
-- Updated the DataFold client to support schema loading functionality
-- Added unit tests for schema loading functionality
-- Created documentation for the schema loading API
-- Updated the FoldSocial's DataFold Node server to support schema loading
-- Updated FoldSocial to use the schema loading functionality
-- Created a Post schema file for testing schema loading
-- Added a test script for demonstrating schema loading
-- Updated documentation to include schema loading information
+- Created a new ApiServer class that handles all API endpoints for external applications
+- Modified the existing WebServer class to focus only on UI functionality
+- Updated the main function to run both servers concurrently
+- Configured the servers to run on different ports (UI on 8080, API on 8081 by default)
+- Made the ports configurable via environment variables (UI_PORT and API_PORT)
+- Fixed the "Missing X-Public-Key header" error by ensuring proper authentication in the API server
 
 ## Next Steps
 1. Add user authentication to support multiple users
@@ -32,3 +22,4 @@ Enhancing the DataFold Node with HTTP endpoints for schema loading, querying, an
 6. Enhance authentication and authorization mechanisms
 7. Add support for more complex schema relationships
 8. Implement schema versioning and migration
+9. Add more comprehensive tests for DataFold Node functionality
