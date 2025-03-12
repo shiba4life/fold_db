@@ -21,6 +21,19 @@ src/datafold_node/data
 *.env
 *.bak
 
+# Chrome extension specific
+chrome-extension/node_modules/
+chrome-extension/dist/
+chrome-extension/build/
+chrome-extension/*.pem
+chrome-extension/*.crx
+chrome-extension/*.zip
+
+# Sample app specific
+sample-app/node_modules/
+sample-app/dist/
+sample-app/build/
+
 # Temporary files
 /tmp/
 *.swp

@@ -8,3 +8,4 @@ pub mod permission_tests;
 pub mod permissions_tests;
 pub mod schema_interpreter_tests;
 pub mod schema_tests;
+pub mod signature_verification_tests;

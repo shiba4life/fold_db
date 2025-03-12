@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FoldDB Query Signer</title>
+  <link rel="stylesheet" href="../css/popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="../images/icon48.png" alt="FoldDB Logo" class="logo">
+      <h1>FoldDB Query Signer</h1>
+    </div>
+    
+    <div class="status-container">
+      <div class="status">
+        <span class="status-label">Status:</span>
+        <span id="connection-status" class="status-value">Disconnected</span>
+      </div>
+      <div class="account">
+        <span class="account-label">Public Key:</span>
+        <span id="public-key" class="account-value">Not generated</span>
+      </div>
+    </div>
+
+    <div class="key-management">
+      <h2>Key Management</h2>
+      <div id="no-keys-message">
+        <p>No keys found. Generate a new key pair to get started.</p>
+        <button id="generate-key-btn" class="btn primary-btn">Generate New Keys</button>
+      </div>
+      
+      <div id="keys-exist-controls" style="display: none;">
+        <div class="key-info">
+          <p>Your keys are securely stored in this browser.</p>
+          <div class="key-display">
+            <label>Public Key (truncated):</label>
+            <div id="public-key-display" class="key-text"></div>
+          </div>
+        </div>
+        <div class="key-actions">
+          <button id="export-key-btn" class="btn secondary-btn">Export Public Key</button>
+          <button id="reset-key-btn" class="btn danger-btn">Reset Keys</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="pending-requests" id="pending-requests-container" style="display: none;">
+      <h2>Pending Requests</h2>
+      <div id="no-requests-message">
+        <p>No pending requests to sign.</p>
+      </div>
+      <div id="request-list"></div>
+    </div>
+
+    <div class="footer">
+      <p>FoldDB Query Signer v1.0.0</p>
+    </div>
+  </div>
+
+  <script src="../js/popup.js"></script>
+</body>
+</html>
