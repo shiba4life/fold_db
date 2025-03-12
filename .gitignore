@@ -15,6 +15,7 @@ Thumbs.db
 # Project specific
 /data/
 src/datafold_node/data/db/
+src/datafold_node/data
 /config/
 *.log
 *.env

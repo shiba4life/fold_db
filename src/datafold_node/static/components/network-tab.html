@@ -1,96 +1,134 @@
 <!-- Network Tab Component -->
 <div id="networkTab" class="tab-content">
-    <div class="section">
-        <h3>Network Status</h3>
-        <div id="networkStatus">
-            <div class="status">Loading network status...</div>
+    <!-- Network Status Section -->
+    <div class="card mt-3">
+        <div class="card-header">
+            <h3 class="mb-0">Network Status</h3>
+        </div>
+        <div class="card-body">
+            <div id="networkStatus" class="network-status">
+                <div class="status info">
+                    <span class="loading"></span>
+                    <span>Loading network status...</span>
+                </div>
+            </div>
         </div>
     </div>
     
-    <div class="section">
-        <h3>Network Operations</h3>
-        <div class="network-actions">
-            <button id="startNetworkBtn">Start Network</button>
-            <button id="stopNetworkBtn">Stop Network</button>
-            <button id="discoverNodesBtn">Discover Nodes</button>
-            <button id="listNodesBtn">List Connected Nodes</button>
+    <!-- Network Operations Section -->
+    <div class="card mt-3">
+        <div class="card-header">
+            <h3 class="mb-0">Network Operations</h3>
+        </div>
+        <div class="card-body">
+            <div class="btn-group">
+                <button id="startNetworkBtn" class="btn btn-success">
+                    <span id="startNetworkIcon"></span> Start Network
+                </button>
+                <button id="stopNetworkBtn" class="btn btn-danger">
+                    <span id="stopNetworkIcon"></span> Stop Network
+                </button>
+                <button id="discoverNodesBtn" class="btn btn-primary">
+                    <span id="discoverNodesIcon"></span> Discover Nodes
+                </button>
+                <button id="listNodesBtn" class="btn btn-secondary">
+                    <span id="listNodesIcon"></span> List Connected Nodes
+                </button>
+            </div>
         </div>
     </div>
     
-    <div class="section">
-        <h3>Network Configuration</h3>
-        <form id="networkConfigForm">
-            <div class="form-group">
-                <label for="listenAddress">Listen Address:</label>
-                <input type="text" id="listenAddress" value="127.0.0.1:8000" class="form-control">
-            </div>
-            
-            <div class="form-group">
-                <label for="discoveryPort">Discovery Port:</label>
-                <input type="number" id="discoveryPort" value="8001" class="form-control">
-            </div>
-            
-            <div class="form-group">
-                <label for="maxConnections">Max Connections:</label>
-                <input type="number" id="maxConnections" value="10" class="form-control">
-            </div>
-            
-            <div class="form-group">
-                <label for="connectionTimeout">Connection Timeout (seconds):</label>
-                <input type="number" id="connectionTimeout" value="30" class="form-control">
-            </div>
-            
-            <div class="form-group">
-                <label for="announcementInterval">Announcement Interval (seconds):</label>
-                <input type="number" id="announcementInterval" value="60" class="form-control">
-            </div>
-            
-            <div class="form-group">
-                <label for="enableDiscovery">Enable Discovery:</label>
-                <input type="checkbox" id="enableDiscovery" checked>
-            </div>
-            
-            <button type="button" id="initNetworkBtn">Initialize Network</button>
-        </form>
+    <!-- Network Configuration Section -->
+    <div class="card mt-3">
+        <div class="card-header">
+            <h3 class="mb-0">Network Configuration</h3>
+        </div>
+        <div class="card-body">
+            <form id="networkConfigForm">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="listenAddress">Listen Address</label>
+                            <input type="text" id="listenAddress" value="127.0.0.1:8000" class="form-control">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="discoveryPort">Discovery Port</label>
+                            <input type="number" id="discoveryPort" value="8001" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="maxConnections">Max Connections</label>
+                            <input type="number" id="maxConnections" value="10" class="form-control">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="connectionTimeout">Connection Timeout (seconds)</label>
+                            <input type="number" id="connectionTimeout" value="30" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="announcementInterval">Announcement Interval (seconds)</label>
+                            <input type="number" id="announcementInterval" value="60" class="form-control">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" id="enableDiscovery" class="form-check-input" checked>
+                                <label for="enableDiscovery" class="form-check-label">Enable Discovery</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="button" id="initNetworkBtn" class="btn btn-primary mt-3">
+                    <span id="initNetworkIcon"></span> Initialize Network
+                </button>
+            </form>
+        </div>
     </div>
     
-    <div class="section">
-        <h3>Connect to Node</h3>
-        <div class="form-group">
-            <label for="nodeId">Node ID:</label>
-            <input type="text" id="nodeId" placeholder="Enter node ID" class="form-control">
+    <!-- Connect to Node Section -->
+    <div class="card mt-3">
+        <div class="card-header">
+            <h3 class="mb-0">Connect to Node</h3>
         </div>
-        <button id="connectToNodeBtn">Connect</button>
+        <div class="card-body">
+            <div class="form-group">
+                <label for="nodeId">Node ID</label>
+                <input type="text" id="nodeId" placeholder="Enter node ID" class="form-control">
+            </div>
+            <button id="connectToNodeBtn" class="btn btn-primary mt-3">
+                <span id="connectToNodeIcon"></span> Connect
+            </button>
+        </div>
     </div>
 </div>
 
-<style>
-    .network-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 20px;
-    }
-    
-    .form-group {
-        margin-bottom: 15px;
-    }
-    
-    .form-group label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-    }
-    
-    .form-control {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-    }
-</style>
-
 <script>
+    // Add icons to buttons
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.icons) {
+            document.getElementById('startNetworkIcon').innerHTML = icons.play();
+            document.getElementById('stopNetworkIcon').innerHTML = icons.stop();
+            document.getElementById('discoverNodesIcon').innerHTML = icons.search();
+            document.getElementById('listNodesIcon').innerHTML = icons.folder();
+            document.getElementById('initNetworkIcon').innerHTML = icons.gear();
+            document.getElementById('connectToNodeIcon').innerHTML = icons.network();
+        }
+    });
+
     // Initialize network with form data
     document.getElementById('initNetworkBtn')?.addEventListener('click', () => {
         const config = {
@@ -114,4 +152,43 @@
             utils.displayResult('Please enter a node ID', true);
         }
     });
+
+    // Update network status rendering
+    if (window.networkModule) {
+        const originalRenderNetworkStatus = networkModule.renderNetworkStatus;
+        
+        networkModule.renderNetworkStatus = function(status) {
+            const container = document.getElementById('networkStatus');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            // Create status cards
+            const createStatusCard = (title, value, status = '') => {
+                const card = document.createElement('div');
+                card.className = `status-card ${status}`;
+                
+                const titleEl = document.createElement('h4');
+                titleEl.textContent = title;
+                
+                const valueEl = document.createElement('p');
+                valueEl.textContent = value;
+                
+                card.appendChild(titleEl);
+                card.appendChild(valueEl);
+                
+                return card;
+            };
+            
+            // Add network status cards
+            container.appendChild(createStatusCard('Status', status.running ? 'Running' : 'Stopped', status.running ? 'active' : 'inactive'));
+            container.appendChild(createStatusCard('Connected Nodes', status.connected_nodes || 0));
+            container.appendChild(createStatusCard('Discovery', status.discovery_enabled ? 'Enabled' : 'Disabled'));
+            container.appendChild(createStatusCard('Listen Address', status.listen_address || 'Not set'));
+            
+            if (status.last_error) {
+                container.appendChild(createStatusCard('Last Error', status.last_error, 'error'));
+            }
+        };
+    }
 </script>

@@ -14,8 +14,25 @@ function displayResult(data, isError = false) {
         return;
     }
     
-    resultsDiv.className = isError ? 'status error' : 'status success';
-    resultsDiv.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    // Format the data
+    const formattedData = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    
+    // Add appropriate styling
+    resultsDiv.className = '';
+    resultsDiv.innerHTML = formattedData;
+    
+    // Scroll to results
+    resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    
+    // Update node status indicator
+    const nodeStatus = document.getElementById('nodeStatus');
+    if (nodeStatus) {
+        nodeStatus.className = isError ? 'status error' : 'status success';
+        const statusIcon = document.getElementById('statusIcon');
+        if (statusIcon && window.icons) {
+            statusIcon.innerHTML = isError ? icons.x() : icons.check();
+        }
+    }
 }
 
 /**
@@ -43,7 +60,12 @@ function showLoading(element, message = 'Loading...') {
         return;
     }
     
-    element.innerHTML = `<div class="loading"></div> ${message}`;
+    element.innerHTML = `
+        <div class="status info">
+            <span class="loading"></span>
+            <span>${message}</span>
+        </div>
+    `;
 }
 
 /**
@@ -53,6 +75,17 @@ function showLoading(element, message = 'Loading...') {
  */
 function handleApiError(error) {
     console.error('API Error:', error);
+    
+    // Update node status indicator to show error
+    const nodeStatus = document.getElementById('nodeStatus');
+    if (nodeStatus) {
+        nodeStatus.className = 'status error';
+        const statusIcon = document.getElementById('statusIcon');
+        if (statusIcon && window.icons) {
+            statusIcon.innerHTML = icons.x();
+        }
+    }
+    
     return `Error: ${error.message || 'Unknown error occurred'}`;
 }
 
@@ -119,9 +152,64 @@ function switchTab(tabName) {
         if (tabName === 'schemas') {
             schemaModule.loadSchemaList();
         }
+        
+        // Refresh network status when switching to network tab
+        if (tabName === 'network' && window.networkModule) {
+            networkModule.getNetworkStatus();
+        }
     } else {
         console.error(`Tab content for ${tabName} not found`);
     }
+}
+
+/**
+ * Show a notification message
+ * @param {string} message - The message to display
+ * @param {string} type - The type of notification (success, error, warning, info)
+ * @param {number} duration - How long to show the notification in ms
+ */
+function showNotification(message, type = 'info', duration = 3000) {
+    // Create notification element if it doesn't exist
+    let notificationContainer = document.getElementById('notification-container');
+    
+    if (!notificationContainer) {
+        notificationContainer = document.createElement('div');
+        notificationContainer.id = 'notification-container';
+        notificationContainer.style.position = 'fixed';
+        notificationContainer.style.top = '20px';
+        notificationContainer.style.right = '20px';
+        notificationContainer.style.zIndex = '1000';
+        document.body.appendChild(notificationContainer);
+    }
+    
+    // Create notification
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} fade-in`;
+    notification.style.marginBottom = '10px';
+    
+    // Add icon based on type
+    let icon = '';
+    if (window.icons) {
+        switch (type) {
+            case 'success': icon = icons.check(); break;
+            case 'error': icon = icons.x(); break;
+            case 'warning': icon = icons.warning(); break;
+            case 'info': icon = icons.info(); break;
+        }
+    }
+    
+    notification.innerHTML = `${icon} ${message}`;
+    
+    // Add to container
+    notificationContainer.appendChild(notification);
+    
+    // Remove after duration
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+            notificationContainer.removeChild(notification);
+        }, 300);
+    }, duration);
 }
 
 /**
@@ -146,5 +234,6 @@ window.utils = {
     handleApiError,
     apiRequest,
     switchTab,
-    toggleSchema
+    toggleSchema,
+    showNotification
 };

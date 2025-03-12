@@ -5,69 +5,136 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DataFold Node</title>
     <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/modern-styles.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap">
 </head>
 <body>
-    <h1>DataFold Node</h1>
-    <div class="status success">
-        Node is running successfully
-    </div>
-
-    <div class="section">
-        <h2>Operations</h2>
-        <div class="tab-container">
-            <div class="tab-buttons">
-                <button class="tab-button active" data-tab="schemas">Loaded Schemas</button>
-                <button class="tab-button" data-tab="schema">Schema</button>
-                <button class="tab-button" data-tab="query">Query</button>
-                <button class="tab-button" data-tab="mutation">Mutation</button>
-                <button class="tab-button" data-tab="network">Network</button>
+    <!-- Header -->
+    <header class="header">
+        <div class="container header-content">
+            <div class="logo">
+                <div class="logo-icon" id="logoIcon"></div>
+                <h1>DataFold Node</h1>
             </div>
-            
-            <!-- Include Schema Tab Components -->
-            <div id="schemaTabsContainer">
-                <script>
-                    fetch('/components/schema-tab.html')
-                        .then(response => response.text())
-                        .then(html => {
-                            document.getElementById('schemaTabsContainer').innerHTML = html;
-                        });
-                </script>
-            </div>
-            
-            <!-- Include Operations Tab Components -->
-            <div id="operationsTabsContainer">
-                <script>
-                    fetch('/components/operations-tab.html')
-                        .then(response => response.text())
-                        .then(html => {
-                            document.getElementById('operationsTabsContainer').innerHTML = html;
-                        });
-                </script>
-            </div>
-            
-            <!-- Include Network Tab Component -->
-            <div id="networkTabContainer">
-                <script>
-                    fetch('/components/network-tab.html')
-                        .then(response => response.text())
-                        .then(html => {
-                            document.getElementById('networkTabContainer').innerHTML = html;
-                        });
-                </script>
+            <div class="node-status">
+                <span class="badge badge-success">Node Active</span>
             </div>
         </div>
-    </div>
+    </header>
 
-    <div class="section">
-        <h2>Results</h2>
-        <div id="results"></div>
-    </div>
+    <!-- Main Content -->
+    <main class="container">
+        <!-- Status Section -->
+        <div class="status success mt-4" id="nodeStatus">
+            <span id="statusIcon"></span>
+            <span>Node is running successfully</span>
+        </div>
+
+        <!-- Operations Section -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h2>Operations</h2>
+            </div>
+            <div class="card-body">
+                <div class="tab-container">
+                    <div class="tab-buttons">
+                        <button class="tab-button active" data-tab="schemas">
+                            <span id="schemasTabIcon"></span> Loaded Schemas
+                        </button>
+                        <button class="tab-button" data-tab="schema">
+                            <span id="schemaTabIcon"></span> Schema
+                        </button>
+                        <button class="tab-button" data-tab="query">
+                            <span id="queryTabIcon"></span> Query
+                        </button>
+                        <button class="tab-button" data-tab="mutation">
+                            <span id="mutationTabIcon"></span> Mutation
+                        </button>
+                        <button class="tab-button" data-tab="network">
+                            <span id="networkTabIcon"></span> Network
+                        </button>
+                    </div>
+                    
+                    <!-- Include Schema Tab Components -->
+                    <div id="schemaTabsContainer">
+                        <script>
+                            fetch('/components/schema-tab.html')
+                                .then(response => response.text())
+                                .then(html => {
+                                    document.getElementById('schemaTabsContainer').innerHTML = html;
+                                });
+                        </script>
+                    </div>
+                    
+                    <!-- Include Operations Tab Components -->
+                    <div id="operationsTabsContainer">
+                        <script>
+                            fetch('/components/operations-tab.html')
+                                .then(response => response.text())
+                                .then(html => {
+                                    document.getElementById('operationsTabsContainer').innerHTML = html;
+                                });
+                        </script>
+                    </div>
+                    
+                    <!-- Include Network Tab Component -->
+                    <div id="networkTabContainer">
+                        <script>
+                            fetch('/components/network-tab.html')
+                                .then(response => response.text())
+                                .then(html => {
+                                    document.getElementById('networkTabContainer').innerHTML = html;
+                                });
+                        </script>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h2>Results</h2>
+            </div>
+            <div class="card-body">
+                <div id="results">No results to display yet. Run an operation to see results here.</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container footer-content">
+            <div class="footer-text">
+                &copy; 2025 DataFold Node - A schema-based database system with atomic operations
+            </div>
+        </div>
+    </footer>
 
     <!-- Load JavaScript modules -->
+    <script src="/js/icons.js"></script>
     <script src="/js/utils.js"></script>
     <script src="/js/schema.js"></script>
     <script src="/js/operations.js"></script>
     <script src="/js/network.js"></script>
     <script src="/js/app.js"></script>
+
+    <!-- Initialize icons -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set logo icon
+            document.getElementById('logoIcon').innerHTML = icons.database();
+            
+            // Set tab icons
+            document.getElementById('schemasTabIcon').innerHTML = icons.folder();
+            document.getElementById('schemaTabIcon').innerHTML = icons.schema();
+            document.getElementById('queryTabIcon').innerHTML = icons.search();
+            document.getElementById('mutationTabIcon').innerHTML = icons.code();
+            document.getElementById('networkTabIcon').innerHTML = icons.network();
+            
+            // Set status icon
+            document.getElementById('statusIcon').innerHTML = icons.check();
+        });
+    </script>
 </body>
 </html>

@@ -3,350 +3,691 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DataFold Node</title>
+    <title>DataFold Node UI Test</title>
     <style>
+        /* Modern UI Styles for DataFold Node */
+        :root {
+          --primary-color: #4361ee;
+          --primary-light: #4895ef;
+          --primary-dark: #3f37c9;
+          --secondary-color: #4cc9f0;
+          --success-color: #4caf50;
+          --warning-color: #ff9800;
+          --danger-color: #f44336;
+          --light-color: #f8f9fa;
+          --dark-color: #212529;
+          --gray-100: #f8f9fa;
+          --gray-200: #e9ecef;
+          --gray-300: #dee2e6;
+          --gray-400: #ced4da;
+          --gray-500: #adb5bd;
+          --gray-600: #6c757d;
+          --gray-700: #495057;
+          --gray-800: #343a40;
+          --gray-900: #212529;
+          --border-radius: 8px;
+          --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          --transition: all 0.3s ease;
+        }
+
+        /* Base styles */
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+          line-height: 1.6;
+          color: var(--gray-800);
+          background-color: #f5f7fa;
+          margin: 0;
+          padding: 0;
         }
-        h1, h2, h3 {
-            color: #333;
-            border-bottom: 2px solid #eee;
-            padding-bottom: 10px;
+
+        .container {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 0 20px;
         }
+
+        /* Header */
+        .header {
+          background-color: white;
+          box-shadow: var(--box-shadow);
+          padding: 1rem 0;
+          position: sticky;
+          top: 0;
+          z-index: 100;
+        }
+
+        .header-content {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .logo {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .logo h1 {
+          font-size: 1.5rem;
+          font-weight: 600;
+          color: var(--primary-color);
+          margin: 0;
+          border: none;
+          padding: 0;
+        }
+
+        .logo-icon {
+          width: 32px;
+          height: 32px;
+          background-color: var(--primary-color);
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: bold;
+        }
+
+        /* Status indicators */
         .status {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 4px;
-            margin: 20px 0;
+          padding: 1rem;
+          border-radius: var(--border-radius);
+          margin: 1rem 0;
+          display: flex;
+          align-items: center;
+          gap: 10px;
         }
+
         .status.success {
-            background: #e6ffe6;
-            color: #006600;
+          background-color: rgba(76, 175, 80, 0.1);
+          color: var(--success-color);
+          border-left: 4px solid var(--success-color);
         }
+
         .status.error {
-            background: #ffe6e6;
-            color: #660000;
+          background-color: rgba(244, 67, 54, 0.1);
+          color: var(--danger-color);
+          border-left: 4px solid var(--danger-color);
         }
-        .section {
-            margin: 20px 0;
-            padding: 20px;
-            border: 1px solid #eee;
-            border-radius: 4px;
+
+        .status.warning {
+          background-color: rgba(255, 152, 0, 0.1);
+          color: var(--warning-color);
+          border-left: 4px solid var(--warning-color);
         }
-        textarea {
-            width: 100%;
-            min-height: 200px;
-            font-family: monospace;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin: 10px 0;
+
+        .status.info {
+          background-color: rgba(33, 150, 243, 0.1);
+          color: var(--primary-color);
+          border-left: 4px solid var(--primary-color);
         }
-        button {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
+
+        .status-icon {
+          font-size: 1.2rem;
         }
-        button:hover {
-            background: #0056b3;
+
+        /* Card styles */
+        .card {
+          background-color: white;
+          border-radius: var(--border-radius);
+          box-shadow: var(--box-shadow);
+          margin-bottom: 1.5rem;
+          overflow: hidden;
         }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
+
+        .card-header {
+          padding: 1rem 1.5rem;
+          border-bottom: 1px solid var(--gray-200);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
         }
-        #results {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 4px;
-            white-space: pre-wrap;
-            font-family: monospace;
+
+        .card-header h2 {
+          font-size: 1.25rem;
+          font-weight: 600;
+          margin: 0;
+          color: var(--gray-800);
+          border: none;
+          padding: 0;
         }
+
+        .card-body {
+          padding: 1.5rem;
+        }
+
+        .card-footer {
+          padding: 1rem 1.5rem;
+          border-top: 1px solid var(--gray-200);
+          background-color: var(--gray-100);
+        }
+
+        /* Tab system */
         .tab-container {
-            margin: 20px 0;
+          margin: 1rem 0;
         }
+
         .tab-buttons {
-            margin-bottom: 10px;
+          display: flex;
+          border-bottom: 1px solid var(--gray-300);
+          margin-bottom: 1rem;
+          overflow-x: auto;
+          scrollbar-width: none; /* Firefox */
         }
+
+        .tab-buttons::-webkit-scrollbar {
+          display: none; /* Chrome, Safari, Edge */
+        }
+
         .tab-button {
-            background: #f8f9fa;
-            border: 1px solid #ddd;
-            padding: 10px 20px;
-            margin-right: 5px;
-            cursor: pointer;
+          background: transparent;
+          border: none;
+          padding: 0.75rem 1.25rem;
+          margin-right: 0.5rem;
+          cursor: pointer;
+          color: var(--gray-600);
+          font-weight: 500;
+          position: relative;
+          transition: var(--transition);
+          white-space: nowrap;
         }
+
+        .tab-button:hover {
+          color: var(--primary-color);
+          background-color: transparent;
+        }
+
         .tab-button.active {
-            background: #007bff;
-            color: white;
-            border-color: #007bff;
+          color: var(--primary-color);
+          background-color: transparent;
+          border-color: transparent;
         }
+
+        .tab-button.active::after {
+          content: '';
+          position: absolute;
+          bottom: -1px;
+          left: 0;
+          width: 100%;
+          height: 2px;
+          background-color: var(--primary-color);
+        }
+
         .tab-content {
-            display: none;
+          display: none;
+          animation: fadeIn 0.3s ease;
         }
+
         .tab-content.active {
-            display: block;
+          display: block;
         }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        /* Form elements */
+        .form-group {
+          margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+          display: block;
+          margin-bottom: 0.5rem;
+          font-weight: 500;
+          color: var(--gray-700);
+        }
+
+        .form-control {
+          width: 100%;
+          padding: 0.75rem 1rem;
+          border: 1px solid var(--gray-300);
+          border-radius: var(--border-radius);
+          font-size: 1rem;
+          transition: var(--transition);
+        }
+
+        .form-control:focus {
+          outline: none;
+          border-color: var(--primary-light);
+          box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+        }
+
+        textarea.form-control {
+          min-height: 200px;
+          font-family: 'Fira Code', 'Courier New', monospace;
+          line-height: 1.5;
+          resize: vertical;
+        }
+
+        .form-check {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .form-check input[type="checkbox"] {
+          width: 18px;
+          height: 18px;
+          accent-color: var(--primary-color);
+        }
+
+        /* Buttons */
+        .btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0.75rem 1.5rem;
+          border-radius: var(--border-radius);
+          font-weight: 500;
+          cursor: pointer;
+          transition: var(--transition);
+          border: none;
+          gap: 0.5rem;
+        }
+
+        .btn-primary {
+          background-color: var(--primary-color);
+          color: white;
+        }
+
+        .btn-primary:hover {
+          background-color: var(--primary-dark);
+        }
+
+        .btn-secondary {
+          background-color: var(--gray-200);
+          color: var(--gray-800);
+        }
+
+        .btn-secondary:hover {
+          background-color: var(--gray-300);
+        }
+
+        .btn-success {
+          background-color: var(--success-color);
+          color: white;
+        }
+
+        .btn-success:hover {
+          background-color: #3d8b40;
+        }
+
+        .btn-danger {
+          background-color: var(--danger-color);
+          color: white;
+        }
+
+        .btn-danger:hover {
+          background-color: #d32f2f;
+        }
+
+        .btn-sm {
+          padding: 0.5rem 1rem;
+          font-size: 0.875rem;
+        }
+
+        .btn-lg {
+          padding: 1rem 2rem;
+          font-size: 1.125rem;
+        }
+
+        .btn-icon {
+          padding: 0.5rem;
+          border-radius: 50%;
+        }
+
+        .btn:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
+        }
+
+        /* Button groups */
+        .btn-group {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
+        /* Schema items */
         .schema-item {
-            background: #f8f9fa;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.2s;
+          background-color: white;
+          border-radius: var(--border-radius);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+          margin-bottom: 1rem;
+          overflow: hidden;
+          transition: var(--transition);
+          border: 1px solid var(--gray-200);
         }
+
         .schema-item:hover {
-            background: #e9ecef;
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
-        .schema-item h3 {
-            margin-top: 0;
-            margin-bottom: 0;
-            color: #007bff;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+
+        .schema-header {
+          padding: 1rem 1.5rem;
+          background-color: var(--gray-100);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          cursor: pointer;
         }
-        .remove-schema {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-left: 10px;
+
+        .schema-title {
+          font-size: 1.1rem;
+          font-weight: 600;
+          color: var(--primary-color);
+          margin: 0;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
         }
-        .remove-schema:hover {
-            background: #c82333;
+
+        .schema-actions {
+          display: flex;
+          gap: 0.5rem;
         }
-        .schema-item h3::after {
-            content: '▼';
-            font-size: 0.8em;
-            transition: transform 0.2s;
+
+        .schema-content {
+          padding: 1.5rem;
+          border-top: 1px solid var(--gray-200);
+          display: none;
         }
-        .schema-item.collapsed h3::after {
-            transform: rotate(-90deg);
+
+        .schema-item.expanded .schema-content {
+          display: block;
+          animation: slideDown 0.3s ease;
         }
-        .schema-item pre {
-            margin: 10px 0;
-            white-space: pre-wrap;
-            word-break: break-all;
-            display: none;
+
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        .schema-item.expanded pre {
-            display: block;
+
+        .schema-code {
+          background-color: var(--gray-100);
+          padding: 1rem;
+          border-radius: var(--border-radius);
+          font-family: 'Fira Code', 'Courier New', monospace;
+          overflow-x: auto;
+          white-space: pre-wrap;
+          word-break: break-all;
         }
-        .example-buttons {
-            margin-top: 10px;
+
+        /* Network status */
+        .network-status {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+          gap: 1rem;
+          margin-bottom: 1.5rem;
         }
-        .example-buttons button {
-            background: #6c757d;
-            font-size: 0.9em;
-            padding: 8px 15px;
+
+        .status-card {
+          background-color: white;
+          border-radius: var(--border-radius);
+          box-shadow: var(--box-shadow);
+          padding: 1.25rem;
+          border-left: 4px solid var(--primary-color);
         }
-        .example-buttons button:hover {
-            background: #5a6268;
+
+        .status-card h4 {
+          margin-top: 0;
+          margin-bottom: 0.5rem;
+          color: var(--gray-800);
+          font-size: 1rem;
+          font-weight: 600;
+        }
+
+        .status-card p {
+          margin-bottom: 0;
+          color: var(--gray-600);
+        }
+
+        .status-card.active {
+          border-left-color: var(--success-color);
+        }
+
+        .status-card.inactive {
+          border-left-color: var(--gray-500);
+        }
+
+        .status-card.error {
+          border-left-color: var(--danger-color);
+        }
+
+        /* Results display */
+        #results {
+          background-color: white;
+          border-radius: var(--border-radius);
+          padding: 1.5rem;
+          white-space: pre-wrap;
+          font-family: 'Fira Code', 'Courier New', monospace;
+          overflow-x: auto;
+          border: 1px solid var(--gray-200);
+          max-height: 400px;
+          overflow-y: auto;
+        }
+
+        /* Loading indicator */
+        .loading {
+          display: inline-block;
+          width: 24px;
+          height: 24px;
+          border: 3px solid rgba(67, 97, 238, 0.3);
+          border-radius: 50%;
+          border-top-color: var(--primary-color);
+          animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+          .tab-button {
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+          }
+          
+          .card-body {
+            padding: 1rem;
+          }
+          
+          .network-status {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        /* Grid system */
+        .row {
+          display: flex;
+          flex-wrap: wrap;
+          margin-right: -0.75rem;
+          margin-left: -0.75rem;
+        }
+
+        .col {
+          flex: 1 0 0%;
+          padding-right: 0.75rem;
+          padding-left: 0.75rem;
+        }
+
+        .col-12 { flex: 0 0 100%; max-width: 100%; }
+        .col-6 { flex: 0 0 50%; max-width: 50%; }
+        .col-4 { flex: 0 0 33.333333%; max-width: 33.333333%; }
+        .col-3 { flex: 0 0 25%; max-width: 25%; }
+
+        @media (max-width: 768px) {
+          .col-md-12 { flex: 0 0 100%; max-width: 100%; }
+          .col-md-6 { flex: 0 0 50%; max-width: 50%; }
+        }
+
+        @media (max-width: 576px) {
+          .col-sm-12 { flex: 0 0 100%; max-width: 100%; }
+        }
+
+        /* Utilities */
+        .mt-0 { margin-top: 0; }
+        .mt-1 { margin-top: 0.25rem; }
+        .mt-2 { margin-top: 0.5rem; }
+        .mt-3 { margin-top: 1rem; }
+        .mt-4 { margin-top: 1.5rem; }
+        .mt-5 { margin-top: 3rem; }
+
+        .mb-0 { margin-bottom: 0; }
+        .mb-1 { margin-bottom: 0.25rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-3 { margin-bottom: 1rem; }
+        .mb-4 { margin-bottom: 1.5rem; }
+        .mb-5 { margin-bottom: 3rem; }
+
+        .ml-auto { margin-left: auto; }
+        .mr-auto { margin-right: auto; }
+
+        .p-0 { padding: 0; }
+        .p-1 { padding: 0.25rem; }
+        .p-2 { padding: 0.5rem; }
+        .p-3 { padding: 1rem; }
+        .p-4 { padding: 1.5rem; }
+        .p-5 { padding: 3rem; }
+
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+
+        .d-flex { display: flex; }
+        .flex-column { flex-direction: column; }
+        .justify-content-between { justify-content: space-between; }
+        .justify-content-center { justify-content: center; }
+        .align-items-center { align-items: center; }
+        .flex-wrap { flex-wrap: wrap; }
+        .gap-1 { gap: 0.25rem; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-3 { gap: 1rem; }
+
+        .w-100 { width: 100%; }
+        .h-100 { height: 100%; }
+
+        /* Badge */
+        .badge {
+          display: inline-block;
+          padding: 0.25rem 0.5rem;
+          font-size: 0.75rem;
+          font-weight: 600;
+          line-height: 1;
+          text-align: center;
+          white-space: nowrap;
+          vertical-align: baseline;
+          border-radius: 50rem;
+        }
+
+        .badge-primary { background-color: var(--primary-color); color: white; }
+        .badge-secondary { background-color: var(--gray-500); color: white; }
+        .badge-success { background-color: var(--success-color); color: white; }
+        .badge-danger { background-color: var(--danger-color); color: white; }
+        .badge-warning { background-color: var(--warning-color); color: white; }
+        .badge-info { background-color: var(--secondary-color); color: white; }
+
+        /* Footer */
+        .footer {
+          background-color: white;
+          padding: 1.5rem 0;
+          border-top: 1px solid var(--gray-200);
+          margin-top: 2rem;
+        }
+
+        .footer-content {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .footer-text {
+          color: var(--gray-600);
+          font-size: 0.875rem;
         }
     </style>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap">
 </head>
 <body>
-    <h1>DataFold Node</h1>
-    <div class="status success">
-        Node is running successfully
-    </div>
-
-    <div class="section">
-        <h2>Operations</h2>
-        <div class="tab-container">
-            <div class="tab-buttons">
-                <button class="tab-button active" onclick="switchTab('schemas')">Loaded Schemas</button>
-                <button class="tab-button" onclick="switchTab('schema')">Schema</button>
-                <button class="tab-button" onclick="switchTab('query')">Query</button>
-                <button class="tab-button" onclick="switchTab('mutation')">Mutation</button>
+    <!-- Header -->
+    <header class="header">
+        <div class="container header-content">
+            <div class="logo">
+                <div class="logo-icon">DF</div>
+                <h1>DataFold Node</h1>
             </div>
-            <div id="schemasTab" class="tab-content active">
-                <div id="schemaList">
-                    <div class="schema-item collapsed" onclick="toggleSchema(this)">
-                        <h3>
-                            <span>UserProfile</span>
-                            <button class="remove-schema" onclick="removeSchema('UserProfile', event)">Remove</button>
-                        </h3>
-                        <pre>{
-  "name": "UserProfile",
-  "fields": {
-    "username": {
-      "field_type": "Single",
-      "permission_policy": {
-        "read_policy": { "NoRequirement": null },
-        "write_policy": { "Distance": 0 },
-        "explicit_read_policy": null,
-        "explicit_write_policy": null
-      }
-    }
-  }
-}</pre>
-                    </div>
-                    <div class="schema-item collapsed" onclick="toggleSchema(this)">
-                        <h3>
-                            <span>UserProfile2</span>
-                            <button class="remove-schema" onclick="removeSchema('UserProfile2', event)">Remove</button>
-                        </h3>
-                        <pre>{
-  "name": "UserProfile2",
-  "fields": {
-    "username": {
-      "field_type": "Single",
-      "permission_policy": {
-        "read_policy": { "NoRequirement": null },
-        "write_policy": { "Distance": 0 },
-        "explicit_read_policy": null,
-        "explicit_write_policy": null
-      }
-    }
-  }
-}</pre>
-                    </div>
-                </div>
-                <div class="example-buttons">
-                    <button onclick="loadSchemaList()">Refresh Schema List</button>
-                </div>
-            </div>
-            <div id="schemaTab" class="tab-content">
-                <textarea id="schemaInput" placeholder="Enter your schema JSON here..."></textarea>
-                <button onclick="loadSchema()">Load Schema</button>
-                <div class="example-buttons">
-                    <button onclick="loadExampleSchema()">Load Example Schema</button>
-                </div>
-            </div>
-            <div id="queryTab" class="tab-content">
-                <textarea id="queryInput" placeholder="Enter your query operation JSON here..."></textarea>
-                <button onclick="executeOperation('query')">Run Query</button>
-                <div class="example-buttons">
-                    <button onclick="loadExampleQuery()">Load Example Query</button>
-                </div>
-            </div>
-            <div id="mutationTab" class="tab-content">
-                <textarea id="mutationInput" placeholder="Enter your mutation operation JSON here..."></textarea>
-                <button onclick="executeOperation('mutation')">Run Mutation</button>
-                <div class="example-buttons">
-                    <button onclick="loadExampleMutation()">Load Example Mutation</button>
-                </div>
+            <div class="node-status">
+                <span class="badge badge-success">Node Active</span>
             </div>
         </div>
-    </div>
+    </header>
 
-    <div class="section">
-        <h2>Results</h2>
-        <div id="results"></div>
-    </div>
+    <!-- Main Content -->
+    <main class="container">
+        <!-- Status Section -->
+        <div class="status success mt-4" id="nodeStatus">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="icon">
+                <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+            </svg>
+            <span>Node is running successfully</span>
+        </div>
 
-    <script>
-        // Toggle schema expansion
-        function toggleSchema(element) {
-            if (element.classList.contains('collapsed')) {
-                element.classList.remove('collapsed');
-                element.classList.add('expanded');
-            } else {
-                element.classList.remove('expanded');
-                element.classList.add('collapsed');
-            }
-        }
-
-        // Helper function to display results/errors
-        function displayResult(data, isError = false) {
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.className = isError ? 'status error' : 'status success';
-            resultsDiv.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-        }
-
-        // Remove schema
-        function removeSchema(schemaName, event) {
-            event.stopPropagation(); // Prevent schema toggle
-            
-            if (!confirm(`Are you sure you want to remove schema "${schemaName}"?`)) {
-                return;
-            }
-
-            displayResult(`Schema ${schemaName} removed successfully`);
-        }
-
-        // Load schema
-        function loadSchema() {
-            const schemaInput = document.getElementById('schemaInput').value;
-            displayResult('Schema loaded successfully');
-        }
-
-        // Execute operation (query or mutation)
-        function executeOperation(type) {
-            const input = document.getElementById(`${type}Input`).value;
-            displayResult(`${type} executed successfully`);
-        }
-
-        // Load schema list
-        function loadSchemaList() {
-            displayResult('Schema list refreshed');
-        }
-
-        // Load example data
-        function loadExampleSchema() {
-            document.getElementById('schemaInput').value = JSON.stringify({
-                name: "ExampleSchema",
-                fields: {
-                    username: {
-                        field_type: "Single",
-                        permission_policy: {
-                            read_policy: { NoRequirement: null },
-                            write_policy: { Distance: 0 }
-                        }
-                    }
-                }
-            }, null, 2);
-        }
-
-        function loadExampleQuery() {
-            document.getElementById('queryInput').value = JSON.stringify({
-                type: "query",
-                schema: "UserProfile",
-                fields: ["username", "email", "bio"],
-                filter: null
-            }, null, 2);
-        }
-
-        function loadExampleMutation() {
-            document.getElementById('mutationInput').value = JSON.stringify({
-                type: "mutation",
-                schema: "UserProfile",
-                mutation_type: "create",
-                data: {
-                    username: "johndoe",
-                    email: "john.doe@example.com",
-                    bio: "Software developer"
-                }
-            }, null, 2);
-        }
-
-        // Tab switching
-        function switchTab(tabName) {
-            // Update tab buttons
-            document.querySelectorAll('.tab-button').forEach(button => {
-                button.classList.remove('active');
-            });
-            document.querySelector(`.tab-button[onclick="switchTab('${tabName}')"]`).classList.add('active');
-
-            // Update tab content
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            document.getElementById(`${tabName}Tab`).classList.add('active');
-            
-            // Refresh schema list when switching to schemas tab
-            if (tabName === 'schemas') {
-                // In a real app, this would fetch the schema list
-            }
-        }
-    </script>
-</body>
+        <!-- Operations Section -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h2>Operations</h2>
+            </div>
+            <div class="card-body">
+                <div class="tab-container">
+                    <div class="tab-buttons">
+                        <button class="tab-button active" data-tab="schemas">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="icon">
+                                <path d="M.54 3.87.5 3a2 2 0 0 1 2-2h3.672a2 2 0 0 1 1.414.586l.828.828A2 2 0 0 0 9.828 3h3.982a2 2 0 0 1 1.992 2.181l-.637 7A2 2 0 0 1 13.174 14H2.826a2 2 0 0 1-1.991-1.819l-.637-7a1.99 1.99 0 0 1 .342-1.31zM2.19 4a1 1 0 0 0-.996 1.09l.637 7a1 1 0 0 0 .995.91h10.348a1 1 0 0 0 .995-.91l.637-7A1 1 0 0 0 13.81 4H2.19zm4.69-1.707A1 1 0 0 0 6.172 2H2.5a1 1 0 0 0-1 .981l.006.139C1.72 3.042 1.95 3 2.19 3h5.396l-.707-.707z"/>
+                            </svg>
+                            Loaded Schemas
+                        </button>
+                        <button class="tab-button" data-tab="schema">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="icon">
+                                <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783z"/>
+                            </svg>
+                            Schema
+                        </button>
+                        <button class="tab-button" data-tab="query">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="icon">
+                                <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                            </svg>
+                            Query
+                        </button>
+                        <button class="tab-button" data-tab="mutation">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="icon">
+                                <path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8l3.147-3.146zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8l-3.147-3.146z"/>
+                            </svg>
+                            Mutation
+                        </button>
+                        <button class="tab-button" data-tab="network">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="icon">
+                                <path d="M5 0a.5.5 0 0 1 .5.5V2h1V.5a.5.5 0 0 1 1 0V2h1V.5a.5.5 0 0 1 1 0V2h1V.5a.5.5 0 0 1 1 0V2A2.5 2.5 0 0 1 14 4.5h1.5a.5.5 0 0 1 0 1H14v1h1.5a.5.5 0 0 1 0 1H14v1h1.5a.5.5 0 0 1 0 1H14v1h1.5a.5.5 0 0 1 0 1H14a2.5 2.5 0 0 1-2.5 2.5v1.5a.5.5 0 0 1-1 0V14h-1v1.5a.5.5 0 0 1-1 0V14h-1v1.5a.5.5 0 0 1-1 0V14h-1v1.5a.5.5 0 0 1-1 0V14A2.5 2.5 0 0 1 2 11.5H.5a.5.5 0 0 1 0-1H2v-1H.5a.5.5 0 0 1 0-1H2v-1H.5a.5.5 0 0 1 0-1H2v-1H.5a.5.5 0 0 1 0-1H2A2.5 2.5 0 0 1 4.5 2V.5A.5.5 0 0 1 5 0zm-.5 3A1.5 1.5 0 0 0 3 4.5v7A1.5 1.5 0 0 0 4.5 13h7a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 11.5 3h-7zM5 6.5A1.5 1.5 0 0 1 6.5 5h3A1.5 1.5 0 0 1 11 6.5v3A1.5 1.5 0 0 1 9.5 11h-3A1.5 1.5 0 0 1 5 9.5v-3zM6.5 6a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3z"/>
+                            </svg>
+                            Network
+                        </button>
+                    </div>
+                    
+                    <!-- Schemas Tab Content -->
+                    <div id="schemasTab" class="tab-content active">
+                        <div id="schemaList" class="mt-3">
+                            <!-- Example schema items -->
+                            <div class="schema-item collapsed">
+                                <div class="schema-header" onclick="toggleSchema(this.parentElement)">
+                                    <h3 class="schema-title">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="icon">
+                                            <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692

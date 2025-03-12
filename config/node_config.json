@@ -1,13 +1,4 @@
 {
   "storage_path": "data",
-  "default_trust_distance": 1,
-  "docker": {
-    "memory_limit": 536870912,
-    "cpu_limit": 1.0,
-    "environment": {},
-    "network_config": {
-      "network_isolated": true,
-      "exposed_ports": {}
-    }
-  }
+  "default_trust_distance": 3
 }
