@@ -163,23 +163,27 @@ function initApp() {
         signButton.disabled = false;
         
         // Add a notice that we're using a fallback provider
-        const statusContainer = document.querySelector('.status-container');
-        const fallbackNotice = document.createElement('div');
-        fallbackNotice.textContent = 'Using fallback provider for testing (extension not detected)';
-        fallbackNotice.style.marginTop = '10px';
-        fallbackNotice.style.color = '#ff9800';
-        fallbackNotice.style.fontWeight = 'bold';
-        statusContainer.appendChild(fallbackNotice);
-        
-        // Add a button to reload the page
-        const reloadButton = document.createElement('button');
-        reloadButton.textContent = 'Reload Page';
-        reloadButton.className = 'btn primary-btn';
-        reloadButton.style.marginTop = '10px';
-        reloadButton.addEventListener('click', () => {
-          window.location.reload();
-        });
-        statusContainer.appendChild(reloadButton);
+        const statusContainer = document.querySelector('.status');
+        if (statusContainer) {
+          const fallbackNotice = document.createElement('div');
+          fallbackNotice.textContent = 'Using fallback provider for testing (extension not detected)';
+          fallbackNotice.style.marginTop = '10px';
+          fallbackNotice.style.color = '#ff9800';
+          fallbackNotice.style.fontWeight = 'bold';
+          statusContainer.appendChild(fallbackNotice);
+          
+          // Add a button to reload the page
+          const reloadButton = document.createElement('button');
+          reloadButton.textContent = 'Reload Page';
+          reloadButton.className = 'btn primary-btn';
+          reloadButton.style.marginTop = '10px';
+          reloadButton.addEventListener('click', () => {
+            window.location.reload();
+          });
+          statusContainer.appendChild(reloadButton);
+        } else {
+          console.warn('Status container not found, could not add fallback notice');
+        }
       }
     }, 2000);
   }

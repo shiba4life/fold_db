@@ -143,7 +143,7 @@
       
       <div class="form-group">
         <label for="query-content">Query Content (JSON)</label>
-        <textarea id="query-content" placeholder='{"operation": "findOne", "collection": "users", "filter": {"username": "testuser"}}'>{"operation": "findOne", "collection": "users", "filter": {"username": "testuser"}}</textarea>
+        <textarea id="query-content" placeholder='{"type": "query", "schema": "UserProfile", "fields": ["username", "email", "bio"], "filter": null}'>{"type": "query", "schema": "UserProfile", "fields": ["username", "email", "bio"], "filter": null}</textarea>
       </div>
       
       <button id="sign-button" disabled>Sign Query</button>
@@ -158,7 +158,7 @@
       <h2>Send to App Server</h2>
       <div class="form-group">
         <label for="server-url">Server URL</label>
-        <input type="text" id="server-url" value="http://localhost:3000/api/query" />
+        <input type="text" id="server-url" value="http://localhost:8081/api/v1/execute" />
       </div>
       
       <button id="send-button" disabled>Send Signed Query</button>

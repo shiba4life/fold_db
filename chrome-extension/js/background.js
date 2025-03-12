@@ -5,10 +5,8 @@ const PENDING_REQUESTS_KEY = 'folddb_pending_requests';
 // State
 let pendingRequests = [];
 let publicKey = null;
-// Make connectedTabs accessible to the popup
-window.connectedTabs = new Set();
-// Alias for backward compatibility
-let connectedTabs = window.connectedTabs;
+// Set for connected tabs
+let connectedTabs = new Set();
 
 // Initialize the background script
 async function initialize() {
@@ -93,7 +91,7 @@ async function signRequest(requestId) {
     
     // Import the private key
     const privateKeyBuffer = base64ToArrayBuffer(keys.privateKey);
-    const privateKey = await window.crypto.subtle.importKey(
+    const privateKey = await crypto.subtle.importKey(
       'pkcs8',
       privateKeyBuffer,
       {
@@ -115,7 +113,7 @@ async function signRequest(requestId) {
     const messageBuffer = encoder.encode(message);
     
     // Sign the message
-    const signatureBuffer = await window.crypto.subtle.sign(
+    const signatureBuffer = await crypto.subtle.sign(
       {
         name: 'ECDSA',
         hash: { name: 'SHA-256' },

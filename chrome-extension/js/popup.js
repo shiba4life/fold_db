@@ -142,7 +142,15 @@ function updateUIBasedOnKeys(keys) {
     PUBLIC_KEY_DISPLAY.textContent = truncatedPublicKey;
     
     // Notify background script that keys are available
-    chrome.runtime.sendMessage({ action: 'keysAvailable', publicKey: keys.publicKey });
+    try {
+      chrome.runtime.sendMessage({ action: 'keysAvailable', publicKey: keys.publicKey }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn('Error notifying background script about keys:', chrome.runtime.lastError);
+        }
+      });
+    } catch (error) {
+      console.warn('Error sending keysAvailable message:', error);
+    }
   } else {
     // No keys
     NO_KEYS_MESSAGE.style.display = 'block';
@@ -150,27 +158,40 @@ function updateUIBasedOnKeys(keys) {
     PUBLIC_KEY_ELEMENT.textContent = 'Not generated';
     
     // Notify background script that keys are not available
-    chrome.runtime.sendMessage({ action: 'keysUnavailable' });
+    try {
+      chrome.runtime.sendMessage({ action: 'keysUnavailable' }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn('Error notifying background script about keys:', chrome.runtime.lastError);
+        }
+      });
+    } catch (error) {
+      console.warn('Error sending keysUnavailable message:', error);
+    }
   }
 }
 
 // Check connection status with app_server
 async function checkConnectionStatus() {
   try {
-    // Get the background page to check connected tabs
-    const backgroundPage = await chrome.runtime.getBackgroundPage();
+    // In Manifest V3, we can't use getBackgroundPage, so we'll use messaging instead
+    // Query for tabs that might be connected
+    const tabs = await chrome.tabs.query({});
+    const connectedTabs = tabs.filter(tab => {
+      return tab.url && (
+        tab.url.includes('localhost') || 
+        tab.url.includes('127.0.0.1') ||
+        tab.url.includes('folddb.com')
+      );
+    });
     
-    if (backgroundPage && backgroundPage.connectedTabs && backgroundPage.connectedTabs.size > 0) {
+    if (connectedTabs.length > 0) {
       CONNECTION_STATUS_ELEMENT.textContent = 'Connected';
       CONNECTION_STATUS_ELEMENT.classList.add('connected');
       CONNECTION_STATUS_ELEMENT.classList.remove('disconnected');
       
-      // Get the tab count
-      const tabCount = backgroundPage.connectedTabs.size;
-      
       // Add a small badge with the count
       const countBadge = document.createElement('span');
-      countBadge.textContent = tabCount;
+      countBadge.textContent = connectedTabs.length;
       countBadge.style.marginLeft = '5px';
       countBadge.style.backgroundColor = '#4CAF50';
       countBadge.style.color = 'white';
@@ -187,25 +208,9 @@ async function checkConnectionStatus() {
       CONNECTION_STATUS_ELEMENT.textContent = 'Connected';
       CONNECTION_STATUS_ELEMENT.appendChild(countBadge);
     } else {
-      // Fallback to the old method if background page is not accessible
-      const tabs = await chrome.tabs.query({});
-      const connectedTabs = tabs.filter(tab => {
-        return tab.url && (
-          tab.url.includes('localhost') || 
-          tab.url.includes('127.0.0.1') ||
-          tab.url.includes('folddb.com')
-        );
-      });
-      
-      if (connectedTabs.length > 0) {
-        CONNECTION_STATUS_ELEMENT.textContent = 'Connected';
-        CONNECTION_STATUS_ELEMENT.classList.add('connected');
-        CONNECTION_STATUS_ELEMENT.classList.remove('disconnected');
-      } else {
-        CONNECTION_STATUS_ELEMENT.textContent = 'Disconnected';
-        CONNECTION_STATUS_ELEMENT.classList.add('disconnected');
-        CONNECTION_STATUS_ELEMENT.classList.remove('connected');
-      }
+      CONNECTION_STATUS_ELEMENT.textContent = 'Disconnected';
+      CONNECTION_STATUS_ELEMENT.classList.add('disconnected');
+      CONNECTION_STATUS_ELEMENT.classList.remove('connected');
     }
   } catch (error) {
     console.error('Error checking connection status:', error);
@@ -216,7 +221,23 @@ async function checkConnectionStatus() {
 // Check for pending signing requests
 async function checkPendingRequests() {
   try {
-    const pendingRequests = await chrome.runtime.sendMessage({ action: 'getPendingRequests' });
+    // Use a Promise with timeout to handle potential connection issues
+    const pendingRequests = await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        resolve([]); // Resolve with empty array on timeout
+        console.warn('Request for pending requests timed out');
+      }, 1000);
+      
+      chrome.runtime.sendMessage({ action: 'getPendingRequests' }, (response) => {
+        clearTimeout(timeout);
+        if (chrome.runtime.lastError) {
+          console.warn('Error getting pending requests:', chrome.runtime.lastError);
+          resolve([]); // Resolve with empty array on error
+        } else {
+          resolve(response || []);
+        }
+      });
+    });
     
     if (pendingRequests && pendingRequests.length > 0) {
       PENDING_REQUESTS_CONTAINER.style.display = 'block';
@@ -237,6 +258,9 @@ async function checkPendingRequests() {
     }
   } catch (error) {
     console.error('Error checking pending requests:', error);
+    PENDING_REQUESTS_CONTAINER.style.display = 'block';
+    NO_REQUESTS_MESSAGE.style.display = 'block';
+    REQUEST_LIST.innerHTML = '';
   }
 }
 
@@ -287,9 +311,25 @@ function createRequestElement(request) {
 // Approve a signing request
 async function approveRequest(requestId) {
   try {
-    await chrome.runtime.sendMessage({ 
-      action: 'approveRequest', 
-      requestId 
+    // Use a Promise with timeout to handle potential connection issues
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Request timed out'));
+        console.warn('Approve request timed out');
+      }, 1000);
+      
+      chrome.runtime.sendMessage({ 
+        action: 'approveRequest', 
+        requestId 
+      }, (response) => {
+        clearTimeout(timeout);
+        if (chrome.runtime.lastError) {
+          console.warn('Error approving request:', chrome.runtime.lastError);
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      });
     });
     
     // Refresh the pending requests
@@ -304,9 +344,25 @@ async function approveRequest(requestId) {
 // Reject a signing request
 async function rejectRequest(requestId) {
   try {
-    await chrome.runtime.sendMessage({ 
-      action: 'rejectRequest', 
-      requestId 
+    // Use a Promise with timeout to handle potential connection issues
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Request timed out'));
+        console.warn('Reject request timed out');
+      }, 1000);
+      
+      chrome.runtime.sendMessage({ 
+        action: 'rejectRequest', 
+        requestId 
+      }, (response) => {
+        clearTimeout(timeout);
+        if (chrome.runtime.lastError) {
+          console.warn('Error rejecting request:', chrome.runtime.lastError);
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      });
     });
     
     // Refresh the pending requests

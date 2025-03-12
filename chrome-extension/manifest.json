@@ -18,7 +18,12 @@
   },
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://localhost:*/*",
+    "http://127.0.0.1:*/*"
   ],
   "background": {
     "service_worker": "js/background.js"
@@ -31,7 +36,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["js/inject.js"],
+      "resources": ["js/inject.js", "js/provider.js", "js/check-provider.js", "js/fallback-provider.js"],
       "matches": ["<all_urls>"]
     }
   ]

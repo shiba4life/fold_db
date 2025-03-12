@@ -16,6 +16,10 @@ class FoldDBProvider {
   // Get the public key
   async getPublicKey() {
     try {
+      if (!window.foldDBProvider) {
+        console.error('foldDBProvider not available');
+        throw new Error('FoldDB provider not available');
+      }
       return await window.foldDBProvider.getPublicKey();
     } catch (error) {
       console.error('Error getting public key:', error);
@@ -26,6 +30,10 @@ class FoldDBProvider {
   // Sign a request
   async signRequest(payload) {
     try {
+      if (!window.foldDBProvider) {
+        console.error('foldDBProvider not available');
+        throw new Error('FoldDB provider not available');
+      }
       return await window.foldDBProvider.signRequest(payload);
     } catch (error) {
       console.error('Error signing request:', error);
