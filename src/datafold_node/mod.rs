@@ -4,7 +4,6 @@ pub mod loader;
 pub mod node;
 pub mod tests;
 pub mod web_server_compat;
-pub mod web_server_old;
 pub mod ui_server;
 pub mod app_server;
 pub mod network;

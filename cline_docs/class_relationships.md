@@ -22,6 +22,14 @@
 - Tracks update timestamps
 - Enables atomic updates through reference switching
 
+### DataFoldNode
+- Application container for FoldDB
+- Manages schema loading and persistence
+- Coordinates network operations
+- Provides API for external applications
+- Handles operation execution
+- Manages network discovery and connections
+
 ## Schema Management
 
 ### SchemaManager
@@ -135,15 +143,85 @@
 - Supports error recovery actions
 - Enables detailed error reporting
 
+## Server Components
+
+### UiServer
+- Provides management UI interface
+- Serves static files for web interface
+- Handles schema operations
+- Manages network operations
+- Provides API for UI interactions
+- Runs on dedicated port (default 8080)
+
+### AppServer
+- Provides 3rd party API access
+- Implements signature verification
+- Includes comprehensive logging
+- Enforces permission checks
+- Provides secure API endpoints
+- Runs on dedicated port (default 8081)
+
+### AppLogger
+- Handles structured logging
+- Records operation details
+- Logs security events
+- Provides debug logging
+- Maintains separate log files by category
+
+## Network Components
+
+### NetworkCore
+- Central coordinator for network operations
+- Manages connections to other nodes
+- Routes messages between components
+- Handles node discovery
+- Coordinates query and schema services
+- Manages network lifecycle
+
+### ConnectionManager
+- Manages peer connections
+- Handles connection lifecycle
+- Monitors connection health
+- Provides message sending interface
+- Manages connection recovery
+
+### MessageRouter
+- Routes messages to appropriate handlers
+- Manages message type registration
+- Coordinates message processing
+- Provides unified message handling interface
+- Supports extensible message types
+
+### QueryService
+- Executes queries locally
+- Sends queries to remote nodes
+- Manages query callbacks
+- Tracks pending queries
+- Handles query responses
+
+### SchemaService
+- Lists available schemas
+- Retrieves schemas from remote nodes
+- Manages schema callbacks
+- Tracks pending schema requests
+- Handles schema responses
+
 ## Key Relationships
 
-1. Version Management
+1. Server Architecture
+   - DataFoldNode provides core functionality
+   - UiServer handles management interface
+   - AppServer provides secure API access
+   - Both servers operate concurrently
+   - Servers share the same DataFoldNode instance
+
+2. Version Management
    - Atoms link to previous versions creating a chain
    - AtomRefs provide latest version lookup
    - Enables atomic updates and version history
    - Schema versions tracked through SchemaPersistence
 
-2. Schema Management Flow
+3. Schema Management Flow
    - SchemaManager coordinates overall schema operations
    - SchemaPersistence handles storage and versioning
    - SchemaInterpreter processes and validates schemas
@@ -151,25 +229,33 @@
    - FieldMappings define transformations between schemas
    - Fields link to PermissionPolicies and PaymentConfigs
 
-3. Schema Transformation Flow
+4. Schema Transformation Flow
    - SchemaRelationships define field connections
    - FieldMappings specify transformation rules
    - SchemaInterpreter executes transformations
    - SchemaPersistence tracks transformation history
 
-4. Access Control
+5. Network Communication Flow
+   - NetworkCore coordinates all network operations
+   - ConnectionManager handles peer connections
+   - MessageRouter directs messages to appropriate handlers
+   - QueryService and SchemaService handle specific operations
+   - NodeDiscovery finds and announces nodes
+
+6. Access Control
    - PermissionManager validates through PermissionPolicies
    - PermissionWrapper provides security layer
    - Integrated with schema-level permissions
    - ErrorManager handles permission failures
+   - AppServer enforces signature verification
 
-5. Payment Processing
+7. Payment Processing
    - PaymentManager coordinates with PaymentCalculator
    - LightningClient handles payment network interaction
    - Integrated with schema-level payment requirements
    - ErrorManager handles payment failures
 
-6. Error Management
+8. Error Management
    - ErrorManager coordinates all error handling
    - ErrorContext provides detailed error information
    - Components integrate with error handling system
@@ -184,3 +270,5 @@ This architecture enables:
 - Integrated payment processing
 - Robust error handling and recovery
 - Containerized application management
+- Secure API access with signature verification
+- Separate management and API interfaces

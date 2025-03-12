@@ -35,6 +35,22 @@ package "Core" {
         + uuid()
         + updated_at()
     }
+    
+    class DataFoldNode {
+        - config: NodeConfig
+        - schema_manager: SchemaManager
+        - network_manager: Option<NetworkManager>
+        - node_id: String
+        + new()
+        + load()
+        + load_schema()
+        + execute_operation()
+        + init_network()
+        + start_network()
+        + stop_network()
+        + discover_nodes()
+        + connect_to_node()
+    }
 }
 
 ' Schema Management
@@ -162,6 +178,83 @@ package "ErrorHandling" {
     }
 }
 
+' Server Components
+package "Servers" {
+    class UiServer {
+        - node: Arc<Mutex<DataFoldNode>>
+        + new()
+        + run()
+        - create_api_routes()
+    }
+    
+    class AppServer {
+        - node: Arc<Mutex<DataFoldNode>>
+        - logger: AppLogger
+        - permission_manager: PermissionManager
+        + new()
+        + run()
+        - create_api_routes()
+    }
+    
+    class AppLogger {
+        - log_dir: String
+        + new()
+        + log_operation()
+        + log_security_event()
+        + log_debug()
+    }
+}
+
+' Network Components
+package "Network" {
+    class NetworkCore {
+        - connection_manager: ConnectionManager
+        - message_router: MessageRouter
+        - query_service: QueryService
+        - schema_service: SchemaService
+        - discovery: NodeDiscovery
+        + new()
+        + start()
+        + stop()
+        + discover_nodes()
+        + connect_to_node()
+        + query_node()
+        + list_available_schemas()
+    }
+    
+    class ConnectionManager {
+        - connections: HashMap<NodeId, Connection>
+        + new()
+        + connect()
+        + disconnect()
+        + get_connection()
+        + send_message()
+    }
+    
+    class MessageRouter {
+        - handlers: HashMap<MessageType, Box<dyn MessageHandler>>
+        + new()
+        + register_handler()
+        + route_message()
+    }
+    
+    class QueryService {
+        - query_callback: Box<dyn Fn(Query) -> QueryResult>
+        - pending_queries: HashMap<Uuid, Sender<QueryResult>>
+        + new()
+        + execute_query()
+        + query_node()
+    }
+    
+    class SchemaService {
+        - schema_list_callback: Box<dyn Fn() -> Vec<SchemaInfo>>
+        - pending_requests: HashMap<Uuid, Sender<Vec<SchemaInfo>>>
+        + new()
+        + list_schemas()
+        + list_remote_schemas()
+    }
+}
+
 ' Relationships
 FoldDB --> SchemaManager
 FoldDB --> PermissionManager
@@ -170,6 +263,21 @@ FoldDB --> ErrorManager
 FoldDB --> "*" Atom
 Atom --> "0..1" Atom: prev_atom
 AtomRef --> "1" Atom: references
+
+DataFoldNode --> FoldDB
+DataFoldNode --> SchemaManager
+DataFoldNode --> NetworkCore
+
+UiServer --> DataFoldNode: uses
+AppServer --> DataFoldNode: uses
+AppServer --> AppLogger: uses
+AppServer --> PermissionManager: uses
+
+NetworkCore --> ConnectionManager
+NetworkCore --> MessageRouter
+NetworkCore --> QueryService
+NetworkCore --> SchemaService
+NetworkCore --> NodeDiscovery
 
 SchemaManager --> "*" Schema
 SchemaManager --> SchemaPersistence

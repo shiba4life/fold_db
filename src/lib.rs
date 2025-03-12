@@ -11,7 +11,6 @@ pub mod testing;
 // Re-export main types for convenience
 pub use datafold_node::DataFoldNode;
 pub use datafold_node::config::NodeConfig;
-pub use datafold_node::web_server::WebServer;
 pub use datafold_node::loader::load_schema_from_file;
 pub use error::{FoldDbError, FoldDbResult};
 pub use fold_db_core::FoldDB;
