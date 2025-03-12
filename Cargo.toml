@@ -24,6 +24,7 @@ tempfile = "3.8"
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 fold_db = { path = ".", features = ["test-utils"] }  # Enable test-utils for tests
+reqwest = { version = "0.11", features = ["json"] }
 
 [lib]
 name = "fold_db"

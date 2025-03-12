@@ -1,3 +1,4 @@
+pub mod app_server_tests;
 pub mod datafold_node_tests;
 pub mod schema_mapping_tests;
 pub mod schema_field_mapping_tests;

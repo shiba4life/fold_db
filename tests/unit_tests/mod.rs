@@ -1,4 +1,5 @@
 pub mod atom_tests;
+pub mod app_server_tests;
 pub mod folddb_tests;
 pub mod network_tests;
 pub mod network_discovery_tests;
