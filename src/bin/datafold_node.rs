@@ -19,13 +19,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut node = DataFoldNode::load(config)?;
     println!("Node loaded successfully");
     
-    // Load schema if provided
-    println!("Checking for schema...");
-    if let Err(e) = load_schema_from_file("config/schema.json", &mut node) {
-        eprintln!("Error loading schema: {}", e);
-    } else {
-        println!("Schema loaded successfully");
-    }
+    // Schemas are loaded from disk during node initialization
+    println!("Previously loaded schemas are available");
     
     // Wrap in Arc<Mutex> and create web server
     println!("Creating web server...");

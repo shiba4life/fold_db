@@ -45,3 +45,8 @@ Simplifying the project architecture by unifying components and streamlining err
 4. Add tests for the new unified error handling system
 
 5. Add tests for the new network layer components
+
+6. ✅ Remove default schema loading
+   - ✅ Removed hardcoded loading of UserProfile schema from config/schema.json
+   - ✅ Now only previously loaded schemas are available on startup
+   - ✅ Schemas are automatically loaded from disk during FoldDB initialization
