@@ -10,7 +10,7 @@ use crate::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 /// - Trust distances enable relationship-based access control
 /// - Explicit permissions allow fine-grained access management
 /// - Both mechanisms can work independently or in combination
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct PermissionManager {}
 
 impl PermissionManager {

@@ -29,6 +29,12 @@
   - [x] Error categorization
   - [x] Direct error handling without legacy types
   - [x] Simplified error propagation
+- Server architecture
+  - [x] UI Server for management interface
+  - [x] App Server for 3rd party API access
+  - [x] Signature verification for API requests
+  - [x] CORS support for cross-origin requests
+  - [x] Comprehensive logging system
 - Atom and AtomRef implementation
 - Version history tracking
 - Schema interpreter implementation
@@ -52,15 +58,33 @@
   - Basic Features: Complete
   - Advanced Features: In Progress
   - Security Features: Planned
+- Server Architecture:
+  - UI Server: Complete
+  - App Server: Complete
+  - API Authentication: Complete
+  - API Documentation: Planned
 - Testing: 
   - Unit Tests: Complete
   - Integration Tests: 90% Complete
   - Schema Transformation Tests: In Progress
   - Network Layer Tests: Planned
   - Error Handling Tests: Planned
+  - API Server Tests: Planned
 - Documentation: Complete
 
 ## Recent Additions
+- Dual server architecture
+  - UI Server for management interface
+  - App Server for 3rd party API access
+- API authentication with cryptographic signatures
+  - Request signing with public/private key pairs
+  - Timestamp validation to prevent replay attacks
+  - Permission checking based on public keys
+- Comprehensive logging system
+  - Security event logging
+  - Operation logging
+  - Debug logging
+- CORS support for cross-origin requests
 - Unified error handling system
   - Centralized FoldDbError type
   - Specific error categories
@@ -90,6 +114,11 @@
   - Concurrent operation tests
 
 ## Next Milestones
+- Implement actual signature verification
+- Add comprehensive tests for the API server
+- Create documentation for 3rd party developers
+- Implement rate limiting for API requests
+- Add more detailed permission checking for operations
 - Add tests for unified error handling system
 - Add tests for new network layer components
 - Implement advanced node discovery mechanisms
@@ -104,6 +133,15 @@
 - Simplify permission system
 
 ## Recent Improvements
+- Implemented separate UI and App servers
+  - UI Server for management interface
+  - App Server for 3rd party API access
+  - Concurrent operation of both servers
+- Added security features for API access
+  - Request signing with public/private key pairs
+  - Timestamp validation to prevent replay attacks
+  - Detailed security logging
+  - Permission checking based on public keys
 - Streamlined network layer components:
   - Split NetworkManager into smaller, focused components
   - Created ConnectionManager for handling connections
