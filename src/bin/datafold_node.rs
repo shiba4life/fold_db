@@ -35,9 +35,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Run both servers in separate tasks
     println!("Starting servers...");
     
+    // Parse command line arguments
+    let args: Vec<String> = std::env::args().collect();
+    let mut port = 3000;
+    
+    // Check for --port argument
+    for i in 1..args.len() {
+        if args[i] == "--port" && i + 1 < args.len() {
+            if let Ok(p) = args[i + 1].parse::<u16>() {
+                port = p;
+                println!("Using port {} as base port", port);
+            }
+        }
+    }
+    
+    // Calculate UI and App server ports
+    let ui_port = port + 1;
+    let app_port = port;
+    
+    println!("UI server will use port {}", ui_port);
+    println!("App server will use port {}", app_port);
+    
     // Run UI server in a separate task
     let ui_handle = tokio::spawn(async move {
-        match ui_server.run(8080).await {
+        match ui_server.run(ui_port).await {
             Ok(_) => println!("UI server stopped normally"),
             Err(e) => {
                 eprintln!("UI server error: {}", e);
@@ -48,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Run App server in a separate task
     let app_handle = tokio::spawn(async move {
-        match app_server.run(8081).await {
+        match app_server.run(app_port).await {
             Ok(_) => println!("App server stopped normally"),
             Err(e) => {
                 eprintln!("App server error: {}", e);

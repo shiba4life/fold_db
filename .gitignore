@@ -33,6 +33,21 @@ chrome-extension/*.zip
 sample-app/node_modules/
 sample-app/dist/
 sample-app/build/
+sample-app/data/
+
+# Network visualizer specific
+network_visualizer/node_modules/
+network_visualizer/dist/
+network_visualizer/build/
+network_visualizer/package-lock.json
+
+# Test scripts and configuration
+# Uncomment these if you want to exclude them from git
+# start_network_visualizer.sh
+# test_network_nodes.sh
+# load_test_data.sh
+# network_testing_guide.md
+# network_visualizer.html
 
 # Temporary files
 /tmp/

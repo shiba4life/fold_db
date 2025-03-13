@@ -87,12 +87,12 @@ impl AppServer {
         logger: AppLogger,
     ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
         // Status route - no authentication required
-        let status = warp::path!("api" / "v1" / "status")
+        let status = warp::path!("api" / "status")
             .and(warp::get())
             .and_then(handle_api_status);
 
         // Simplified operation handler that doesn't use the complex middleware
-        let execute = warp::path!("api" / "v1" / "execute")
+        let execute = warp::path!("api" / "execute")
             .and(warp::post())
             .and(warp::body::json::<SignedRequest>())
             .and(warp::header::<String>("x-public-key"))
@@ -107,7 +107,61 @@ impl AppServer {
                 handle_signed_operation(request, public_key, client_ip, request_id, node, logger)
             });
 
+        // Network routes
+        let init_network = warp::path!("api" / "init_network")
+            .and(warp::post())
+            .and(warp::body::json::<NetworkInitRequest>())
+            .and(with_node(node.clone()))
+            .and_then(handle_init_network);
+
+        let connect = warp::path!("api" / "connect")
+            .and(warp::post())
+            .and(warp::body::json::<ConnectRequest>())
+            .and(with_node(node.clone()))
+            .and_then(handle_connect_to_node);
+
+        let discover = warp::path!("api" / "discover")
+            .and(warp::post())
+            .and(with_node(node.clone()))
+            .and_then(handle_discover_nodes);
+
+        let connected_nodes = warp::path!("api" / "connected_nodes")
+            .and(warp::get())
+            .and(with_node(node.clone()))
+            .and_then(handle_get_connected_nodes);
+
+        let known_nodes = warp::path!("api" / "known_nodes")
+            .and(warp::get())
+            .and(with_node(node.clone()))
+            .and_then(handle_get_known_nodes);
+
+        let query_node = warp::path!("api" / "query_node")
+            .and(warp::post())
+            .and(warp::body::json::<QueryNodeRequest>())
+            .and(with_node(node.clone()))
+            .and_then(handle_query_node);
+
+        let list_schemas = warp::path!("api" / "list_schemas")
+            .and(warp::post())
+            .and(warp::body::json::<ConnectRequest>())
+            .and(with_node(node.clone()))
+            .and_then(handle_list_node_schemas);
+
+        let node_id = warp::path!("api" / "node_id")
+            .and(warp::get())
+            .and(with_node(node.clone()))
+            .and_then(handle_get_node_id);
+
         // Combine all routes
-        status.or(execute)
+        status
+            .or(execute)
+            .or(init_network)
+            .or(connect)
+            .or(discover)
+            .or(connected_nodes)
+            .or(known_nodes)
+            .or(query_node)
+            .or(list_schemas)
+            .or(node_id)
     }
 }
