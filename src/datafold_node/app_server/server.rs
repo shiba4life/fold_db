@@ -11,6 +11,7 @@ use crate::permissions::permission_manager::PermissionManager;
 pub struct AppServer {
     node: Arc<tokio::sync::Mutex<DataFoldNode>>,
     logger: AppLogger,
+    #[allow(dead_code)]
     permission_manager: PermissionManager,
 }
 

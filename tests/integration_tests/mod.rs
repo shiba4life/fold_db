@@ -5,3 +5,4 @@ pub mod schema_field_mapping_tests;
 pub mod versioning_tests;
 pub mod web_api_tests;
 pub mod user_profile_api_tests;
+pub mod peer_to_peer_query_test;

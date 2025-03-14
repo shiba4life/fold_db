@@ -12,7 +12,7 @@ use crate::datafold_node::app_server::logging::{AppLogger, LogLevel};
 pub async fn handle_signed_operation(
     request: SignedRequest,
     public_key: String,
-    client_ip: String,
+    _client_ip: String,
     request_id: String,
     node: Arc<tokio::sync::Mutex<DataFoldNode>>,
     logger: AppLogger,

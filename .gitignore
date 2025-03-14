@@ -21,6 +21,19 @@ src/datafold_node/data
 *.env
 *.bak
 
+# Old network implementation backups
+src/datafold_node/network/connection.rs.*
+src/datafold_node/network/connection_manager.rs.*
+src/datafold_node/network/discovery.rs.*
+src/datafold_node/network/manager.rs.*
+src/datafold_node/network/message.rs.*
+src/datafold_node/network/message_router.rs.*
+src/datafold_node/network/network_core.rs.*
+src/datafold_node/network/query_service.rs.*
+src/datafold_node/network/schema_service.rs.*
+tests/unit_tests/network_tests.rs.*
+tests/unit_tests/network_discovery_tests.rs.*
+
 # Chrome extension specific
 chrome-extension/node_modules/
 chrome-extension/dist/

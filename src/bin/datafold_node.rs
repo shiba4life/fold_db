@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Load or initialize node without Arc
     println!("Loading DataFold Node...");
-    let mut node = DataFoldNode::load(config)?;
+    let node = DataFoldNode::load(config)?;
     println!("Node loaded successfully");
     
     // Schemas are loaded from disk during node initialization

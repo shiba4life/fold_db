@@ -1,6 +1,7 @@
 // We'll create a simplified version of the verify_signature function for testing
 // since we're having issues with the actual implementation
 use ring::{rand, signature};
+use ring::signature::KeyPair;
 use base64::{Engine as _, engine::general_purpose};
 
 // Simplified version of verify_signature for testing
@@ -21,10 +22,7 @@ fn verify_signature(signature: &str, public_key: &str, message: &str) -> bool {
     
     // Import the public key
     let public_key_alg = &signature::ECDSA_P256_SHA256_ASN1;
-    let public_key = match signature::UnparsedPublicKey::new(public_key_alg, &public_key_bytes) {
-        Ok(key) => key,
-        Err(_) => return false,
-    };
+    let public_key = signature::UnparsedPublicKey::new(public_key_alg, &public_key_bytes);
     
     // Verify the signature
     match public_key.verify(message_bytes, &signature_bytes) {

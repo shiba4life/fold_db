@@ -9,7 +9,7 @@ use crate::schema::types::{Mutation, Query, Operation};
 use crate::schema::{Schema, SchemaError};
 use crate::datafold_node::{
     config::NodeConfig,
-    network::{NetworkManager, NetworkConfig, NodeId, SchemaInfo},
+    network::{LibP2pManager, NetworkConfig, NodeId, SchemaInfo},
 };
 use crate::datafold_node::config::NodeInfo;
 
@@ -23,7 +23,7 @@ pub struct DataFoldNode {
     /// Map of trusted nodes and their trust distances
     trusted_nodes: HashMap<String, NodeInfo>,
     /// Network manager for node discovery and communication
-    network: Option<Arc<Mutex<NetworkManager>>>,
+    network: Option<Arc<Mutex<LibP2pManager>>>,
     /// Unique identifier for this node
     node_id: String,
 }
@@ -221,7 +221,7 @@ impl DataFoldNode {
     /// Initializes the network layer with the specified configuration.
     pub fn init_network(&mut self, network_config: NetworkConfig) -> FoldDbResult<()> {
         // Create network manager
-        let network_manager = NetworkManager::new(
+        let network_manager = LibP2pManager::new(
             network_config,
             self.node_id.clone(),
             None, // TODO: Add public key support

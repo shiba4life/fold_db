@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::datafold_node::node::DataFoldNode;
 use crate::datafold_node::app_server::errors::{AppError, AppErrorResponse};
 use crate::datafold_node::app_server::types::ApiSuccessResponse;
-use crate::datafold_node::network::{NetworkConfig, NodeId};
+use crate::datafold_node::network::NetworkConfig;
 use crate::schema::types::Query;
 
 #[derive(Debug, Deserialize)]

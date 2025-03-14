@@ -1,6 +1,6 @@
 // Internal modules
 pub(crate) mod core;
-pub(crate) mod types;
+pub mod types;
 
 // Public re-exports
 pub use types::{
@@ -12,4 +12,5 @@ pub use core::SchemaCore;
 /// Public prelude module containing types needed by tests and external code
 pub mod prelude {
     pub use super::SchemaCore;
+    pub use super::types::*;
 }

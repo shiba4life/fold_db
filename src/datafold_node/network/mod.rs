@@ -1,23 +1,8 @@
-mod connection;
-mod connection_manager;
-mod discovery;
 mod error;
-mod manager;
-mod message;
-mod message_router;
-mod network_core;
-mod query_service;
-mod schema_service;
-mod types;
+pub mod types;
+mod libp2p_network;
+mod libp2p_manager;
 
-pub use connection::Connection;
-pub use connection_manager::ConnectionManager;
-pub use discovery::NodeDiscovery;
 pub use error::NetworkResult;
-pub use manager::NetworkManager;
-pub use message::Message;
-pub use message_router::{MessageRouter, MessageHandler, MessageType};
-pub use network_core::NetworkCore;
-pub use query_service::QueryService;
-pub use schema_service::SchemaService;
 pub use types::{NodeId, NodeInfo, NetworkConfig, SchemaInfo, QueryResult, SerializableQueryResult, NodeCapabilities};
+pub use libp2p_manager::LibP2pManager;
