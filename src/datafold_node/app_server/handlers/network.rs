@@ -49,7 +49,6 @@ pub async fn handle_init_network(
         discovery_port: request.discovery_port.unwrap_or(8090),
         max_connections: request.max_connections.unwrap_or(50),
         connection_timeout: std::time::Duration::from_secs(request.connection_timeout_secs.unwrap_or(10)),
-        announcement_interval: std::time::Duration::from_secs(request.announcement_interval_secs.unwrap_or(60)),
         enable_discovery: request.enable_discovery.unwrap_or(true),
     };
     

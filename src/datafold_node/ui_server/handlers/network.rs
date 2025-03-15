@@ -25,7 +25,6 @@ pub async fn handle_init_network(
         discovery_port: config.discovery_port,
         max_connections: config.max_connections,
         connection_timeout: Duration::from_secs(config.connection_timeout_secs),
-        announcement_interval: Duration::from_secs(config.announcement_interval_secs),
         enable_discovery: config.enable_discovery,
     };
 

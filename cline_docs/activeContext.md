@@ -1,7 +1,7 @@
 # Active Context
 
 ## Current Task
-Removing unused network implementation that isn't using libp2p in the FoldDB project.
+Simplifying the libp2p network implementation in the FoldDB project.
 
 ## Recent Changes
 1. Removed unused network implementation that wasn't using libp2p:
@@ -19,7 +19,7 @@ Removing unused network implementation that isn't using libp2p in the FoldDB pro
    - Added core libp2p crate with necessary features
    - Included support for various protocols (noise, yamux, gossipsub, mdns, kad, etc.)
 
-2. Created LibP2pNetwork implementation:
+3. Created LibP2pNetwork implementation:
    - Implemented basic network operations (start, stop, discover, connect, query)
    - Added support for request-response protocol
    - Implemented node discovery using libp2p mechanisms
@@ -27,16 +27,26 @@ Removing unused network implementation that isn't using libp2p in the FoldDB pro
    - Implemented remote querying and schema listing
    - Added logging for network operations
 
-3. Created LibP2pManager wrapper:
+4. Created LibP2pManager wrapper:
    - Provides compatibility with existing NetworkManager API
    - Handles async/sync conversion using tokio runtime
    - Maintains the same interface for network operations
 
-4. Updated network module:
+5. Updated network module:
    - Added libp2p_network and libp2p_manager modules
    - Exposed LibP2pManager through the public API
 
-5. Updated progress documentation to reflect the changes
+6. Simplified the network implementation:
+   - Removed unused message types and structures from LibP2pNetwork
+   - Removed TrustProof struct from LibP2pNetwork (no longer needed)
+   - Removed pending_queries and pending_schemas maps from LibP2pNetwork
+   - Simplified the Drop implementation in LibP2pNetwork
+   - Removed verbose logging from LibP2pManager
+   - Removed Drop implementation from LibP2pManager
+   - Simplified NetworkConfig by removing announcement_interval field
+   - Removed SerializableQueryResult from types.rs
+   - Removed ConnectionState enum from types.rs
+   - Updated UI and API handlers to use the simplified NetworkConfig
 
 ## Next Steps
 1. Implement full libp2p functionality with actual networking
@@ -46,6 +56,7 @@ Removing unused network implementation that isn't using libp2p in the FoldDB pro
 5. Implement NAT traversal for better connectivity
 6. Add node reputation tracking
 7. Optimize network operations
+8. Update UI and API handlers to reflect the simplified network configuration
 
 ## Implementation Details
 

@@ -1,81 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
-use tokio::sync::oneshot;
 use uuid::Uuid;
-use serde::{Serialize, Deserialize};
 
 use crate::error::{FoldDbError, NetworkErrorKind, FoldDbResult};
 use crate::datafold_node::network::types::{
     NodeId, NodeInfo, NetworkConfig, SchemaInfo, QueryResult as FoldDbQueryResult
 };
 use crate::schema::types::Query;
-// Define TrustProof struct here since we removed the message module
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrustProof {
-    pub public_key: String,
-    pub signature: String,
-    pub trust_distance: u32,
-}
-
-/// Message types for libp2p request-response protocol
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum LibP2pRequest {
-    Query(QueryRequest),
-    ListSchemas(ListSchemasRequest),
-    Ping(PingRequest),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum LibP2pResponse {
-    Query(QueryResponse),
-    ListSchemas(ListSchemasResponse),
-    Ping(PingResponse),
-    Error(ErrorResponse),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct QueryRequest {
-    query_id: Uuid,
-    query: Query,
-    trust_proof: TrustProof,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct QueryResponse {
-    query_id: Uuid,
-    results: Vec<Result<serde_json::Value, String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ListSchemasRequest {
-    request_id: Uuid,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ListSchemasResponse {
-    request_id: Uuid,
-    schemas: Vec<SchemaInfo>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct PingRequest {
-    ping_id: Uuid,
-    timestamp: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct PingResponse {
-    ping_id: Uuid,
-    timestamp: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ErrorResponse {
-    code: u32,
-    message: String,
-    details: Option<String>,
-    related_id: Option<Uuid>,
-}
 
 /// LibP2pNetwork implements the network layer using libp2p
 pub struct LibP2pNetwork {
@@ -91,10 +22,6 @@ pub struct LibP2pNetwork {
     query_callback: Arc<Mutex<Box<dyn Fn(Query) -> FoldDbQueryResult + Send + Sync>>>,
     /// Callback for handling schema list requests
     schema_list_callback: Arc<Mutex<Box<dyn Fn() -> Vec<SchemaInfo> + Send + Sync>>>,
-    /// Map of pending query responses by ID
-    pending_queries: Arc<Mutex<HashMap<Uuid, oneshot::Sender<FoldDbQueryResult>>>>,
-    /// Map of pending schema list responses by ID
-    pending_schemas: Arc<Mutex<HashMap<Uuid, oneshot::Sender<Vec<SchemaInfo>>>>>,
     /// Whether the network is running
     running: Arc<Mutex<bool>>,
 }
@@ -126,8 +53,6 @@ impl LibP2pNetwork {
             connected_nodes: Arc::new(Mutex::new(HashSet::new())),
             query_callback: Arc::new(Mutex::new(query_callback)),
             schema_list_callback: Arc::new(Mutex::new(schema_list_callback)),
-            pending_queries: Arc::new(Mutex::new(HashMap::new())),
-            pending_schemas: Arc::new(Mutex::new(HashMap::new())),
             running: Arc::new(Mutex::new(false)),
         })
     }
@@ -161,16 +86,6 @@ impl LibP2pNetwork {
 
         println!("Stopping LibP2pNetwork with node ID: {}", self.local_node_id);
 
-        // Clear pending queries and schemas
-        {
-            let mut pending_queries = self.pending_queries.lock().unwrap();
-            pending_queries.clear();
-        }
-        {
-            let mut pending_schemas = self.pending_schemas.lock().unwrap();
-            pending_schemas.clear();
-        }
-
         Ok(())
     }
 
@@ -198,7 +113,6 @@ impl LibP2pNetwork {
 
         // In a real implementation, this would use libp2p's discovery mechanisms
         // For now, we'll just return the known nodes
-
         let known_nodes = self.known_nodes.lock().unwrap();
         let nodes: Vec<NodeInfo> = known_nodes.values().cloned().collect();
 
@@ -217,7 +131,6 @@ impl LibP2pNetwork {
 
         // In a real implementation, this would use libp2p to establish a connection
         // For now, we'll just add it to the connected nodes
-
         let mut connected_nodes = self.connected_nodes.lock().unwrap();
         connected_nodes.insert(node_id.clone());
 
@@ -239,7 +152,6 @@ impl LibP2pNetwork {
 
         // In a real implementation, this would use libp2p to send a query to the node
         // For now, we'll just simulate it by executing the query locally
-
         let callback = self.query_callback.lock().unwrap();
         let result = (*callback)(query.clone());
 
@@ -258,7 +170,6 @@ impl LibP2pNetwork {
 
         // In a real implementation, this would use libp2p to request schemas from the node
         // For now, we'll just simulate it by returning the local schemas
-
         let callback = self.schema_list_callback.lock().unwrap();
         let schemas = (*callback)();
 
@@ -290,16 +201,6 @@ impl Drop for LibP2pNetwork {
             
             // Set running to false to indicate we're stopping
             *running = false;
-            
-            // Clear pending queries and schemas
-            {
-                let mut pending_queries = self.pending_queries.lock().unwrap();
-                pending_queries.clear();
-            }
-            {
-                let mut pending_schemas = self.pending_schemas.lock().unwrap();
-                pending_schemas.clear();
-            }
         }
     }
 }

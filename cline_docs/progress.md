@@ -146,6 +146,18 @@
   - Fixed tokio runtime issues in LibP2pManager and LibP2pNetwork
   - Marked libp2p tests as ignored to avoid tokio runtime nesting issues
 
+- Simplified the libp2p network implementation:
+  - Removed unused message types and structures from LibP2pNetwork
+  - Removed TrustProof struct from LibP2pNetwork (no longer needed)
+  - Removed pending_queries and pending_schemas maps from LibP2pNetwork
+  - Simplified the Drop implementation in LibP2pNetwork
+  - Removed verbose logging from LibP2pManager
+  - Removed Drop implementation from LibP2pManager
+  - Simplified NetworkConfig by removing announcement_interval field
+  - Removed SerializableQueryResult from types.rs
+  - Removed ConnectionState enum from types.rs
+  - Updated UI and API handlers to use the simplified NetworkConfig
+
 - Implemented separate UI and App servers
   - UI Server for management interface
   - App Server for 3rd party API access

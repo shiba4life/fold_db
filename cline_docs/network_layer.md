@@ -1,208 +1,142 @@
 # Network Layer Design
 
 ## Overview
-The network layer enables DataFold nodes to discover other nodes, establish connections, and query data while maintaining the system's security and trust model. Each node operates independently, keeping its schemas private unless explicitly queried.
+The network layer enables DataFold nodes to discover other nodes, establish connections, and query data while maintaining the system's security and trust model. Each node operates independently, keeping its schemas private unless explicitly queried. The implementation uses libp2p for peer-to-peer networking.
 
 ## Core Components
 
-### NetworkCore
-Central component responsible for coordinating all network operations.
+### LibP2pNetwork
+Core implementation of the network layer using libp2p.
 
 ```rust
-pub struct NetworkCore {
-    connection_manager: ConnectionManager,
-    message_router: Arc<MessageRouter>,
-    query_service: Arc<QueryService>,
-    schema_service: Arc<SchemaService>,
-    discovery: Arc<Mutex<NodeDiscovery>>,
-    config: NetworkConfig,
+pub struct LibP2pNetwork {
+    /// Local node ID
     local_node_id: NodeId,
-}
-
-impl NetworkCore {
-    pub fn new(config: NetworkConfig, local_node_id: NodeId, public_key: Option<String>) -> NetworkResult<Self>;
-    pub fn start(&mut self) -> NetworkResult<()>;
-    pub fn stop(&mut self) -> NetworkResult<()>;
-    pub fn set_query_callback<F>(&self, callback: F) where F: Fn(Query) -> QueryResult + Send + Sync + 'static;
-    pub fn set_schema_list_callback<F>(&self, callback: F) where F: Fn() -> Vec<SchemaInfo> + Send + Sync + 'static;
-    pub fn discover_nodes(&mut self) -> NetworkResult<Vec<NodeInfo>>;
-    pub fn connect_to_node(&self, node_id: &NodeId) -> NetworkResult<()>;
-    pub fn query_node(&self, node_id: &NodeId, query: Query) -> NetworkResult<QueryResult>;
-    pub fn list_available_schemas(&self, node_id: &NodeId) -> NetworkResult<Vec<SchemaInfo>>;
-    pub fn connected_nodes(&self) -> HashSet<NodeId>;
-    pub fn known_nodes(&self) -> HashMap<NodeId, NodeInfo>;
-}
-```
-
-### NetworkManager
-Simplified wrapper around NetworkCore that provides backward compatibility with the old NetworkManager API.
-
-```rust
-pub struct NetworkManager {
-    core: NetworkCore,
-}
-
-impl NetworkManager {
-    pub fn new(config: NetworkConfig, local_node_id: NodeId, public_key: Option<String>) -> NetworkResult<Self>;
-    pub fn set_schema_list_callback<F>(&self, callback: F) where F: Fn() -> Vec<SchemaInfo> + Send + Sync + 'static;
-    pub fn set_query_callback<F>(&self, callback: F) where F: Fn(Query) -> QueryResult + Send + Sync + 'static;
-    pub fn start(&mut self) -> NetworkResult<()>;
-    pub fn stop(&mut self) -> NetworkResult<()>;
-    pub fn discover_nodes(&mut self) -> NetworkResult<Vec<NodeInfo>>;
-    pub fn connect_to_node(&self, node_id: &NodeId) -> NetworkResult<()>;
-    pub fn query_node(&self, node_id: &NodeId, query: Query) -> NetworkResult<QueryResult>;
-    pub fn list_available_schemas(&self, node_id: &NodeId) -> NetworkResult<Vec<SchemaInfo>>;
-    pub fn connected_nodes(&self) -> HashSet<NodeId>;
-    pub fn known_nodes(&self) -> HashMap<NodeId, NodeInfo>;
-}
-```
-
-### NodeDiscovery
-Handles node discovery and presence management on the network.
-
-```rust
-pub struct NodeDiscovery {
-    discovery_method: DiscoveryMethod,
-    socket: UdpSocket,
-    known_nodes: HashSet<NodeId>,
-}
-
-pub struct NodeInfo {
-    node_id: NodeId,
-    public_key: PublicKey,
-    address: SocketAddr,
-    trust_distance: u32,
-    capabilities: NodeCapabilities,
-}
-
-impl NodeDiscovery {
-    pub fn new(config: DiscoveryConfig) -> Result<Self>;
-    pub fn find_nodes(&mut self) -> Result<Vec<NodeInfo>>;
-    pub fn announce_presence(&self) -> Result<()>;
-    pub fn handle_node_announcement(&mut self, announcement: NodeAnnouncement) -> Result<()>;
-}
-```
-
-### Connection
-Manages individual peer connections and message handling.
-
-```rust
-pub struct Connection {
-    node_id: NodeId,
-    stream: TcpStream,
-    trust_distance: u32,
-    last_seen: Instant,
-    state: ConnectionState,
-}
-
-impl Connection {
-    pub fn new(stream: TcpStream, node_id: NodeId) -> Result<Self>;
-    pub fn send_message(&mut self, message: Message) -> Result<()>;
-    pub fn receive_message(&mut self) -> Result<Message>;
-    pub fn validate_node(&self) -> Result<()>;
-    pub fn is_healthy(&self) -> bool;
-}
-```
-
-### QueryService
-Unified service for handling query operations (both client and server functionality).
-
-```rust
-pub struct QueryService {
+    /// Network configuration
+    config: NetworkConfig,
+    /// Map of known nodes by ID
+    known_nodes: Arc<Mutex<HashMap<NodeId, NodeInfo>>>,
+    /// Map of connected nodes by ID
+    connected_nodes: Arc<Mutex<HashSet<NodeId>>>,
+    /// Callback for handling query requests
     query_callback: Arc<Mutex<Box<dyn Fn(Query) -> QueryResult + Send + Sync>>>,
-    pending_queries: Arc<Mutex<HashMap<Uuid, oneshot::Sender<QueryResult>>>>,
-}
-
-impl QueryService {
-    pub fn new() -> Self;
-    pub fn set_query_callback<F>(&mut self, callback: F) where F: Fn(Query) -> QueryResult + Send + Sync + 'static;
-    pub fn execute_query(&self, query: Query) -> QueryResult;
-    pub fn query_node(&self, connection: Arc<Mutex<Connection>>, query: Query, trust_proof: TrustProof) -> NetworkResult<QueryResult>;
-}
-
-impl MessageHandler for QueryService {
-    fn handle(&self, message: &Message, node_id: &NodeId) -> NetworkResult<Option<Message>>;
-    fn message_types(&self) -> Vec<MessageType>;
-}
-```
-
-### SchemaService
-Unified service for handling schema operations (both client and server functionality).
-
-```rust
-pub struct SchemaService {
+    /// Callback for handling schema list requests
     schema_list_callback: Arc<Mutex<Box<dyn Fn() -> Vec<SchemaInfo> + Send + Sync>>>,
-    pending_requests: Arc<Mutex<HashMap<Uuid, oneshot::Sender<Vec<SchemaInfo>>>>>,
+    /// Whether the network is running
+    running: Arc<Mutex<bool>>,
 }
 
-impl SchemaService {
-    pub fn new() -> Self;
+impl LibP2pNetwork {
+    pub fn new(config: NetworkConfig, local_node_id: Option<NodeId>, public_key: Option<String>) -> FoldDbResult<Self>;
+    pub async fn start(&mut self) -> FoldDbResult<()>;
+    pub async fn stop(&mut self) -> FoldDbResult<()>;
+    pub fn set_query_callback<F>(&mut self, callback: F) where F: Fn(Query) -> QueryResult + Send + Sync + 'static;
     pub fn set_schema_list_callback<F>(&mut self, callback: F) where F: Fn() -> Vec<SchemaInfo> + Send + Sync + 'static;
-    pub fn list_schemas(&self) -> Vec<SchemaInfo>;
-    pub fn list_remote_schemas(&self, connection: Arc<Mutex<Connection>>) -> NetworkResult<Vec<SchemaInfo>>;
-}
-
-impl MessageHandler for SchemaService {
-    fn handle(&self, message: &Message, node_id: &NodeId) -> NetworkResult<Option<Message>>;
-    fn message_types(&self) -> Vec<MessageType>;
+    pub async fn discover_nodes(&mut self) -> FoldDbResult<Vec<NodeInfo>>;
+    pub async fn connect_to_node(&mut self, node_id: &NodeId) -> FoldDbResult<()>;
+    pub async fn query_node(&self, node_id: &NodeId, query: Query) -> FoldDbResult<QueryResult>;
+    pub async fn list_available_schemas(&self, node_id: &NodeId) -> FoldDbResult<Vec<SchemaInfo>>;
+    pub fn connected_nodes(&self) -> HashSet<NodeId>;
+    pub fn known_nodes(&self) -> HashMap<NodeId, NodeInfo>;
+    pub fn get_node_id(&self) -> &NodeId;
 }
 ```
 
-### Message Protocol
-Defines the communication protocol between nodes.
+### LibP2pManager
+Wrapper around LibP2pNetwork that provides compatibility with the existing NetworkManager API.
 
 ```rust
-pub enum Message {
-    Query(QueryMessage),
-    QueryResponse(QueryResponseMessage),
-    ListSchemasRequest(ListSchemasRequestMessage),
-    SchemaListResponse(SchemaListResponseMessage),
-    NodeAnnouncement(NodeAnnouncement),
-    Error(ErrorMessage),
-    Ping(PingMessage),
-    Pong(PongMessage),
+pub struct LibP2pManager {
+    /// The underlying libp2p network
+    network: Arc<Mutex<LibP2pNetwork>>,
+    /// Runtime for executing async tasks
+    runtime: tokio::runtime::Handle,
 }
 
-pub struct QueryMessage {
-    query_id: Uuid,
-    query: Query,
-    trust_proof: TrustProof,
+impl LibP2pManager {
+    pub fn new(config: NetworkConfig, local_node_id: NodeId, public_key: Option<String>) -> FoldDbResult<Self>;
+    pub fn set_schema_list_callback<F>(&self, callback: F) where F: Fn() -> Vec<SchemaInfo> + Send + Sync + 'static;
+    pub fn set_query_callback<F>(&self, callback: F) where F: Fn(Query) -> QueryResult + Send + Sync + 'static;
+    pub fn start(&mut self) -> FoldDbResult<()>;
+    pub fn stop(&mut self) -> FoldDbResult<()>;
+    pub fn discover_nodes(&mut self) -> FoldDbResult<Vec<NodeInfo>>;
+    pub fn connect_to_node(&self, node_id: &NodeId) -> FoldDbResult<()>;
+    pub fn query_node(&self, node_id: &NodeId, query: Query) -> FoldDbResult<QueryResult>;
+    pub fn list_available_schemas(&self, node_id: &NodeId) -> FoldDbResult<Vec<SchemaInfo>>;
+    pub fn connected_nodes(&self) -> HashSet<NodeId>;
+    pub fn known_nodes(&self) -> HashMap<NodeId, NodeInfo>;
+}
+```
+
+### Network Types
+Common types used by the network layer.
+
+```rust
+/// Unique identifier for a node in the network
+pub type NodeId = String;
+
+/// Configuration for the network layer
+pub struct NetworkConfig {
+    /// Address to listen for incoming connections
+    pub listen_address: SocketAddr,
+    /// Port for node discovery broadcasts
+    pub discovery_port: u16,
+    /// Maximum number of concurrent connections
+    pub max_connections: usize,
+    /// Timeout for connection attempts
+    pub connection_timeout: Duration,
+    /// Whether to enable automatic node discovery
+    pub enable_discovery: bool,
 }
 
-pub struct QueryResponseMessage {
-    query_id: Uuid,
-    result: SerializableQueryResult,
+/// Information about a node in the network
+pub struct NodeInfo {
+    /// Unique identifier for the node
+    pub node_id: NodeId,
+    /// Network address of the node
+    pub address: SocketAddr,
+    /// Trust distance to this node
+    pub trust_distance: u32,
+    /// Public key for authentication
+    pub public_key: Option<String>,
+    /// Node capabilities
+    pub capabilities: NodeCapabilities,
 }
 
-pub struct ListSchemasRequestMessage {
-    request_id: Uuid,
+/// Capabilities of a node in the network
+pub struct NodeCapabilities {
+    /// Whether the node supports querying
+    pub supports_query: bool,
+    /// Whether the node supports schema listing
+    pub supports_schema_listing: bool,
 }
 
-pub struct SchemaListResponseMessage {
-    request_id: Uuid,
-    schemas: Vec<SchemaInfo>,
-}
+/// Result of a query operation - internal type
+pub type QueryResult = Vec<Result<Value, SchemaError>>;
 
-pub struct ErrorMessage {
-    code: ErrorCode,
-    message: String,
-    details: Option<String>,
-    related_message_id: Option<Uuid>,
+/// Information about a schema available on a node
+pub struct SchemaInfo {
+    /// Name of the schema
+    pub name: String,
+    /// Version of the schema
+    pub version: String,
+    /// Description of the schema
+    pub description: Option<String>,
 }
 ```
 
 ## Implementation Details
 
 ### Node Discovery Process
-1. Node starts up and initializes NetworkManager
-2. NodeDiscovery begins listening on UDP port for announcements
-3. Periodically broadcasts presence on local network
+1. Node starts up and initializes LibP2pManager
+2. LibP2pNetwork begins listening for connections
+3. Uses libp2p's discovery mechanisms (mDNS, Kademlia DHT)
 4. Maintains list of known nodes with their information
 5. Updates node status based on periodic health checks
 
 ### Connection Establishment
-1. Node initiates connection to peer
-2. TLS handshake for secure channel
+1. Node initiates connection to peer using libp2p
+2. Noise protocol for secure channel
 3. Exchange public keys and validate
 4. Verify trust distance requirements
 5. Establish message protocol version
@@ -213,14 +147,14 @@ pub struct ErrorMessage {
 2. Node A requests list of available schemas
 3. Node B responds with enabled schema list
 4. Node A validates schema availability
-5. Node A sends query with trust proof
+5. Node A sends query
 6. Node B validates trust and permissions
 7. Node B executes query
 8. Node B sends response
 9. Node A processes results
 
 ### Security Measures
-- TLS encryption for all connections
+- Noise protocol encryption for all connections
 - Public key authentication
 - Trust distance validation
 - Permission enforcement per query
@@ -241,10 +175,9 @@ pub struct ErrorMessage {
 
 ### Dependencies
 - tokio for async runtime
-- rustls for TLS
+- libp2p for peer-to-peer networking
 - serde for serialization
 - uuid for message tracking
-- trust-dns for discovery (optional)
 
 ### Performance Considerations
 - Connection pooling
@@ -264,8 +197,9 @@ pub struct ErrorMessage {
 7. Edge case validation
 
 ## Future Enhancements
-1. DHT-based discovery
-2. NAT traversal
-3. Connection multiplexing
-4. Protocol versioning
-5. Node reputation tracking
+1. Implement full libp2p functionality with actual networking
+2. Add comprehensive tests for the libp2p implementation
+3. Add security features for libp2p communication
+4. Implement NAT traversal for better connectivity
+5. Add node reputation tracking
+6. Optimize network operations

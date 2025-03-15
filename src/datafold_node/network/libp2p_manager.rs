@@ -32,8 +32,6 @@ impl LibP2pManager {
         // Get the current runtime handle
         let runtime = tokio::runtime::Handle::current();
         
-        println!("Created LibP2pManager with node ID: {}", local_node_id);
-        
         Ok(Self {
             network: Arc::new(Mutex::new(network)),
             runtime,
@@ -60,8 +58,6 @@ impl LibP2pManager {
 
     /// Starts the network manager
     pub fn start(&mut self) -> FoldDbResult<()> {
-        println!("Starting LibP2pManager");
-        
         let network = Arc::clone(&self.network);
         
         // Run the async start method in the runtime
@@ -73,8 +69,6 @@ impl LibP2pManager {
 
     /// Stops the network manager
     pub fn stop(&mut self) -> FoldDbResult<()> {
-        println!("Stopping LibP2pManager");
-        
         let network = Arc::clone(&self.network);
         
         // Run the async stop method in the runtime
@@ -86,8 +80,6 @@ impl LibP2pManager {
 
     /// Discovers nodes on the network
     pub fn discover_nodes(&mut self) -> FoldDbResult<Vec<NodeInfo>> {
-        println!("LibP2pManager: Discovering nodes");
-        
         let network = Arc::clone(&self.network);
         
         // Run the async discover_nodes method in the runtime
@@ -99,8 +91,6 @@ impl LibP2pManager {
 
     /// Connects to a node by ID
     pub fn connect_to_node(&self, node_id: &NodeId) -> FoldDbResult<()> {
-        println!("LibP2pManager: Connecting to node {}", node_id);
-        
         let network = Arc::clone(&self.network);
         let node_id = node_id.clone();
         
@@ -113,8 +103,6 @@ impl LibP2pManager {
 
     /// Queries a node for data
     pub fn query_node(&self, node_id: &NodeId, query: Query) -> FoldDbResult<QueryResult> {
-        println!("LibP2pManager: Querying node {}", node_id);
-        
         let network = Arc::clone(&self.network);
         let node_id = node_id.clone();
         
@@ -127,8 +115,6 @@ impl LibP2pManager {
 
     /// Lists available schemas on a node
     pub fn list_available_schemas(&self, node_id: &NodeId) -> FoldDbResult<Vec<SchemaInfo>> {
-        println!("LibP2pManager: Listing schemas on node {}", node_id);
-        
         let network = Arc::clone(&self.network);
         let node_id = node_id.clone();
         
@@ -149,16 +135,5 @@ impl LibP2pManager {
     pub fn known_nodes(&self) -> HashMap<NodeId, NodeInfo> {
         let network = self.network.lock().unwrap();
         network.known_nodes()
-    }
-}
-
-impl Drop for LibP2pManager {
-    fn drop(&mut self) {
-        // Don't try to call stop() in drop, as it would try to use block_on
-        // which can cause issues if we're already in a tokio runtime
-        println!("LibP2pManager dropped");
-        
-        // Just log that we're dropping the manager
-        // The network will be dropped automatically when the Arc is dropped
     }
 }
