@@ -18,7 +18,6 @@ fn test_libp2p_manager_creation() {
         discovery_port: 8090,
         max_connections: 10,
         connection_timeout: Duration::from_secs(5),
-        announcement_interval: Duration::from_secs(60),
         enable_discovery: true,
     };
 
@@ -66,7 +65,6 @@ fn test_libp2p_manager_discovery() {
         discovery_port: 8090,
         max_connections: 10,
         connection_timeout: Duration::from_secs(5),
-        announcement_interval: Duration::from_secs(60),
         enable_discovery: true,
     };
 
@@ -75,7 +73,6 @@ fn test_libp2p_manager_discovery() {
         discovery_port: 8092,
         max_connections: 10,
         connection_timeout: Duration::from_secs(5),
-        announcement_interval: Duration::from_secs(60),
         enable_discovery: true,
     };
 
@@ -122,7 +119,6 @@ fn test_libp2p_manager_connection() {
         discovery_port: 8090,
         max_connections: 10,
         connection_timeout: Duration::from_secs(5),
-        announcement_interval: Duration::from_secs(60),
         enable_discovery: true,
     };
 
@@ -131,7 +127,6 @@ fn test_libp2p_manager_connection() {
         discovery_port: 8092,
         max_connections: 10,
         connection_timeout: Duration::from_secs(5),
-        announcement_interval: Duration::from_secs(60),
         enable_discovery: true,
     };
 

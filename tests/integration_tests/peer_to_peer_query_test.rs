@@ -19,7 +19,6 @@ fn create_test_network_config(listen_port: u16, discovery_port: u16) -> NetworkC
         discovery_port,
         max_connections: 10,
         connection_timeout: Duration::from_secs(5),
-        announcement_interval: Duration::from_millis(500), // Faster for tests
         enable_discovery: true,
     }
 }
