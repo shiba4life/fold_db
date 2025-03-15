@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
-use crate::datafold_node::network::error::NetworkResult;
+use crate::error::FoldDbResult;
 use crate::datafold_node::network::libp2p_network::LibP2pNetwork;
 use crate::datafold_node::network::types::{
     NodeId, NodeInfo, NetworkConfig, SchemaInfo, QueryResult
@@ -25,7 +25,7 @@ impl LibP2pManager {
         config: NetworkConfig,
         local_node_id: NodeId,
         public_key: Option<String>,
-    ) -> NetworkResult<Self> {
+    ) -> FoldDbResult<Self> {
         // Create the libp2p network
         let network = LibP2pNetwork::new(config, Some(local_node_id.clone()), public_key)?;
         
@@ -59,7 +59,7 @@ impl LibP2pManager {
     }
 
     /// Starts the network manager
-    pub fn start(&mut self) -> NetworkResult<()> {
+    pub fn start(&mut self) -> FoldDbResult<()> {
         println!("Starting LibP2pManager");
         
         let network = Arc::clone(&self.network);
@@ -72,7 +72,7 @@ impl LibP2pManager {
     }
 
     /// Stops the network manager
-    pub fn stop(&mut self) -> NetworkResult<()> {
+    pub fn stop(&mut self) -> FoldDbResult<()> {
         println!("Stopping LibP2pManager");
         
         let network = Arc::clone(&self.network);
@@ -85,7 +85,7 @@ impl LibP2pManager {
     }
 
     /// Discovers nodes on the network
-    pub fn discover_nodes(&mut self) -> NetworkResult<Vec<NodeInfo>> {
+    pub fn discover_nodes(&mut self) -> FoldDbResult<Vec<NodeInfo>> {
         println!("LibP2pManager: Discovering nodes");
         
         let network = Arc::clone(&self.network);
@@ -98,7 +98,7 @@ impl LibP2pManager {
     }
 
     /// Connects to a node by ID
-    pub fn connect_to_node(&self, node_id: &NodeId) -> NetworkResult<()> {
+    pub fn connect_to_node(&self, node_id: &NodeId) -> FoldDbResult<()> {
         println!("LibP2pManager: Connecting to node {}", node_id);
         
         let network = Arc::clone(&self.network);
@@ -112,7 +112,7 @@ impl LibP2pManager {
     }
 
     /// Queries a node for data
-    pub fn query_node(&self, node_id: &NodeId, query: Query) -> NetworkResult<QueryResult> {
+    pub fn query_node(&self, node_id: &NodeId, query: Query) -> FoldDbResult<QueryResult> {
         println!("LibP2pManager: Querying node {}", node_id);
         
         let network = Arc::clone(&self.network);
@@ -126,7 +126,7 @@ impl LibP2pManager {
     }
 
     /// Lists available schemas on a node
-    pub fn list_available_schemas(&self, node_id: &NodeId) -> NetworkResult<Vec<SchemaInfo>> {
+    pub fn list_available_schemas(&self, node_id: &NodeId) -> FoldDbResult<Vec<SchemaInfo>> {
         println!("LibP2pManager: Listing schemas on node {}", node_id);
         
         let network = Arc::clone(&self.network);

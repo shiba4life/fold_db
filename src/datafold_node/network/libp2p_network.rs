@@ -1,18 +1,14 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use std::str::FromStr;
-use futures::StreamExt;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 
 use crate::error::{FoldDbError, NetworkErrorKind, FoldDbResult};
-use crate::datafold_node::network::error::NetworkResult;
 use crate::datafold_node::network::types::{
     NodeId, NodeInfo, NetworkConfig, SchemaInfo, QueryResult as FoldDbQueryResult
 };
-use crate::schema::types::{Query, SchemaError};
+use crate::schema::types::Query;
 // Define TrustProof struct here since we removed the message module
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrustProof {
@@ -109,7 +105,7 @@ impl LibP2pNetwork {
         config: NetworkConfig,
         local_node_id: Option<NodeId>,
         public_key: Option<String>,
-    ) -> NetworkResult<Self> {
+    ) -> FoldDbResult<Self> {
         // Generate a random node ID if not provided
         let local_node_id = local_node_id.unwrap_or_else(|| Uuid::new_v4().to_string());
 
@@ -137,7 +133,7 @@ impl LibP2pNetwork {
     }
 
     /// Starts the network
-    pub async fn start(&mut self) -> NetworkResult<()> {
+    pub async fn start(&mut self) -> FoldDbResult<()> {
         let mut running = self.running.lock().unwrap();
         if *running {
             return Ok(());
@@ -155,7 +151,7 @@ impl LibP2pNetwork {
     }
 
     /// Stops the network
-    pub async fn stop(&mut self) -> NetworkResult<()> {
+    pub async fn stop(&mut self) -> FoldDbResult<()> {
         let mut running = self.running.lock().unwrap();
         if !*running {
             return Ok(());
@@ -197,7 +193,7 @@ impl LibP2pNetwork {
     }
 
     /// Discovers nodes on the network
-    pub async fn discover_nodes(&mut self) -> NetworkResult<Vec<NodeInfo>> {
+    pub async fn discover_nodes(&mut self) -> FoldDbResult<Vec<NodeInfo>> {
         println!("Discovering nodes on the network");
 
         // In a real implementation, this would use libp2p's discovery mechanisms
@@ -210,14 +206,14 @@ impl LibP2pNetwork {
     }
 
     /// Connects to a node by ID
-    pub async fn connect_to_node(&mut self, node_id: &NodeId) -> NetworkResult<()> {
+    pub async fn connect_to_node(&mut self, node_id: &NodeId) -> FoldDbResult<()> {
         println!("Connecting to node: {}", node_id);
 
-        // Get the node info
+        // Check if the node exists
         let known_nodes = self.known_nodes.lock().unwrap();
-        let node_info = known_nodes.get(node_id).cloned().ok_or_else(|| {
-            FoldDbError::Network(NetworkErrorKind::Connection(format!("Node {} not found", node_id)))
-        })?;
+        if !known_nodes.contains_key(node_id) {
+            return Err(FoldDbError::Network(NetworkErrorKind::Connection(format!("Node {} not found", node_id))));
+        }
 
         // In a real implementation, this would use libp2p to establish a connection
         // For now, we'll just add it to the connected nodes
@@ -231,7 +227,7 @@ impl LibP2pNetwork {
     }
 
     /// Queries a node for data
-    pub async fn query_node(&self, node_id: &NodeId, query: Query) -> NetworkResult<FoldDbQueryResult> {
+    pub async fn query_node(&self, node_id: &NodeId, query: Query) -> FoldDbResult<FoldDbQueryResult> {
         println!("Querying node: {}", node_id);
         println!("Query: {:?}", query);
 
@@ -251,7 +247,7 @@ impl LibP2pNetwork {
     }
 
     /// Lists available schemas on a node
-    pub async fn list_available_schemas(&self, node_id: &NodeId) -> NetworkResult<Vec<SchemaInfo>> {
+    pub async fn list_available_schemas(&self, node_id: &NodeId) -> FoldDbResult<Vec<SchemaInfo>> {
         println!("Listing schemas on node: {}", node_id);
 
         // Check if the node is connected
