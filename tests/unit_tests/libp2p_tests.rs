@@ -1,11 +1,9 @@
-use std::net::SocketAddr;
 use std::time::Duration;
 use std::thread;
 
 use fold_db::datafold_node::network::{
     LibP2pManager,
     NetworkConfig,
-    NodeId,
     SchemaInfo,
 };
 use fold_db::schema::types::Query;

@@ -1,7 +1,6 @@
 use fold_db::{DataFoldNode, NodeConfig};
 use fold_db::schema::Schema;
 use serde_json::json;
-use std::fs;
 use tempfile::tempdir;
 
 #[test]

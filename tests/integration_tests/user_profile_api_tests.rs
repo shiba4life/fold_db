@@ -1,5 +1,5 @@
 use fold_db::{DataFoldNode, NodeConfig};
-use fold_db::datafold_node::web_server_compat::{ApiSuccessResponse, ApiErrorResponse, handle_schema, handle_execute, with_node};
+use fold_db::datafold_node::web_server_compat::{handle_schema, handle_execute, with_node};
 use serde_json::{json, Value};
 use std::sync::Arc;
 use tempfile::tempdir;

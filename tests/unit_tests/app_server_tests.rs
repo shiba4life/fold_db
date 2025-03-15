@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::collections::HashMap;
-use serde_json::json;
 
 use fold_db::datafold_node::node::DataFoldNode;
 use fold_db::datafold_node::config::NodeConfig;
