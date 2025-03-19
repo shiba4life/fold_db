@@ -2,25 +2,51 @@
  * Operations-related functionality for the DataFold Node UI
  */
 
-// Example query data
-const exampleQuery = {
-    type: "query",
-    schema: "UserProfile",
-    fields: ["username", "email", "bio"],
-    filter: null
-};
-
-// Example mutation data
-const exampleMutation = {
-    type: "mutation",
-    schema: "UserProfile",
-    mutation_type: "create",
-    data: {
-        username: "johndoe",
-        email: "john.doe@example.com",
-        bio: "Software developer"
+// Function to fetch example query from the API
+async function fetchExampleQuery() {
+    try {
+        const response = await utils.apiRequest('/api/examples/user_profile_queries.json');
+        // Return the first query from the array
+        if (Array.isArray(response.data) && response.data.length > 0) {
+            return response.data[0];
+        }
+        throw new Error('No example queries found');
+    } catch (error) {
+        console.error('Error fetching example query:', error);
+        // Fallback to a simple example if the API fails
+        return {
+            type: "query",
+            schema: "UserProfile",
+            fields: ["username", "email", "bio"],
+            filter: null
+        };
     }
-};
+}
+
+// Function to fetch example mutation from the API
+async function fetchExampleMutation() {
+    try {
+        const response = await utils.apiRequest('/api/examples/user_profile_mutations.json');
+        // Return the first mutation from the array
+        if (Array.isArray(response.data) && response.data.length > 0) {
+            return response.data[0];
+        }
+        throw new Error('No example mutations found');
+    } catch (error) {
+        console.error('Error fetching example mutation:', error);
+        // Fallback to a simple example if the API fails
+        return {
+            type: "mutation",
+            schema: "UserProfile",
+            mutation_type: "create",
+            data: {
+                username: "johndoe",
+                email: "john.doe@example.com",
+                bio: "Software developer"
+            }
+        };
+    }
+}
 
 /**
  * Execute an operation (query or mutation)
@@ -57,14 +83,16 @@ async function executeOperation(type) {
 /**
  * Load an example query into the textarea
  */
-function loadExampleQuery() {
+async function loadExampleQuery() {
+    const exampleQuery = await fetchExampleQuery();
     document.getElementById('queryInput').value = JSON.stringify(exampleQuery, null, 2);
 }
 
 /**
  * Load an example mutation into the textarea
  */
-function loadExampleMutation() {
+async function loadExampleMutation() {
+    const exampleMutation = await fetchExampleMutation();
     document.getElementById('mutationInput').value = JSON.stringify(exampleMutation, null, 2);
 }
 

@@ -2,61 +2,40 @@
  * Schema-related operations for the DataFold Node UI
  */
 
-// Example schema data
-const exampleSchema = {
-    name: "UserProfile",
-    fields: {
-        username: {
-            field_type: "Single",
-            permission_policy: {
-                read_policy: { NoRequirement: null },
-                write_policy: { Distance: 0 },
-                explicit_read_policy: null,
-                explicit_write_policy: null
+// Function to fetch example schemas from the API
+async function fetchExampleSchema() {
+    try {
+        const response = await utils.apiRequest('/api/examples/user_profile_schema.json');
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching example schema:', error);
+        // Fallback to a simple example if the API fails
+        return {
+            name: "UserProfile",
+            fields: {
+                username: {
+                    field_type: "Single",
+                    permission_policy: {
+                        read_policy: { NoRequirement: null },
+                        write_policy: { Distance: 0 },
+                        explicit_read_policy: null,
+                        explicit_write_policy: null
+                    },
+                    payment_config: {
+                        base_multiplier: 1.0,
+                        trust_distance_scaling: { None: null },
+                        min_payment: null
+                    },
+                    field_mappers: {}
+                }
             },
             payment_config: {
                 base_multiplier: 1.0,
-                trust_distance_scaling: { None: null },
-                min_payment: null
-            },
-            field_mappers: {}
-        },
-        email: {
-            field_type: "Single",
-            permission_policy: {
-                read_policy: { Distance: 1 },
-                write_policy: { Distance: 0 },
-                explicit_read_policy: null,
-                explicit_write_policy: null
-            },
-            payment_config: {
-                base_multiplier: 1.0,
-                trust_distance_scaling: { None: null },
-                min_payment: null
-            },
-            field_mappers: {}
-        },
-        bio: {
-            field_type: "Single",
-            permission_policy: {
-                read_policy: { NoRequirement: null },
-                write_policy: { Distance: 0 },
-                explicit_read_policy: null,
-                explicit_write_policy: null
-            },
-            payment_config: {
-                base_multiplier: 1.0,
-                trust_distance_scaling: { None: null },
-                min_payment: null
-            },
-            field_mappers: {}
-        }
-    },
-    payment_config: {
-        base_multiplier: 1.0,
-        min_payment_threshold: 0
+                min_payment_threshold: 0
+            }
+        };
     }
-};
+}
 
 /**
  * Load the list of schemas from the API
@@ -156,7 +135,8 @@ async function loadSchema() {
 /**
  * Load an example schema into the textarea
  */
-function loadExampleSchema() {
+async function loadExampleSchema() {
+    const exampleSchema = await fetchExampleSchema();
     document.getElementById('schemaInput').value = JSON.stringify(exampleSchema, null, 2);
 }
 

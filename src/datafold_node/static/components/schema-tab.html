@@ -18,31 +18,7 @@
     <div class="form-group mt-3">
         <label for="schemaInput">Schema JSON</label>
         <textarea id="schemaInput" class="form-control code-editor" placeholder="Enter your schema JSON here...
-Example:
-{
-  &quot;name&quot;: &quot;UserProfile&quot;,
-  &quot;fields&quot;: {
-    &quot;username&quot;: {
-      &quot;field_type&quot;: &quot;Single&quot;,
-      &quot;permission_policy&quot;: {
-        &quot;read_policy&quot;: { &quot;NoRequirement&quot;: null },
-        &quot;write_policy&quot;: { &quot;Distance&quot;: 0 },
-        &quot;explicit_read_policy&quot;: null,
-        &quot;explicit_write_policy&quot;: null
-      },
-      &quot;payment_config&quot;: {
-        &quot;base_multiplier&quot;: 1.0,
-        &quot;trust_distance_scaling&quot;: { &quot;None&quot;: null },
-        &quot;min_payment&quot;: null
-      },
-      &quot;field_mappers&quot;: {}
-    }
-  },
-  &quot;payment_config&quot;: {
-    &quot;base_multiplier&quot;: 1.0,
-    &quot;min_payment_threshold&quot;: 0
-  }
-}"></textarea>
+Click 'Load Example' to see a sample schema from the examples directory."></textarea>
     </div>
     <div class="btn-group mt-3">
         <button id="loadSchemaBtn" class="btn btn-primary">

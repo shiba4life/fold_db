@@ -35,7 +35,14 @@ function setupEventListeners() {
     
     const loadExampleSchemaBtn = document.getElementById('loadExampleSchemaBtn');
     if (loadExampleSchemaBtn) {
-        loadExampleSchemaBtn.addEventListener('click', schemaModule.loadExampleSchema);
+        loadExampleSchemaBtn.addEventListener('click', async () => {
+            try {
+                await schemaModule.loadExampleSchema();
+            } catch (error) {
+                console.error('Error loading example schema:', error);
+                utils.displayResult('Error loading example schema', true);
+            }
+        });
     }
     
     // Query tab
@@ -46,7 +53,14 @@ function setupEventListeners() {
     
     const loadExampleQueryBtn = document.getElementById('loadExampleQueryBtn');
     if (loadExampleQueryBtn) {
-        loadExampleQueryBtn.addEventListener('click', operationsModule.loadExampleQuery);
+        loadExampleQueryBtn.addEventListener('click', async () => {
+            try {
+                await operationsModule.loadExampleQuery();
+            } catch (error) {
+                console.error('Error loading example query:', error);
+                utils.displayResult('Error loading example query', true);
+            }
+        });
     }
     
     // Mutation tab
@@ -57,7 +71,14 @@ function setupEventListeners() {
     
     const loadExampleMutationBtn = document.getElementById('loadExampleMutationBtn');
     if (loadExampleMutationBtn) {
-        loadExampleMutationBtn.addEventListener('click', operationsModule.loadExampleMutation);
+        loadExampleMutationBtn.addEventListener('click', async () => {
+            try {
+                await operationsModule.loadExampleMutation();
+            } catch (error) {
+                console.error('Error loading example mutation:', error);
+                utils.displayResult('Error loading example mutation', true);
+            }
+        });
     }
     
     // Network tab (if exists)

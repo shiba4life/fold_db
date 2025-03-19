@@ -152,6 +152,15 @@ impl UiServer {
             .and(with_node(node))
             .and_then(handle_list_nodes);
 
+        // Example API routes
+        let list_examples = warp::path!("api" / "examples")
+            .and(warp::get())
+            .and_then(handle_list_examples);
+
+        let get_example = warp::path!("api" / "examples" / String)
+            .and(warp::get())
+            .and_then(handle_get_example);
+
         // Combine all routes
         list_schemas
             .or(schema)
@@ -164,5 +173,7 @@ impl UiServer {
             .or(discover_nodes)
             .or(connect_to_node)
             .or(list_nodes)
+            .or(list_examples)
+            .or(get_example)
     }
 }

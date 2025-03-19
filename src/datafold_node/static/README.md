@@ -34,6 +34,29 @@ The web UI follows a modular architecture with clear separation of concerns:
    - `network.js`: Network-related operations
    - `app.js`: Application initialization and event handling
 
+## Centralized Examples System
+
+The web UI uses a centralized approach for example schemas, mutations, and queries:
+
+1. **Example Storage**: All examples are stored in the `src/datafold_node/examples/` directory
+2. **API Endpoints**: The UI server provides endpoints to access these examples:
+   - `/api/examples` - Lists all available example files
+   - `/api/examples/{filename}` - Retrieves a specific example file
+3. **Dynamic Loading**: When users click "Load Example" buttons, the UI fetches examples from these endpoints
+4. **No Duplication**: Examples are not hardcoded in the JavaScript files, ensuring a single source of truth
+
+This approach ensures consistency across the system and makes it easier to maintain and update examples.
+
+## Example Loading Flow
+
+When a user clicks "Load Example":
+
+1. The event handler in `app.js` calls the appropriate module's `loadExample` function
+2. The function makes an API request to `/api/examples/{filename}`
+3. The server reads the example file from the examples directory
+4. The example is returned as JSON and loaded into the UI
+5. If the API request fails, a simple fallback example is used
+
 ## Features
 
 - **Modular Design**: Each component can be developed and tested independently.

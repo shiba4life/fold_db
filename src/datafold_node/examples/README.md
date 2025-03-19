@@ -1,6 +1,6 @@
-# FoldDB Sample Schemas for Testing
+# FoldDB Sample Schemas, Mutations, and Queries
 
-This directory contains sample schemas, mutations, and queries for testing the FoldDB node webapp.
+This directory contains the centralized repository of sample schemas, mutations, and queries for the FoldDB system. These examples are used by both the web UI and the CLI.
 
 ## Files Overview
 
@@ -8,6 +8,38 @@ This directory contains sample schemas, mutations, and queries for testing the F
 - `user_profile2_schema.json`: A UserProfile2 schema that maps fields from the UserProfile schema
 - `user_profile_mutations.json`: Sample mutations for creating, updating, and deleting UserProfile records
 - `user_profile_queries.json`: Sample queries for both UserProfile and UserProfile2 schemas
+
+## Centralized Example System
+
+These examples serve as the single source of truth for the FoldDB system. They are used by:
+
+1. **Web UI**: The web interface loads these examples via API endpoints when users click "Load Example" buttons
+2. **CLI**: The command-line interface can use these examples for testing and demonstration
+3. **Documentation**: These examples are referenced in documentation to ensure consistency
+
+This centralized approach ensures that all examples are maintained in one place, avoiding duplication and inconsistencies across different parts of the system.
+
+## Usage in Web UI
+
+The web UI loads these examples through API endpoints:
+
+- `/api/examples` - Lists all available example files
+- `/api/examples/{filename}` - Retrieves a specific example file
+
+When users click "Load Example" buttons in the Schema, Query, or Mutation tabs, the UI fetches the appropriate example from these endpoints.
+
+## Usage with CLI
+
+You can use these examples with the FoldDB CLI:
+
+```bash
+# Load a schema from an example file
+cargo run --bin fold_cli load-schema --file src/datafold_node/examples/user_profile_schema.json
+
+# Execute a query using an example (requires extracting a single query from the array)
+# Create a temporary file with a single query from user_profile_queries.json
+cargo run --bin fold_cli query --schema UserProfile --json-file path/to/extracted_query.json
+```
 
 ## Testing Instructions
 
