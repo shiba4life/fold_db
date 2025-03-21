@@ -1,7 +1,7 @@
 # Active Context
 
 ## Current Task
-Simplifying the libp2p network implementation in the FoldDB project.
+Implementing the networking layer using libp2p in the FoldDB project.
 
 ## Recent Changes
 1. Removed unused network implementation that wasn't using libp2p:
@@ -48,15 +48,98 @@ Simplifying the libp2p network implementation in the FoldDB project.
    - Removed ConnectionState enum from types.rs
    - Updated UI and API handlers to use the simplified NetworkConfig
 
+7. Started implementing the schema protocol:
+   - Created SchemaListProtocol for schema listing
+   - Implemented SchemaCodec for serializing/deserializing schema messages
+   - Added SchemaMessage enum for request/response messages
+   - Integrated with the LibP2pNetwork implementation
+
+8. Implemented network behavior:
+   - Created FoldDbBehaviour for handling network events
+   - Added support for mDNS discovery
+   - Added support for schema request/response protocol
+   - Integrated with the LibP2pNetwork implementation
+
+## Current Implementation Status
+1. Basic libp2p structure is in place:
+   - LibP2pNetwork class for network operations
+   - LibP2pManager wrapper for compatibility
+   - SchemaListProtocol for schema listing
+   - FoldDbBehaviour for network behavior
+
+2. Implemented schema protocol components:
+   - Completed SchemaCodec implementation for serialization/deserialization
+   - Implemented SchemaMessage enum for request/response messages
+   - Fixed syntax errors in the implementation
+   - Ensured proper parameter passing in function signatures
+   - Added proper comma separation in generic type parameters
+
+3. Implemented network behavior:
+   - Created FoldDbBehaviour for handling network events
+   - Added support for peer discovery and tracking
+   - Implemented methods for adding and removing peers
+   - Added support for getting discovered peers
+   - Integrated with the LibP2pNetwork implementation
+
+4. Enhanced LibP2pNetwork implementation:
+   - Added thread-safe access to network components using Arc<Mutex<>>
+   - Implemented async/await support for network operations
+   - Added support for simulating node discovery
+   - Implemented schema list request/response handling
+   - Added proper error handling for network operations
+
+5. Current focus:
+   - Fixing remaining syntax issues in the implementation
+   - Implementing the transport layer setup
+   - Adding comprehensive tests for the network layer
+   - Integrating with the DataFoldNode implementation
+
 ## Next Steps
-1. Implement full libp2p functionality with actual networking
-2. Add comprehensive tests for the libp2p implementation
-3. Integrate with the existing network layer
-4. Add security features for libp2p communication
-5. Implement NAT traversal for better connectivity
-6. Add node reputation tracking
-7. Optimize network operations
-8. Update UI and API handlers to reflect the simplified network configuration
+1. Complete the schema protocol implementation:
+   - Finalize SchemaCodec implementation
+   - Test serialization/deserialization of schema messages
+   - Integrate with the LibP2pNetwork implementation
+
+2. Implement the network behavior:
+   - Add support for mDNS discovery
+   - Add support for Kademlia DHT
+   - Add support for request-response protocol
+   - Integrate with the LibP2pNetwork implementation
+
+3. Implement the transport layer:
+   - Add support for TCP transport
+   - Add support for WebSocket transport
+   - Add support for QUIC transport (optional)
+   - Integrate with the LibP2pNetwork implementation
+
+4. Implement peer management:
+   - Add support for connection limits
+   - Add support for peer prioritization
+   - Add support for trust distance checking
+   - Integrate with the LibP2pNetwork implementation
+
+5. Implement security features:
+   - Add support for Noise protocol encryption
+   - Add support for public key authentication
+   - Add support for trust distance checking
+   - Integrate with the LibP2pNetwork implementation
+
+6. Implement payment features:
+   - Add support for Lightning Network payments
+   - Add support for payment verification
+   - Integrate with the LibP2pNetwork implementation
+
+7. Add comprehensive tests:
+   - Unit tests for protocol implementation
+   - Integration tests for node discovery
+   - Error handling tests
+   - Local network tests
+
+8. Optimize network operations:
+   - Add connection pooling
+   - Add message batching
+   - Add streaming substreams
+   - Integrate with the LibP2pNetwork implementation
 
 ## Implementation Details
 

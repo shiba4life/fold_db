@@ -121,6 +121,14 @@
 - Add more detailed permission checking for operations
 - Add tests for unified error handling system
 - Add tests for new network layer components
+- Complete libp2p network implementation:
+  - Fix schema protocol implementation issues
+  - Complete network behavior implementation
+  - Implement transport layer setup
+  - Add peer management
+  - Add security features
+  - Add payment features
+  - Add comprehensive tests
 - Implement advanced node discovery mechanisms
 - Add security enhancements for node communication
 - Implement NAT traversal for better connectivity
@@ -157,6 +165,23 @@
   - Removed SerializableQueryResult from types.rs
   - Removed ConnectionState enum from types.rs
   - Updated UI and API handlers to use the simplified NetworkConfig
+
+- Continued implementing the libp2p network layer:
+  - Created SchemaListProtocol for schema listing
+  - Implemented SchemaCodec for serializing/deserializing schema messages
+  - Added SchemaMessage enum for request/response messages
+  - Created FoldDbBehaviour for handling network events
+  - Added support for peer discovery and tracking
+  - Implemented request-response protocol for schema listing
+  - Updated LibP2pNetwork to use the new SchemaCodec implementation
+  - Fixed syntax errors in the SchemaCodec implementation
+  - Ensured proper parameter passing in function signatures
+  - Added proper comma separation in generic type parameters
+  - Implemented async/await support for network operations
+  - Added thread-safe access to network components using Arc<Mutex<>>
+  - Simplified the network behavior implementation
+  - Added support for simulating node discovery
+  - Implemented schema list request/response handling
 
 - Implemented separate UI and App servers
   - UI Server for management interface

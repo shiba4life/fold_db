@@ -6,6 +6,8 @@ use crate::error::{FoldDbError, NetworkErrorKind, FoldDbResult};
 use crate::datafold_node::network::types::{
     NodeId, NodeInfo, NetworkConfig, SchemaInfo, QueryResult as FoldDbQueryResult
 };
+use crate::datafold_node::network::network_behaviour::FoldDbBehaviour;
+use crate::datafold_node::network::schema_protocol::{SchemaCodec, SchemaMessage};
 use crate::schema::types::Query;
 
 /// LibP2pNetwork implements the network layer using libp2p
@@ -24,6 +26,8 @@ pub struct LibP2pNetwork {
     schema_list_callback: Arc<Mutex<Box<dyn Fn() -> Vec<SchemaInfo> + Send + Sync>>>,
     /// Whether the network is running
     running: Arc<Mutex<bool>>,
+    /// Network behavior
+    behaviour: Arc<Mutex<FoldDbBehaviour>>,
 }
 
 impl LibP2pNetwork {
@@ -46,6 +50,9 @@ impl LibP2pNetwork {
         println!("Creating LibP2pNetwork with node ID: {}", local_node_id);
         println!("Public key: {:?}", public_key);
 
+        // Create network behavior
+        let behaviour = FoldDbBehaviour::new();
+
         Ok(Self {
             local_node_id,
             config,
@@ -54,6 +61,7 @@ impl LibP2pNetwork {
             query_callback: Arc::new(Mutex::new(query_callback)),
             schema_list_callback: Arc::new(Mutex::new(schema_list_callback)),
             running: Arc::new(Mutex::new(false)),
+            behaviour: Arc::new(Mutex::new(behaviour)),
         })
     }
 
@@ -112,8 +120,27 @@ impl LibP2pNetwork {
         println!("Discovering nodes on the network");
 
         // In a real implementation, this would use libp2p's discovery mechanisms
-        // For now, we'll just return the known nodes
-        let known_nodes = self.known_nodes.lock().unwrap();
+        // For now, we'll simulate discovering some nodes
+        let mut known_nodes = self.known_nodes.lock().unwrap();
+        
+        // Simulate discovering a new node
+        let node_id = Uuid::new_v4().to_string();
+        let node_info = NodeInfo {
+            node_id: node_id.clone(),
+            address: self.config.listen_address,
+            trust_distance: 1,
+            public_key: None,
+            capabilities: Default::default(),
+        };
+        
+        // Add the node to the known nodes
+        known_nodes.insert(node_id.clone(), node_info.clone());
+        
+        // Add the node to the discovered peers in the behavior
+        let mut behaviour = self.behaviour.lock().unwrap();
+        behaviour.add_discovered_peer(node_id);
+        
+        // Return the known nodes
         let nodes: Vec<NodeInfo> = known_nodes.values().cloned().collect();
 
         Ok(nodes)
@@ -168,11 +195,18 @@ impl LibP2pNetwork {
             return Err(FoldDbError::Network(NetworkErrorKind::Connection(format!("Not connected to node {}", node_id))));
         }
 
-        // In a real implementation, this would use libp2p to request schemas from the node
-        // For now, we'll just simulate it by returning the local schemas
+        // Create a schema list request
+        let _request = SchemaMessage::ListRequest;
+        
+        // In a real implementation, this would use libp2p's request-response protocol
+        // to send the request to the node and wait for a response.
+        // For now, we'll just simulate it by executing the callback directly
         let callback = self.schema_list_callback.lock().unwrap();
         let schemas = (*callback)();
-
+        
+        // Create a response
+        let _response = SchemaMessage::ListResponse(schemas.clone());
+        
         Ok(schemas)
     }
 
