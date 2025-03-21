@@ -1,62 +1,46 @@
 # Active Context
 
 ## Current Task
-Implementing separate UI and App servers for DataFold node to distinguish between management UI and 3rd party API access.
+Removing UI server, app server, and network layer code from the DataFold node to simplify the codebase.
 
 ## Recent Changes
-1. Created a new server architecture with two separate servers:
-   - UI Server (port 8080): For management UI access
-   - App Server (port 8081): For 3rd party API access with cryptographic signature verification
+1. Removed UI Server:
+   - Removed web_server_compat module
+   - Removed UI server initialization from the main binary
 
-2. Implemented UI Server:
-   - Renamed existing web_server to ui_server
-   - Updated error handling with UiError and UiErrorResponse
-   - Maintained all existing API endpoints
+2. Removed App Server:
+   - Removed app_server module and all its components
+   - Removed app server initialization from the main binary
 
-3. Implemented App Server:
-   - Created new app_server module with:
-     - Signature verification middleware
-     - CORS support for cross-origin requests
-     - Comprehensive logging system
-     - Error handling specific to API requests
-   - Implemented cryptographic signature verification for all requests
-   - Added timestamp validation to prevent replay attacks
+3. Removed Network Layer:
+   - Removed network-related methods from DataFoldNode
+   - Removed network field from DataFoldNode struct
+   - Removed network-related imports
 
-4. Added security features:
-   - Request signing with public/private key pairs
-   - Timestamp validation (5-minute window)
-   - Detailed security logging
-   - Permission checking based on public keys
+4. Updated Tests:
+   - Removed references to app_server_tests, network_tests, and network_discovery_tests in unit tests
+   - Removed references to app_server_tests, web_api_tests, user_profile_api_tests, and schema_mapping_tests in integration tests
 
-5. Updated main binary to run both servers concurrently
+5. Updated Main Binary:
+   - Simplified to just load the node and wait for Ctrl+C signal
+   - Removed server initialization and execution
 
 ## Next Steps
-1. Implement actual signature verification (currently a placeholder)
-2. Add comprehensive tests for the new API server
-3. Create documentation for 3rd party developers
-4. Implement rate limiting for API requests
-5. Add more detailed permission checking for operations
+1. Implement a simpler, more focused API if needed
+2. Update documentation to reflect the simplified architecture
+3. Fix any remaining issues with tests
+4. Consider alternative approaches for node communication if needed
+5. Enhance the CLI with additional features as needed
 
 ## Implementation Details
 
-### API Authentication Flow
-1. Client signs request with private key
-2. Request includes:
-   - Public key in header
-   - Signature in header
-   - Timestamp in request body
-   - Operation details in request body
-3. Server verifies:
-   - Signature is valid for the request
-   - Timestamp is within 5 minutes
-   - Public key has permission for the operation
-
-### API Endpoints
-- GET /api/v1/status - Get API status (no authentication)
-- POST /api/v1/execute - Execute an operation (requires signature)
+### Core Functionality
+- DataFoldNode now focuses solely on database operations
+- No network communication or API endpoints
+- Simplified architecture with fewer dependencies
+- CLI interface for interacting with the node
 
 ### Security Considerations
-- All API requests must be signed
-- Timestamps prevent replay attacks
-- Detailed security logging for audit purposes
-- Permission checking based on public keys and trust distance
+- Security now relies on direct access control to the node
+- No network exposure reduces attack surface
+- CLI provides controlled access to node operations

@@ -1,5 +1,5 @@
-use std::sync::{Arc, Mutex};
-use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use std::collections::HashMap;
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -7,10 +7,7 @@ use crate::error::{FoldDbError, FoldDbResult};
 use crate::fold_db_core::FoldDB;
 use crate::schema::types::{Mutation, Query, Operation};
 use crate::schema::{Schema, SchemaError};
-use crate::datafold_node::{
-    config::NodeConfig,
-    network::{NetworkManager, NetworkConfig, NodeId, SchemaInfo},
-};
+use crate::datafold_node::config::NodeConfig;
 use crate::datafold_node::config::NodeInfo;
 
 /// A node in the FoldDB distributed database system.
@@ -22,8 +19,6 @@ pub struct DataFoldNode {
     config: NodeConfig,
     /// Map of trusted nodes and their trust distances
     trusted_nodes: HashMap<String, NodeInfo>,
-    /// Network manager for node discovery and communication
-    network: Option<Arc<Mutex<NetworkManager>>>,
     /// Unique identifier for this node
     node_id: String,
 }
@@ -45,7 +40,6 @@ impl DataFoldNode {
             db, 
             config,
             trusted_nodes: HashMap::new(),
-            network: None,
             node_id,
         })
     }
@@ -216,191 +210,7 @@ impl DataFoldNode {
         }
     }
 
-    // Network-related methods
-
-    /// Initializes the network layer with the specified configuration.
-    pub fn init_network(&mut self, network_config: NetworkConfig) -> FoldDbResult<()> {
-        // Create network manager
-        let network_manager = NetworkManager::new(
-            network_config,
-            self.node_id.clone(),
-            None, // TODO: Add public key support
-        ).map_err(|e| FoldDbError::Config(format!("Failed to initialize network: {}", e)))?;
-        
-        self.network = Some(Arc::new(Mutex::new(network_manager)));
-        Ok(())
-    }
-
-    /// Starts the network layer.
-    pub fn start_network(&mut self) -> FoldDbResult<()> {
-        // First, check if network is initialized
-        if self.network.is_none() {
-            return Err(FoldDbError::Config("Network not initialized".to_string()));
-        }
-        
-        // Clone self for use in callbacks
-        let self_clone = self.clone();
-        let self_clone2 = self.clone();
-        
-        // Get a lock on the network manager
-        let network = self.network.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Network not initialized".to_string()))?;
-        
-        let mut network_manager = network.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock network manager".to_string()))?;
-        
-        // Set callbacks for schema listing and query handling
-        network_manager.set_schema_list_callback(move || {
-            // Convert schemas to SchemaInfo
-            let schemas = self_clone.list_schemas().unwrap_or_default();
-            schemas.into_iter()
-                .map(|schema| SchemaInfo {
-                    name: schema.name.clone(),
-                    version: "1.0.0".to_string(), // Default version
-                    description: None,
-                })
-                .collect()
-        });
-        
-        network_manager.set_query_callback(move |query| {
-            self_clone2.query(query).unwrap_or_default()
-        });
-        
-        // Start the network manager
-        network_manager.start()
-            .map_err(|e| FoldDbError::Config(format!("Failed to start network: {}", e)))
-    }
-
-    /// Stops the network layer.
-    pub fn stop_network(&mut self) -> FoldDbResult<()> {
-        // First, check if network is initialized
-        if self.network.is_none() {
-            return Ok(());
-        }
-        
-        // Get a lock on the network manager
-        let network = self.network.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Network not initialized".to_string()))?;
-        
-        let mut network_manager = network.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock network manager".to_string()))?;
-        
-        // Stop the network manager
-        network_manager.stop()
-            .map_err(|e| FoldDbError::Config(format!("Failed to stop network: {}", e)))
-    }
-
-    /// Discovers nodes on the network.
-    pub fn discover_nodes(&mut self) -> FoldDbResult<Vec<crate::datafold_node::network::NodeInfo>> {
-        // First, check if network is initialized
-        if self.network.is_none() {
-            return Err(FoldDbError::Config("Network not initialized".to_string()));
-        }
-        
-        // Get a lock on the network manager
-        let network = self.network.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Network not initialized".to_string()))?;
-        
-        let mut network_manager = network.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock network manager".to_string()))?;
-        
-        // Discover nodes
-        network_manager.discover_nodes()
-            .map_err(|e| FoldDbError::Config(format!("Failed to discover nodes: {}", e)))
-    }
-
-    /// Connects to a node with the specified ID.
-    pub fn connect_to_node(&self, node_id: &str) -> FoldDbResult<()> {
-        // First, check if network is initialized
-        if self.network.is_none() {
-            return Err(FoldDbError::Config("Network not initialized".to_string()));
-        }
-        
-        // Get a lock on the network manager
-        let network = self.network.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Network not initialized".to_string()))?;
-        
-        let network_manager = network.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock network manager".to_string()))?;
-        
-        // Connect to the node
-        network_manager.connect_to_node(&node_id.to_string())
-            .map_err(|e| FoldDbError::Config(format!("Failed to connect to node: {}", e)))
-    }
-
-    /// Queries a node with the specified ID.
-    pub fn query_node(&self, node_id: &str, query: Query) -> FoldDbResult<Vec<Result<Value, SchemaError>>> {
-        // First, check if network is initialized
-        if self.network.is_none() {
-            return Err(FoldDbError::Config("Network not initialized".to_string()));
-        }
-        
-        // Get a lock on the network manager
-        let network = self.network.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Network not initialized".to_string()))?;
-        
-        let network_manager = network.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock network manager".to_string()))?;
-        
-        // Query the node
-        network_manager.query_node(&node_id.to_string(), query)
-            .map_err(|e| FoldDbError::Config(format!("Failed to query node: {}", e)))
-    }
-
-    /// Lists schemas available on a node with the specified ID.
-    pub fn list_node_schemas(&self, node_id: &str) -> FoldDbResult<Vec<SchemaInfo>> {
-        // First, check if network is initialized
-        if self.network.is_none() {
-            return Err(FoldDbError::Config("Network not initialized".to_string()));
-        }
-        
-        // Get a lock on the network manager
-        let network = self.network.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Network not initialized".to_string()))?;
-        
-        let network_manager = network.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock network manager".to_string()))?;
-        
-        // List schemas on the node
-        network_manager.list_available_schemas(&node_id.to_string())
-            .map_err(|e| FoldDbError::Config(format!("Failed to list schemas on node: {}", e)))
-    }
-
-    /// Gets a list of connected node IDs.
-    pub fn get_connected_nodes(&self) -> FoldDbResult<HashSet<NodeId>> {
-        // First, check if network is initialized
-        if self.network.is_none() {
-            return Err(FoldDbError::Config("Network not initialized".to_string()));
-        }
-        
-        // Get a lock on the network manager
-        let network = self.network.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Network not initialized".to_string()))?;
-        
-        let network_manager = network.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock network manager".to_string()))?;
-        
-        // Get connected nodes
-        Ok(network_manager.connected_nodes())
-    }
-
-    /// Gets a map of known nodes and their information.
-    pub fn get_known_nodes(&self) -> FoldDbResult<HashMap<NodeId, crate::datafold_node::network::NodeInfo>> {
-        // First, check if network is initialized
-        if self.network.is_none() {
-            return Err(FoldDbError::Config("Network not initialized".to_string()));
-        }
-        
-        // Get a lock on the network manager
-        let network = self.network.as_ref()
-            .ok_or_else(|| FoldDbError::Config("Network not initialized".to_string()))?;
-        
-        let network_manager = network.lock()
-            .map_err(|_| FoldDbError::Config("Failed to lock network manager".to_string()))?;
-        
-        // Get known nodes
-        Ok(network_manager.known_nodes())
-    }
+    // Network-related methods have been removed
 
     /// Gets the unique identifier for this node.
     pub fn get_node_id(&self) -> &str {

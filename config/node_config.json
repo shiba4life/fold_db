@@ -1,4 +1,4 @@
 {
-  "storage_path": "data",
-  "default_trust_distance": 3
+  "storage_path": "./data/db",
+  "default_trust_distance": 1
 }

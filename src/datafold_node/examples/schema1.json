@@ -2,6 +2,7 @@
     "name": "UserProfile",
     "fields": {
       "username": {
+        "field_type": "Single",
         "permission_policy": {
           "read_policy": {
             "NoRequirement": null
@@ -24,6 +25,7 @@
         }
       },
       "email": {
+        "field_type": "Single",
         "permission_policy": {
           "read_policy": {
             "Distance": 1
@@ -58,5 +60,3 @@
       "min_payment_threshold": 500
     }
   }
-  
-  

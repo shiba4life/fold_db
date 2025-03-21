@@ -17,24 +17,11 @@
   - [x] Field-level permissions
   - [x] Permission policies
   - [x] Thread-safe permission checks
-- Network layer
-  - [x] Node discovery mechanism
-  - [x] Connection management
-  - [x] Message protocol
-  - [x] Schema listing between nodes
-  - [x] Remote querying
-  - [x] Integration with DataFoldNode
 - Error handling system
   - [x] Centralized error types
   - [x] Error categorization
   - [x] Direct error handling without legacy types
   - [x] Simplified error propagation
-- Server architecture
-  - [x] UI Server for management interface
-  - [x] App Server for 3rd party API access
-  - [x] Signature verification for API requests
-  - [x] CORS support for cross-origin requests
-  - [x] Comprehensive logging system
 - Atom and AtomRef implementation
 - Version history tracking
 - Schema interpreter implementation
@@ -54,48 +41,23 @@
 - Error Handling System:
   - Basic Features: Complete
   - Advanced Features (recovery mechanisms): Planned
-- Network Layer:
-  - Basic Features: Complete
-  - Advanced Features: In Progress
-  - Security Features: Planned
-- Server Architecture:
-  - UI Server: Complete
-  - App Server: Complete
-  - API Authentication: Complete
-  - API Documentation: Planned
 - Testing: 
-  - Unit Tests: Complete
-  - Integration Tests: 90% Complete
+  - Unit Tests: Partial (network and server tests removed)
+  - Integration Tests: Partial (network and server tests removed)
   - Schema Transformation Tests: In Progress
-  - Network Layer Tests: Planned
   - Error Handling Tests: Planned
-  - API Server Tests: Planned
 - Documentation: Complete
 
 ## Recent Additions
-- Dual server architecture
-  - UI Server for management interface
-  - App Server for 3rd party API access
-- API authentication with cryptographic signatures
-  - Request signing with public/private key pairs
-  - Timestamp validation to prevent replay attacks
-  - Permission checking based on public keys
-- Comprehensive logging system
-  - Security event logging
-  - Operation logging
-  - Debug logging
-- CORS support for cross-origin requests
+- Simplified architecture
+  - Removed UI Server and App Server
+  - Removed network layer
+  - Focused on core database functionality
 - Unified error handling system
   - Centralized FoldDbError type
   - Specific error categories
   - Direct error propagation
   - Removed legacy error types
-- Network layer implementation
-  - Node discovery with UDP broadcasts
-  - TCP-based connections with message protocol
-  - Schema listing between nodes
-  - Remote querying capabilities
-  - Integration with DataFoldNode
 - Unified schema system
   - Combined SchemaManager and SchemaInterpreter
   - Simplified API
@@ -109,22 +71,14 @@
   - Relationship tracking
   - Automatic updates
 - Improved testing infrastructure
-  - Schema mapping tests
-  - Transformation tests
+  - Schema transformation tests
   - Concurrent operation tests
 
 ## Next Milestones
-- Implement actual signature verification
-- Add comprehensive tests for the API server
-- Create documentation for 3rd party developers
-- Implement rate limiting for API requests
-- Add more detailed permission checking for operations
-- Add tests for unified error handling system
-- Add tests for new network layer components
-- Implement advanced node discovery mechanisms
-- Add security enhancements for node communication
-- Implement NAT traversal for better connectivity
-- Add node reputation tracking
+- Implement a simpler, more focused API if needed
+- Update documentation to reflect the simplified architecture
+- Fix any remaining issues with tests
+- Consider alternative approaches for node communication if needed
 - Complete schema transformation system
 - Implement advanced field validations
 - Optimize schema operations
@@ -133,23 +87,23 @@
 - Simplify permission system
 
 ## Recent Improvements
-- Implemented separate UI and App servers
-  - UI Server for management interface
-  - App Server for 3rd party API access
-  - Concurrent operation of both servers
-- Added security features for API access
-  - Request signing with public/private key pairs
-  - Timestamp validation to prevent replay attacks
-  - Detailed security logging
-  - Permission checking based on public keys
-- Streamlined network layer components:
-  - Split NetworkManager into smaller, focused components
-  - Created ConnectionManager for handling connections
-  - Created MessageRouter for routing messages to handlers
-  - Created QueryService and SchemaService for handling specific operations
-  - Improved error recovery in network operations
-  - Simplified message handling with a handler registry pattern
-  - Unified client and server components (QueryService, SchemaService)
-  - Simplified NetworkCore to use unified services
-  - Reduced code duplication and improved maintainability
-  - Fixed warnings and improved code quality
+- Simplified architecture by removing:
+  - UI Server
+  - App Server
+  - Network layer
+- Streamlined DataFoldNode implementation:
+  - Removed network-related fields and methods
+  - Focused on core database operations
+  - Simplified initialization and usage
+- Updated main binary:
+  - Removed server initialization and execution
+  - Simplified to just load the node and wait for Ctrl+C signal
+- Updated tests:
+  - Removed references to removed components
+  - Focused on core functionality tests
+- Added CLI interface:
+  - Command-line tool for interacting with the node
+  - Support for loading schemas
+  - Support for executing queries and mutations
+  - Support for executing operations from JSON files
+  - Comprehensive documentation and examples
