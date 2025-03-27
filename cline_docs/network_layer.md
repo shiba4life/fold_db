@@ -23,7 +23,7 @@ pub struct NetworkCore {
 impl NetworkCore {
     pub async fn new(config: NetworkConfig) -> NetworkResult<Self>;
     pub async fn run(&mut self) -> NetworkResult<()>;
-    pub async fn request_schemas(&mut self, peer_id: PeerId) -> NetworkResult<Vec<SchemaInfo>>;
+    pub async fn check_schemas(&mut self, peer_id: PeerId, schema_names: Vec<String>) -> NetworkResult<Vec<String>>;
 }
 ```
 
@@ -32,15 +32,16 @@ Unified service for handling schema operations. Leverages libp2p's event seriali
 
 ```rust
 pub struct SchemaService {
-    // Function pointer for schema listing, set once at initialization
-    schema_list_callback: Box<dyn Fn() -> Vec<SchemaInfo> + Send + Sync>,
+    // Function pointer for schema availability check, set once at initialization
+    schema_check_callback: Box<dyn Fn(&[String]) -> Vec<String> + Send + Sync>,
 }
 
 impl SchemaService {
     pub fn new() -> Self;
-    pub fn set_schema_list_callback<F>(&mut self, callback: F) 
-        where F: Fn() -> Vec<SchemaInfo> + Send + Sync + 'static;
-    pub fn list_schemas(&self) -> Vec<SchemaInfo>;
+    pub fn set_schema_check_callback<F>(&mut self, callback: F) 
+        where F: Fn(&[String]) -> Vec<String> + Send + Sync + 'static;
+    // Returns subset of input schema names that are available on this node
+    pub fn check_schemas(&self, schema_names: &[String]) -> Vec<String>;
 }
 ```
 
@@ -50,22 +51,15 @@ Defines the request-response protocol between nodes.
 ```rust
 #[derive(Serialize, Deserialize)]
 enum SchemaRequest {
-    ListSchemas,
+    // Request to check availability of specific schemas
+    CheckSchemas(Vec<String>),
 }
 
 #[derive(Serialize, Deserialize)]
 enum SchemaResponse {
-    SchemaList(Vec<SchemaInfo>),
+    // Returns subset of requested schemas that are available
+    AvailableSchemas(Vec<String>),
     Error(String),
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct SchemaInfo {
-    id: String,
-    name: String,
-    version: u64,
-    fields: Vec<FieldInfo>,
-    metadata: HashMap<String, String>,
 }
 ```
 
@@ -81,11 +75,12 @@ pub struct SchemaInfo {
 2. Automatic multiplexing through yamux
 3. Begin request-response protocol
 
-### Schema Exchange Flow
+### Schema Availability Check Flow
 1. Node A discovers Node B through mDNS
-2. Node A sends ListSchemas request directly to Node B
-3. Node B responds with its current schema list
-4. Node A receives and processes the response
+2. Node A sends CheckSchemas request with list of schema names
+3. Node B checks which schemas from the list are available
+4. Node B responds with subset of available schemas
+5. Node A receives and processes the response
 
 ### Concurrency Model
 The network layer takes advantage of libp2p's built-in concurrency guarantees:
