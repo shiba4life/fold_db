@@ -6,6 +6,7 @@ edition = "2021"
 [features]
 default = []
 test-utils = []  # Feature flag for test utilities
+simulate-peers = []  # Feature flag for simulating peer discovery
 
 [dependencies]
 # Cryptography

@@ -66,12 +66,16 @@ impl NetworkCore {
         println!("Network service started on {}", listen_address);
         println!("Using protocol: {}", SCHEMA_PROTOCOL_NAME);
         
-        // For now, just simulate discovering some peers
-        // In a real implementation, this would happen through mDNS
-        for _ in 0..3 {
-            let peer_id = PeerId::random();
-            self.known_peers.insert(peer_id);
-            println!("Discovered peer: {}", peer_id);
+        // Note: In this simplified implementation, we're not actually discovering peers
+        // through mDNS. In a real implementation, libp2p would handle peer discovery.
+        // The code below is just a simulation for demonstration purposes.
+        if cfg!(feature = "simulate-peers") {
+            println!("SIMULATION: Generating random peers for demonstration");
+            for _ in 0..3 {
+                let peer_id = PeerId::random();
+                self.known_peers.insert(peer_id);
+                println!("SIMULATION: Discovered peer: {}", peer_id);
+            }
         }
         
         Ok(())
@@ -114,6 +118,11 @@ impl NetworkCore {
         tokio::time::sleep(Duration::from_millis(100)).await;
         
         Ok(available_schemas)
+    }
+    
+    /// Add a known peer to the network
+    pub fn add_known_peer(&mut self, peer_id: PeerId) {
+        self.known_peers.insert(peer_id);
     }
     
     /// Add a mock peer for testing

@@ -65,6 +65,31 @@ node.start_network("/ip4/0.0.0.0/tcp/9000").await?;
 
 // Check which schemas are available on a remote peer
 let available_schemas = node.check_remote_schemas(peer_id, schema_names).await?;
+
+// Get a mutable reference to the network core
+let mut network = node.get_network_mut().await?;
+```
+
+## Implementation Notes
+
+### Peer Discovery Simulation
+
+In the current implementation, peer discovery is simulated for demonstration purposes. In a real-world scenario, libp2p's mDNS discovery would be used to automatically find peers on the local network.
+
+To enable the peer discovery simulation, you can use the `simulate-peers` feature flag:
+
+```bash
+cargo run --bin datafold_node --features simulate-peers -- --port 9000
+```
+
+This will generate random peer IDs and add them to the known peers list, simulating the discovery process.
+
+In the examples, we manually add peers to the known peers list to demonstrate the schema checking functionality:
+
+```rust
+// Add a peer to the known peers list
+let mut network = node.get_network_mut().await?;
+network.add_known_peer(peer_id);
 ```
 
 ## Security Considerations

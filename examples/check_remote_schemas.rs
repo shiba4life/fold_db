@@ -61,6 +61,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     node2.start_network("/ip4/127.0.0.1/tcp/9002").await?;
     
     println!("Network services started");
+    println!("\nNote: In this simplified implementation, we're not actually discovering peers");
+    println!("through mDNS. In a real implementation, libp2p would handle peer discovery.");
+    println!("For this example, we're manually adding peers to the known peers list.\n");
     
     // Get the node IDs
     let node1_id = node1.get_node_id().to_string();
@@ -72,6 +75,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Add trusted nodes
     node1.add_trusted_node(&node2_id)?;
     node2.add_trusted_node(&node1_id)?;
+    
+    // Convert node IDs to PeerIds for remote schema checking
+    let node1_peer_id = libp2p::PeerId::random(); // In a real scenario, this would be derived from the node ID
+    let node2_peer_id = libp2p::PeerId::random(); // In a real scenario, this would be derived from the node ID
+    
+    println!("Node 1 Peer ID: {}", node1_peer_id);
+    println!("Node 2 Peer ID: {}", node2_peer_id);
+    
+    // For testing purposes, add these peer IDs to the known peers in the network core
+    // In a real scenario, this would happen through mDNS discovery
+    {
+        let mut network1 = node1.get_network_mut().await?;
+        network1.add_known_peer(node2_peer_id.clone());
+    }
+    
+    {
+        let mut network2 = node2.get_network_mut().await?;
+        network2.add_known_peer(node1_peer_id.clone());
+    }
     
     println!("Trusted nodes added");
     
@@ -87,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "non_existent_schema".to_string(),
     ];
     
-    match node2.check_remote_schemas(&node1_id, schemas_to_check).await {
+    match node2.check_remote_schemas(&node1_peer_id.to_string(), schemas_to_check).await {
         Ok(available_schemas) => {
             println!("Available schemas on Node 1:");
             for schema in available_schemas {
@@ -106,7 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "product_catalog".to_string(),
     ];
     
-    match node1.check_remote_schemas(&node2_id, schemas_to_check).await {
+    match node1.check_remote_schemas(&node2_peer_id.to_string(), schemas_to_check).await {
         Ok(available_schemas) => {
             println!("Available schemas on Node 2:");
             for schema in available_schemas {

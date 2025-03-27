@@ -261,6 +261,15 @@ impl DataFoldNode {
         }
     }
     
+    /// Get a mutable reference to the network core
+    pub async fn get_network_mut(&self) -> FoldDbResult<tokio::sync::MutexGuard<'_, NetworkCore>> {
+        if let Some(network) = &self.network {
+            Ok(network.lock().await)
+        } else {
+            Err(FoldDbError::Network(NetworkErrorKind::Protocol("Network not initialized".to_string())))
+        }
+    }
+    
     /// Check which schemas are available on a remote peer
     pub async fn check_remote_schemas(
         &self,
