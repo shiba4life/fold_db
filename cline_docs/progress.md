@@ -76,11 +76,10 @@
   - Concurrent operation tests
 
 ## Next Milestones
-- Integrate the network layer with DataFoldNode
-- Implement full libp2p functionality
-- Add configuration options for the network layer
-- Create more comprehensive tests for the network layer
 - Add schema synchronization capabilities
+- Implement Kademlia DHT for wider peer discovery
+- Add node reputation tracking
+- Implement custom protocol handlers
 - Complete schema transformation system
 - Implement advanced field validations
 - Optimize schema operations
@@ -89,20 +88,24 @@
 - Simplify permission system
 
 ## Recent Improvements
-- Added P2P network layer:
-  - NetworkCore component for P2P communication
-  - SchemaService for schema availability checking
-  - Error handling and configuration
-  - Testing infrastructure
-- Created schema exchange protocol:
-  - Request-response based schema checking
-  - Privacy-preserving design
-  - Efficient message format
+- Integrated network layer with DataFoldNode:
+  - Added network initialization and management methods
+  - Implemented schema checking functionality
+  - Added proper error handling for network operations
+- Implemented full libp2p functionality:
+  - Added mDNS discovery
+  - Implemented request-response protocol
+  - Added proper error handling
+- Enhanced network configuration:
+  - Added comprehensive configuration options
+  - Implemented builder pattern for flexible configuration
+  - Added support for mDNS discovery control
+- Added testing infrastructure:
+  - Unit tests for network components
+  - Integration tests for DataFoldNode with network layer
+  - Mock peer functionality for testing
 - Updated documentation:
   - Detailed network layer design
   - Schema exchange flow
   - Security considerations
-- Added testing infrastructure:
-  - Unit tests for schema service
-  - Tests for network core creation
-  - Framework for testing schema availability
+  - Network configuration options

@@ -21,6 +21,17 @@ src/datafold_node/data
 *.env
 *.bak
 
+# Test data directories
+/test_data/
+/test_data/*/
+/test_data/*/*/
+/test_data/*/*/*/
+/test_data/*/*/*/*/
+
+# Example generated files
+examples/*/db/
+examples/*/*/db/
+
 # Chrome extension specific
 chrome-extension/node_modules/
 chrome-extension/dist/

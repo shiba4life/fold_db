@@ -1,9 +1,12 @@
 use crate::network::config::NetworkConfig;
 use crate::network::error::{NetworkError, NetworkResult};
+use crate::network::schema_protocol::{SchemaRequest, SchemaResponse, SCHEMA_PROTOCOL_NAME};
 use crate::network::schema_service::SchemaService;
-use libp2p::PeerId;
-#[cfg(test)]
-use std::collections::HashMap;
+use libp2p::{PeerId, Multiaddr};
+use std::collections::{HashMap, HashSet};
+use std::time::Duration;
+use tokio::sync::mpsc;
+use tokio::time::timeout;
 
 /// Core network component for P2P communication
 pub struct NetworkCore {
@@ -11,6 +14,10 @@ pub struct NetworkCore {
     schema_service: SchemaService,
     /// Local peer ID
     local_peer_id: PeerId,
+    /// Known peers
+    known_peers: HashSet<PeerId>,
+    /// Request timeout in seconds
+    request_timeout: u64,
     /// Mock for testing - maps peer IDs to schema services
     #[cfg(test)]
     mock_peers: HashMap<PeerId, SchemaService>,
@@ -18,13 +25,15 @@ pub struct NetworkCore {
 
 impl NetworkCore {
     /// Create a new network core
-    pub async fn new(_config: NetworkConfig) -> NetworkResult<Self> {
-        // For now, just generate a random peer ID
+    pub async fn new(config: NetworkConfig) -> NetworkResult<Self> {
+        // Generate a random peer ID for now
         let local_peer_id = PeerId::random();
         
         Ok(Self {
             schema_service: SchemaService::new(),
             local_peer_id,
+            known_peers: HashSet::new(),
+            request_timeout: config.request_timeout,
             #[cfg(test)]
             mock_peers: HashMap::new(),
         })
@@ -48,10 +57,22 @@ impl NetworkCore {
     /// Start the network service
     pub async fn run(&mut self, listen_address: &str) -> NetworkResult<()> {
         // This is a placeholder for the actual implementation
-        println!("Network service started on {}", listen_address);
+        // In a real implementation, this would:
+        // 1. Parse the listen address
+        // 2. Create and start the libp2p swarm
+        // 3. Set up mDNS discovery
+        // 4. Set up the request-response protocol
         
-        // In a real implementation, this would start the libp2p swarm
-        // and process events in a loop
+        println!("Network service started on {}", listen_address);
+        println!("Using protocol: {}", SCHEMA_PROTOCOL_NAME);
+        
+        // For now, just simulate discovering some peers
+        // In a real implementation, this would happen through mDNS
+        for _ in 0..3 {
+            let peer_id = PeerId::random();
+            self.known_peers.insert(peer_id);
+            println!("Discovered peer: {}", peer_id);
+        }
         
         Ok(())
     }
@@ -60,27 +81,45 @@ impl NetworkCore {
     pub async fn check_schemas(
         &mut self,
         peer_id: PeerId,
-        _schema_names: Vec<String>,
+        schema_names: Vec<String>,
     ) -> NetworkResult<Vec<String>> {
-        // This is a placeholder for the actual implementation
-        // In a real implementation, this would send a request to the peer
-        // and wait for a response
-        
         #[cfg(test)]
         {
             // For testing, use the mock peer if available
             if let Some(peer_service) = self.mock_peers.get(&peer_id) {
-                return Ok(peer_service.check_schemas(&_schema_names));
+                return Ok(peer_service.check_schemas(&schema_names));
             }
         }
         
-        // Return an error if the peer is not found
-        Err(NetworkError::ConnectionError(format!("Peer not found: {}", peer_id)))
+        // Check if the peer is known
+        if !self.known_peers.contains(&peer_id) {
+            return Err(NetworkError::ConnectionError(format!("Peer not found: {}", peer_id)));
+        }
+        
+        // This is a placeholder for the actual implementation
+        // In a real implementation, this would:
+        // 1. Create a request message
+        // 2. Send the request to the peer
+        // 3. Wait for the response
+        // 4. Parse and return the response
+        
+        // For now, just simulate a response with a random subset of schemas
+        let available_schemas = schema_names
+            .iter()
+            .filter(|_| rand::random::<bool>())
+            .cloned()
+            .collect();
+        
+        // Simulate network delay
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        
+        Ok(available_schemas)
     }
     
     /// Add a mock peer for testing
     #[cfg(test)]
     pub fn add_mock_peer(&mut self, peer_id: PeerId, schema_service: SchemaService) {
         self.mock_peers.insert(peer_id, schema_service);
+        self.known_peers.insert(peer_id);
     }
 }

@@ -1,4 +1,9 @@
-use fold_db::network::{NetworkCore, NetworkConfig, SchemaService};
+use fold_db::datafold_node::{DataFoldNode, config::NodeConfig};
+use fold_db::network::{NetworkCore, NetworkConfig, SchemaService, PeerId};
+use fold_db::schema::Schema;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use tempfile::tempdir;
 
 #[tokio::test]
 async fn test_schema_service() {
@@ -36,4 +41,70 @@ async fn test_network_core_creation() {
     // Verify we have a valid peer ID
     let peer_id = node.local_peer_id();
     assert!(!peer_id.to_string().is_empty());
+}
+
+#[tokio::test]
+async fn test_datafold_node_network_integration() {
+    // Create temporary directories for the nodes
+    let node1_dir = tempdir().unwrap();
+    let node2_dir = tempdir().unwrap();
+    
+    // Create node configs
+    let node1_config = NodeConfig {
+        storage_path: node1_dir.path().to_path_buf(),
+        default_trust_distance: 1,
+    };
+    
+    let node2_config = NodeConfig {
+        storage_path: node2_dir.path().to_path_buf(),
+        default_trust_distance: 1,
+    };
+    
+    // Create the nodes
+    let mut node1 = DataFoldNode::new(node1_config).unwrap();
+    let mut node2 = DataFoldNode::new(node2_config).unwrap();
+    
+    // Create network configs
+    let network1_config = NetworkConfig::new("/ip4/127.0.0.1/tcp/0")
+        .with_mdns(false); // Disable mDNS for testing
+    
+    let network2_config = NetworkConfig::new("/ip4/127.0.0.1/tcp/0")
+        .with_mdns(false); // Disable mDNS for testing
+    
+    // Initialize the network layers
+    node1.init_network(network1_config).await.unwrap();
+    node2.init_network(network2_config).await.unwrap();
+    
+    // Create a test schema for node1
+    let test_schema = Schema::new("test_schema".to_string());
+    
+    // Load the schema into node1
+    node1.load_schema(test_schema.clone()).unwrap();
+    
+    // Get the peer IDs
+    let node1_id = node1.get_node_id().to_string();
+    let node2_id = node2.get_node_id().to_string();
+    
+    // Add trusted nodes
+    node1.add_trusted_node(&node2_id).unwrap();
+    node2.add_trusted_node(&node1_id).unwrap();
+    
+    // Start the network services
+    node1.start_network("/ip4/127.0.0.1/tcp/0").await.unwrap();
+    node2.start_network("/ip4/127.0.0.1/tcp/0").await.unwrap();
+    
+    // Since we're using mock peers for testing, we need to manually add them
+    // In a real scenario, peers would be discovered via mDNS
+    
+    // Check schemas on node2 from node1
+    // This is a bit tricky to test without actual network communication
+    // In a real scenario, we would use the actual peer ID from discovery
+    
+    // For now, we'll just verify that the methods don't panic
+    // In a real test, we would need to set up actual network communication
+    // or use more sophisticated mocking
+    
+    // This test mainly verifies that the integration compiles and the methods exist
+    assert!(node1.get_schema("test_schema").unwrap().is_some());
+    assert!(node2.get_schema("test_schema").unwrap().is_none());
 }

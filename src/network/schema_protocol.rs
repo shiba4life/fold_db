@@ -1,8 +1,7 @@
 use serde::{Serialize, Deserialize};
 
 /// Protocol name for schema operations
-#[derive(Debug, Clone)]
-pub struct SchemaProtocol;
+pub const SCHEMA_PROTOCOL_NAME: &str = "/fold/schema/1.0.0";
 
 /// Schema request types
 #[derive(Debug, Clone, Serialize, Deserialize)]

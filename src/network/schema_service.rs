@@ -4,6 +4,15 @@ pub struct SchemaService {
     schema_check_callback: Box<dyn Fn(&[String]) -> Vec<String> + Send + Sync>,
 }
 
+impl Clone for SchemaService {
+    fn clone(&self) -> Self {
+        // Since we can't clone the function pointer directly,
+        // we create a new service with the default callback
+        // This is only used for testing and initialization
+        Self::new()
+    }
+}
+
 impl SchemaService {
     /// Create a new schema service
     pub fn new() -> Self {

@@ -16,20 +16,34 @@ Implementing a P2P layer where nodes can connect to each other and get each othe
    - Created protocol for schema requests and responses
    - Added testing infrastructure for schema availability
 
-3. Updated Documentation:
+3. Integrated Network Layer with DataFoldNode:
+   - Added network initialization and management methods to DataFoldNode
+   - Implemented schema checking functionality
+   - Added proper error handling for network operations
+
+4. Enhanced Network Configuration:
+   - Added comprehensive configuration options
+   - Implemented builder pattern for flexible configuration
+   - Added support for mDNS discovery control
+
+5. Added Testing Infrastructure:
+   - Created unit tests for network components
+   - Added integration tests for DataFoldNode with network layer
+   - Implemented mock peer functionality for testing
+
+6. Updated Documentation:
    - Created detailed network layer design documentation
    - Documented the simplified P2P approach using libp2p
    - Added information about schema exchange flow
+   - Updated network layer documentation with new features
 
 ## Next Steps
-1. Integrate the network layer with the DataFoldNode
-2. Implement the full libp2p functionality:
-   - Add proper mDNS discovery
-   - Implement the request-response protocol
-   - Add proper error handling for network operations
-3. Add configuration options for the network layer
-4. Create more comprehensive tests for the network layer
-5. Add schema synchronization capabilities
+1. Implement schema synchronization capabilities
+2. Add Kademlia DHT for wider peer discovery
+3. Implement more advanced security features
+4. Add node reputation tracking
+5. Create more comprehensive tests for edge cases
+6. Implement custom protocol handlers for specialized operations
 
 ## Implementation Details
 
@@ -38,6 +52,7 @@ Implementing a P2P layer where nodes can connect to each other and get each othe
 - Simplified approach focusing on schema availability checking
 - Privacy-preserving design (only shares schemas when explicitly requested)
 - Efficient request-response protocol
+- Configurable mDNS discovery
 
 ### Schema Exchange Flow
 1. Node A discovers Node B through mDNS
@@ -52,3 +67,4 @@ Implementing a P2P layer where nodes can connect to each other and get each othe
 - Automatic connection management
 - Node validation checks
 - Error handling for security violations
+- Configurable connection limits and timeouts

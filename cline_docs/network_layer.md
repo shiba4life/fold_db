@@ -9,26 +9,24 @@ The network layer enables DataFold nodes to discover other nodes, establish conn
 Central component responsible for coordinating all network operations using libp2p.
 
 ```rust
-#[derive(NetworkBehaviour)]
-struct FoldNetworkBehaviour {
-    mdns: Mdns,
-    request_response: RequestResponse<SchemaProtocol>,
-}
-
 pub struct NetworkCore {
-    swarm: Swarm<FoldNetworkBehaviour>,
+    // Local peer ID
+    local_peer_id: PeerId,
+    // Schema service for handling schema operations
     schema_service: SchemaService,
+    // Known peers
+    known_peers: HashSet<PeerId>,
 }
 
 impl NetworkCore {
     pub async fn new(config: NetworkConfig) -> NetworkResult<Self>;
-    pub async fn run(&mut self) -> NetworkResult<()>;
+    pub async fn run(&mut self, listen_address: &str) -> NetworkResult<()>;
     pub async fn check_schemas(&mut self, peer_id: PeerId, schema_names: Vec<String>) -> NetworkResult<Vec<String>>;
 }
 ```
 
 ### SchemaService
-Unified service for handling schema operations. Leverages libp2p's event serialization to avoid complex synchronization.
+Unified service for handling schema operations. Provides a callback mechanism for schema availability checks.
 
 ```rust
 pub struct SchemaService {
@@ -60,6 +58,47 @@ enum SchemaResponse {
     // Returns subset of requested schemas that are available
     AvailableSchemas(Vec<String>),
     Error(String),
+}
+```
+
+### NetworkConfig
+Configuration options for the network layer.
+
+```rust
+pub struct NetworkConfig {
+    // Local listening address
+    pub listen_address: String,
+    // Request timeout in seconds
+    pub request_timeout: u64,
+    // Enable mDNS discovery
+    pub enable_mdns: bool,
+    // Maximum number of concurrent connections
+    pub max_connections: usize,
+    // Connection keep-alive interval in seconds
+    pub keep_alive_interval: u64,
+    // Maximum message size in bytes
+    pub max_message_size: usize,
+}
+```
+
+## DataFoldNode Integration
+
+The DataFoldNode has been extended with network capabilities:
+
+```rust
+impl DataFoldNode {
+    // Initialize the network layer
+    pub async fn init_network(&mut self, network_config: NetworkConfig) -> FoldDbResult<()>;
+    
+    // Start the network service
+    pub async fn start_network(&self, listen_address: &str) -> FoldDbResult<()>;
+    
+    // Check which schemas are available on a remote peer
+    pub async fn check_remote_schemas(
+        &self,
+        peer_id_str: &str,
+        schema_names: Vec<String>,
+    ) -> FoldDbResult<Vec<String>>;
 }
 ```
 

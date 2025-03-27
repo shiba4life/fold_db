@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::error::{FoldDbError, FoldDbResult};
+use crate::error::{FoldDbError, FoldDbResult, NetworkErrorKind};
 use crate::fold_db_core::FoldDB;
+use crate::network::{NetworkCore, NetworkConfig, NetworkError, NetworkResult, PeerId};
 use crate::schema::types::{Mutation, Query, Operation};
 use crate::schema::{Schema, SchemaError};
 use crate::datafold_node::config::NodeConfig;
@@ -21,6 +22,8 @@ pub struct DataFoldNode {
     trusted_nodes: HashMap<String, NodeInfo>,
     /// Unique identifier for this node
     node_id: String,
+    /// Network layer for P2P communication
+    network: Option<Arc<tokio::sync::Mutex<NetworkCore>>>,
 }
 
 impl DataFoldNode {
@@ -41,6 +44,7 @@ impl DataFoldNode {
             config,
             trusted_nodes: HashMap::new(),
             node_id,
+            network: None,
         })
     }
 
@@ -210,7 +214,77 @@ impl DataFoldNode {
         }
     }
 
-    // Network-related methods have been removed
+    /// Initialize the network layer
+    pub async fn init_network(&mut self, network_config: NetworkConfig) -> FoldDbResult<()> {
+        // Create the network core
+        let network_core = NetworkCore::new(network_config)
+            .await
+            .map_err(|e| FoldDbError::Network(e.into()))?;
+        
+        // Set up the schema check callback
+        let mut network_core = network_core;
+        let db_clone = self.db.clone();
+        
+        network_core.schema_service_mut().set_schema_check_callback(move |schema_names| {
+            schema_names
+                .iter()
+                .filter(|name| {
+                    // Check if the schema exists
+                    if let Ok(Some(_)) = db_clone.schema_manager.get_schema(name) {
+                        true
+                    } else {
+                        false
+                    }
+                })
+                .cloned()
+                .collect()
+        });
+        
+        // Store the network core
+        self.network = Some(Arc::new(tokio::sync::Mutex::new(network_core)));
+        
+        Ok(())
+    }
+    
+    /// Start the network service
+    pub async fn start_network(&self, listen_address: &str) -> FoldDbResult<()> {
+        if let Some(network) = &self.network {
+            let mut network = network.lock().await;
+            network
+                .run(listen_address)
+                .await
+                .map_err(|e| FoldDbError::Network(e.into()))?;
+            
+            Ok(())
+        } else {
+            Err(FoldDbError::Network(NetworkErrorKind::Protocol("Network not initialized".to_string())))
+        }
+    }
+    
+    /// Check which schemas are available on a remote peer
+    pub async fn check_remote_schemas(
+        &self,
+        peer_id_str: &str,
+        schema_names: Vec<String>,
+    ) -> FoldDbResult<Vec<String>> {
+        if let Some(network) = &self.network {
+            // Parse the peer ID
+            let peer_id = peer_id_str
+                .parse::<PeerId>()
+                .map_err(|e| FoldDbError::Network(NetworkErrorKind::Connection(format!("Invalid peer ID: {}", e))))?;
+            
+            // Check schemas
+            let mut network = network.lock().await;
+            let result = network
+                .check_schemas(peer_id, schema_names)
+                .await
+                .map_err(|e| FoldDbError::Network(e.into()))?;
+            
+            Ok(result)
+        } else {
+            Err(FoldDbError::Network(NetworkErrorKind::Protocol("Network not initialized".to_string())))
+        }
+    }
 
     /// Gets the unique identifier for this node.
     pub fn get_node_id(&self) -> &str {
