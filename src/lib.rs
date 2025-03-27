@@ -2,6 +2,7 @@ pub mod atom;
 pub mod db_operations;
 pub mod error;
 pub mod fees;
+pub mod network;
 pub mod permissions;
 pub mod schema;
 pub mod datafold_node;
@@ -14,6 +15,7 @@ pub use datafold_node::config::NodeConfig;
 pub use datafold_node::loader::load_schema_from_file;
 pub use error::{FoldDbError, FoldDbResult};
 pub use fold_db_core::FoldDB;
+pub use network::{NetworkCore, NetworkConfig, PeerId, NetworkError, NetworkResult, SchemaService};
 
 // Re-export schema types needed for CLI
 pub use schema::Schema;

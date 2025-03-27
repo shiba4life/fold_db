@@ -24,6 +24,15 @@ futures = "0.3"
 rand = "0.8"
 tempfile = "3.8"
 clap = { version = "4.4", features = ["derive"] }
+# P2P Networking
+libp2p = { version = "0.53", features = [
+    "mdns",
+    "noise",
+    "yamux",
+    "tcp",
+    "request-response",
+    "tokio"
+]}
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }

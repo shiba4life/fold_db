@@ -49,10 +49,11 @@
 - Documentation: Complete
 
 ## Recent Additions
-- Simplified architecture
-  - Removed UI Server and App Server
-  - Removed network layer
-  - Focused on core database functionality
+- Implemented P2P network layer
+  - Added libp2p for P2P networking
+  - Created schema availability checking
+  - Privacy-preserving design
+  - Efficient request-response protocol
 - Unified error handling system
   - Centralized FoldDbError type
   - Specific error categories
@@ -75,10 +76,11 @@
   - Concurrent operation tests
 
 ## Next Milestones
-- Implement a simpler, more focused API if needed
-- Update documentation to reflect the simplified architecture
-- Fix any remaining issues with tests
-- Consider alternative approaches for node communication if needed
+- Integrate the network layer with DataFoldNode
+- Implement full libp2p functionality
+- Add configuration options for the network layer
+- Create more comprehensive tests for the network layer
+- Add schema synchronization capabilities
 - Complete schema transformation system
 - Implement advanced field validations
 - Optimize schema operations
@@ -87,23 +89,20 @@
 - Simplify permission system
 
 ## Recent Improvements
-- Simplified architecture by removing:
-  - UI Server
-  - App Server
-  - Network layer
-- Streamlined DataFoldNode implementation:
-  - Removed network-related fields and methods
-  - Focused on core database operations
-  - Simplified initialization and usage
-- Updated main binary:
-  - Removed server initialization and execution
-  - Simplified to just load the node and wait for Ctrl+C signal
-- Updated tests:
-  - Removed references to removed components
-  - Focused on core functionality tests
-- Added CLI interface:
-  - Command-line tool for interacting with the node
-  - Support for loading schemas
-  - Support for executing queries and mutations
-  - Support for executing operations from JSON files
-  - Comprehensive documentation and examples
+- Added P2P network layer:
+  - NetworkCore component for P2P communication
+  - SchemaService for schema availability checking
+  - Error handling and configuration
+  - Testing infrastructure
+- Created schema exchange protocol:
+  - Request-response based schema checking
+  - Privacy-preserving design
+  - Efficient message format
+- Updated documentation:
+  - Detailed network layer design
+  - Schema exchange flow
+  - Security considerations
+- Added testing infrastructure:
+  - Unit tests for schema service
+  - Tests for network core creation
+  - Framework for testing schema availability
