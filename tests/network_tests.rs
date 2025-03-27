@@ -53,11 +53,13 @@ async fn test_datafold_node_network_integration() {
     let node1_config = NodeConfig {
         storage_path: node1_dir.path().to_path_buf(),
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
     };
     
     let node2_config = NodeConfig {
         storage_path: node2_dir.path().to_path_buf(),
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
     };
     
     // Create the nodes
@@ -90,8 +92,8 @@ async fn test_datafold_node_network_integration() {
     node2.add_trusted_node(&node1_id).unwrap();
     
     // Start the network services
-    node1.start_network("/ip4/127.0.0.1/tcp/0").await.unwrap();
-    node2.start_network("/ip4/127.0.0.1/tcp/0").await.unwrap();
+    node1.start_network_with_address("/ip4/127.0.0.1/tcp/0").await.unwrap();
+    node2.start_network_with_address("/ip4/127.0.0.1/tcp/0").await.unwrap();
     
     // Since we're using mock peers for testing, we need to manually add them
     // In a real scenario, peers would be discovered via mDNS

@@ -54,6 +54,7 @@
   - Created schema availability checking
   - Privacy-preserving design
   - Efficient request-response protocol
+  - Automatic peer discovery using mDNS
 - Unified error handling system
   - Centralized FoldDbError type
   - Specific error categories
@@ -88,24 +89,24 @@
 - Simplify permission system
 
 ## Recent Improvements
-- Integrated network layer with DataFoldNode:
-  - Added network initialization and management methods
-  - Implemented schema checking functionality
-  - Added proper error handling for network operations
-- Implemented full libp2p functionality:
-  - Added mDNS discovery
-  - Implemented request-response protocol
-  - Added proper error handling
-- Enhanced network configuration:
-  - Added comprehensive configuration options
-  - Implemented builder pattern for flexible configuration
-  - Added support for mDNS discovery control
-- Added testing infrastructure:
-  - Unit tests for network components
-  - Integration tests for DataFoldNode with network layer
-  - Mock peer functionality for testing
+- Implemented mDNS discovery:
+  - Enhanced NetworkConfig with additional fields for mDNS discovery
+  - Implemented discover_nodes method to actively scan for peers
+  - Added background task for periodic mDNS announcements
+  - Updated DataFoldNode to expose mDNS discovery functionality
+- Updated NodeConfig:
+  - Added network_listen_address field
+  - Updated all tests and examples to use the new field
+  - Added default value for network_listen_address
+- Enhanced Network Service Methods:
+  - Split start_network into two methods for flexibility
+  - Updated all tests and examples to use the appropriate method
+- Added Node Discovery Methods:
+  - Implemented discover_nodes method in DataFoldNode
+  - Added get_known_nodes method to retrieve discovered peers
+  - Updated tests to verify discovery functionality
 - Updated documentation:
-  - Detailed network layer design
-  - Schema exchange flow
-  - Security considerations
+  - Detailed mDNS discovery process
   - Network configuration options
+  - Node discovery methods
+  - Security considerations

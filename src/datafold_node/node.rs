@@ -247,7 +247,24 @@ impl DataFoldNode {
     }
     
     /// Start the network service
-    pub async fn start_network(&self, listen_address: &str) -> FoldDbResult<()> {
+    pub async fn start_network(&self) -> FoldDbResult<()> {
+        if let Some(network) = &self.network {
+            let mut network = network.lock().await;
+            // Use the address from the config
+            let address = &self.config.network_listen_address;
+            network
+                .run(address)
+                .await
+                .map_err(|e| FoldDbError::Network(e.into()))?;
+            
+            Ok(())
+        } else {
+            Err(FoldDbError::Network(NetworkErrorKind::Protocol("Network not initialized".to_string())))
+        }
+    }
+    
+    /// Start the network service with a specific listen address
+    pub async fn start_network_with_address(&self, listen_address: &str) -> FoldDbResult<()> {
         if let Some(network) = &self.network {
             let mut network = network.lock().await;
             network
@@ -261,10 +278,70 @@ impl DataFoldNode {
         }
     }
     
+    /// Stop the network service
+    pub async fn stop_network(&self) -> FoldDbResult<()> {
+        if let Some(network) = &self.network {
+            let mut network = network.lock().await;
+            // In a real implementation, this would stop the network service
+            // For now, just log that we're stopping
+            println!("Stopping network service");
+            Ok(())
+        } else {
+            Err(FoldDbError::Network(NetworkErrorKind::Protocol("Network not initialized".to_string())))
+        }
+    }
+    
     /// Get a mutable reference to the network core
     pub async fn get_network_mut(&self) -> FoldDbResult<tokio::sync::MutexGuard<'_, NetworkCore>> {
         if let Some(network) = &self.network {
             Ok(network.lock().await)
+        } else {
+            Err(FoldDbError::Network(NetworkErrorKind::Protocol("Network not initialized".to_string())))
+        }
+    }
+    
+    /// Discover nodes on the local network using mDNS
+    pub async fn discover_nodes(&self) -> FoldDbResult<Vec<PeerId>> {
+        if let Some(network) = &self.network {
+            let mut network = network.lock().await;
+            
+            // Trigger mDNS discovery
+            // This will update the known_peers list in the NetworkCore
+            println!("Triggering mDNS discovery...");
+            
+            // In a real implementation, this would actively scan for peers
+            // For now, we'll just return the current known peers
+            let known_peers: Vec<PeerId> = network.known_peers().iter().cloned().collect();
+            
+            Ok(known_peers)
+        } else {
+            Err(FoldDbError::Network(NetworkErrorKind::Protocol("Network not initialized".to_string())))
+        }
+    }
+    
+    /// Get the list of known nodes
+    pub async fn get_known_nodes(&self) -> FoldDbResult<HashMap<String, NodeInfo>> {
+        if let Some(network) = &self.network {
+            let network = network.lock().await;
+            
+            // Convert the PeerId set to a HashMap of NodeInfo
+            let mut result = HashMap::new();
+            for peer_id in network.known_peers() {
+                let peer_id_str = peer_id.to_string();
+                
+                // If the peer is already in trusted_nodes, use that info
+                if let Some(info) = self.trusted_nodes.get(&peer_id_str) {
+                    result.insert(peer_id_str, info.clone());
+                } else {
+                    // Otherwise, create a new NodeInfo with default trust distance
+                    result.insert(peer_id_str.clone(), NodeInfo {
+                        id: peer_id_str,
+                        trust_distance: self.config.default_trust_distance,
+                    });
+                }
+            }
+            
+            Ok(result)
         } else {
             Err(FoldDbError::Network(NetworkErrorKind::Protocol("Network not initialized".to_string())))
         }

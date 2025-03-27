@@ -13,6 +13,12 @@ pub struct NetworkConfig {
     pub keep_alive_interval: u64,
     /// Maximum message size in bytes
     pub max_message_size: usize,
+    /// UDP port for discovery
+    pub discovery_port: u16,
+    /// Connection timeout in seconds
+    pub connection_timeout: std::time::Duration,
+    /// Announcement interval in milliseconds
+    pub announcement_interval: std::time::Duration,
 }
 
 impl Default for NetworkConfig {
@@ -24,6 +30,9 @@ impl Default for NetworkConfig {
             max_connections: 50,
             keep_alive_interval: 20,
             max_message_size: 1_000_000, // 1MB
+            discovery_port: 0, // 0 means use a random port
+            connection_timeout: std::time::Duration::from_secs(30),
+            announcement_interval: std::time::Duration::from_secs(60),
         }
     }
 }
@@ -63,6 +72,24 @@ impl NetworkConfig {
     /// Set the maximum message size in bytes
     pub fn with_max_message_size(mut self, size: usize) -> Self {
         self.max_message_size = size;
+        self
+    }
+    
+    /// Set the discovery port
+    pub fn with_discovery_port(mut self, port: u16) -> Self {
+        self.discovery_port = port;
+        self
+    }
+    
+    /// Set the connection timeout
+    pub fn with_connection_timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.connection_timeout = timeout;
+        self
+    }
+    
+    /// Set the announcement interval
+    pub fn with_announcement_interval(mut self, interval: std::time::Duration) -> Self {
+        self.announcement_interval = interval;
         self
     }
 }

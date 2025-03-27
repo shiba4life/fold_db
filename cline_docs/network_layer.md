@@ -78,6 +78,12 @@ pub struct NetworkConfig {
     pub keep_alive_interval: u64,
     // Maximum message size in bytes
     pub max_message_size: usize,
+    // UDP port for discovery
+    pub discovery_port: u16,
+    // Connection timeout in seconds
+    pub connection_timeout: std::time::Duration,
+    // Announcement interval in milliseconds
+    pub announcement_interval: std::time::Duration,
 }
 ```
 
@@ -91,7 +97,16 @@ impl DataFoldNode {
     pub async fn init_network(&mut self, network_config: NetworkConfig) -> FoldDbResult<()>;
     
     // Start the network service
-    pub async fn start_network(&self, listen_address: &str) -> FoldDbResult<()>;
+    pub async fn start_network(&self) -> FoldDbResult<()>;
+    
+    // Start the network service with a specific listen address
+    pub async fn start_network_with_address(&self, listen_address: &str) -> FoldDbResult<()>;
+    
+    // Discover nodes on the local network using mDNS
+    pub async fn discover_nodes(&self) -> FoldDbResult<Vec<PeerId>>;
+    
+    // Get the list of known nodes
+    pub async fn get_known_nodes(&self) -> FoldDbResult<HashMap<String, NodeInfo>>;
     
     // Check which schemas are available on a remote peer
     pub async fn check_remote_schemas(
@@ -107,7 +122,22 @@ impl DataFoldNode {
 ### Node Discovery Process
 1. Node starts up and initializes NetworkCore
 2. libp2p mDNS discovery automatically finds peers on local network
-3. Maintains automatic connections through libp2p
+3. Periodic announcements are made at the configured interval
+4. Nodes can actively scan for peers using the discover_nodes method
+5. Discovered peers are added to the known_peers list
+6. Maintains automatic connections through libp2p
+
+#### mDNS Discovery Implementation
+The mDNS discovery process works as follows:
+
+1. When a node starts, it checks if mDNS discovery is enabled in the configuration
+2. If enabled, it starts a background task that periodically announces the node's presence
+3. Announcements are made at the configured interval (announcement_interval)
+4. The announcements include the node's PeerId and listening address
+5. Other nodes on the local network receive these announcements and add the node to their known_peers list
+6. Nodes can also actively scan for peers using the discover_nodes method
+7. The discover_nodes method sends out mDNS queries and waits for responses
+8. Discovered peers are added to the known_peers list and returned to the caller
 
 ### Connection Establishment
 1. libp2p Noise protocol handles secure connection setup

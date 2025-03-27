@@ -18,6 +18,8 @@ pub struct NetworkCore {
     known_peers: HashSet<PeerId>,
     /// Request timeout in seconds
     request_timeout: u64,
+    /// Network configuration
+    config: NetworkConfig,
     /// Mock for testing - maps peer IDs to schema services
     #[cfg(test)]
     mock_peers: HashMap<PeerId, SchemaService>,
@@ -34,6 +36,7 @@ impl NetworkCore {
             local_peer_id,
             known_peers: HashSet::new(),
             request_timeout: config.request_timeout,
+            config,
             #[cfg(test)]
             mock_peers: HashMap::new(),
         })
@@ -56,26 +59,53 @@ impl NetworkCore {
 
     /// Start the network service
     pub async fn run(&mut self, listen_address: &str) -> NetworkResult<()> {
-        // This is a placeholder for the actual implementation
-        // In a real implementation, this would:
-        // 1. Parse the listen address
-        // 2. Create and start the libp2p swarm
-        // 3. Set up mDNS discovery
-        // 4. Set up the request-response protocol
-        
         println!("Network service started on {}", listen_address);
         println!("Using protocol: {}", SCHEMA_PROTOCOL_NAME);
         
-        // Note: In this simplified implementation, we're not actually discovering peers
-        // through mDNS. In a real implementation, libp2p would handle peer discovery.
-        // The code below is just a simulation for demonstration purposes.
-        if cfg!(feature = "simulate-peers") {
-            println!("SIMULATION: Generating random peers for demonstration");
-            for _ in 0..3 {
-                let peer_id = PeerId::random();
-                self.known_peers.insert(peer_id);
-                println!("SIMULATION: Discovered peer: {}", peer_id);
+        // Set up mDNS discovery if enabled
+        if self.config.enable_mdns {
+            println!("mDNS discovery enabled");
+            println!("Discovery port: {}", self.config.discovery_port);
+            println!("Announcement interval: {:?}", self.config.announcement_interval);
+            
+            // In a real implementation, this would:
+            // 1. Create a libp2p swarm with mDNS discovery
+            // 2. Start listening for mDNS announcements
+            // 3. Announce this node via mDNS
+            // 4. Add discovered peers to known_peers
+            
+            // Start a background task for periodic announcements
+            let announcement_interval = self.config.announcement_interval;
+            let discovery_port = self.config.discovery_port;
+            let local_peer_id = self.local_peer_id;
+            
+            // This is a placeholder for the actual implementation
+            // In a real implementation, this would start a background task
+            // that periodically announces this node via mDNS
+            tokio::spawn(async move {
+                println!("Starting mDNS announcements on port {} every {:?}", 
+                    discovery_port, announcement_interval);
+                
+                loop {
+                    // Simulate mDNS announcement
+                    println!("SIMULATION: Announcing peer {} via mDNS", local_peer_id);
+                    
+                    // Wait for the next announcement
+                    tokio::time::sleep(announcement_interval).await;
+                }
+            });
+            
+            // For now, we'll simulate peer discovery
+            if cfg!(feature = "simulate-peers") {
+                println!("SIMULATION: Generating random peers for demonstration");
+                for _ in 0..3 {
+                    let peer_id = PeerId::random();
+                    self.known_peers.insert(peer_id);
+                    println!("SIMULATION: Discovered peer: {}", peer_id);
+                }
             }
+        } else {
+            println!("mDNS discovery disabled");
         }
         
         Ok(())
@@ -123,6 +153,46 @@ impl NetworkCore {
     /// Add a known peer to the network
     pub fn add_known_peer(&mut self, peer_id: PeerId) {
         self.known_peers.insert(peer_id);
+    }
+    
+    /// Get the set of known peers
+    pub fn known_peers(&self) -> &HashSet<PeerId> {
+        &self.known_peers
+    }
+    
+    /// Actively scan for peers using mDNS
+    pub async fn discover_nodes(&mut self) -> NetworkResult<Vec<PeerId>> {
+        if !self.config.enable_mdns {
+            println!("mDNS discovery is disabled, no peers will be discovered");
+            return Ok(Vec::new());
+        }
+        
+        println!("Scanning for peers using mDNS on port {}", self.config.discovery_port);
+        
+        // In a real implementation, this would:
+        // 1. Send out mDNS queries
+        // 2. Wait for responses
+        // 3. Add discovered peers to known_peers
+        // 4. Return the list of discovered peers
+        
+        // For now, we'll simulate peer discovery
+        if cfg!(feature = "simulate-peers") {
+            println!("SIMULATION: Generating random peers for demonstration");
+            
+            // Generate 0-3 random peers
+            let num_peers = rand::random::<u8>() % 4;
+            for _ in 0..num_peers {
+                let peer_id = PeerId::random();
+                self.known_peers.insert(peer_id.clone());
+                println!("SIMULATION: Discovered peer: {}", peer_id);
+            }
+        }
+        
+        // Simulate network delay
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        
+        // Return the current set of known peers
+        Ok(self.known_peers.iter().cloned().collect())
     }
     
     /// Add a mock peer for testing

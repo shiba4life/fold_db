@@ -23,12 +23,15 @@ fn create_test_network_config(enable_discovery: bool) -> NetworkConfig {
     drop(udp_socket);
     
     NetworkConfig {
-        listen_address: format!("127.0.0.1:{}", tcp_port).parse().unwrap(),
-        discovery_port: udp_port,
+        listen_address: format!("/ip4/127.0.0.1/tcp/{}", tcp_port),
+        request_timeout: 30,
+        enable_mdns: enable_discovery,
         max_connections: 10,
+        keep_alive_interval: 20,
+        max_message_size: 1_000_000,
+        discovery_port: udp_port,
         connection_timeout: Duration::from_secs(1),
         announcement_interval: Duration::from_millis(500), // Faster for tests
-        enable_discovery, // Enable or disable discovery based on parameter
     }
 }
 
@@ -42,6 +45,7 @@ fn test_discovery_initialization() {
     let node_config = NodeConfig {
         storage_path,
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
     };
 
     // Create a network configuration with discovery enabled
@@ -73,11 +77,13 @@ fn test_node_discovery_enabled() {
     let node1_config = NodeConfig {
         storage_path: temp_dir1.path().to_path_buf(),
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
     };
     
     let node2_config = NodeConfig {
         storage_path: temp_dir2.path().to_path_buf(),
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
     };
     
     // Create network configurations with discovery enabled
@@ -159,11 +165,13 @@ fn test_node_discovery_disabled() {
     let node1_config = NodeConfig {
         storage_path: temp_dir1.path().to_path_buf(),
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
     };
     
     let node2_config = NodeConfig {
         storage_path: temp_dir2.path().to_path_buf(),
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
     };
     
     // Create network configurations with discovery disabled
@@ -214,11 +222,13 @@ fn test_manual_node_connection() {
     let node1_config = NodeConfig {
         storage_path: temp_dir1.path().to_path_buf(),
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
     };
     
     let node2_config = NodeConfig {
         storage_path: temp_dir2.path().to_path_buf(),
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
     };
     
     // Create network configurations with discovery disabled
@@ -283,6 +293,7 @@ fn test_discovery_with_multiple_nodes() {
         let node_config = NodeConfig {
             storage_path: temp_dir.path().to_path_buf(),
             default_trust_distance: 1,
+            network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
         };
         
         let network_config = create_test_network_config(true);

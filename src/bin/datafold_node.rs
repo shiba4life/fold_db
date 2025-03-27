@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Start the network service
     println!("Starting network service on port {}...", port);
-    node.start_network(&listen_address).await?;
+    node.start_network_with_address(&listen_address).await?;
     println!("Network service started");
     
     // Print node ID for connecting

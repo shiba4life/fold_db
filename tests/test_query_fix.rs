@@ -10,6 +10,7 @@ async fn main() {
     let config = NodeConfig {
         storage_path: dir.path().to_path_buf(),
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
     };
     let mut node = DataFoldNode::new(config).unwrap();
     

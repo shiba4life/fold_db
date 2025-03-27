@@ -22,11 +22,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let node1_config = NodeConfig {
         storage_path: node1_dir,
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/9001".to_string(),
     };
     
     let node2_config = NodeConfig {
         storage_path: node2_dir,
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/9002".to_string(),
     };
     
     // Create the nodes
@@ -57,8 +59,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Network layers initialized");
     
     // Start the network services
-    node1.start_network("/ip4/127.0.0.1/tcp/9001").await?;
-    node2.start_network("/ip4/127.0.0.1/tcp/9002").await?;
+    node1.start_network_with_address("/ip4/127.0.0.1/tcp/9001").await?;
+    node2.start_network_with_address("/ip4/127.0.0.1/tcp/9002").await?;
     
     println!("Network services started");
     println!("\nNote: In this simplified implementation, we're not actually discovering peers");
