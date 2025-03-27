@@ -1,237 +1,120 @@
 # Network Layer Design
 
 ## Overview
-The network layer enables DataFold nodes to discover other nodes, establish connections, and query data while maintaining the system's security and trust model. Each node operates independently, keeping its schemas private unless explicitly queried.
+The network layer enables DataFold nodes to discover other nodes, establish connections, and query data while maintaining the system's security model. Each node operates independently, keeping its schemas private unless explicitly queried. The implementation uses libp2p for robust P2P networking capabilities, leveraging its built-in concurrency guarantees for simplified state management.
 
 ## Core Components
 
 ### NetworkCore
-Central component responsible for coordinating all network operations.
+Central component responsible for coordinating all network operations using libp2p.
 
 ```rust
+#[derive(NetworkBehaviour)]
+struct FoldNetworkBehaviour {
+    mdns: Mdns,
+    request_response: RequestResponse<SchemaProtocol>,
+}
+
 pub struct NetworkCore {
-    connection_manager: ConnectionManager,
-    message_router: Arc<MessageRouter>,
-    query_service: Arc<QueryService>,
-    schema_service: Arc<SchemaService>,
-    discovery: Arc<Mutex<NodeDiscovery>>,
-    config: NetworkConfig,
-    local_node_id: NodeId,
+    swarm: Swarm<FoldNetworkBehaviour>,
+    schema_service: SchemaService,
 }
 
 impl NetworkCore {
-    pub fn new(config: NetworkConfig, local_node_id: NodeId, public_key: Option<String>) -> NetworkResult<Self>;
-    pub fn start(&mut self) -> NetworkResult<()>;
-    pub fn stop(&mut self) -> NetworkResult<()>;
-    pub fn set_query_callback<F>(&self, callback: F) where F: Fn(Query) -> QueryResult + Send + Sync + 'static;
-    pub fn set_schema_list_callback<F>(&self, callback: F) where F: Fn() -> Vec<SchemaInfo> + Send + Sync + 'static;
-    pub fn discover_nodes(&mut self) -> NetworkResult<Vec<NodeInfo>>;
-    pub fn connect_to_node(&self, node_id: &NodeId) -> NetworkResult<()>;
-    pub fn query_node(&self, node_id: &NodeId, query: Query) -> NetworkResult<QueryResult>;
-    pub fn list_available_schemas(&self, node_id: &NodeId) -> NetworkResult<Vec<SchemaInfo>>;
-    pub fn connected_nodes(&self) -> HashSet<NodeId>;
-    pub fn known_nodes(&self) -> HashMap<NodeId, NodeInfo>;
-}
-```
-
-### NetworkManager
-Simplified wrapper around NetworkCore that provides backward compatibility with the old NetworkManager API.
-
-```rust
-pub struct NetworkManager {
-    core: NetworkCore,
-}
-
-impl NetworkManager {
-    pub fn new(config: NetworkConfig, local_node_id: NodeId, public_key: Option<String>) -> NetworkResult<Self>;
-    pub fn set_schema_list_callback<F>(&self, callback: F) where F: Fn() -> Vec<SchemaInfo> + Send + Sync + 'static;
-    pub fn set_query_callback<F>(&self, callback: F) where F: Fn(Query) -> QueryResult + Send + Sync + 'static;
-    pub fn start(&mut self) -> NetworkResult<()>;
-    pub fn stop(&mut self) -> NetworkResult<()>;
-    pub fn discover_nodes(&mut self) -> NetworkResult<Vec<NodeInfo>>;
-    pub fn connect_to_node(&self, node_id: &NodeId) -> NetworkResult<()>;
-    pub fn query_node(&self, node_id: &NodeId, query: Query) -> NetworkResult<QueryResult>;
-    pub fn list_available_schemas(&self, node_id: &NodeId) -> NetworkResult<Vec<SchemaInfo>>;
-    pub fn connected_nodes(&self) -> HashSet<NodeId>;
-    pub fn known_nodes(&self) -> HashMap<NodeId, NodeInfo>;
-}
-```
-
-### NodeDiscovery
-Handles node discovery and presence management on the network.
-
-```rust
-pub struct NodeDiscovery {
-    discovery_method: DiscoveryMethod,
-    socket: UdpSocket,
-    known_nodes: HashSet<NodeId>,
-}
-
-pub struct NodeInfo {
-    node_id: NodeId,
-    public_key: PublicKey,
-    address: SocketAddr,
-    trust_distance: u32,
-    capabilities: NodeCapabilities,
-}
-
-impl NodeDiscovery {
-    pub fn new(config: DiscoveryConfig) -> Result<Self>;
-    pub fn find_nodes(&mut self) -> Result<Vec<NodeInfo>>;
-    pub fn announce_presence(&self) -> Result<()>;
-    pub fn handle_node_announcement(&mut self, announcement: NodeAnnouncement) -> Result<()>;
-}
-```
-
-### Connection
-Manages individual peer connections and message handling.
-
-```rust
-pub struct Connection {
-    node_id: NodeId,
-    stream: TcpStream,
-    trust_distance: u32,
-    last_seen: Instant,
-    state: ConnectionState,
-}
-
-impl Connection {
-    pub fn new(stream: TcpStream, node_id: NodeId) -> Result<Self>;
-    pub fn send_message(&mut self, message: Message) -> Result<()>;
-    pub fn receive_message(&mut self) -> Result<Message>;
-    pub fn validate_node(&self) -> Result<()>;
-    pub fn is_healthy(&self) -> bool;
-}
-```
-
-### QueryService
-Unified service for handling query operations (both client and server functionality).
-
-```rust
-pub struct QueryService {
-    query_callback: Arc<Mutex<Box<dyn Fn(Query) -> QueryResult + Send + Sync>>>,
-    pending_queries: Arc<Mutex<HashMap<Uuid, oneshot::Sender<QueryResult>>>>,
-}
-
-impl QueryService {
-    pub fn new() -> Self;
-    pub fn set_query_callback<F>(&mut self, callback: F) where F: Fn(Query) -> QueryResult + Send + Sync + 'static;
-    pub fn execute_query(&self, query: Query) -> QueryResult;
-    pub fn query_node(&self, connection: Arc<Mutex<Connection>>, query: Query, trust_proof: TrustProof) -> NetworkResult<QueryResult>;
-}
-
-impl MessageHandler for QueryService {
-    fn handle(&self, message: &Message, node_id: &NodeId) -> NetworkResult<Option<Message>>;
-    fn message_types(&self) -> Vec<MessageType>;
+    pub async fn new(config: NetworkConfig) -> NetworkResult<Self>;
+    pub async fn run(&mut self) -> NetworkResult<()>;
+    pub async fn request_schemas(&mut self, peer_id: PeerId) -> NetworkResult<Vec<SchemaInfo>>;
 }
 ```
 
 ### SchemaService
-Unified service for handling schema operations (both client and server functionality).
+Unified service for handling schema operations. Leverages libp2p's event serialization to avoid complex synchronization.
 
 ```rust
 pub struct SchemaService {
-    schema_list_callback: Arc<Mutex<Box<dyn Fn() -> Vec<SchemaInfo> + Send + Sync>>>,
-    pending_requests: Arc<Mutex<HashMap<Uuid, oneshot::Sender<Vec<SchemaInfo>>>>>,
+    // Function pointer for schema listing, set once at initialization
+    schema_list_callback: Box<dyn Fn() -> Vec<SchemaInfo> + Send + Sync>,
 }
 
 impl SchemaService {
     pub fn new() -> Self;
-    pub fn set_schema_list_callback<F>(&mut self, callback: F) where F: Fn() -> Vec<SchemaInfo> + Send + Sync + 'static;
+    pub fn set_schema_list_callback<F>(&mut self, callback: F) 
+        where F: Fn() -> Vec<SchemaInfo> + Send + Sync + 'static;
     pub fn list_schemas(&self) -> Vec<SchemaInfo>;
-    pub fn list_remote_schemas(&self, connection: Arc<Mutex<Connection>>) -> NetworkResult<Vec<SchemaInfo>>;
-}
-
-impl MessageHandler for SchemaService {
-    fn handle(&self, message: &Message, node_id: &NodeId) -> NetworkResult<Option<Message>>;
-    fn message_types(&self) -> Vec<MessageType>;
 }
 ```
 
 ### Message Protocol
-Defines the communication protocol between nodes.
+Defines the request-response protocol between nodes.
 
 ```rust
-pub enum Message {
-    Query(QueryMessage),
-    QueryResponse(QueryResponseMessage),
-    ListSchemasRequest(ListSchemasRequestMessage),
-    SchemaListResponse(SchemaListResponseMessage),
-    NodeAnnouncement(NodeAnnouncement),
-    Error(ErrorMessage),
-    Ping(PingMessage),
-    Pong(PongMessage),
+#[derive(Serialize, Deserialize)]
+enum SchemaRequest {
+    ListSchemas,
 }
 
-pub struct QueryMessage {
-    query_id: Uuid,
-    query: Query,
-    trust_proof: TrustProof,
+#[derive(Serialize, Deserialize)]
+enum SchemaResponse {
+    SchemaList(Vec<SchemaInfo>),
+    Error(String),
 }
 
-pub struct QueryResponseMessage {
-    query_id: Uuid,
-    result: SerializableQueryResult,
-}
-
-pub struct ListSchemasRequestMessage {
-    request_id: Uuid,
-}
-
-pub struct SchemaListResponseMessage {
-    request_id: Uuid,
-    schemas: Vec<SchemaInfo>,
-}
-
-pub struct ErrorMessage {
-    code: ErrorCode,
-    message: String,
-    details: Option<String>,
-    related_message_id: Option<Uuid>,
+#[derive(Serialize, Deserialize)]
+pub struct SchemaInfo {
+    id: String,
+    name: String,
+    version: u64,
+    fields: Vec<FieldInfo>,
+    metadata: HashMap<String, String>,
 }
 ```
 
 ## Implementation Details
 
 ### Node Discovery Process
-1. Node starts up and initializes NetworkManager
-2. NodeDiscovery begins listening on UDP port for announcements
-3. Periodically broadcasts presence on local network
-4. Maintains list of known nodes with their information
-5. Updates node status based on periodic health checks
+1. Node starts up and initializes NetworkCore
+2. libp2p mDNS discovery automatically finds peers on local network
+3. Maintains automatic connections through libp2p
 
 ### Connection Establishment
-1. Node initiates connection to peer
-2. TLS handshake for secure channel
-3. Exchange public keys and validate
-4. Verify trust distance requirements
-5. Establish message protocol version
-6. Begin message exchange
+1. libp2p Noise protocol handles secure connection setup
+2. Automatic multiplexing through yamux
+3. Begin request-response protocol
 
-### Query Flow
-1. Node A connects to Node B
-2. Node A requests list of available schemas
-3. Node B responds with enabled schema list
-4. Node A validates schema availability
-5. Node A sends query with trust proof
-6. Node B validates trust and permissions
-7. Node B executes query
-8. Node B sends response
-9. Node A processes results
+### Schema Exchange Flow
+1. Node A discovers Node B through mDNS
+2. Node A sends ListSchemas request directly to Node B
+3. Node B responds with its current schema list
+4. Node A receives and processes the response
+
+### Concurrency Model
+The network layer takes advantage of libp2p's built-in concurrency guarantees:
+
+1. Event Serialization
+   - Swarm processes events sequentially
+   - Request-response handled in order
+   - No manual synchronization needed
+
+2. State Management
+   - Network events handled in single event loop
+   - Schema requests processed sequentially
+   - No shared state between requests
+
+3. Thread Safety
+   - Swarm handles connection multiplexing
+   - Request-response protocol manages message handling
+   - No need for manual lock management
 
 ### Security Measures
-- TLS encryption for all connections
-- Public key authentication
-- Trust distance validation
-- Permission enforcement per query
-- Connection timeouts
+- Noise protocol encryption for all connections
+- libp2p PeerId-based authentication
+- Automatic connection management
 - Node validation checks
 - Error handling for security violations
 
 ### Error Handling
 - Connection failures
-- Invalid messages
-- Trust violations
+- Invalid requests/responses
 - Timeout handling
 - Resource exhaustion
 - Protocol violations
@@ -240,16 +123,18 @@ pub struct ErrorMessage {
 ## Technical Requirements
 
 ### Dependencies
+- libp2p for P2P networking
+  - noise for encryption
+  - yamux for multiplexing
+  - mdns for discovery
+  - request-response protocol
 - tokio for async runtime
-- rustls for TLS
 - serde for serialization
-- uuid for message tracking
-- trust-dns for discovery (optional)
+- uuid for request tracking
 
 ### Performance Considerations
-- Connection pooling
-- Message batching
-- Efficient serialization
+- Efficient request-response handling
+- Automatic connection management
 - Resource limits
 - Timeout management
 - Health monitoring
@@ -264,8 +149,20 @@ pub struct ErrorMessage {
 7. Edge case validation
 
 ## Future Enhancements
-1. DHT-based discovery
-2. NAT traversal
-3. Connection multiplexing
-4. Protocol versioning
-5. Node reputation tracking
+1. Kademlia DHT for wider peer discovery
+2. WebRTC transport support
+3. Custom protocol handlers for specialized operations
+4. Node reputation tracking
+5. Advanced request validation
+6. Cross-network bridging capabilities
+
+## Benefits of libp2p Implementation
+1. Reduced code complexity
+2. Built-in security features
+3. Automatic peer discovery
+4. Privacy-preserving schema sharing
+5. Battle-tested networking stack
+6. Future extensibility
+7. Cross-platform compatibility
+8. Simplified concurrency model
+9. Reduced synchronization overhead
