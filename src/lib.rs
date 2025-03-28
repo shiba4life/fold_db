@@ -1,4 +1,5 @@
 pub mod atom;
+pub mod app_sdk;
 pub mod db_operations;
 pub mod error;
 pub mod fees;
@@ -16,6 +17,19 @@ pub use datafold_node::loader::load_schema_from_file;
 pub use error::{FoldDbError, FoldDbResult};
 pub use fold_db_core::FoldDB;
 pub use network::{NetworkCore, NetworkConfig, PeerId, NetworkError, NetworkResult, SchemaService};
+
+// Re-export app SDK types
+pub use app_sdk::{
+    DataFoldClient, SocialAppContainer, ContainerConfig, AppSdkError, AppSdkResult,
+    NetworkIsolation, MicroVMConfig, MicroVMType, LinuxContainerConfig, WasmSandboxConfig,
+    AppPermissions, FieldPermissions, QueryBuilder, MutationBuilder, NetworkManager, SchemaDiscovery
+};
+
+// Re-export additional types needed for the SDK
+pub use app_sdk::types::{
+    QueryFilter, QueryResult, MutationResult, NodeInfo, RemoteNodeInfo
+};
+pub use app_sdk::mutation_builder::MutationType as AppSdkMutationType;
 
 // Re-export schema types needed for CLI
 pub use schema::Schema;

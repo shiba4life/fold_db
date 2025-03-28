@@ -1,0 +1,27 @@
+// App SDK for containerized applications
+//
+// This module provides the SDK for developing containerized applications
+// that can interact with DataFold nodes while maintaining security and privacy.
+
+pub mod client;
+pub mod container;
+pub mod error;
+pub mod isolation;
+pub mod permissions;
+pub mod query_builder;
+pub mod mutation_builder;
+pub mod network_manager;
+pub mod schema_discovery;
+pub mod types;
+
+// Re-export main types for convenience
+pub use client::DataFoldClient;
+pub use container::{SocialAppContainer, ContainerConfig};
+pub use error::{AppSdkError, AppSdkResult};
+pub use isolation::{NetworkIsolation, MicroVMConfig, MicroVMType, LinuxContainerConfig, WasmSandboxConfig};
+pub use permissions::{AppPermissions, FieldPermissions};
+pub use query_builder::QueryBuilder;
+pub use mutation_builder::MutationBuilder;
+pub use network_manager::NetworkManager;
+pub use schema_discovery::SchemaDiscovery;
+pub use types::{AppRequest, AppChannel, NodeConnection, AuthCredentials, SchemaCache, NodeInfo, QueryFilter, QueryResult, MutationResult, RemoteNodeInfo};
