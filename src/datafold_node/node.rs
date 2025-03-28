@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use serde_json::Value;
 use uuid::Uuid;
@@ -15,7 +15,7 @@ use crate::datafold_node::config::NodeInfo;
 #[derive(Clone)]
 pub struct DataFoldNode {
     /// The underlying database instance for data storage and operations
-    db: Arc<FoldDB>,
+    db: Arc<Mutex<FoldDB>>,
     /// Configuration settings for this node
     config: NodeConfig,
     /// Map of trusted nodes and their trust distances
@@ -29,12 +29,12 @@ pub struct DataFoldNode {
 impl DataFoldNode {
     /// Creates a new DataFoldNode with the specified configuration.
     pub fn new(config: NodeConfig) -> FoldDbResult<Self> {
-        let db = Arc::new(FoldDB::new(
+        let db = Arc::new(Mutex::new(FoldDB::new(
             config
                 .storage_path
                 .to_str()
                 .ok_or_else(|| FoldDbError::Config("Invalid storage path".to_string()))?,
-        )?);
+        )?));
 
         // Generate a unique node ID if not provided
         let node_id = Uuid::new_v4().to_string();
@@ -55,8 +55,8 @@ impl DataFoldNode {
 
     /// Loads a schema into the database.
     pub fn load_schema(&mut self, schema: Schema) -> FoldDbResult<()> {
-        let db = Arc::get_mut(&mut self.db)
-            .ok_or_else(|| FoldDbError::Config("Cannot get mutable reference to database".into()))?;
+        let mut db = self.db.lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
         db.load_schema(schema)?;
         Ok(())
     }
@@ -74,7 +74,9 @@ impl DataFoldNode {
                     trust_distance: 0, // Set write distance to 0 for all queries
                 };
                 
-                let results = self.db.query_schema(query);
+                let db = self.db.lock()
+                    .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+                let results = db.query_schema(query);
                 
                 // Unwrap the Ok values from the results before serializing
                 let unwrapped_results: Vec<Value> = results.into_iter()
@@ -119,8 +121,8 @@ impl DataFoldNode {
                     mutation_type,
                 };
 
-                let db = Arc::get_mut(&mut self.db)
-                    .ok_or_else(|| FoldDbError::Config("Cannot get mutable reference to database".into()))?;
+                let mut db = self.db.lock()
+                    .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
                 db.write_schema(mutation)?;
 
                 Ok(Value::Null)
@@ -130,15 +132,19 @@ impl DataFoldNode {
 
     /// Retrieves a schema by its ID.
     pub fn get_schema(&self, schema_id: &str) -> FoldDbResult<Option<Schema>> {
-        Ok(self.db.schema_manager.get_schema(schema_id)?)
+        let db = self.db.lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        Ok(db.schema_manager.get_schema(schema_id)?)
     }
 
     /// Lists all loaded schemas in the database.
     pub fn list_schemas(&self) -> FoldDbResult<Vec<Schema>> {
-        let schema_names = self.db.schema_manager.list_schemas()?;
+        let db = self.db.lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        let schema_names = db.schema_manager.list_schemas()?;
         let mut schemas = Vec::new();
         for name in schema_names {
-            if let Some(schema) = self.db.schema_manager.get_schema(&name)? {
+            if let Some(schema) = db.schema_manager.get_schema(&name)? {
                 schemas.push(schema);
             }
         }
@@ -150,13 +156,15 @@ impl DataFoldNode {
         if query.trust_distance == 0 {
             query.trust_distance = self.config.default_trust_distance;
         }
-        Ok(self.db.query_schema(query))
+        let db = self.db.lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        Ok(db.query_schema(query))
     }
 
     /// Executes a mutation on the database.
     pub fn mutate(&mut self, mutation: Mutation) -> FoldDbResult<()> {
-        let db = Arc::get_mut(&mut self.db)
-            .ok_or_else(|| FoldDbError::Config("Cannot get mutable reference to database".into()))?;
+        let mut db = self.db.lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
         db.write_schema(mutation)?;
         Ok(())
     }
@@ -183,9 +191,9 @@ impl DataFoldNode {
     
     /// Retrieves the version history for a specific atom reference.
     pub fn get_history(&self, aref_uuid: &str) -> FoldDbResult<Vec<Value>> {
-        // Since we can't get mutable access to Arc<FoldDB> in an immutable method,
-        // we'll access atom_manager directly through the public field
-        let history = self.db.atom_manager.get_atom_history(aref_uuid)
+        let db = self.db.lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        let history = db.atom_manager.get_atom_history(aref_uuid)
             .map_err(|e| FoldDbError::Database(e.to_string()))?;
 
         Ok(history
@@ -196,16 +204,16 @@ impl DataFoldNode {
 
     /// Allows operations on a schema.
     pub fn allow_schema(&mut self, schema_name: &str) -> FoldDbResult<()> {
-        let db = Arc::get_mut(&mut self.db)
-            .ok_or_else(|| FoldDbError::Config("Cannot get mutable reference to database".into()))?;
+        let mut db = self.db.lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
         db.allow_schema(schema_name)?;
         Ok(())
     }
 
     /// Removes a schema from the database.
     pub fn remove_schema(&mut self, schema_name: &str) -> FoldDbResult<()> {
-        let db = Arc::get_mut(&mut self.db)
-            .ok_or_else(|| FoldDbError::Config("Cannot get mutable reference to database".into()))?;
+        let mut db = self.db.lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
         
         match db.schema_manager.unload_schema(schema_name) {
             Ok(true) => Ok(()),
@@ -226,11 +234,16 @@ impl DataFoldNode {
         let db_clone = self.db.clone();
         
         network_core.schema_service_mut().set_schema_check_callback(move |schema_names| {
+            let db = match db_clone.lock() {
+                Ok(db) => db,
+                Err(_) => return Vec::new(), // Return empty list if we can't lock the mutex
+            };
+            
             schema_names
                 .iter()
                 .filter(|name| {
                     // Check if the schema exists
-                    if let Ok(Some(_)) = db_clone.schema_manager.get_schema(name) {
+                    if let Ok(Some(_)) = db.schema_manager.get_schema(name) {
                         true
                     } else {
                         false
