@@ -1,7 +1,6 @@
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Connection to a DataFold node

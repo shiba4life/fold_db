@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::error::{FoldDbError, FoldDbResult, NetworkErrorKind};
 use crate::fold_db_core::FoldDB;
-use crate::network::{NetworkCore, NetworkConfig, NetworkError, NetworkResult, PeerId};
+use crate::network::{NetworkCore, NetworkConfig, PeerId};
 use crate::schema::types::{Mutation, Query, Operation};
 use crate::schema::{Schema, SchemaError};
 use crate::datafold_node::config::NodeConfig;
@@ -212,7 +212,7 @@ impl DataFoldNode {
 
     /// Removes a schema from the database.
     pub fn remove_schema(&mut self, schema_name: &str) -> FoldDbResult<()> {
-        let mut db = self.db.lock()
+        let db = self.db.lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
         
         match db.schema_manager.unload_schema(schema_name) {
@@ -294,7 +294,7 @@ impl DataFoldNode {
     /// Stop the network service
     pub async fn stop_network(&self) -> FoldDbResult<()> {
         if let Some(network) = &self.network {
-            let mut network = network.lock().await;
+            let network = network.lock().await;
             // In a real implementation, this would stop the network service
             // For now, just log that we're stopping
             println!("Stopping network service");
@@ -316,7 +316,7 @@ impl DataFoldNode {
     /// Discover nodes on the local network using mDNS
     pub async fn discover_nodes(&self) -> FoldDbResult<Vec<PeerId>> {
         if let Some(network) = &self.network {
-            let mut network = network.lock().await;
+            let network = network.lock().await;
             
             // Trigger mDNS discovery
             // This will update the known_peers list in the NetworkCore

@@ -1,6 +1,6 @@
 use fold_db::{DataFoldNode, NodeConfig};
 use fold_db::testing::Operation;
-use serde_json::{json, Value};
+use serde_json::Value;
 use tempfile::tempdir;
 
 #[tokio::main]

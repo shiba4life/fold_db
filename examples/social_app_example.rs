@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use fold_db::{
     DataFoldClient, SocialAppContainer, ContainerConfig, AppPermissions, FieldPermissions,
-    MicroVMConfig, MicroVMType, LinuxContainerConfig, WasmSandboxConfig, NetworkIsolation,
+    MicroVMConfig, MicroVMType, LinuxContainerConfig, WasmSandboxConfig,
     QueryFilter, AppSdkMutationType
 };
 
@@ -77,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a social app container
     println!("\n5. Creating a social app container...");
-    let mut container = SocialAppContainer::new(
+    let container = SocialAppContainer::new(
         "example-social-app",
         "public-key-placeholder",
         permissions,

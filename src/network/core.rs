@@ -1,12 +1,10 @@
 use crate::network::config::NetworkConfig;
 use crate::network::error::{NetworkError, NetworkResult};
-use crate::network::schema_protocol::{SchemaRequest, SchemaResponse, SCHEMA_PROTOCOL_NAME};
+use crate::network::schema_protocol::SCHEMA_PROTOCOL_NAME;
 use crate::network::schema_service::SchemaService;
-use libp2p::{PeerId, Multiaddr};
+use libp2p::PeerId;
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
-use tokio::sync::mpsc;
-use tokio::time::timeout;
 
 /// Core network component for P2P communication
 pub struct NetworkCore {

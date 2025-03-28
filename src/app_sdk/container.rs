@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
 use serde::{Serialize, Deserialize};
-use tokio::sync::Mutex;
 
 use crate::app_sdk::error::{AppSdkError, AppSdkResult};
 use crate::app_sdk::isolation::{
@@ -10,7 +8,7 @@ use crate::app_sdk::isolation::{
     ResourceLimits, MicroVMType, DriveConfig, VsockConfig, SocketPath, MountPoint
 };
 use crate::app_sdk::permissions::AppPermissions;
-use crate::app_sdk::types::{NodeConnection, AppChannel};
+use crate::app_sdk::types::NodeConnection;
 
 /// Container for a social app
 #[derive(Debug)]

@@ -1,8 +1,6 @@
 use fold_db::datafold_node::{DataFoldNode, config::NodeConfig};
-use fold_db::network::{NetworkCore, NetworkConfig, SchemaService, PeerId};
+use fold_db::network::{NetworkCore, NetworkConfig, SchemaService};
 use fold_db::schema::Schema;
-use std::collections::HashMap;
-use std::path::PathBuf;
 use tempfile::tempdir;
 
 #[tokio::test]

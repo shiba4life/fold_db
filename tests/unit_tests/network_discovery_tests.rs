@@ -1,12 +1,12 @@
 use std::net::{TcpListener, UdpSocket};
 use std::time::Duration;
 use std::thread;
-use std::collections::HashSet;
 use tempfile;
 
 use fold_db::datafold_node::{
-    DataFoldNode, config::NodeConfig, network::NetworkConfig
+    DataFoldNode, config::NodeConfig
 };
+use fold_db::network::NetworkConfig;
 
 // Helper function to create a test network config with random ports
 fn create_test_network_config(enable_discovery: bool) -> NetworkConfig {
@@ -35,8 +35,8 @@ fn create_test_network_config(enable_discovery: bool) -> NetworkConfig {
     }
 }
 
-#[test]
-fn test_discovery_initialization() {
+#[tokio::test]
+async fn test_discovery_initialization() {
     // Create a temporary directory for test data
     let temp_dir = tempfile::tempdir().unwrap();
     let storage_path = temp_dir.path().to_path_buf();
@@ -55,20 +55,20 @@ fn test_discovery_initialization() {
     let mut node = DataFoldNode::new(node_config).unwrap();
     
     // Initialize the network layer
-    let result = node.init_network(network_config);
+    let result = node.init_network(network_config).await;
     assert!(result.is_ok(), "Failed to initialize network with discovery enabled: {:?}", result);
     
     // Start the network layer
-    let result = node.start_network();
+    let result = node.start_network().await;
     assert!(result.is_ok(), "Failed to start network with discovery enabled: {:?}", result);
     
     // Stop the network layer
-    let result = node.stop_network();
+    let result = node.stop_network().await;
     assert!(result.is_ok(), "Failed to stop network: {:?}", result);
 }
 
-#[test]
-fn test_node_discovery_enabled() {
+#[tokio::test]
+async fn test_node_discovery_enabled() {
     // Create temporary directories for test data
     let temp_dir1 = tempfile::tempdir().unwrap();
     let temp_dir2 = tempfile::tempdir().unwrap();
@@ -95,17 +95,17 @@ fn test_node_discovery_enabled() {
     let mut node2 = DataFoldNode::new(node2_config).unwrap();
     
     // Initialize network layers
-    let result = node1.init_network(network1_config);
+    let result = node1.init_network(network1_config).await;
     assert!(result.is_ok(), "Failed to initialize network 1: {:?}", result);
     
-    let result = node2.init_network(network2_config);
+    let result = node2.init_network(network2_config).await;
     assert!(result.is_ok(), "Failed to initialize network 2: {:?}", result);
     
     // Start network layers
-    let result = node1.start_network();
+    let result = node1.start_network().await;
     assert!(result.is_ok(), "Failed to start network 1: {:?}", result);
     
-    let result = node2.start_network();
+    let result = node2.start_network().await;
     assert!(result.is_ok(), "Failed to start network 2: {:?}", result);
     
     // Get node IDs for reference
@@ -119,20 +119,20 @@ fn test_node_discovery_enabled() {
     thread::sleep(Duration::from_secs(2));
     
     // Trigger discovery process
-    let discovered_nodes1 = node1.discover_nodes();
+    let discovered_nodes1 = node1.discover_nodes().await;
     println!("Node 1 discovery result: {:?}", discovered_nodes1);
     // Don't fail the test if discovery fails due to network issues
     // Just log the result and continue
     
-    let discovered_nodes2 = node2.discover_nodes();
+    let discovered_nodes2 = node2.discover_nodes().await;
     println!("Node 2 discovery result: {:?}", discovered_nodes2);
     // Don't fail the test if discovery fails due to network issues
     
     // Get known nodes
-    let known_nodes1 = node1.get_known_nodes();
+    let known_nodes1 = node1.get_known_nodes().await;
     assert!(known_nodes1.is_ok(), "Failed to get known nodes from node 1: {:?}", known_nodes1);
     
-    let known_nodes2 = node2.get_known_nodes();
+    let known_nodes2 = node2.get_known_nodes().await;
     assert!(known_nodes2.is_ok(), "Failed to get known nodes from node 2: {:?}", known_nodes2);
     
     // Check if nodes discovered each other
@@ -148,15 +148,15 @@ fn test_node_discovery_enabled() {
     // We're primarily testing that the discovery process runs without errors.
     
     // Stop network layers
-    let result = node1.stop_network();
+    let result = node1.stop_network().await;
     assert!(result.is_ok(), "Failed to stop network 1: {:?}", result);
     
-    let result = node2.stop_network();
+    let result = node2.stop_network().await;
     assert!(result.is_ok(), "Failed to stop network 2: {:?}", result);
 }
 
-#[test]
-fn test_node_discovery_disabled() {
+#[tokio::test]
+async fn test_node_discovery_disabled() {
     // Create temporary directories for test data
     let temp_dir1 = tempfile::tempdir().unwrap();
     let temp_dir2 = tempfile::tempdir().unwrap();
@@ -183,21 +183,21 @@ fn test_node_discovery_disabled() {
     let mut node2 = DataFoldNode::new(node2_config).unwrap();
     
     // Initialize network layers
-    let result = node1.init_network(network1_config);
+    let result = node1.init_network(network1_config).await;
     assert!(result.is_ok(), "Failed to initialize network 1: {:?}", result);
     
-    let result = node2.init_network(network2_config);
+    let result = node2.init_network(network2_config).await;
     assert!(result.is_ok(), "Failed to initialize network 2: {:?}", result);
     
     // Start network layers
-    let result = node1.start_network();
+    let result = node1.start_network().await;
     assert!(result.is_ok(), "Failed to start network 1: {:?}", result);
     
-    let result = node2.start_network();
+    let result = node2.start_network().await;
     assert!(result.is_ok(), "Failed to start network 2: {:?}", result);
     
     // Trigger discovery process
-    let discovered_nodes1 = node1.discover_nodes();
+    let discovered_nodes1 = node1.discover_nodes().await;
     assert!(discovered_nodes1.is_ok(), "Failed to discover nodes from node 1: {:?}", discovered_nodes1);
     
     // With discovery disabled, the result should be an empty list
@@ -205,15 +205,15 @@ fn test_node_discovery_disabled() {
     assert!(discovered_nodes.is_empty(), "Expected empty list with discovery disabled, got: {:?}", discovered_nodes);
     
     // Stop network layers
-    let result = node1.stop_network();
+    let result = node1.stop_network().await;
     assert!(result.is_ok(), "Failed to stop network 1: {:?}", result);
     
-    let result = node2.stop_network();
+    let result = node2.stop_network().await;
     assert!(result.is_ok(), "Failed to stop network 2: {:?}", result);
 }
 
-#[test]
-fn test_manual_node_connection() {
+#[tokio::test]
+async fn test_manual_node_connection() {
     // Create temporary directories for test data
     let temp_dir1 = tempfile::tempdir().unwrap();
     let temp_dir2 = tempfile::tempdir().unwrap();
@@ -240,21 +240,21 @@ fn test_manual_node_connection() {
     let mut node2 = DataFoldNode::new(node2_config).unwrap();
     
     // Initialize network layers
-    let result = node1.init_network(network1_config.clone());
+    let result = node1.init_network(network1_config.clone()).await;
     assert!(result.is_ok(), "Failed to initialize network 1: {:?}", result);
     
-    let result = node2.init_network(network2_config.clone());
+    let result = node2.init_network(network2_config.clone()).await;
     assert!(result.is_ok(), "Failed to initialize network 2: {:?}", result);
     
     // Start network layers
-    let result = node1.start_network();
+    let result = node1.start_network().await;
     assert!(result.is_ok(), "Failed to start network 1: {:?}", result);
     
-    let result = node2.start_network();
+    let result = node2.start_network().await;
     assert!(result.is_ok(), "Failed to start network 2: {:?}", result);
     
     // Get node IDs
-    let node1_id = node1.get_node_id().to_string();
+    let _node1_id = node1.get_node_id().to_string();
     let node2_id = node2.get_node_id().to_string();
     
     // Manually add node2 to node1's trusted nodes
@@ -270,15 +270,15 @@ fn test_manual_node_connection() {
     // the connection attempt would fail
     
     // Stop network layers
-    let result = node1.stop_network();
+    let result = node1.stop_network().await;
     assert!(result.is_ok(), "Failed to stop network 1: {:?}", result);
     
-    let result = node2.stop_network();
+    let result = node2.stop_network().await;
     assert!(result.is_ok(), "Failed to stop network 2: {:?}", result);
 }
 
-#[test]
-fn test_discovery_with_multiple_nodes() {
+#[tokio::test]
+async fn test_discovery_with_multiple_nodes() {
     const NUM_NODES: usize = 3;
     
     // Create temporary directories and nodes
@@ -299,7 +299,7 @@ fn test_discovery_with_multiple_nodes() {
         let network_config = create_test_network_config(true);
         
         let mut node = DataFoldNode::new(node_config).unwrap();
-        let result = node.init_network(network_config);
+        let result = node.init_network(network_config).await;
         assert!(result.is_ok(), "Failed to initialize network: {:?}", result);
         
         let node_id = node.get_node_id().to_string();
@@ -311,7 +311,7 @@ fn test_discovery_with_multiple_nodes() {
     
     // Start all nodes
     for node in &mut nodes {
-        let result = node.start_network();
+        let result = node.start_network().await;
         assert!(result.is_ok(), "Failed to start network: {:?}", result);
     }
     
@@ -325,14 +325,14 @@ fn test_discovery_with_multiple_nodes() {
     
     // Trigger discovery on all nodes
     for (i, node) in nodes.iter_mut().enumerate() {
-        let result = node.discover_nodes();
+        let result = node.discover_nodes().await;
         println!("Node {} discovery result: {:?}", i, result);
         // Don't fail the test if discovery fails due to network issues
     }
     
     // Check known nodes for each node
     for (i, node) in nodes.iter().enumerate() {
-        let known_nodes = node.get_known_nodes();
+        let known_nodes = node.get_known_nodes().await;
         assert!(known_nodes.is_ok(), "Failed to get known nodes from node {}: {:?}", i, known_nodes);
         
         let known_nodes = known_nodes.unwrap();
@@ -344,7 +344,7 @@ fn test_discovery_with_multiple_nodes() {
     
     // Stop all nodes
     for node in &mut nodes {
-        let result = node.stop_network();
+        let result = node.stop_network().await;
         assert!(result.is_ok(), "Failed to stop network: {:?}", result);
     }
 }

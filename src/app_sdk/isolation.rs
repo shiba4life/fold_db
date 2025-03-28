@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
 /// Network isolation configuration for a social app container

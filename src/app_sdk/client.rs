@@ -4,8 +4,7 @@ use tokio::sync::Mutex;
 
 use crate::app_sdk::error::{AppSdkError, AppSdkResult};
 use crate::app_sdk::types::{
-    NodeConnection, AuthCredentials, SchemaCache, NodeInfo, AppRequest,
-    QueryResult, MutationResult, RemoteNodeInfo
+    NodeConnection, AuthCredentials, SchemaCache, NodeInfo, AppRequest, RemoteNodeInfo
 };
 use crate::app_sdk::query_builder::QueryBuilder;
 use crate::app_sdk::mutation_builder::MutationBuilder;
