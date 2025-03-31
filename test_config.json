@@ -1,0 +1,4 @@
+{
+  "storage_path": "./data/test_db",
+  "default_trust_distance": 2
+}
