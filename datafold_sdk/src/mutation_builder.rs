@@ -22,6 +22,7 @@ pub struct MutationBuilder {
     target_node: Option<String>,
     
     /// Connection to the node
+    #[allow(dead_code)]
     connection: NodeConnection,
     
     /// Authentication credentials
@@ -136,7 +137,7 @@ pub enum MutationType {
 /// Helper function to create a mutation for a specific schema
 pub fn mutate(schema_name: &str) -> MutationBuilder {
     // Create a default node connection using a Unix socket
-    let socket_path = format!("/var/run/datafold/node.sock");
+    let socket_path = "/var/run/datafold/node.sock".to_string();
     let connection = NodeConnection::UnixSocket(socket_path);
     
     // Create dummy authentication credentials

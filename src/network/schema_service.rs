@@ -1,7 +1,10 @@
+/// Type alias for the schema check callback function
+pub type SchemaCheckCallback = Box<dyn Fn(&[String]) -> Vec<String> + Send + Sync>;
+
 /// Service for handling schema operations
 pub struct SchemaService {
     /// Callback function for checking schema availability
-    schema_check_callback: Box<dyn Fn(&[String]) -> Vec<String> + Send + Sync>,
+    schema_check_callback: SchemaCheckCallback,
 }
 
 impl Clone for SchemaService {
@@ -13,13 +16,19 @@ impl Clone for SchemaService {
     }
 }
 
-impl SchemaService {
-    /// Create a new schema service
-    pub fn new() -> Self {
+impl Default for SchemaService {
+    fn default() -> Self {
         Self {
             // Default callback returns empty list (no schemas available)
             schema_check_callback: Box::new(|_| Vec::new()),
         }
+    }
+}
+
+impl SchemaService {
+    /// Create a new schema service
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Set the callback function for checking schema availability

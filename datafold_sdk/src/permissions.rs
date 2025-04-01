@@ -20,9 +20,8 @@ pub struct AppPermissions {
     pub rate_limits: OperationRateLimits,
 }
 
-impl AppPermissions {
-    /// Create new app permissions with default values
-    pub fn new() -> Self {
+impl Default for AppPermissions {
+    fn default() -> Self {
         Self {
             allowed_schemas: HashSet::new(),
             field_permissions: HashMap::new(),
@@ -30,6 +29,13 @@ impl AppPermissions {
             max_trust_distance: 1,
             rate_limits: OperationRateLimits::default(),
         }
+    }
+}
+
+impl AppPermissions {
+    /// Create new app permissions with default values
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Allow access to a schema
@@ -110,7 +116,7 @@ impl AppPermissions {
 }
 
 /// Field-level permissions for a schema
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FieldPermissions {
     /// Fields that can be read
     pub readable_fields: HashSet<String>,
@@ -122,10 +128,7 @@ pub struct FieldPermissions {
 impl FieldPermissions {
     /// Create new field permissions with no fields
     pub fn new() -> Self {
-        Self {
-            readable_fields: HashSet::new(),
-            writable_fields: HashSet::new(),
-        }
+        Self::default()
     }
 
     /// Allow reading a field

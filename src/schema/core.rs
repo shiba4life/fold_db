@@ -213,7 +213,7 @@ impl SchemaCore {
         let mut atom_refs = Vec::new();
 
         // For unmapped fields, create a new ref_atom_uuid and AtomRef
-        for (_, field) in &mut schema.fields {
+        for field in schema.fields.values_mut() {
             if field.get_ref_atom_uuid().is_none() {
                 let ref_atom_uuid = Uuid::new_v4().to_string();
                 

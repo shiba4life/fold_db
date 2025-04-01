@@ -34,7 +34,7 @@ impl DataFoldClient {
     /// Create a new client
     pub fn new(app_id: &str, private_key: &str, public_key: &str) -> Self {
         // Create a default node connection using a Unix socket
-        let socket_path = format!("/var/run/datafold/node.sock");
+        let socket_path = "/var/run/datafold/node.sock".to_string();
         let connection = NodeConnection::UnixSocket(socket_path);
         
         // Create authentication credentials

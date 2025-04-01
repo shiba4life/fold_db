@@ -40,9 +40,10 @@ impl Default for NetworkConfig {
 impl NetworkConfig {
     /// Create a new network configuration with the specified listen address
     pub fn new(listen_address: &str) -> Self {
-        let mut config = Self::default();
-        config.listen_address = listen_address.to_string();
-        config
+        Self {
+            listen_address: listen_address.to_string(),
+            ..Default::default()
+        }
     }
     
     /// Set the request timeout in seconds

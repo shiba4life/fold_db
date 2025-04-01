@@ -3,7 +3,9 @@ use crate::network::error::{NetworkError, NetworkResult};
 use crate::network::schema_protocol::SCHEMA_PROTOCOL_NAME;
 use crate::network::schema_service::SchemaService;
 use libp2p::PeerId;
-use std::collections::{HashMap, HashSet};
+#[cfg(test)]
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::time::Duration;
 
 /// Core network component for P2P communication
@@ -15,6 +17,7 @@ pub struct NetworkCore {
     /// Known peers
     known_peers: HashSet<PeerId>,
     /// Request timeout in seconds
+    #[allow(dead_code)]
     request_timeout: u64,
     /// Network configuration
     config: NetworkConfig,
@@ -181,7 +184,7 @@ impl NetworkCore {
             let num_peers = rand::random::<u8>() % 4;
             for _ in 0..num_peers {
                 let peer_id = PeerId::random();
-                self.known_peers.insert(peer_id.clone());
+                self.known_peers.insert(peer_id);
                 println!("SIMULATION: Discovered peer: {}", peer_id);
             }
         }

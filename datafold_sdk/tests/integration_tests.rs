@@ -1,5 +1,5 @@
 use datafold_sdk::{
-    DataFoldClient, QueryFilter, AppPermissions, FieldPermissions,
+    DataFoldClient, QueryFilter,
     NodeConnection, AuthCredentials
 };
 use serde_json::json;

@@ -243,11 +243,7 @@ impl DataFoldNode {
                 .iter()
                 .filter(|name| {
                     // Check if the schema exists
-                    if let Ok(Some(_)) = db.schema_manager.get_schema(name) {
-                        true
-                    } else {
-                        false
-                    }
+                    matches!(db.schema_manager.get_schema(name), Ok(Some(_)))
                 })
                 .cloned()
                 .collect()
@@ -294,7 +290,7 @@ impl DataFoldNode {
     /// Stop the network service
     pub async fn stop_network(&self) -> FoldDbResult<()> {
         if let Some(network) = &self.network {
-            let network = network.lock().await;
+            let _network = network.lock().await;
             // In a real implementation, this would stop the network service
             // For now, just log that we're stopping
             println!("Stopping network service");
@@ -316,7 +312,7 @@ impl DataFoldNode {
     /// Discover nodes on the local network using mDNS
     pub async fn discover_nodes(&self) -> FoldDbResult<Vec<PeerId>> {
         if let Some(network) = &self.network {
-            let network = network.lock().await;
+            let network_guard = network.lock().await;
             
             // Trigger mDNS discovery
             // This will update the known_peers list in the NetworkCore
@@ -324,7 +320,7 @@ impl DataFoldNode {
             
             // In a real implementation, this would actively scan for peers
             // For now, we'll just return the current known peers
-            let known_peers: Vec<PeerId> = network.known_peers().iter().cloned().collect();
+            let known_peers: Vec<PeerId> = network_guard.known_peers().iter().cloned().collect();
             
             Ok(known_peers)
         } else {
@@ -335,11 +331,11 @@ impl DataFoldNode {
     /// Get the list of known nodes
     pub async fn get_known_nodes(&self) -> FoldDbResult<HashMap<String, NodeInfo>> {
         if let Some(network) = &self.network {
-            let network = network.lock().await;
+            let network_guard = network.lock().await;
             
             // Convert the PeerId set to a HashMap of NodeInfo
             let mut result = HashMap::new();
-            for peer_id in network.known_peers() {
+            for peer_id in network_guard.known_peers() {
                 let peer_id_str = peer_id.to_string();
                 
                 // If the peer is already in trusted_nodes, use that info

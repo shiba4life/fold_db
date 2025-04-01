@@ -158,12 +158,12 @@ impl SocialAppContainer {
     }
 
     /// Start a Linux container
-    async fn start_linux_container(&mut self, container_config: &LinuxContainerConfig) -> AppSdkResult<()> {
+    async fn start_linux_container(&mut self, _container_config: &LinuxContainerConfig) -> AppSdkResult<()> {
         // In a real implementation, this would start a Linux container using the specified configuration
         // For now, we'll just log that we're starting a Linux container
         println!("Starting Linux container for app {}", self.app_id);
-        println!("Network namespace: {}", container_config.network_namespace);
-        println!("Dropped capabilities: {:?}", container_config.dropped_capabilities);
+        // println!("Network namespace: {}", _container_config.network_namespace);
+        // println!("Dropped capabilities: {:?}", _container_config.dropped_capabilities);
         
         // Set a dummy process ID
         self.process_id = Some(2000);
@@ -184,12 +184,12 @@ impl SocialAppContainer {
     }
 
     /// Start a WebAssembly sandbox
-    async fn start_wasm_sandbox(&mut self, wasm_config: &WasmSandboxConfig) -> AppSdkResult<()> {
+    async fn start_wasm_sandbox(&mut self, _wasm_config: &WasmSandboxConfig) -> AppSdkResult<()> {
         // In a real implementation, this would start a WebAssembly sandbox using the specified configuration
         // For now, we'll just log that we're starting a WebAssembly sandbox
         println!("Starting WebAssembly sandbox for app {}", self.app_id);
-        println!("Memory isolation: {}", wasm_config.memory_isolation);
-        println!("Allowed imports: {:?}", wasm_config.allowed_imports);
+        // println!("Memory isolation: {}", _wasm_config.memory_isolation);
+        // println!("Allowed imports: {:?}", _wasm_config.allowed_imports);
         
         // Set a dummy process ID
         self.process_id = Some(3000);
@@ -365,7 +365,7 @@ pub async fn create_firecracker_vm(
     println!("App binary: {}", app_binary);
     
     // Create a VM configuration
-    let vm_config = MicroVMConfig {
+    let _vm_config = MicroVMConfig {
         vm_type: MicroVMType::Firecracker,
         vcpu_count: 1,
         memory_mb: 128,
@@ -408,7 +408,7 @@ pub async fn create_kata_container(
     println!("App binary: {}", app_binary);
     
     // Create a container configuration
-    let container_config = ContainerConfig {
+    let _container_config = ContainerConfig {
         app_binary_path: PathBuf::from(app_binary),
         isolation_type: IsolationType::MicroVM(MicroVMConfig {
             vm_type: MicroVMType::KataContainers,
@@ -447,7 +447,7 @@ pub async fn create_isolated_container(
     println!("App binary: {}", app_binary);
     
     // Create a container configuration
-    let container_config = ContainerConfig {
+    let _container_config = ContainerConfig {
         app_binary_path: PathBuf::from(app_binary),
         isolation_type: IsolationType::LinuxContainer(LinuxContainerConfig {
             network_namespace: true,
@@ -492,7 +492,7 @@ pub async fn create_wasm_sandbox(
     println!("WASM module size: {} bytes", wasm_module.len());
     
     // Create a sandbox configuration
-    let sandbox_config = WasmSandboxConfig {
+    let _sandbox_config = WasmSandboxConfig {
         network_imports: vec![],
         allowed_imports: vec![
             "query_local".to_string(),

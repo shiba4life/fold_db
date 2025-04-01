@@ -2,7 +2,6 @@ use datafold_sdk::{
     DataFoldClient, QueryFilter, AppPermissions, FieldPermissions,
     ContainerConfig, SocialAppContainer, MicroVMConfig, MicroVMType
 };
-use datafold_sdk::isolation::ResourceLimits;
 use serde_json::json;
 use std::path::PathBuf;
 

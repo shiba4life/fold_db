@@ -12,6 +12,7 @@ use crate::types::{
 #[derive(Debug, Clone)]
 pub struct NetworkManager {
     /// Connection to the local node
+    #[allow(dead_code)]
     connection: NodeConnection,
     
     /// Authentication credentials

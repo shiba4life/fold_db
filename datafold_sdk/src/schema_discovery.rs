@@ -12,6 +12,7 @@ use crate::types::{
 #[derive(Debug, Clone)]
 pub struct SchemaDiscovery {
     /// Connection to the local node
+    #[allow(dead_code)]
     connection: NodeConnection,
     
     /// Authentication credentials

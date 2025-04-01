@@ -22,6 +22,7 @@ pub struct QueryBuilder {
     target_node: Option<String>,
     
     /// Connection to the node
+    #[allow(dead_code)]
     connection: NodeConnection,
     
     /// Authentication credentials
@@ -125,7 +126,7 @@ impl QueryBuilder {
 /// Helper function to create a query for a specific schema
 pub fn query(schema_name: &str) -> QueryBuilder {
     // Create a default node connection using a Unix socket
-    let socket_path = format!("/var/run/datafold/node.sock");
+    let socket_path = "/var/run/datafold/node.sock".to_string();
     let connection = NodeConnection::UnixSocket(socket_path);
     
     // Create dummy authentication credentials

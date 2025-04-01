@@ -308,7 +308,7 @@ impl AppRequest {
     }
 
     /// Sign the request using the app's private key
-    fn sign(&self, private_key: &str) -> String {
+    fn sign(&self, _private_key: &str) -> String {
         // In a real implementation, this would use the private key to sign the request
         // For now, we'll just return a placeholder
         format!("signed-{}-{}", self.app_id, self.timestamp)
