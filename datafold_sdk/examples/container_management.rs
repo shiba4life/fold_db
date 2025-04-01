@@ -1,7 +1,8 @@
 use datafold_sdk::{
     SocialAppContainer, ContainerConfig, AppPermissions, FieldPermissions,
-    MicroVMConfig, MicroVMType, ResourceLimits
+    MicroVMConfig, MicroVMType
 };
+use datafold_sdk::isolation::ResourceLimits;
 use std::path::PathBuf;
 
 #[tokio::main]
