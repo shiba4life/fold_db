@@ -3,8 +3,8 @@ use std::sync::Arc;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
-use crate::app_sdk::error::{AppSdkError, AppSdkResult};
-use crate::app_sdk::types::{
+use crate::error::{AppSdkError, AppSdkResult};
+use crate::types::{
     NodeConnection, AuthCredentials, SchemaCache, NodeInfo, AppRequest, RemoteNodeInfo
 };
 

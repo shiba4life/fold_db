@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 
-use crate::app_sdk::error::{AppSdkError, AppSdkResult};
-use crate::app_sdk::isolation::{
+use crate::error::{AppSdkError, AppSdkResult};
+use crate::isolation::{
     NetworkIsolation, MicroVMConfig, LinuxContainerConfig, WasmSandboxConfig,
     ResourceLimits, MicroVMType, DriveConfig, VsockConfig, SocketPath, MountPoint
 };
-use crate::app_sdk::permissions::AppPermissions;
-use crate::app_sdk::types::NodeConnection;
+use crate::permissions::AppPermissions;
+use crate::types::NodeConnection;
 
 /// Container for a social app
 #[derive(Debug)]
@@ -369,7 +369,7 @@ pub async fn create_firecracker_vm(
         vm_type: MicroVMType::Firecracker,
         vcpu_count: 1,
         memory_mb: 128,
-        network_config: crate::app_sdk::isolation::NetworkConfig::none(),
+        network_config: crate::isolation::NetworkConfig::none(),
         vsock_config: VsockConfig {
             vsock_id: format!("vsock-{}", app_id),
             guest_cid: 3,
@@ -414,7 +414,7 @@ pub async fn create_kata_container(
             vm_type: MicroVMType::KataContainers,
             vcpu_count: 1,
             memory_mb: 128,
-            network_config: crate::app_sdk::isolation::NetworkConfig::none(),
+            network_config: crate::isolation::NetworkConfig::none(),
             vsock_config: VsockConfig::default(),
             kernel_params: vec![
                 "console=ttyS0".to_string(),

@@ -1,7 +1,9 @@
 # Rust specific
 /target/
+/datafold_sdk/target/
 **/*.rs.bk
 Cargo.lock
+datafold_sdk/Cargo.lock
 
 # IDE
 .vscode/

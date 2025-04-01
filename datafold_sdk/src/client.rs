@@ -2,14 +2,14 @@ use std::sync::Arc;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
-use crate::app_sdk::error::{AppSdkError, AppSdkResult};
-use crate::app_sdk::types::{
+use crate::error::{AppSdkError, AppSdkResult};
+use crate::types::{
     NodeConnection, AuthCredentials, SchemaCache, NodeInfo, AppRequest, RemoteNodeInfo
 };
-use crate::app_sdk::query_builder::QueryBuilder;
-use crate::app_sdk::mutation_builder::MutationBuilder;
-use crate::app_sdk::network_manager::NetworkManager;
-use crate::app_sdk::schema_discovery::SchemaDiscovery;
+use crate::query_builder::QueryBuilder;
+use crate::mutation_builder::MutationBuilder;
+use crate::network_manager::NetworkManager;
+use crate::schema_discovery::SchemaDiscovery;
 
 /// Main client for interacting with the DataFold network
 #[derive(Debug, Clone)]

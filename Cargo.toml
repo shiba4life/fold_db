@@ -9,6 +9,9 @@ test-utils = []  # Feature flag for test utilities
 simulate-peers = []  # Feature flag for simulating peer discovery
 
 [dependencies]
+# SDK
+datafold_sdk = { path = "./datafold_sdk" }
+
 # Cryptography
 ring = "0.16.20"
 base64 = "0.21.0"

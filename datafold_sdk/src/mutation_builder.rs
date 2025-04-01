@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use serde_json::Value;
 
-use crate::app_sdk::error::{AppSdkError, AppSdkResult};
-use crate::app_sdk::types::{
+use crate::error::{AppSdkError, AppSdkResult};
+use crate::types::{
     NodeConnection, AuthCredentials, MutationResult, AppRequest
 };
 

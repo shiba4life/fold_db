@@ -1,7 +1,7 @@
-// App SDK for containerized applications
-//
-// This module provides the SDK for developing containerized applications
-// that can interact with DataFold nodes while maintaining security and privacy.
+//! DataFold SDK for interacting with DataFold nodes
+//!
+//! This crate provides a client SDK for applications to interact with DataFold nodes
+//! while maintaining security and privacy.
 
 pub mod client;
 pub mod container;
@@ -24,4 +24,7 @@ pub use query_builder::QueryBuilder;
 pub use mutation_builder::MutationBuilder;
 pub use network_manager::NetworkManager;
 pub use schema_discovery::SchemaDiscovery;
-pub use types::{AppRequest, AppChannel, NodeConnection, AuthCredentials, SchemaCache, NodeInfo, QueryFilter, QueryResult, MutationResult, RemoteNodeInfo};
+pub use types::{
+    AppRequest, AppChannel, NodeConnection, AuthCredentials, SchemaCache, 
+    NodeInfo, QueryFilter, QueryResult, MutationResult, RemoteNodeInfo
+};
