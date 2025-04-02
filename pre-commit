@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Pre-commit hook to run all tests in the project
+# Place this file in .git/hooks/ and make it executable with: chmod +x .git/hooks/pre-commit
+
+set -e  # Exit immediately if a command exits with a non-zero status
+
+echo "Running pre-commit hook..."
+
+# Store the current directory
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+
+# Check if there are any Rust files being committed
+if git diff --cached --name-only | grep -q '\.rs$'; then
+    echo "Rust files detected in commit, running tests..."
+    
+    # Run clippy on the entire project
+    echo "Running clippy..."
+    cargo clippy -- -D warnings || { echo "Clippy failed!"; exit 1; }
+    
+    # Run main project tests
+    echo "Running main project unit tests..."
+    cargo test --lib || { echo "Main project unit tests failed!"; exit 1; }
+    
+    echo "Running main project integration tests..."
+    cargo test --test mod || { echo "Main project integration tests failed!"; exit 1; }
+    
+    echo "Running network tests..."
+    cargo test --test network_tests || { echo "Network tests failed!"; exit 1; }
+    
+    # Run SDK tests
+    echo "Running SDK unit tests..."
+    cd datafold_sdk
+    cargo test --lib || { echo "SDK unit tests failed!"; exit 1; }
+    
+    echo "Running SDK integration tests..."
+    cargo test --test sdk_tests || { echo "SDK tests failed!"; exit 1; }
+    
+    echo "Running real integration tests..."
+    cargo test --test real_integration_tests || { echo "Real integration tests failed!"; exit 1; }
+    cd "$REPO_ROOT"
+    
+    echo "All tests passed!"
+else
+    echo "No Rust files in commit, skipping tests."
+fi
+
+exit 0
