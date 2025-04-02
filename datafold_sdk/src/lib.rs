@@ -11,6 +11,9 @@ pub mod permissions;
 pub mod query_builder;
 pub mod mutation_builder;
 pub mod network_manager;
+pub mod network_utils;
+#[cfg(any(test, feature = "mock"))]
+pub mod network_mock;
 pub mod schema_discovery;
 pub mod types;
 
@@ -23,6 +26,9 @@ pub use permissions::{AppPermissions, FieldPermissions};
 pub use query_builder::QueryBuilder;
 pub use mutation_builder::MutationBuilder;
 pub use network_manager::NetworkManager;
+pub use network_utils::NetworkUtils;
+#[cfg(any(test, feature = "mock"))]
+pub use network_mock::NetworkMock;
 pub use schema_discovery::SchemaDiscovery;
 pub use types::{
     AppRequest, AppChannel, NodeConnection, AuthCredentials, SchemaCache, 

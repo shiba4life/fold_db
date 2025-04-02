@@ -16,6 +16,15 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 rand = "0.8"
 
+[features]
+default = []
+mock = []  # Feature for mock implementations
+
+# Automatically enable the mock feature during tests
+[dev-dependencies.datafold_sdk]
+path = "."
+features = ["mock"]
+
 # We'll need to implement our own error handling without depending on the main crate
 
 [dev-dependencies]

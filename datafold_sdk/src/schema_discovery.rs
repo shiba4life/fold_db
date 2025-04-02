@@ -3,7 +3,8 @@ use std::sync::Arc;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
-use crate::error::{AppSdkError, AppSdkResult};
+use crate::error::AppSdkResult;
+use crate::network_utils::NetworkUtils;
 use crate::types::{
     NodeConnection, AuthCredentials, SchemaCache, SchemaInfo, AppRequest
 };
@@ -12,7 +13,6 @@ use crate::types::{
 #[derive(Debug, Clone)]
 pub struct SchemaDiscovery {
     /// Connection to the local node
-    #[allow(dead_code)]
     connection: NodeConnection,
     
     /// Authentication credentials
@@ -118,154 +118,6 @@ impl SchemaDiscovery {
 
     /// Send a request to the node
     async fn send_request(&self, request: AppRequest) -> AppSdkResult<Value> {
-        // In a real implementation, this would send the request to the node
-        // For now, we'll just log that we're sending a request and return a dummy response
-        println!("Sending schema discovery request to node: {:?}", request);
-        
-        // Create a dummy response based on the operation
-        match request.operation.as_str() {
-            "list_schemas" => {
-                Ok(serde_json::json!(["user", "post", "comment"]))
-            },
-            "get_schema" => {
-                let params: Value = serde_json::from_str(&request.params.to_string())?;
-                let schema_name = params["schema_name"].as_str().unwrap_or("unknown");
-                
-                match schema_name {
-                    "user" => {
-                        Ok(serde_json::json!({
-                            "name": "user",
-                            "fields": [
-                                {
-                                    "name": "id",
-                                    "field_type": "string",
-                                    "description": "Unique identifier",
-                                    "required": true
-                                },
-                                {
-                                    "name": "username",
-                                    "field_type": "string",
-                                    "description": "User's username",
-                                    "required": true
-                                },
-                                {
-                                    "name": "email",
-                                    "field_type": "string",
-                                    "description": "User's email address",
-                                    "required": true
-                                },
-                                {
-                                    "name": "full_name",
-                                    "field_type": "string",
-                                    "description": "User's full name",
-                                    "required": false
-                                },
-                                {
-                                    "name": "bio",
-                                    "field_type": "string",
-                                    "description": "User's biography",
-                                    "required": false
-                                },
-                                {
-                                    "name": "created_at",
-                                    "field_type": "datetime",
-                                    "description": "When the user was created",
-                                    "required": true
-                                }
-                            ],
-                            "description": "User profile information"
-                        }))
-                    },
-                    "post" => {
-                        Ok(serde_json::json!({
-                            "name": "post",
-                            "fields": [
-                                {
-                                    "name": "id",
-                                    "field_type": "string",
-                                    "description": "Unique identifier",
-                                    "required": true
-                                },
-                                {
-                                    "name": "title",
-                                    "field_type": "string",
-                                    "description": "Post title",
-                                    "required": true
-                                },
-                                {
-                                    "name": "content",
-                                    "field_type": "string",
-                                    "description": "Post content",
-                                    "required": true
-                                },
-                                {
-                                    "name": "author_id",
-                                    "field_type": "string",
-                                    "description": "ID of the post author",
-                                    "required": true
-                                },
-                                {
-                                    "name": "created_at",
-                                    "field_type": "datetime",
-                                    "description": "When the post was created",
-                                    "required": true
-                                },
-                                {
-                                    "name": "updated_at",
-                                    "field_type": "datetime",
-                                    "description": "When the post was last updated",
-                                    "required": false
-                                }
-                            ],
-                            "description": "User-created posts"
-                        }))
-                    },
-                    "comment" => {
-                        Ok(serde_json::json!({
-                            "name": "comment",
-                            "fields": [
-                                {
-                                    "name": "id",
-                                    "field_type": "string",
-                                    "description": "Unique identifier",
-                                    "required": true
-                                },
-                                {
-                                    "name": "content",
-                                    "field_type": "string",
-                                    "description": "Comment content",
-                                    "required": true
-                                },
-                                {
-                                    "name": "author_id",
-                                    "field_type": "string",
-                                    "description": "ID of the comment author",
-                                    "required": true
-                                },
-                                {
-                                    "name": "post_id",
-                                    "field_type": "string",
-                                    "description": "ID of the post being commented on",
-                                    "required": true
-                                },
-                                {
-                                    "name": "created_at",
-                                    "field_type": "datetime",
-                                    "description": "When the comment was created",
-                                    "required": true
-                                }
-                            ],
-                            "description": "Comments on posts"
-                        }))
-                    },
-                    _ => {
-                        Err(AppSdkError::Schema(format!("Unknown schema: {}", schema_name)))
-                    }
-                }
-            },
-            _ => {
-                Err(AppSdkError::Schema(format!("Unknown operation: {}", request.operation)))
-            }
-        }
+        NetworkUtils::send_request(&self.connection, request).await
     }
 }

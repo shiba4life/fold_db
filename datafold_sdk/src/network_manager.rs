@@ -3,7 +3,8 @@ use std::sync::Arc;
 use serde_json::Value;
 use tokio::sync::Mutex;
 
-use crate::error::{AppSdkError, AppSdkResult};
+use crate::error::AppSdkResult;
+use crate::network_utils::NetworkUtils;
 use crate::types::{
     NodeConnection, AuthCredentials, SchemaCache, NodeInfo, AppRequest, RemoteNodeInfo
 };
@@ -12,7 +13,6 @@ use crate::types::{
 #[derive(Debug, Clone)]
 pub struct NetworkManager {
     /// Connection to the local node
-    #[allow(dead_code)]
     connection: NodeConnection,
     
     /// Authentication credentials
@@ -157,62 +157,6 @@ impl NetworkManager {
 
     /// Send a request to the node
     async fn send_request(&self, request: AppRequest) -> AppSdkResult<Value> {
-        // In a real implementation, this would send the request to the node
-        // For now, we'll just log that we're sending a request and return a dummy response
-        println!("Sending network request to node: {:?}", request);
-        
-        // Create a dummy response based on the operation
-        match request.operation.as_str() {
-            "discover_nodes" => {
-                Ok(serde_json::json!([
-                    {
-                        "id": "node1",
-                        "trust_distance": 1,
-                    },
-                    {
-                        "id": "node2",
-                        "trust_distance": 2,
-                    },
-                    {
-                        "id": "node3",
-                        "trust_distance": 3,
-                    },
-                ]))
-            },
-            "check_node_availability" => {
-                Ok(serde_json::json!(true))
-            },
-            "get_node_info" => {
-                let params: Value = serde_json::from_str(&request.params.to_string())?;
-                let node_id = params["node_id"].as_str().unwrap_or("unknown");
-                
-                Ok(serde_json::json!({
-                    "id": node_id,
-                    "trust_distance": 1,
-                }))
-            },
-            "get_all_nodes" => {
-                Ok(serde_json::json!([
-                    {
-                        "id": "node1",
-                        "trust_distance": 1,
-                        "available_schemas": ["user", "post", "comment"],
-                    },
-                    {
-                        "id": "node2",
-                        "trust_distance": 2,
-                        "available_schemas": ["user", "post"],
-                    },
-                    {
-                        "id": "node3",
-                        "trust_distance": 3,
-                        "available_schemas": ["user"],
-                    },
-                ]))
-            },
-            _ => {
-                Err(AppSdkError::Network(format!("Unknown operation: {}", request.operation)))
-            }
-        }
+        NetworkUtils::send_request(&self.connection, request).await
     }
 }

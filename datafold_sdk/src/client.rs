@@ -9,6 +9,7 @@ use crate::types::{
 use crate::query_builder::QueryBuilder;
 use crate::mutation_builder::MutationBuilder;
 use crate::network_manager::NetworkManager;
+use crate::network_utils::NetworkUtils;
 use crate::schema_discovery::SchemaDiscovery;
 
 /// Main client for interacting with the DataFold network
@@ -191,18 +192,7 @@ impl DataFoldClient {
 
     /// Send a raw request to the node
     pub async fn send_request(&self, request: AppRequest) -> AppSdkResult<Value> {
-        // In a real implementation, this would send the request to the node
-        // For now, we'll just log that we're sending a request and return a dummy response
-        println!("Sending request to node: {:?}", request);
-        
-        // Return a dummy response
-        Ok(serde_json::json!({
-            "success": true,
-            "result": {
-                "message": "Request processed successfully",
-                "timestamp": chrono::Utc::now().to_rfc3339(),
-            }
-        }))
+        NetworkUtils::send_request(&self.connection, request).await
     }
 
     /// Clear the schema cache

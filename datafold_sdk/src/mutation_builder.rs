@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use serde_json::Value;
 
 use crate::error::{AppSdkError, AppSdkResult};
+use crate::network_utils::NetworkUtils;
 use crate::types::{
     NodeConnection, AuthCredentials, MutationResult, AppRequest
 };
@@ -22,7 +23,6 @@ pub struct MutationBuilder {
     target_node: Option<String>,
     
     /// Connection to the node
-    #[allow(dead_code)]
     connection: NodeConnection,
     
     /// Authentication credentials
@@ -99,16 +99,9 @@ impl MutationBuilder {
 
     /// Send a request to the node
     async fn send_request(&self, request: AppRequest) -> AppSdkResult<MutationResult> {
-        // In a real implementation, this would send the request to the node
-        // For now, we'll just log that we're sending a request and return a dummy response
-        println!("Sending mutation request to node: {:?}", request);
-        
-        // Create a dummy response
-        Ok(MutationResult {
-            success: true,
-            id: Some("123".to_string()),
-            error: None,
-        })
+        let response = NetworkUtils::send_request(&self.connection, request).await?;
+        let result: MutationResult = serde_json::from_value(response)?;
+        Ok(result)
     }
 }
 

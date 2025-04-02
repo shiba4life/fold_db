@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use serde_json::Value;
 
 use crate::error::{AppSdkError, AppSdkResult};
+use crate::network_utils::NetworkUtils;
 use crate::types::{
     NodeConnection, AuthCredentials, QueryFilter, QueryResult, AppRequest
 };
@@ -22,7 +23,6 @@ pub struct QueryBuilder {
     target_node: Option<String>,
     
     /// Connection to the node
-    #[allow(dead_code)]
     connection: NodeConnection,
     
     /// Authentication credentials
@@ -96,30 +96,9 @@ impl QueryBuilder {
 
     /// Send a request to the node
     async fn send_request(&self, request: AppRequest) -> AppSdkResult<QueryResult> {
-        // In a real implementation, this would send the request to the node
-        // For now, we'll just log that we're sending a request and return a dummy response
-        println!("Sending query request to node: {:?}", request);
-        
-        // Create a dummy response
-        let results = vec![
-            serde_json::json!({
-                "id": "123",
-                "name": "Test User",
-                "email": "test@example.com",
-                "created_at": "2023-01-01T00:00:00Z",
-            }),
-            serde_json::json!({
-                "id": "456",
-                "name": "Another User",
-                "email": "another@example.com",
-                "created_at": "2023-01-02T00:00:00Z",
-            }),
-        ];
-        
-        Ok(QueryResult {
-            results,
-            errors: Vec::new(),
-        })
+        let response = NetworkUtils::send_request(&self.connection, request).await?;
+        let result: QueryResult = serde_json::from_value(response)?;
+        Ok(result)
     }
 }
 

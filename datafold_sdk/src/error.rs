@@ -36,6 +36,10 @@ pub enum AppSdkError {
     #[error("IO error: {0}")]
     Io(#[from] io::Error),
     
+    /// Errors related to connection operations
+    #[error("Connection error: {0}")]
+    Connection(String),
+    
     /// Errors from the underlying database
     #[error("Database error: {0}")]
     Database(String),
