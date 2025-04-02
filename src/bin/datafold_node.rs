@@ -1,5 +1,5 @@
 use fold_db::{
-    datafold_node::{DataFoldNode, config::NodeConfig},
+    datafold_node::{DataFoldNode, TcpServer, config::NodeConfig},
     network::NetworkConfig,
 };
 use std::fs;
@@ -12,12 +12,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command-line arguments
     let args: Vec<String> = env::args().collect();
     let mut port = 9000; // Default port
+    let mut tcp_port = 9000; // Default TCP port
     
     // Simple argument parsing
     for i in 1..args.len() {
         if args[i] == "--port" && i + 1 < args.len() {
             if let Ok(p) = args[i + 1].parse::<u16>() {
                 port = p;
+            }
+        }
+        if args[i] == "--tcp-port" && i + 1 < args.len() {
+            if let Ok(p) = args[i + 1].parse::<u16>() {
+                tcp_port = p;
             }
         }
     }
@@ -61,10 +67,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Node ID: {}", node.get_node_id());
     println!("Other nodes can connect to this node using the Node ID above");
     
+    // Start the TCP server
+    println!("Starting TCP server on port {}...", tcp_port);
+    let tcp_server = TcpServer::new(node.clone(), tcp_port).await?;
+    
+    // Run the TCP server in a separate task
+    let tcp_server_handle = tokio::spawn(async move {
+        if let Err(e) = tcp_server.run().await {
+            eprintln!("TCP server error: {}", e);
+        }
+    });
+    
     // Keep the process running until interrupted
     println!("DataFold Node is running. Press Ctrl+C to stop.");
     tokio::signal::ctrl_c().await?;
     println!("Shutting down...");
+    
+    // Cancel the TCP server task
+    tcp_server_handle.abort();
     
     Ok(())
 }

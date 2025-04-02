@@ -12,6 +12,8 @@ pub enum NodeConnection {
     SharedMemory(SharedMemoryRegion),
     /// Named pipe (for Windows)
     NamedPipe(String),
+    /// TCP connection
+    TcpSocket(String, u16),
 }
 
 /// Shared memory region for communication

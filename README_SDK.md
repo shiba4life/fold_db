@@ -65,11 +65,20 @@ let container_config = ContainerConfig::new_wasm_sandbox(
 The SDK provides a client for interacting with the DataFold network:
 
 ```rust
-// Create a client
+// Create a client with default connection (Unix socket)
 let client = DataFoldClient::new(
     "my-social-app",
     "private-key",
     "public-key"
+);
+
+// Or create a client with a TCP connection
+let connection = NodeConnection::TcpSocket("127.0.0.1".to_string(), 9000);
+let client = DataFoldClient::with_connection(
+    "my-social-app",
+    "private-key",
+    "public-key",
+    connection
 );
 
 // Query user profiles
@@ -157,9 +166,62 @@ let remote_schemas = client.discover_remote_schemas("node1").await?;
 let schema_details = client.get_schema_details("user", None).await?;
 ```
 
-## Example
+## Connection Types
 
-See the [social_app_example.rs](examples/social_app_example.rs) file for a complete example of using the SDK.
+The SDK supports multiple connection types for communicating with DataFold nodes:
+
+### 1. Unix Socket (Default)
+
+Uses Unix domain sockets for local communication:
+
+```rust
+// Create a client with default connection (Unix socket)
+let client = DataFoldClient::new(
+    "my-social-app",
+    "private-key",
+    "public-key"
+);
+```
+
+### 2. TCP Socket
+
+Uses TCP sockets for network communication:
+
+```rust
+// Create a client with a TCP connection
+let connection = NodeConnection::TcpSocket("127.0.0.1".to_string(), 9000);
+let client = DataFoldClient::with_connection(
+    "my-social-app",
+    "private-key",
+    "public-key",
+    connection
+);
+```
+
+### 3. Mock Connection
+
+Uses a mock connection for testing:
+
+```rust
+// Create a client with a mock connection
+let connection = NodeConnection::Mock(MockNetworkManager::new());
+let client = DataFoldClient::with_connection(
+    "my-social-app",
+    "private-key",
+    "public-key",
+    connection
+);
+```
+
+## Examples
+
+See the following examples for complete usage of the SDK:
+
+- [social_app_example.rs](examples/social_app_example.rs) - A simulated social app example
+- [social_app_real.rs](examples/social_app_real.rs) - A real social app example using Unix sockets
+- [social_app_mock.rs](examples/social_app_mock.rs) - A social app example using mock connections
+
+For a complete example of a social app using TCP connections, see the [social_app_example](social_app_example/) crate.
 
 ## Security Considerations
 

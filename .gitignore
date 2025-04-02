@@ -1,9 +1,11 @@
 # Rust specific
 /target/
 /datafold_sdk/target/
+/social_app_example/target/
 **/*.rs.bk
 Cargo.lock
 datafold_sdk/Cargo.lock
+social_app_example/Cargo.lock
 
 # IDE
 .vscode/

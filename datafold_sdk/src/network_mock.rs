@@ -150,6 +150,6 @@ impl NetworkMock {
     
     /// Check if a path is a mock path
     pub fn is_mock_path(path: &str) -> bool {
-        path == "mock" || path == "/var/run/datafold/node.sock"
+        path == "mock" || path == "/var/run/datafold/node.sock" || path.starts_with("mock://")
     }
 }

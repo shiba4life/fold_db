@@ -46,6 +46,15 @@ impl NetworkUtils {
                     Err(AppSdkError::Connection("Named pipes are only supported on Windows".to_string()))
                 }
             }
+            NodeConnection::TcpSocket(host, port) => {
+                // Connect to the TCP socket
+                let addr = format!("{}:{}", host, port);
+                let stream = tokio::net::TcpStream::connect(&addr)
+                    .await
+                    .map_err(|e| AppSdkError::Connection(format!("Failed to connect to TCP socket at {}: {}", addr, e)))?;
+                
+                Self::send_request_stream(stream, request).await
+            }
         }
     }
 
