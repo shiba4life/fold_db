@@ -95,6 +95,9 @@
   - Implemented request forwarding mechanism in the network layer
   - Added proper response handling from remote nodes
   - Created comprehensive test for request forwarding
+  - Fixed port determination for forwarded requests
+  - Improved error handling in the forwarding process
+  - Enhanced the social_app_two_nodes example to demonstrate cross-node querying
 - Implemented mDNS discovery:
   - Enhanced NetworkConfig with additional fields for mDNS discovery
   - Implemented discover_nodes method to actively scan for peers

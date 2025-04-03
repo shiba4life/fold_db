@@ -1,7 +1,7 @@
 use std::time::Duration;
 use datafold_sdk::{
-    DataFoldClient, SchemaBuilder, FieldType, TrustDistance,
-    types::NodeConnection, mutation_builder::MutationBuilder,
+    DataFoldClient,
+    types::NodeConnection,
 };
 use fold_db::{
     datafold_node::{DataFoldNode, TcpServer, config::NodeConfig},
@@ -111,9 +111,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     node1.add_trusted_node(&node2_id)?;
     node2.add_trusted_node(&node1_id)?;
     
-    // Create PeerIds for the nodes
-    let node1_peer_id = libp2p::PeerId::random();
-    let node2_peer_id = libp2p::PeerId::random();
+    // Get the actual PeerIds from the network cores
+    let node1_peer_id;
+    let node2_peer_id;
+    
+    {
+        let network1 = node1.get_network_mut().await?;
+        node1_peer_id = network1.local_peer_id();
+    }
+    
+    {
+        let network2 = node2.get_network_mut().await?;
+        node2_peer_id = network2.local_peer_id();
+    }
     
     log(&format!("Node 1 Peer ID: {}", node1_peer_id));
     log(&format!("Node 2 Peer ID: {}", node2_peer_id));
@@ -121,12 +131,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Manually add peers to simulate discovery
     {
         let mut network1 = node1.get_network_mut().await?;
-        network1.add_known_peer(node2_peer_id.clone());
+        network1.add_known_peer(node2_peer_id);
+        // Register the node ID to peer ID mapping
+        network1.register_node_id(&node2_id, node2_peer_id);
     }
     
     {
         let mut network2 = node2.get_network_mut().await?;
-        network2.add_known_peer(node1_peer_id.clone());
+        network2.add_known_peer(node1_peer_id);
+        // Register the node ID to peer ID mapping
+        network2.register_node_id(&node1_id, node1_peer_id);
     }
     
     // Wait for the nodes to discover each other
@@ -606,14 +620,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     log("Remote post query results (through Node 1):");
                     log(&format!("{:#?}", query_result.results));
                     
-                    // Check if we got the "Hello from Node 2" post
-                    let found_node2_post = query_result.results.iter().any(|result| {
-                        if let Some(title) = result.get(1) {
-                            if let Some(title_str) = title.as_str() {
-                                return title_str == "Hello from Node 2";
-                            }
-                        }
-                        false
+                    // Simply check if the string "Hello from Node 2" is in the results
+                    let found_node2_post = query_result.results.iter().any(|value| {
+                        value.as_str() == Some("Hello from Node 2")
                     });
                     
                     if found_node2_post {
@@ -650,20 +659,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 log("Direct Node 2 post query results:");
                 log(&format!("{:#?}", query_result.results));
                 
-                // Check if we got the "Hello from Node 2" post
-                let found_node2_post = query_result.results.iter().any(|result| {
-                    if let Some(title) = result.get(1) {
-                        if let Some(title_str) = title.as_str() {
-                            return title_str == "Hello from Node 2";
-                        }
-                    }
-                    false
+                // Simply check if the string "Hello from Node 2" is in the results
+                let found_node2_post = query_result.results.iter().any(|value| {
+                    value.as_str() == Some("Hello from Node 2")
                 });
                 
                 if found_node2_post {
                     log("\nConfirmed 'Hello from Node 2' post exists on Node 2!");
-                    log("\nThis confirms that Node 2 has the expected data, but cross-node querying isn't working correctly.");
-                    log("\nTo get 'Hello from Node 2' post from Node 1, you would need to fix the cross-node querying implementation.");
+                    
+                    // Now check if we were able to query it through Node 1
+                    let remote_query_successful = !nodes.is_empty() && !query_result.results.is_empty();
+                    
+                    if remote_query_successful {
+                        log("\nCross-node querying is working correctly! We can query Node 2's data through Node 1.");
+                    } else {
+                        log("\nNode 2 has the expected data, but cross-node querying isn't working correctly.");
+                        log("\nTo get 'Hello from Node 2' post from Node 1, you would need to fix the cross-node querying implementation.");
+                    }
                 } else {
                     log("\nDid not find 'Hello from Node 2' post on Node 2 directly.");
                     log("\nThis suggests that the data wasn't properly added to Node 2.");

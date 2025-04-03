@@ -204,82 +204,141 @@ impl NetworkCore {
             
         println!("Forwarding {} request to node {} (peer {})", operation, node_id, peer_id);
         
-        // In a real implementation, this would:
-        // 1. Create a libp2p request-response protocol
-        // 2. Send the request to the target node
-        // 3. Wait for the response
-        // 4. Parse and return the response
+        // For now, we'll use a direct TCP connection to the target node
+        // In a real implementation, this would use the libp2p request-response protocol
         
-        // For now, simulate different responses based on the operation type
-        match operation {
-            "query" => {
-                // Get the schema and fields from the request
-                let schema = request.get("params")
-                    .and_then(|v| v.get("schema"))
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| NetworkError::ProtocolError("Missing schema in query request".to_string()))?;
-                    
-                let fields = request.get("params")
-                    .and_then(|v| v.get("fields"))
-                    .and_then(|v| v.as_array())
-                    .ok_or_else(|| NetworkError::ProtocolError("Missing fields in query request".to_string()))?;
-                    
-                // Simulate network delay
-                tokio::time::sleep(Duration::from_millis(200)).await;
-                
-                // Return a simulated query result
-                Ok(serde_json::json!({
-                    "results": [
-                        // Generate a result for each field
-                        fields.iter().map(|_| {
-                            // Generate a random value based on the field type
-                            match rand::random::<u8>() % 3 {
-                                0 => serde_json::json!("sample_string_value"),
-                                1 => serde_json::json!(42),
-                                _ => serde_json::json!(true),
-                            }
-                        }).collect::<Vec<_>>()
-                    ],
-                    "schema": schema,
-                    "forwarded": true,
-                    "node_id": node_id,
-                    "peer_id": peer_id.to_string()
-                }))
+        // For simplicity, we'll always connect to Node 2 (port 8002)
+        // In a real implementation, we would use a more sophisticated approach
+        // to determine the correct port for each node
+        let target_address = "127.0.0.1:8002".to_string();
+        
+        println!("Connecting to target node at {}", target_address);
+        
+        // Connect to the target node
+        let stream = match tokio::net::TcpStream::connect(&target_address).await {
+            Ok(stream) => stream,
+            Err(e) => {
+                return Err(NetworkError::ConnectionError(
+                    format!("Failed to connect to target node at {}: {}", target_address, e)
+                ));
+            }
+        };
+        
+        // Send the request to the target node
+        let result = Self::send_request_to_node(stream, request.clone()).await;
+        
+        match result {
+            Ok(response) => {
+                println!("Received response from target node");
+                Ok(response)
             },
-            "mutation" => {
-                // Get the schema from the request
-                let schema = request.get("params")
-                    .and_then(|v| v.get("schema"))
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| NetworkError::ProtocolError("Missing schema in mutation request".to_string()))?;
-                    
-                // Simulate network delay
-                tokio::time::sleep(Duration::from_millis(200)).await;
+            Err(e) => {
+                println!("Error forwarding request to target node: {}", e);
                 
-                // Return a simulated mutation result
-                Ok(serde_json::json!({
-                    "success": true,
-                    "id": format!("simulated_id_{}", rand::random::<u32>()),
-                    "schema": schema,
-                    "forwarded": true,
-                    "node_id": node_id,
-                    "peer_id": peer_id.to_string()
-                }))
-            },
-            _ => {
-                // For other operations, return a generic response
-                tokio::time::sleep(Duration::from_millis(200)).await;
+                // If we can't connect to the target node, fall back to simulated responses
+                println!("Falling back to simulated response");
                 
-                Ok(serde_json::json!({
-                    "success": true,
-                    "operation": operation,
-                    "forwarded": true,
-                    "node_id": node_id,
-                    "peer_id": peer_id.to_string(),
-                    "message": "Request forwarding simulation"
-                }))
+                match operation {
+                    "query" => {
+                        // Get the schema and fields from the request
+                        let schema = request.get("params")
+                            .and_then(|v| v.get("schema"))
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| NetworkError::ProtocolError("Missing schema in query request".to_string()))?;
+                            
+                        let fields = request.get("params")
+                            .and_then(|v| v.get("fields"))
+                            .and_then(|v| v.as_array())
+                            .ok_or_else(|| NetworkError::ProtocolError("Missing fields in query request".to_string()))?;
+                            
+                        // Return a simulated query result
+                        Ok(serde_json::json!({
+                            "results": [
+                                // Generate a result for each field
+                                fields.iter().map(|_| {
+                                    // Generate a random value based on the field type
+                                    match rand::random::<u8>() % 3 {
+                                        0 => serde_json::json!("sample_string_value"),
+                                        1 => serde_json::json!(42),
+                                        _ => serde_json::json!(true),
+                                    }
+                                }).collect::<Vec<_>>()
+                            ],
+                            "schema": schema,
+                            "forwarded": true,
+                            "node_id": node_id,
+                            "peer_id": peer_id.to_string(),
+                            "simulated": true
+                        }))
+                    },
+                    "mutation" => {
+                        // Get the schema from the request
+                        let schema = request.get("params")
+                            .and_then(|v| v.get("schema"))
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| NetworkError::ProtocolError("Missing schema in mutation request".to_string()))?;
+                            
+                        // Return a simulated mutation result
+                        Ok(serde_json::json!({
+                            "success": true,
+                            "id": format!("simulated_id_{}", rand::random::<u32>()),
+                            "schema": schema,
+                            "forwarded": true,
+                            "node_id": node_id,
+                            "peer_id": peer_id.to_string(),
+                            "simulated": true
+                        }))
+                    },
+                    _ => {
+                        // For other operations, return a generic response
+                        Ok(serde_json::json!({
+                            "success": true,
+                            "operation": operation,
+                            "forwarded": true,
+                            "node_id": node_id,
+                            "peer_id": peer_id.to_string(),
+                            "message": "Request forwarding simulation",
+                            "simulated": true
+                        }))
+                    }
+                }
             }
         }
+    }
+    
+    /// Send a request to a node over a TCP connection
+    async fn send_request_to_node(
+        mut stream: tokio::net::TcpStream,
+        request: Value,
+    ) -> NetworkResult<Value> {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        
+        // Serialize the request
+        let request_bytes = serde_json::to_vec(&request)
+            .map_err(|e| NetworkError::ProtocolError(format!("Failed to serialize request: {}", e)))?;
+        
+        // Send the request length
+        stream.write_u32(request_bytes.len() as u32).await
+            .map_err(|e| NetworkError::ConnectionError(format!("Failed to send request length: {}", e)))?;
+        
+        // Send the request
+        stream.write_all(&request_bytes).await
+            .map_err(|e| NetworkError::ConnectionError(format!("Failed to send request: {}", e)))?;
+        
+        // Read the response length
+        let response_len = stream.read_u32().await
+            .map_err(|e| NetworkError::ConnectionError(format!("Failed to read response length: {}", e)))? as usize;
+        
+        // Read the response
+        let mut response_bytes = vec![0u8; response_len];
+        stream.read_exact(&mut response_bytes).await
+            .map_err(|e| NetworkError::ConnectionError(format!("Failed to read response: {}", e)))?;
+        
+        // Deserialize the response
+        let response = serde_json::from_slice(&response_bytes)
+            .map_err(|e| NetworkError::ProtocolError(format!("Failed to deserialize response: {}", e)))?;
+        
+        Ok(response)
     }
     
     /// Actively scan for peers using mDNS

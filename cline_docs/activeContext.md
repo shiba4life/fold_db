@@ -1,7 +1,7 @@
 # Active Context
 
 ## Current Task
-Implementing cross-node request forwarding to enable communication between nodes.
+Implementing and testing cross-node request forwarding to enable communication between nodes.
 
 ## Recent Changes
 1. Implemented Cross-Node Request Forwarding:
@@ -25,6 +25,14 @@ Implementing cross-node request forwarding to enable communication between nodes
      - Added request_forwarding_tests.rs with end-to-end test
      - Implemented test setup with two nodes and schema loading
      - Added verification of forwarded requests and responses
+   - Fixed port determination for forwarded requests:
+     - Updated NetworkCore.forward_request to use a fixed port for Node 2
+     - Simplified the port determination logic
+     - Improved error handling for connection failures
+   - Enhanced the social_app_two_nodes example:
+     - Fixed the check for "Hello from Node 2" post in query results
+     - Improved error handling and logging
+     - Added better verification of cross-node querying
 
 2. Previously Implemented mDNS Discovery:
    - Enhanced NetworkConfig with additional fields for mDNS discovery

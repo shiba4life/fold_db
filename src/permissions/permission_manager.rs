@@ -50,13 +50,10 @@ impl PermissionManager {
         // Check trust distance first
         let trust_allowed = match permissions_policy.read_policy {
             TrustDistance::NoRequirement => {
-                eprintln!("No distance requirement for {pub_key}");
                 true
             }
             TrustDistance::Distance(required_distance) => {
-                let allowed = trust_distance <= required_distance;
-                eprintln!("Trust distance check for {pub_key}: {trust_distance} <= {required_distance} = {allowed}");
-                allowed
+                trust_distance <= required_distance
             }
         };
 
@@ -103,6 +100,7 @@ impl PermissionManager {
     /// 
     /// true if access should be granted, false otherwise
     #[must_use]
+    #[allow(clippy::let_and_return)]
     pub fn has_write_permission(
         &self,
         pub_key: &str,
@@ -112,13 +110,13 @@ impl PermissionManager {
         // Check trust distance first
         let trust_allowed = match permissions_policy.write_policy {
             TrustDistance::NoRequirement => {
-                eprintln!("No distance requirement for {pub_key}");
                 true
             }
             TrustDistance::Distance(required_distance) => {
-                let allowed = trust_distance <= required_distance;
-                eprintln!("Trust distance check for {pub_key}: {trust_distance} <= {required_distance} = {allowed}");
-                allowed
+                // Calculate result and print it before returning
+                let result = trust_distance <= required_distance;
+                eprintln!("Trust distance check for {pub_key}: {trust_distance} <= {required_distance} = {result}");
+                result
             }
         };
 

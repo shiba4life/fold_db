@@ -89,6 +89,9 @@ async fn test_request_forwarding() {
         network2.register_node_id(&node1_id, node1_peer_id);
     }
     
+    // Wait a moment to ensure both nodes are fully registered
+    sleep(Duration::from_millis(500)).await;
+    
     // Create a test schema on node2
     let test_schema = json!({
         "name": "test_schema",
