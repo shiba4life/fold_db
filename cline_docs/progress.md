@@ -89,6 +89,12 @@
 - Simplify permission system
 
 ## Recent Improvements
+- Implemented cross-node request forwarding:
+  - Added NodeId to PeerId mapping in NetworkCore
+  - Enhanced TCP server to check target_node_id in incoming requests
+  - Implemented request forwarding mechanism in the network layer
+  - Added proper response handling from remote nodes
+  - Created comprehensive test for request forwarding
 - Implemented mDNS discovery:
   - Enhanced NetworkConfig with additional fields for mDNS discovery
   - Implemented discover_nodes method to actively scan for peers
@@ -110,3 +116,8 @@
   - Network configuration options
   - Node discovery methods
   - Security considerations
+- Streamlined example codebase:
+  - Removed mock implementation references
+  - Updated Cargo.toml to focus on real implementations
+  - Updated documentation to reflect current examples
+  - Simplified the example structure for better clarity

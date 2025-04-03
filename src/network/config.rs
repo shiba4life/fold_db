@@ -30,9 +30,9 @@ impl Default for NetworkConfig {
             max_connections: 50,
             keep_alive_interval: 20,
             max_message_size: 1_000_000, // 1MB
-            discovery_port: 0, // 0 means use a random port
+            discovery_port: 5353, // Standard mDNS port
             connection_timeout: std::time::Duration::from_secs(30),
-            announcement_interval: std::time::Duration::from_secs(60),
+            announcement_interval: std::time::Duration::from_secs(30), // More frequent announcements
         }
     }
 }

@@ -7,9 +7,8 @@ This directory contains examples of social applications built on top of the Data
 1. `social_app_example.rs` - A simulated social app example that demonstrates the SDK's capabilities without requiring a running node.
 2. `social_app_example_real.rs` - A social app example that connects to a real DataFold node, but uses simulated data.
 3. `social_app_real.rs` - A fully functional social app example that connects to a real DataFold node and uses real data.
-4. `social_app_mock.rs` - A simplified example that uses the mock implementation for testing.
-5. `social_app_simple.rs` - A minimal example that demonstrates the basic usage of the SDK.
-6. `social_app_tcp.rs` - An example that uses a TCP connection to connect to a real DataFold node.
+4. `social_app_simple.rs` - A minimal example that demonstrates the basic usage of the SDK.
+5. `social_app_tcp.rs` - An example that uses a TCP connection to connect to a real DataFold node.
 
 ## Running the Examples
 

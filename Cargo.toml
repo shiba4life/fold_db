@@ -44,24 +44,12 @@ fold_db = { path = ".", features = ["test-utils"] }  # Enable test-utils for tes
 reqwest = { version = "0.11", features = ["json"] }
 
 [[example]]
-name = "social_app_example"
-path = "examples/social_app_example.rs"
+name = "social_app_tcp"
+path = "examples/social_app_tcp.rs"
 
 [[example]]
-name = "social_app_example_real"
-path = "examples/social_app_example_real.rs"
-
-[[example]]
-name = "social_app_real"
-path = "examples/social_app_real.rs"
-
-[[example]]
-name = "social_app_mock"
-path = "examples/social_app_mock.rs"
-
-[[example]]
-name = "social_app_simple"
-path = "examples/social_app_simple.rs"
+name = "social_app_two_nodes"
+path = "examples/social_app_two_nodes.rs"
 
 
 [lib]

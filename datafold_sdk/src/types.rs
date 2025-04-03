@@ -243,12 +243,80 @@ impl QueryFilter {
 }
 
 /// Result of a query operation
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct QueryResult {
     /// Results of the query
     pub results: Vec<Value>,
     /// Errors that occurred during the query
     pub errors: Vec<String>,
+}
+
+impl<'de> Deserialize<'de> for QueryResult {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // Define a helper struct for standard deserialization
+        #[derive(Deserialize)]
+        struct StandardQueryResult {
+            results: Vec<Value>,
+            errors: Vec<String>,
+        }
+        
+        // Define a helper struct for map-based deserialization
+        #[derive(Deserialize)]
+        struct MapQueryResult {
+            results: HashMap<String, Value>,
+            errors: Vec<String>,
+        }
+        
+        // Try to deserialize as a standard result first
+        let result = serde_json::Value::deserialize(deserializer)?;
+        
+        if let Ok(standard) = serde_json::from_value::<StandardQueryResult>(result.clone()) {
+            // Standard format with array results
+            return Ok(QueryResult {
+                results: standard.results,
+                errors: standard.errors,
+            });
+        } else if let Ok(map_result) = serde_json::from_value::<MapQueryResult>(result) {
+            // Map format - convert to array
+            let results = map_result.results
+                .into_iter()
+                .map(|(_, value)| value)
+                .collect();
+            
+            return Ok(QueryResult {
+                results,
+                errors: map_result.errors,
+            });
+        }
+        
+        // If both formats fail, return an error
+        Err(serde::de::Error::custom("Failed to deserialize QueryResult"))
+    }
+}
+
+impl Serialize for QueryResult {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Define a helper struct for serialization
+        #[derive(Serialize)]
+        struct SerializeHelper<'a> {
+            results: &'a Vec<Value>,
+            errors: &'a Vec<String>,
+        }
+        
+        // Use the helper to serialize
+        let helper = SerializeHelper {
+            results: &self.results,
+            errors: &self.errors,
+        };
+        
+        helper.serialize(serializer)
+    }
 }
 
 /// Result of a mutation operation

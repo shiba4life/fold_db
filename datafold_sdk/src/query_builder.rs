@@ -97,8 +97,43 @@ impl QueryBuilder {
     /// Send a request to the node
     async fn send_request(&self, request: AppRequest) -> AppSdkResult<QueryResult> {
         let response = NetworkUtils::send_request(&self.connection, request).await?;
-        let result: QueryResult = serde_json::from_value(response)?;
-        Ok(result)
+        
+        // Check if the response is an array directly (common case)
+        if let Some(array) = response.as_array() {
+            return Ok(QueryResult {
+                results: array.clone(),
+                errors: Vec::new(),
+            });
+        }
+        
+        // Try to deserialize the response as a standard QueryResult
+        match serde_json::from_value::<QueryResult>(response.clone()) {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                // Try to extract results from the response directly
+                if let Some(results) = response.get("results") {
+                    if let Some(results_array) = results.as_array() {
+                        return Ok(QueryResult {
+                            results: results_array.clone(),
+                            errors: Vec::new(),
+                        });
+                    } else if let Some(results_obj) = results.as_object() {
+                        let results_vec: Vec<Value> = results_obj
+                            .iter()
+                            .map(|(_, v)| v.clone())
+                            .collect();
+                        
+                        return Ok(QueryResult {
+                            results: results_vec,
+                            errors: Vec::new(),
+                        });
+                    }
+                }
+                
+                // If all else fails, return the original error
+                Err(AppSdkError::Serialization(format!("Failed to deserialize QueryResult: {}", e)))
+            }
+        }
     }
 }
 

@@ -6,6 +6,7 @@ The DataFold SDK is a client library for interacting with DataFold nodes. It pro
 
 - **Client API**: High-level API for interacting with DataFold nodes
 - **Query and Mutation Builders**: Fluent API for building and executing queries and mutations
+- **Schema Management**: Create, update, and delete schemas with a fluent builder API
 - **Schema Discovery**: Discover available schemas on local and remote nodes
 - **Network Management**: Discover and interact with remote nodes
 - **Container Management**: Manage containerized applications with various isolation mechanisms
@@ -48,6 +49,69 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     
     println!("Mutation result: {:?}", result);
+    
+    Ok(())
+}
+```
+
+### Schema Management
+
+```rust
+use datafold_sdk::{DataFoldClient, SchemaBuilder, FieldType, TrustDistance};
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create a client
+    let client = DataFoldClient::new("my-app", "private-key", "public-key");
+    
+    // Create a schema using the builder
+    let schema = client.schema_builder("user_profile")
+        .add_field("username", |field| {
+            field.field_type(FieldType::Single)
+                .required(true)
+                .description("User's unique username")
+                .permissions(
+                    TrustDistance::Distance(0), // Public read
+                    TrustDistance::Distance(1)  // Owner-only write
+                )
+        })
+        .add_field("email", |field| {
+            field.field_type(FieldType::Single)
+                .required(true)
+                .description("User's email address")
+                .validation(json!({
+                    "format": "email"
+                }))
+        })
+        .add_field("posts", |field| {
+            field.field_type(FieldType::Collection)
+                .required(false)
+                .description("User's posts")
+        })
+        .build()?;
+    
+    // Create the schema on the node
+    client.create_schema(schema).await?;
+    
+    // Get schema details
+    let details = client.get_schema_details("user_profile", None).await?;
+    println!("Schema details: {}", details);
+    
+    // Update the schema (add a new field)
+    let updated_schema = client.schema_builder("user_profile")
+        // Include existing fields...
+        .add_field("bio", |field| {
+            field.field_type(FieldType::Single)
+                .required(false)
+                .description("User's biography")
+        })
+        .build()?;
+    
+    client.update_schema(updated_schema).await?;
+    
+    // Delete a schema
+    client.delete_schema("unused_schema").await?;
     
     Ok(())
 }

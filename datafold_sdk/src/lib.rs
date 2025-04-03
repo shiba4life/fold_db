@@ -14,6 +14,8 @@ pub mod network_manager;
 pub mod network_utils;
 #[cfg(any(test, feature = "mock"))]
 pub mod network_mock;
+pub mod schema;
+pub mod schema_builder;
 pub mod schema_discovery;
 pub mod types;
 
@@ -29,6 +31,8 @@ pub use network_manager::NetworkManager;
 pub use network_utils::NetworkUtils;
 #[cfg(any(test, feature = "mock"))]
 pub use network_mock::NetworkMock;
+pub use schema::*;
+pub use schema_builder::SchemaBuilder;
 pub use schema_discovery::SchemaDiscovery;
 pub use types::{
     AppRequest, AppChannel, NodeConnection, AuthCredentials, SchemaCache, 

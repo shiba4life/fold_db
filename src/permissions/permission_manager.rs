@@ -62,7 +62,6 @@ impl PermissionManager {
 
         // If trust distance check passes, allow access
         if trust_allowed {
-            eprintln!("Trust distance check passed for {pub_key}");
             return true;
         }
 
@@ -125,7 +124,6 @@ impl PermissionManager {
 
         // If trust distance check passes, allow access
         if trust_allowed {
-            eprintln!("Trust distance check passed for {pub_key}");
             return true;
         }
 

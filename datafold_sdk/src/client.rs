@@ -11,6 +11,8 @@ use crate::mutation_builder::MutationBuilder;
 use crate::network_manager::NetworkManager;
 use crate::network_utils::NetworkUtils;
 use crate::schema_discovery::SchemaDiscovery;
+use crate::schema::Schema;
+use crate::schema_builder::SchemaBuilder;
 
 /// Main client for interacting with the DataFold network
 #[derive(Debug, Clone)]
@@ -173,6 +175,169 @@ impl DataFoldClient {
         node_id: Option<&str>,
     ) -> AppSdkResult<Value> {
         self.schema_discovery.get_schema_details(schema_name, node_id).await
+    }
+
+    /// Create a new schema on the local node
+    /// 
+    /// This method creates a new schema with the specified configuration.
+    /// It uses the SchemaBuilder to construct the schema with the provided
+    /// fields, permissions, and payment configurations.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema` - The schema to create
+    /// 
+    /// # Returns
+    /// 
+    /// A Result indicating success or failure
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use datafold_sdk::schema_builder::SchemaBuilder;
+    /// use datafold_sdk::schema::FieldType;
+    /// 
+    /// let client = DataFoldClient::new("app_id", "private_key", "public_key");
+    /// 
+    /// let schema = SchemaBuilder::new("user_profile")
+    ///     .add_field("username", |field| {
+    ///         field.field_type(FieldType::Single)
+    ///             .required(true)
+    ///             .description("User's unique username")
+    ///     })
+    ///     .add_field("email", |field| {
+    ///         field.field_type(FieldType::Single)
+    ///             .required(true)
+    ///             .description("User's email address")
+    ///     })
+    ///     .build()?;
+    /// 
+    /// client.create_schema(schema).await?;
+    /// ```
+    pub async fn create_schema(&self, schema: Schema) -> AppSdkResult<()> {
+        // Create the request
+        let request = AppRequest::new(
+            &self.auth.app_id,
+            None,
+            "create_schema",
+            serde_json::json!({
+                "schema": schema,
+            }),
+            &self.auth.private_key,
+        );
+
+        // Send the request
+        let _response = self.send_request(request).await?;
+        
+        // Clear the schema cache
+        let mut cache = self.schema_cache.lock().await;
+        cache.clear();
+        
+        Ok(())
+    }
+
+    /// Update an existing schema on the local node
+    /// 
+    /// This method updates an existing schema with the specified configuration.
+    /// It allows modifying the schema's fields, permissions, and payment configurations.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema` - The updated schema
+    /// 
+    /// # Returns
+    /// 
+    /// A Result indicating success or failure
+    pub async fn update_schema(&self, schema: Schema) -> AppSdkResult<()> {
+        // Create the request
+        let request = AppRequest::new(
+            &self.auth.app_id,
+            None,
+            "update_schema",
+            serde_json::json!({
+                "schema": schema,
+            }),
+            &self.auth.private_key,
+        );
+
+        // Send the request
+        let _response = self.send_request(request).await?;
+        
+        // Clear the schema cache
+        let mut cache = self.schema_cache.lock().await;
+        cache.clear();
+        
+        Ok(())
+    }
+
+    /// Delete a schema from the local node
+    /// 
+    /// This method deletes a schema with the specified name.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema_name` - Name of the schema to delete
+    /// 
+    /// # Returns
+    /// 
+    /// A Result indicating success or failure
+    pub async fn delete_schema(&self, schema_name: &str) -> AppSdkResult<()> {
+        // Create the request
+        let request = AppRequest::new(
+            &self.auth.app_id,
+            None,
+            "delete_schema",
+            serde_json::json!({
+                "schema_name": schema_name,
+            }),
+            &self.auth.private_key,
+        );
+
+        // Send the request
+        let _response = self.send_request(request).await?;
+        
+        // Clear the schema cache
+        let mut cache = self.schema_cache.lock().await;
+        cache.clear();
+        
+        Ok(())
+    }
+
+    /// Get a schema builder for creating a new schema
+    /// 
+    /// This method returns a SchemaBuilder for constructing a new schema
+    /// with fields, permissions, and payment configurations.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `schema_name` - Name of the schema to create
+    /// 
+    /// # Returns
+    /// 
+    /// A SchemaBuilder instance
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// let client = DataFoldClient::new("app_id", "private_key", "public_key");
+    /// 
+    /// let schema = client.schema_builder("user_profile")
+    ///     .add_field("username", |field| {
+    ///         field.field_type(FieldType::Single)
+    ///             .required(true)
+    ///             .description("User's unique username")
+    ///     })
+    ///     .add_field("email", |field| {
+    ///         field.field_type(FieldType::Single)
+    ///             .required(true)
+    ///             .description("User's email address")
+    ///     })
+    ///     .build()?;
+    /// 
+    /// client.create_schema(schema).await?;
+    /// ```
+    pub fn schema_builder(&self, schema_name: &str) -> SchemaBuilder {
+        SchemaBuilder::new(schema_name)
     }
 
     /// Check if a node is available

@@ -3,10 +3,9 @@ use crate::network::error::{NetworkError, NetworkResult};
 use crate::network::schema_protocol::SCHEMA_PROTOCOL_NAME;
 use crate::network::schema_service::SchemaService;
 use libp2p::PeerId;
-#[cfg(test)]
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
+use serde_json::Value;
 
 /// Core network component for P2P communication
 pub struct NetworkCore {
@@ -21,6 +20,10 @@ pub struct NetworkCore {
     request_timeout: u64,
     /// Network configuration
     config: NetworkConfig,
+    /// Mapping from node IDs (UUIDs) to peer IDs
+    node_to_peer_map: HashMap<String, PeerId>,
+    /// Mapping from peer IDs to node IDs (UUIDs)
+    peer_to_node_map: HashMap<PeerId, String>,
     /// Mock for testing - maps peer IDs to schema services
     #[cfg(test)]
     mock_peers: HashMap<PeerId, SchemaService>,
@@ -38,9 +41,27 @@ impl NetworkCore {
             known_peers: HashSet::new(),
             request_timeout: config.request_timeout,
             config,
+            node_to_peer_map: HashMap::new(),
+            peer_to_node_map: HashMap::new(),
             #[cfg(test)]
             mock_peers: HashMap::new(),
         })
+    }
+    
+    /// Register a node ID with a peer ID
+    pub fn register_node_id(&mut self, node_id: &str, peer_id: PeerId) {
+        self.node_to_peer_map.insert(node_id.to_string(), peer_id);
+        self.peer_to_node_map.insert(peer_id, node_id.to_string());
+    }
+    
+    /// Get the peer ID for a node ID
+    pub fn get_peer_id_for_node(&self, node_id: &str) -> Option<PeerId> {
+        self.node_to_peer_map.get(node_id).cloned()
+    }
+    
+    /// Get the node ID for a peer ID
+    pub fn get_node_id_for_peer(&self, peer_id: &PeerId) -> Option<String> {
+        self.peer_to_node_map.get(peer_id).cloned()
     }
 
     /// Get the local peer ID
@@ -159,6 +180,106 @@ impl NetworkCore {
     /// Get the set of known peers
     pub fn known_peers(&self) -> &HashSet<PeerId> {
         &self.known_peers
+    }
+    
+    /// Forward a request to another node
+    pub async fn forward_request(
+        &mut self,
+        peer_id: PeerId,
+        request: Value,
+    ) -> NetworkResult<Value> {
+        // Check if the peer is known
+        if !self.known_peers.contains(&peer_id) {
+            return Err(NetworkError::ConnectionError(format!("Peer not found: {}", peer_id)));
+        }
+        
+        // Get the operation type from the request
+        let operation = request.get("operation")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| NetworkError::ProtocolError("Missing operation in request".to_string()))?;
+            
+        // Get the node ID for this peer if available
+        let node_id = self.get_node_id_for_peer(&peer_id)
+            .unwrap_or_else(|| peer_id.to_string());
+            
+        println!("Forwarding {} request to node {} (peer {})", operation, node_id, peer_id);
+        
+        // In a real implementation, this would:
+        // 1. Create a libp2p request-response protocol
+        // 2. Send the request to the target node
+        // 3. Wait for the response
+        // 4. Parse and return the response
+        
+        // For now, simulate different responses based on the operation type
+        match operation {
+            "query" => {
+                // Get the schema and fields from the request
+                let schema = request.get("params")
+                    .and_then(|v| v.get("schema"))
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| NetworkError::ProtocolError("Missing schema in query request".to_string()))?;
+                    
+                let fields = request.get("params")
+                    .and_then(|v| v.get("fields"))
+                    .and_then(|v| v.as_array())
+                    .ok_or_else(|| NetworkError::ProtocolError("Missing fields in query request".to_string()))?;
+                    
+                // Simulate network delay
+                tokio::time::sleep(Duration::from_millis(200)).await;
+                
+                // Return a simulated query result
+                Ok(serde_json::json!({
+                    "results": [
+                        // Generate a result for each field
+                        fields.iter().map(|_| {
+                            // Generate a random value based on the field type
+                            match rand::random::<u8>() % 3 {
+                                0 => serde_json::json!("sample_string_value"),
+                                1 => serde_json::json!(42),
+                                _ => serde_json::json!(true),
+                            }
+                        }).collect::<Vec<_>>()
+                    ],
+                    "schema": schema,
+                    "forwarded": true,
+                    "node_id": node_id,
+                    "peer_id": peer_id.to_string()
+                }))
+            },
+            "mutation" => {
+                // Get the schema from the request
+                let schema = request.get("params")
+                    .and_then(|v| v.get("schema"))
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| NetworkError::ProtocolError("Missing schema in mutation request".to_string()))?;
+                    
+                // Simulate network delay
+                tokio::time::sleep(Duration::from_millis(200)).await;
+                
+                // Return a simulated mutation result
+                Ok(serde_json::json!({
+                    "success": true,
+                    "id": format!("simulated_id_{}", rand::random::<u32>()),
+                    "schema": schema,
+                    "forwarded": true,
+                    "node_id": node_id,
+                    "peer_id": peer_id.to_string()
+                }))
+            },
+            _ => {
+                // For other operations, return a generic response
+                tokio::time::sleep(Duration::from_millis(200)).await;
+                
+                Ok(serde_json::json!({
+                    "success": true,
+                    "operation": operation,
+                    "forwarded": true,
+                    "node_id": node_id,
+                    "peer_id": peer_id.to_string(),
+                    "message": "Request forwarding simulation"
+                }))
+            }
+        }
     }
     
     /// Actively scan for peers using mDNS

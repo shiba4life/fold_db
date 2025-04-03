@@ -217,9 +217,8 @@ let client = DataFoldClient::with_connection(
 
 See the following examples for complete usage of the SDK:
 
-- [social_app_example.rs](examples/social_app_example.rs) - A simulated social app example
-- [social_app_real.rs](examples/social_app_real.rs) - A real social app example using Unix sockets
-- [social_app_mock.rs](examples/social_app_mock.rs) - A social app example using mock connections
+- [social_app_tcp.rs](examples/social_app_tcp.rs) - A social app example using TCP connections
+- [social_app_two_nodes.rs](examples/social_app_two_nodes.rs) - A social app example demonstrating communication between two nodes
 
 For a complete example of a social app using TCP connections, see the [social_app_example](social_app_example/) crate.
 

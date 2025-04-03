@@ -16,12 +16,20 @@ pub struct NetworkCore {
     schema_service: SchemaService,
     // Known peers
     known_peers: HashSet<PeerId>,
+    // Mapping from node IDs (UUIDs) to peer IDs
+    node_to_peer_map: HashMap<String, PeerId>,
+    // Mapping from peer IDs to node IDs (UUIDs)
+    peer_to_node_map: HashMap<PeerId, String>,
 }
 
 impl NetworkCore {
     pub async fn new(config: NetworkConfig) -> NetworkResult<Self>;
     pub async fn run(&mut self, listen_address: &str) -> NetworkResult<()>;
     pub async fn check_schemas(&mut self, peer_id: PeerId, schema_names: Vec<String>) -> NetworkResult<Vec<String>>;
+    pub async fn forward_request(&mut self, peer_id: PeerId, request: Value) -> NetworkResult<Value>;
+    pub fn register_node_id(&mut self, node_id: &str, peer_id: PeerId);
+    pub fn get_peer_id_for_node(&self, node_id: &str) -> Option<PeerId>;
+    pub fn get_node_id_for_peer(&self, peer_id: &PeerId) -> Option<String>;
 }
 ```
 
@@ -114,6 +122,9 @@ impl DataFoldNode {
         peer_id_str: &str,
         schema_names: Vec<String>,
     ) -> FoldDbResult<Vec<String>>;
+    
+    // Forward a request to another node
+    pub async fn forward_request(&self, peer_id: PeerId, request: Value) -> FoldDbResult<Value>;
 }
 ```
 
@@ -143,6 +154,22 @@ The mDNS discovery process works as follows:
 1. libp2p Noise protocol handles secure connection setup
 2. Automatic multiplexing through yamux
 3. Begin request-response protocol
+
+### Request Forwarding Process
+1. Client sends a request to Node A with a target_node_id field
+2. Node A checks if the target_node_id matches its own node ID
+3. If not, Node A looks up the PeerId for the target_node_id
+4. Node A forwards the request to the target node using the network layer
+5. Target node processes the request and sends a response
+6. Node A receives the response and forwards it back to the client
+
+### NodeId to PeerId Mapping
+1. Each node has a unique NodeId (UUID) and PeerId (libp2p peer ID)
+2. When a node initializes its network layer, it registers its NodeId with its PeerId
+3. When nodes discover each other, they exchange NodeIds and PeerIds
+4. The mapping is stored in node_to_peer_map and peer_to_node_map
+5. When forwarding a request, the system looks up the PeerId for the target NodeId
+6. If the mapping doesn't exist, fallback mechanisms are used
 
 ### Schema Availability Check Flow
 1. Node A discovers Node B through mDNS
@@ -213,12 +240,13 @@ The network layer takes advantage of libp2p's built-in concurrency guarantees:
 7. Edge case validation
 
 ## Future Enhancements
-1. Kademlia DHT for wider peer discovery
-2. WebRTC transport support
-3. Custom protocol handlers for specialized operations
-4. Node reputation tracking
-5. Advanced request validation
-6. Cross-network bridging capabilities
+1. Implement real request forwarding using libp2p request-response protocol
+2. Kademlia DHT for wider peer discovery
+3. WebRTC transport support
+4. Custom protocol handlers for specialized operations
+5. Node reputation tracking
+6. Advanced request validation
+7. Cross-network bridging capabilities
 
 ## Benefits of libp2p Implementation
 1. Reduced code complexity

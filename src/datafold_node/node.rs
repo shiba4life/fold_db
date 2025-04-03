@@ -249,6 +249,11 @@ impl DataFoldNode {
                 .collect()
         });
         
+        // Register the node ID with the network core
+        let local_peer_id = network_core.local_peer_id();
+        network_core.register_node_id(&self.node_id, local_peer_id);
+        println!("Registered node ID {} with peer ID {}", self.node_id, local_peer_id);
+        
         // Store the network core
         self.network = Some(Arc::new(tokio::sync::Mutex::new(network_core)));
         
@@ -376,6 +381,31 @@ impl DataFoldNode {
                 .map_err(|e| FoldDbError::Network(e.into()))?;
             
             Ok(result)
+        } else {
+            Err(FoldDbError::Network(NetworkErrorKind::Protocol("Network not initialized".to_string())))
+        }
+    }
+    
+    /// Forward a request to another node
+    pub async fn forward_request(&self, peer_id: PeerId, request: Value) -> FoldDbResult<Value> {
+        if let Some(network) = &self.network {
+            let mut network = network.lock().await;
+            
+            // Get the node ID for this peer if available
+            let node_id = network.get_node_id_for_peer(&peer_id)
+                .unwrap_or_else(|| peer_id.to_string());
+                
+            println!("Forwarding request to node {} (peer {})", node_id, peer_id);
+            
+            // Use the network layer to forward the request
+            let response = network
+                .forward_request(peer_id, request)
+                .await
+                .map_err(|e| FoldDbError::Network(e.into()))?;
+                
+            println!("Received response from node {} (peer {})", node_id, peer_id);
+            
+            Ok(response)
         } else {
             Err(FoldDbError::Network(NetworkErrorKind::Protocol("Network not initialized".to_string())))
         }
