@@ -193,10 +193,12 @@ impl DataFoldClient {
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```no_run
+    /// use datafold_sdk::DataFoldClient;
     /// use datafold_sdk::schema_builder::SchemaBuilder;
     /// use datafold_sdk::schema::FieldType;
     /// 
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = DataFoldClient::new("app_id", "private_key", "public_key");
     /// 
     /// let schema = SchemaBuilder::new("user_profile")
@@ -213,6 +215,8 @@ impl DataFoldClient {
     ///     .build()?;
     /// 
     /// client.create_schema(schema).await?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub async fn create_schema(&self, schema: Schema) -> AppSdkResult<()> {
         // Create the request
@@ -227,7 +231,8 @@ impl DataFoldClient {
         );
 
         // Send the request
-        let _response = self.send_request(request).await?;
+        let response = self.send_request(request).await?;
+        let _ = response; // Acknowledge the response to avoid unused variable warning
         
         // Clear the schema cache
         let mut cache = self.schema_cache.lock().await;
@@ -261,7 +266,8 @@ impl DataFoldClient {
         );
 
         // Send the request
-        let _response = self.send_request(request).await?;
+        let response = self.send_request(request).await?;
+        let _ = response; // Acknowledge the response to avoid unused variable warning
         
         // Clear the schema cache
         let mut cache = self.schema_cache.lock().await;
@@ -294,7 +300,8 @@ impl DataFoldClient {
         );
 
         // Send the request
-        let _response = self.send_request(request).await?;
+        let response = self.send_request(request).await?;
+        let _ = response; // Acknowledge the response to avoid unused variable warning
         
         // Clear the schema cache
         let mut cache = self.schema_cache.lock().await;
@@ -318,7 +325,11 @@ impl DataFoldClient {
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```no_run
+    /// use datafold_sdk::DataFoldClient;
+    /// use datafold_sdk::schema::FieldType;
+    /// 
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = DataFoldClient::new("app_id", "private_key", "public_key");
     /// 
     /// let schema = client.schema_builder("user_profile")
@@ -335,6 +346,8 @@ impl DataFoldClient {
     ///     .build()?;
     /// 
     /// client.create_schema(schema).await?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn schema_builder(&self, schema_name: &str) -> SchemaBuilder {
         SchemaBuilder::new(schema_name)

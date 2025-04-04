@@ -56,7 +56,6 @@ impl IpcServer {
         // Start the request handler task
         let auth_manager = self.auth_manager.clone();
         let node_client = self.node_client.clone();
-        let connections = self.connections.clone();
         let handler_task = tokio::spawn(async move {
             while let Some((request, response_tx)) = rx.recv().await {
                 // Process the request
@@ -73,8 +72,7 @@ impl IpcServer {
         // Start the server for each app
         let apps = {
             let auth_manager = self.auth_manager.clone();
-            let apps = auth_manager.list_apps()?;
-            apps
+            auth_manager.list_apps()?
         };
 
         for app in apps {

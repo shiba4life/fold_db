@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use crate::error::{AppSdkError, AppSdkResult};
 use crate::isolation::{
     NetworkIsolation, MicroVMConfig, LinuxContainerConfig, WasmSandboxConfig,
-    ResourceLimits, MicroVMType, DriveConfig, VsockConfig, SocketPath, MountPoint
+    ResourceLimits
 };
 use crate::permissions::AppPermissions;
 use crate::types::NodeConnection;
@@ -158,12 +158,14 @@ impl SocialAppContainer {
     }
 
     /// Start a Linux container
-    async fn start_linux_container(&mut self, _container_config: &LinuxContainerConfig) -> AppSdkResult<()> {
+    async fn start_linux_container(&mut self, container_config: &LinuxContainerConfig) -> AppSdkResult<()> {
         // In a real implementation, this would start a Linux container using the specified configuration
         // For now, we'll just log that we're starting a Linux container
         println!("Starting Linux container for app {}", self.app_id);
-        // println!("Network namespace: {}", _container_config.network_namespace);
-        // println!("Dropped capabilities: {:?}", _container_config.dropped_capabilities);
+        // Uncomment these lines if you need to use the container_config
+        // println!("Network namespace: {}", container_config.network_namespace);
+        // println!("Dropped capabilities: {:?}", container_config.dropped_capabilities);
+        let _ = container_config; // Acknowledge the parameter to avoid unused variable warning
         
         // Set a dummy process ID
         self.process_id = Some(2000);
@@ -184,12 +186,14 @@ impl SocialAppContainer {
     }
 
     /// Start a WebAssembly sandbox
-    async fn start_wasm_sandbox(&mut self, _wasm_config: &WasmSandboxConfig) -> AppSdkResult<()> {
+    async fn start_wasm_sandbox(&mut self, wasm_config: &WasmSandboxConfig) -> AppSdkResult<()> {
         // In a real implementation, this would start a WebAssembly sandbox using the specified configuration
         // For now, we'll just log that we're starting a WebAssembly sandbox
         println!("Starting WebAssembly sandbox for app {}", self.app_id);
-        // println!("Memory isolation: {}", _wasm_config.memory_isolation);
-        // println!("Allowed imports: {:?}", _wasm_config.allowed_imports);
+        // Uncomment these lines if you need to use the wasm_config
+        // println!("Memory isolation: {}", wasm_config.memory_isolation);
+        // println!("Allowed imports: {:?}", wasm_config.allowed_imports);
+        let _ = wasm_config; // Acknowledge the parameter to avoid unused variable warning
         
         // Set a dummy process ID
         self.process_id = Some(3000);
@@ -364,35 +368,6 @@ pub async fn create_firecracker_vm(
     println!("Creating Firecracker VM for app {}", app_id);
     println!("App binary: {}", app_binary);
     
-    // Create a VM configuration
-    let _vm_config = MicroVMConfig {
-        vm_type: MicroVMType::Firecracker,
-        vcpu_count: 1,
-        memory_mb: 128,
-        network_config: crate::isolation::NetworkConfig::none(),
-        vsock_config: VsockConfig {
-            vsock_id: format!("vsock-{}", app_id),
-            guest_cid: 3,
-            uds_path: format!("/tmp/firecracker-{}.sock", app_id),
-        },
-        kernel_params: vec![
-            "console=ttyS0".to_string(),
-            "reboot=k".to_string(),
-            "panic=1".to_string(),
-            "pci=off".to_string(),
-            "nomodules".to_string(),
-            "ip=none".to_string(),
-        ],
-        root_fs: "/var/lib/datafold/vm-images/minimal-rootfs.ext4".to_string(),
-        additional_drives: vec![
-            DriveConfig {
-                path_on_host: format!("/var/lib/datafold/apps/{}/drive.ext4", app_id),
-                is_read_only: false,
-                is_root_device: false,
-            },
-        ],
-    };
-    
     // Return a dummy VM ID
     Ok(format!("vm-{}", app_id))
 }
@@ -406,31 +381,6 @@ pub async fn create_kata_container(
     // For now, we'll just log that we're creating a container and return a dummy container ID
     println!("Creating Kata container for app {}", app_id);
     println!("App binary: {}", app_binary);
-    
-    // Create a container configuration
-    let _container_config = ContainerConfig {
-        app_binary_path: PathBuf::from(app_binary),
-        isolation_type: IsolationType::MicroVM(MicroVMConfig {
-            vm_type: MicroVMType::KataContainers,
-            vcpu_count: 1,
-            memory_mb: 128,
-            network_config: crate::isolation::NetworkConfig::none(),
-            vsock_config: VsockConfig::default(),
-            kernel_params: vec![
-                "console=ttyS0".to_string(),
-                "reboot=k".to_string(),
-                "panic=1".to_string(),
-                "pci=off".to_string(),
-                "nomodules".to_string(),
-                "ip=none".to_string(),
-            ],
-            root_fs: "/var/lib/datafold/vm-images/minimal-rootfs.ext4".to_string(),
-            additional_drives: vec![],
-        }),
-        env_vars: HashMap::new(),
-        working_dir: PathBuf::from("/app"),
-        args: vec![],
-    };
     
     // Return a dummy container ID
     Ok(format!("container-{}", app_id))
@@ -446,37 +396,6 @@ pub async fn create_isolated_container(
     println!("Creating isolated container for app {}", app_id);
     println!("App binary: {}", app_binary);
     
-    // Create a container configuration
-    let _container_config = ContainerConfig {
-        app_binary_path: PathBuf::from(app_binary),
-        isolation_type: IsolationType::LinuxContainer(LinuxContainerConfig {
-            network_namespace: true,
-            dropped_capabilities: vec![
-                "NET_ADMIN".to_string(),
-                "NET_RAW".to_string(),
-                "NET_BROADCAST".to_string(),
-            ],
-            allowed_sockets: vec![
-                SocketPath {
-                    host_path: format!("/var/run/datafold/app_{}.sock", app_id),
-                    container_path: "/var/run/datafold/node.sock".to_string(),
-                },
-            ],
-            seccomp_filters: vec![],
-            resource_limits: ResourceLimits::default(),
-            mounts: vec![
-                MountPoint {
-                    source: app_binary.to_string(),
-                    target: "/app/binary".to_string(),
-                    read_only: true,
-                },
-            ],
-        }),
-        env_vars: HashMap::new(),
-        working_dir: PathBuf::from("/app"),
-        args: vec![],
-    };
-    
     // Return a dummy container ID
     Ok(format!("container-{}", app_id))
 }
@@ -490,21 +409,6 @@ pub async fn create_wasm_sandbox(
     // For now, we'll just log that we're creating a sandbox and return a dummy sandbox ID
     println!("Creating WebAssembly sandbox for app {}", app_id);
     println!("WASM module size: {} bytes", wasm_module.len());
-    
-    // Create a sandbox configuration
-    let _sandbox_config = WasmSandboxConfig {
-        network_imports: vec![],
-        allowed_imports: vec![
-            "query_local".to_string(),
-            "query_remote".to_string(),
-            "mutate_local".to_string(),
-            "mutate_remote".to_string(),
-            "discover_nodes".to_string(),
-            "discover_schemas".to_string(),
-        ],
-        memory_isolation: true,
-        resource_limits: ResourceLimits::default(),
-    };
     
     // Return a dummy sandbox ID
     Ok(format!("sandbox-{}", app_id))

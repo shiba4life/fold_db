@@ -24,10 +24,11 @@ impl LightningClient for MockLightningClient {
     async fn create_invoice(
         &self,
         amount: u64,
-        _memo: String,
+        memo: String,
         expiry: Duration,
         hold_invoice: bool,
     ) -> Result<LightningPaymentRequest, Error> {
+        let _ = memo; // Acknowledge the parameter to avoid unused variable warning
         // Generate a mock payment hash
         let payment_hash = Uuid::new_v4().to_string();
 
