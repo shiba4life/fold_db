@@ -2,6 +2,7 @@
 /target/
 /datafold_sdk/target/
 /social_app_example/target/
+/fold_client/target/
 **/*.rs.bk
 Cargo.lock
 datafold_sdk/Cargo.lock
