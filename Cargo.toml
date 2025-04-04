@@ -18,6 +18,7 @@ mock = []  # Feature flag for mock network implementation
 [dependencies]
 # SDK
 datafold_sdk = { path = "./datafold_sdk" }
+fold_client = { path = "./fold_client" }
 
 # Cryptography
 ring = "0.16.20"
@@ -56,6 +57,10 @@ path = "examples/social_app_tcp.rs"
 [[example]]
 name = "social_app_two_nodes"
 path = "examples/social_app_two_nodes.rs"
+
+[[example]]
+name = "sandboxed_app_two_nodes"
+path = "examples/sandboxed_app_two_nodes/main.rs"
 
 
 [lib]
