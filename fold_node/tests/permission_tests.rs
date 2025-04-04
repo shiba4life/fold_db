@@ -2,9 +2,10 @@ use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::test_data::test_helpers::operation_builder::{create_mutation, create_query};
-use crate::test_data::test_helpers::schema_builder::{create_field_with_permissions, create_schema_with_fields};
-use crate::test_data::test_helpers::{cleanup_test_db, setup_and_allow_schema, setup_test_db};
+mod test_data;
+use test_data::test_helpers::operation_builder::{create_mutation, create_query};
+use test_data::test_helpers::schema_builder::{create_field_with_permissions, create_schema_with_fields};
+use test_data::test_helpers::{cleanup_test_db, setup_and_allow_schema, setup_test_db};
 
 #[test]
 fn test_permission_based_access() {
@@ -81,7 +82,7 @@ fn test_permission_based_access() {
         .fields
         .iter()
         .cloned()
-        .zip(reader_results.into_iter())
+        .zip(reader_results)
         .collect();
 
     assert!(reader_results.get("public_field").unwrap().is_ok()); // Can read public field
@@ -99,7 +100,7 @@ fn test_permission_based_access() {
         .fields
         .iter()
         .cloned()
-        .zip(unauth_results.into_iter())
+        .zip(unauth_results)
         .collect();
 
     assert!(unauth_results.get("public_field").unwrap().is_ok()); // Can read public field

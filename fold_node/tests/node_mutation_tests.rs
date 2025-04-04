@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use serde_json::json;
 use tempfile::tempdir;
 
-use fold_db::{DataFoldNode, NodeConfig};
-use fold_db::testing::{
+use fold_node::{DataFoldNode, datafold_node::config::NodeConfig};
+use fold_node::testing::{
     Schema, SchemaField, Mutation, MutationType,
     PermissionsPolicy, TrustDistance,
     FieldPaymentConfig,

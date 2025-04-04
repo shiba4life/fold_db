@@ -1,12 +1,10 @@
 use std::net::{TcpListener, UdpSocket};
 use std::time::Duration;
 use std::thread;
-use tempfile;
 
-use fold_db::datafold_node::{
-    DataFoldNode, config::NodeConfig
+use fold_node::{
+    DataFoldNode, datafold_node::config::NodeConfig, network::NetworkConfig
 };
-use fold_db::network::NetworkConfig;
 
 // Helper function to create a test network config with random ports
 fn create_test_network_config(enable_discovery: bool) -> NetworkConfig {

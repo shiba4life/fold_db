@@ -1,5 +1,5 @@
-use fold_db::datafold_node::{DataFoldNode, TcpServer, config::NodeConfig};
-use fold_db::network::NetworkConfig;
+use fold_node::{DataFoldNode, datafold_node::TcpServer, datafold_node::config::NodeConfig};
+use fold_node::network::NetworkConfig;
 use serde_json::json;
 use std::path::PathBuf;
 use tokio::time::sleep;
@@ -142,7 +142,7 @@ async fn test_request_forwarding() {
     });
     
     // Load the schema into node2
-    let schema: fold_db::schema::Schema = serde_json::from_value(test_schema).unwrap();
+    let schema: fold_node::schema::Schema = serde_json::from_value(test_schema).unwrap();
     node2.load_schema(schema).unwrap();
     
     // Start the TCP servers
@@ -193,7 +193,7 @@ async fn test_request_forwarding() {
         Ok(response_len) => {
             // Read the response
             let mut response_bytes = vec![0u8; response_len as usize];
-            if let Ok(_) = stream.read_exact(&mut response_bytes).await {
+            if stream.read_exact(&mut response_bytes).await.is_ok() {
                 // Deserialize the response
                 if let Ok(response) = serde_json::from_slice::<serde_json::Value>(&response_bytes) {
                     println!("Response: {:?}", response);

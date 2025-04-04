@@ -1,4 +1,4 @@
-use fold_db::testing::SchemaCore;
+use fold_node::testing::SchemaCore;
 
 
 #[test]

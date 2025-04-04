@@ -7,7 +7,7 @@ This directory contains tests for the DataFold SDK.
 The tests are organized into the following files:
 
 - `sdk_tests.rs`: Unit tests for the SDK components
-- `integration_tests.rs`: Integration tests with a mock server
+- `real_integration_tests.rs`: Integration tests with a real node
 
 ## Running the Tests
 
@@ -42,8 +42,8 @@ cargo test
 # Run only unit tests
 cargo test --lib
 
-# Run only integration tests
-cargo test --test integration_tests
+# Run only real integration tests
+cargo test --test real_integration_tests
 
 # Run only SDK tests
 cargo test --test sdk_tests
@@ -98,9 +98,11 @@ The tests cover the following functionality:
    - Schema discovery and usage
    - Network operations
 
-## Mock Server
+## Test Environments
 
-The integration tests use a mock server to simulate the behavior of a real DataFold node. The mock server provides:
+### Mock Server (sdk_tests.rs)
+
+The SDK tests use a mock server to simulate the behavior of a real DataFold node. The mock server provides:
 
 - Schema information
 - Data storage and retrieval
@@ -108,3 +110,15 @@ The integration tests use a mock server to simulate the behavior of a real DataF
 - Error handling
 
 This allows testing the SDK without requiring a real DataFold node to be running.
+
+### Real Node Integration (real_integration_tests.rs)
+
+The real integration tests connect to an actual DataFold node instance that is launched during the test. These tests:
+
+- Start a DataFold node process
+- Connect to it using the SDK
+- Perform real operations against the node
+- Verify the results
+- Clean up the node process
+
+These tests provide end-to-end validation of the SDK's functionality with a real node.

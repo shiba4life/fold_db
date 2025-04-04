@@ -1,6 +1,7 @@
-use fold_db::testing::{Schema, SchemaCore};
+use fold_node::testing::{Schema, SchemaCore};
 use tempfile::tempdir;
-use crate::test_data::schema_test_data::*;
+mod test_data;
+use test_data::schema_test_data::*;
 
 #[test]
 fn test_schema_creation() {
@@ -30,23 +31,23 @@ fn test_schema_field_permissions() {
     // Verify permissions for each field
     let public_field = schema.fields.get("public_field").unwrap();
     match public_field.permission_policy.read_policy {
-        fold_db::testing::TrustDistance::Distance(d) => assert_eq!(d, 0),
+        fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 0),
         _ => panic!("Expected Distance variant"),
     }
 
     let protected_field = schema.fields.get("protected_field").unwrap();
     match protected_field.permission_policy.read_policy {
-        fold_db::testing::TrustDistance::Distance(d) => assert_eq!(d, 1),
+        fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 1),
         _ => panic!("Expected Distance variant"),
     }
     match protected_field.permission_policy.write_policy {
-        fold_db::testing::TrustDistance::Distance(d) => assert_eq!(d, 2),
+        fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 2),
         _ => panic!("Expected Distance variant"),
     }
 
     let private_field = schema.fields.get("private_field").unwrap();
     match private_field.permission_policy.read_policy {
-        fold_db::testing::TrustDistance::Distance(d) => assert_eq!(d, 3),
+        fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 3),
         _ => panic!("Expected Distance variant"),
     }
 }
@@ -62,19 +63,19 @@ fn test_user_profile_schema() {
     // Verify field permissions
     let username_field = schema.fields.get("username").unwrap();
     match username_field.permission_policy.read_policy {
-        fold_db::testing::TrustDistance::Distance(d) => assert_eq!(d, 0), // Public read
+        fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 0), // Public read
         _ => panic!("Expected Distance variant"),
     }
 
     let email_field = schema.fields.get("email").unwrap();
     match email_field.permission_policy.read_policy {
-        fold_db::testing::TrustDistance::Distance(d) => assert_eq!(d, 1), // Limited read
+        fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 1), // Limited read
         _ => panic!("Expected Distance variant"),
     }
 
     let payment_field = schema.fields.get("payment_info").unwrap();
     match payment_field.permission_policy.read_policy {
-        fold_db::testing::TrustDistance::Distance(d) => assert_eq!(d, 3), // Restricted read
+        fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 3), // Restricted read
         _ => panic!("Expected Distance variant"),
     }
 }

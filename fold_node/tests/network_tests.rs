@@ -1,8 +1,7 @@
 use std::time::Duration;
-use tempfile;
 
-use fold_db::datafold_node::{
-    DataFoldNode, config::NodeConfig, network::NetworkConfig
+use fold_node::{
+    DataFoldNode, datafold_node::config::NodeConfig, network::NetworkConfig
 };
 
 // Helper function to create a test network config with random ports
@@ -23,16 +22,19 @@ fn create_test_network_config() -> NetworkConfig {
     
     NetworkConfig {
         listen_address: format!("127.0.0.1:{}", tcp_port).parse().unwrap(),
-        discovery_port: udp_port,
+        request_timeout: 1,
+        enable_mdns: false,
         max_connections: 10,
+        keep_alive_interval: 1,
+        max_message_size: 1024 * 1024, // 1MB
+        discovery_port: udp_port,
         connection_timeout: Duration::from_secs(1),
         announcement_interval: Duration::from_secs(1),
-        enable_discovery: false, // Disable discovery for tests
     }
 }
 
-#[test]
-fn test_network_initialization() {
+#[tokio::test]
+async fn test_network_initialization() {
     // Create a temporary directory for test data
     let temp_dir = tempfile::tempdir().unwrap();
     let storage_path = temp_dir.path().to_path_buf();
@@ -41,6 +43,7 @@ fn test_network_initialization() {
     let node_config = NodeConfig {
         storage_path,
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
     };
 
     // Create a network configuration with random ports
@@ -50,20 +53,20 @@ fn test_network_initialization() {
     let mut node = DataFoldNode::new(node_config).unwrap();
     
     // Initialize the network layer
-    let result = node.init_network(network_config);
+    let result = node.init_network(network_config).await;
     assert!(result.is_ok(), "Failed to initialize network: {:?}", result);
     
     // Start the network layer
-    let result = node.start_network();
+    let result = node.start_network().await;
     assert!(result.is_ok(), "Failed to start network: {:?}", result);
     
     // Stop the network layer
-    let result = node.stop_network();
+    let result = node.stop_network().await;
     assert!(result.is_ok(), "Failed to stop network: {:?}", result);
 }
 
-#[test]
-fn test_node_discovery() {
+#[tokio::test]
+async fn test_node_discovery() {
     // Create temporary directories for test data
     let temp_dir1 = tempfile::tempdir().unwrap();
     let temp_dir2 = tempfile::tempdir().unwrap();
@@ -72,11 +75,13 @@ fn test_node_discovery() {
     let node1_config = NodeConfig {
         storage_path: temp_dir1.path().to_path_buf(),
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
     };
     
     let node2_config = NodeConfig {
         storage_path: temp_dir2.path().to_path_buf(),
         default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
     };
     
     // Create network configurations with different random ports
@@ -85,9 +90,15 @@ fn test_node_discovery() {
     
     // Ensure the TCP listener ports are different
     // If by chance they're the same, increment the second one
-    if network1_config.listen_address.port() == network2_config.listen_address.port() {
-        let new_port = network2_config.listen_address.port() + 2;
-        network2_config.listen_address = format!("127.0.0.1:{}", new_port).parse().unwrap();
+    let addr1 = network1_config.listen_address.clone();
+    let addr2 = network2_config.listen_address.clone();
+    if addr1 == addr2 {
+        // Just use a different port if they happen to be the same
+        let parts = network2_config.listen_address.split(':').collect::<Vec<_>>();
+        if parts.len() > 1 {
+            let port = parts[parts.len() - 1].parse::<u16>().unwrap_or(8000) + 2;
+            network2_config.listen_address = format!("127.0.0.1:{}", port).parse().unwrap();
+        }
     }
     
     // Create nodes
@@ -95,17 +106,17 @@ fn test_node_discovery() {
     let mut node2 = DataFoldNode::new(node2_config).unwrap();
     
     // Initialize network layers
-    let result = node1.init_network(network1_config);
+    let result = node1.init_network(network1_config).await;
     assert!(result.is_ok(), "Failed to initialize network 1: {:?}", result);
     
-    let result = node2.init_network(network2_config);
+    let result = node2.init_network(network2_config).await;
     assert!(result.is_ok(), "Failed to initialize network 2: {:?}", result);
     
     // Start network layers
-    let result = node1.start_network();
+    let result = node1.start_network().await;
     assert!(result.is_ok(), "Failed to start network 1: {:?}", result);
     
-    let result = node2.start_network();
+    let result = node2.start_network().await;
     assert!(result.is_ok(), "Failed to start network 2: {:?}", result);
     
     // Add a trusted node
@@ -117,9 +128,9 @@ fn test_node_discovery() {
     // the result since we're using mock discovery with discovery disabled
     
     // Stop network layers
-    let result = node1.stop_network();
+    let result = node1.stop_network().await;
     assert!(result.is_ok(), "Failed to stop network 1: {:?}", result);
     
-    let result = node2.stop_network();
+    let result = node2.stop_network().await;
     assert!(result.is_ok(), "Failed to stop network 2: {:?}", result);
 }

@@ -91,11 +91,12 @@ impl AtomRefBehavior for AtomRef {
     }
 
     fn set_status(&mut self, status: &AtomRefStatus, source_pub_key: String) {
-        self.status = status.clone();
+        let status_clone = status.clone();
+        self.status = status_clone.clone();
         self.updated_at = Utc::now();
         self.update_history.push(AtomRefUpdate {
             timestamp: Utc::now(),
-            status: status.clone(),
+            status: status_clone,
             source_pub_key,
         });
     }
@@ -168,11 +169,12 @@ impl AtomRefBehavior for AtomRefCollection {
     }
 
     fn set_status(&mut self, status: &AtomRefStatus, source_pub_key: String) {
-        self.status = status.clone();
+        let status_clone = status.clone();
+        self.status = status_clone.clone();
         self.updated_at = Utc::now();
         self.update_history.push(AtomRefUpdate {
             timestamp: Utc::now(),
-            status: status.clone(),
+            status: status_clone,
             source_pub_key,
         });
     }

@@ -12,7 +12,6 @@ use fold_node::testing::{
     MutationType,
     FieldType,
 };
-use fold_node::FoldDB;
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -21,11 +20,8 @@ fn create_default_payment_config() -> FieldPaymentConfig {
     FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
 }
 
-use crate::test_data::test_helpers::{cleanup_test_db, cleanup_tmp_dir};
-
-fn setup_test_db() -> (FoldDB, String) {
-    crate::test_data::test_helpers::setup_test_db()
-}
+mod test_data;
+use test_data::test_helpers::{cleanup_test_db, cleanup_tmp_dir, setup_test_db};
 
 // Clean up tmp directory after all tests
 #[cfg(test)]

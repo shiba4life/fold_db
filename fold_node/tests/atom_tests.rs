@@ -19,7 +19,7 @@ fn test_atom_creation() {
     assert_eq!(atom.source_pub_key(), "test_key");
     assert_eq!(atom.prev_atom_uuid(), None);
     assert_eq!(atom.content(), &content);
-    assert!(atom.uuid().len() > 0);
+    assert!(!atom.uuid().is_empty());
     assert!(atom.created_at() <= Utc::now());
 }
 
