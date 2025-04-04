@@ -5,7 +5,6 @@
 
 use crate::ipc::{AppRequest, AppResponse, get_app_socket_path};
 use serde_json::Value;
-use std::path::PathBuf;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
 
@@ -39,7 +38,7 @@ pub struct IpcClient {
 
 impl IpcClient {
     /// Connect to the FoldClient
-    pub async fn connect(app_socket_dir: &PathBuf, app_id: &str, token: &str) -> Result<Self> {
+    pub async fn connect(app_socket_dir: &std::path::Path, app_id: &str, token: &str) -> Result<Self> {
         // Get the socket path for the app
         let socket_path = get_app_socket_path(app_socket_dir, app_id);
 
@@ -62,7 +61,7 @@ impl IpcClient {
 
         // Serialize the request
         let request_bytes = serde_json::to_vec(&request)
-            .map_err(|e| IpcClientError::Serialization(e))?;
+            .map_err(IpcClientError::Serialization)?;
 
         // Send the request length
         self.stream.write_u32(request_bytes.len() as u32).await?;
@@ -79,7 +78,7 @@ impl IpcClient {
 
         // Deserialize the response
         let response: AppResponse = serde_json::from_slice(&response_bytes)
-            .map_err(|e| IpcClientError::Serialization(e))?;
+            .map_err(IpcClientError::Serialization)?;
 
         // Check if the request was successful
         if response.success {

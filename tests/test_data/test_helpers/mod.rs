@@ -41,9 +41,20 @@ pub fn get_test_db_path() -> String {
     let safe_uuid = Uuid::new_v4().to_string().replace("-", "_");
     let db_path = tmp_dir.join(format!("test_db_{}", safe_uuid));
 
-    // Create the database directory and schemas subdirectory
+    // Create the database directory
     fs::create_dir_all(&db_path).expect("Failed to create database directory");
-    fs::create_dir_all(db_path.join("schemas")).expect("Failed to create schemas directory");
+    
+    // Create schemas subdirectory with proper error handling
+    let schemas_dir = db_path.join("schemas");
+    match fs::create_dir_all(&schemas_dir) {
+        Ok(_) => {},
+        Err(e) => {
+            eprintln!("Warning: Failed to create schemas directory: {}", e);
+            // Try an alternative approach
+            let schemas_path = db_path.to_string_lossy().into_owned() + "/schemas";
+            fs::create_dir_all(schemas_path).expect("Failed to create schemas directory with alternative method");
+        }
+    }
 
     db_path.to_string_lossy().into_owned()
 }

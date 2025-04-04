@@ -254,7 +254,6 @@ async fn test_manual_node_connection() {
     assert!(result.is_ok(), "Failed to start network 2: {:?}", result);
     
     // Get node IDs
-    let _node1_id = node1.get_node_id().to_string();
     let node2_id = node2.get_node_id().to_string();
     
     // Manually add node2 to node1's trusted nodes

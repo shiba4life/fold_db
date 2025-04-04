@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Child;
 use std::sync::{Arc, Mutex};
-use tokio::task::JoinHandle;
 
 /// Process manager for FoldClient
 pub struct ProcessManager {
@@ -30,12 +29,8 @@ pub struct ProcessManager {
 
 /// A managed process
 struct ManagedProcess {
-    /// App registration
-    app: AppRegistration,
     /// Child process
     child: Child,
-    /// Working directory
-    working_dir: PathBuf,
 }
 
 impl ProcessManager {
@@ -97,9 +92,7 @@ impl ProcessManager {
         processes.insert(
             app.app_id.clone(),
             ManagedProcess {
-                app,
                 child,
-                working_dir,
             },
         );
 

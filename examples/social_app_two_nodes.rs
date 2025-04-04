@@ -72,11 +72,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start the TCP server for Node 1 on a different port
     log("Starting TCP server for Node 1 on port 8001...");
     let tcp_server1 = TcpServer::new(node1.clone(), 8001).await?;
-    let _tcp_server1_handle = tokio::spawn(async move {
+    let tcp_server1_handle = tokio::spawn(async move {
         if let Err(e) = tcp_server1.run().await {
             eprintln!("Node 1 TCP server error: {}", e);
         }
     });
+    // We need to keep the handle to prevent the task from being dropped
+    let _ = tcp_server1_handle;
     log("Node 1 TCP server started");
     
     // Wait a moment before starting the second node
@@ -88,11 +90,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start the TCP server for Node 2 on a different port
     log("Starting TCP server for Node 2 on port 8002...");
     let tcp_server2 = TcpServer::new(node2.clone(), 8002).await?;
-    let _tcp_server2_handle = tokio::spawn(async move {
+    let tcp_server2_handle = tokio::spawn(async move {
         if let Err(e) = tcp_server2.run().await {
             eprintln!("Node 2 TCP server error: {}", e);
         }
     });
+    // We need to keep the handle to prevent the task from being dropped
+    let _ = tcp_server2_handle;
     log("Node 2 TCP server started");
     
     // Wait a moment to ensure both nodes are fully started

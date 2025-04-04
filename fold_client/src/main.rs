@@ -151,7 +151,7 @@ async fn main() -> Result<()> {
             }
 
             // Create and start the FoldClient
-            let client = FoldClient::with_config(config)?;
+            let mut client = FoldClient::with_config(config)?;
             client.start().await?;
 
             // Wait for Ctrl+C
@@ -162,7 +162,7 @@ async fn main() -> Result<()> {
         }
         Commands::RegisterApp { name, permissions } => {
             // Create the FoldClient
-            let client = FoldClient::with_config(config)?;
+            let mut client = FoldClient::with_config(config)?;
 
             // Parse permissions
             let permissions: Vec<&str> = permissions.split(',').collect();

@@ -1,5 +1,5 @@
 use datafold_sdk::{
-    DataFoldClient, SchemaBuilder, Schema, SchemaField, FieldType,
+    DataFoldClient, Schema, SchemaField, FieldType,
     PermissionsPolicy, TrustDistance, FieldPaymentConfig, SchemaPaymentConfig,
     TrustDistanceScaling, AppSdkResult
 };

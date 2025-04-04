@@ -2,8 +2,6 @@
 //!
 //! This module provides functionality for communicating with the DataFold node.
 
-use crate::Result;
-use crate::FoldClientError;
 use serde_json::Value;
 use std::path::PathBuf;
 

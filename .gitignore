@@ -55,6 +55,7 @@ sample-app/build/
 *.swp
 *.swo
 *~
+logs
 
 # Debug files
 *.pdb

@@ -89,7 +89,15 @@ impl AuthManager {
             let path = entry.path();
 
             // Skip non-JSON files and the keypair file
-            if path.extension().map_or(true, |ext| ext != "json") || path.file_name().map_or(true, |name| name == "fold_client.key") {
+            let is_not_json = match path.extension() {
+                None => true,
+                Some(ext) => ext != "json"
+            };
+            let is_keypair_file = match path.file_name() {
+                None => true,
+                Some(name) => name == "fold_client.key"
+            };
+            if is_not_json || is_keypair_file {
                 continue;
             }
 
@@ -115,7 +123,7 @@ impl AuthManager {
         let mut csprng = OsRng07{};
         let app_keypair = Keypair::generate(&mut csprng);
         let public_key_bytes = app_keypair.public.to_bytes();
-        let public_key = base64::encode(&public_key_bytes);
+        let public_key = base64::encode(public_key_bytes);
 
         // Create the app registration
         let app = AppRegistration {

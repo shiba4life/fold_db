@@ -281,10 +281,7 @@ impl<'de> Deserialize<'de> for QueryResult {
             });
         } else if let Ok(map_result) = serde_json::from_value::<MapQueryResult>(result) {
             // Map format - convert to array
-            let results = map_result.results
-                .into_iter()
-                .map(|(_, value)| value)
-                .collect();
+            let results = map_result.results.into_values().collect();
             
             return Ok(QueryResult {
                 results,
@@ -378,9 +375,10 @@ impl AppRequest {
     }
 
     /// Sign the request using the app's private key
-    fn sign(&self, _private_key: &str) -> String {
+    fn sign(&self, private_key: &str) -> String {
         // In a real implementation, this would use the private key to sign the request
         // For now, we'll just return a placeholder
+        let _ = private_key; // Acknowledge the parameter to avoid unused variable warning
         format!("signed-{}-{}", self.app_id, self.timestamp)
     }
 }

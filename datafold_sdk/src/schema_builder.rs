@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use serde_json::Value;
 
-use crate::error::{AppSdkError, AppSdkResult};
+use crate::error::AppSdkResult;
 use crate::schema::{
     Schema, SchemaField, FieldType, PermissionsPolicy, 
     TrustDistance, FieldPaymentConfig, SchemaPaymentConfig, TrustDistanceScaling
@@ -25,6 +25,7 @@ use crate::schema::{
 /// 
 /// ```
 /// use datafold_sdk::schema_builder::SchemaBuilder;
+/// use datafold_sdk::schema::FieldType;
 /// 
 /// // Create a simple user profile schema
 /// let schema = SchemaBuilder::new("user_profile")
@@ -49,9 +50,6 @@ use crate::schema::{
 pub struct SchemaBuilder {
     /// Name of the schema being built
     name: String,
-    
-    /// Fields being added to the schema
-    fields: HashMap<String, SchemaField>,
     
     /// Payment configuration for the schema
     payment_config: SchemaPaymentConfig,
@@ -108,13 +106,7 @@ impl Default for FieldDefinition {
 
 /// Builder for configuring a single field within a schema
 #[derive(Debug)]
-pub struct FieldBuilder<'a> {
-    /// Reference to the parent schema builder
-    schema_builder: &'a mut SchemaBuilder,
-    
-    /// Name of the field being built
-    field_name: String,
-    
+pub struct FieldBuilder {
     /// Definition of the field
     definition: FieldDefinition,
 }
@@ -136,7 +128,6 @@ impl SchemaBuilder {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            fields: HashMap::new(),
             payment_config: SchemaPaymentConfig {
                 base_multiplier: 1.0,
                 trust_scaling: TrustDistanceScaling::None,
@@ -165,8 +156,6 @@ impl SchemaBuilder {
     {
         let definition = {
             let field_builder = FieldBuilder {
-                schema_builder: &mut self,
-                field_name: field_name.to_string(),
                 definition: FieldDefinition::default(),
             };
             
@@ -240,7 +229,7 @@ impl SchemaBuilder {
     }
 }
 
-impl<'a> FieldBuilder<'a> {
+impl FieldBuilder {
     /// Sets the field type (single or collection).
     /// 
     /// # Arguments

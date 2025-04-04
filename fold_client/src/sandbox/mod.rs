@@ -4,7 +4,6 @@
 //! applications from the system.
 
 use crate::Result;
-use std::path::Path;
 use std::process::Child;
 
 #[cfg(target_os = "linux")]

@@ -3,6 +3,12 @@ name = "fold_db"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = [
+    "datafold_sdk",
+    "fold_client",
+]
+
 [features]
 default = ["mock"]  # Enable mock feature by default
 test-utils = []  # Feature flag for test utilities

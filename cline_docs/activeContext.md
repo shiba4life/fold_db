@@ -4,7 +4,18 @@
 Implementing and testing cross-node request forwarding to enable communication between nodes.
 
 ## Recent Changes
-1. Implemented Cross-Node Request Forwarding:
+1. Enhanced Pre-commit Hook and Fixed Tests and Linting Issues:
+   - Added `cargo test --workspace` to the pre-commit hook to run all tests across the entire workspace
+   - Updated HOOKS_README.md to reflect the new test in the pre-commit hook
+   - Fixed failing test `unit_tests::folddb_tests::test_write_and_query` by improving error handling in the test helper function
+   - Fixed doctests in `datafold_sdk/src/schema_builder.rs` and `datafold_sdk/src/client.rs` by adding proper imports and async/await syntax
+   - Fixed linting issues across the codebase:
+     - Removed unused imports in various files
+     - Fixed unused variables by prefixing them with underscore
+     - Added `#[allow(dead_code)]` attributes to unused test helper functions
+   - This ensures more comprehensive testing before each commit and improves code quality
+
+2. Implemented Cross-Node Request Forwarding:
    - Added NodeId to PeerId mapping in NetworkCore:
      - Added node_to_peer_map and peer_to_node_map fields
      - Implemented register_node_id, get_peer_id_for_node, and get_node_id_for_peer methods

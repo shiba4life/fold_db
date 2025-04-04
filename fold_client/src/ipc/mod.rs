@@ -3,7 +3,6 @@
 //! This module provides IPC (Inter-Process Communication) mechanisms for
 //! communication between the FoldClient and sandboxed applications.
 
-use crate::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
@@ -108,6 +107,6 @@ pub struct NodeResponse {
 }
 
 /// Get the path to the IPC socket for an app
-pub fn get_app_socket_path(app_socket_dir: &PathBuf, app_id: &str) -> PathBuf {
+pub fn get_app_socket_path(app_socket_dir: &std::path::Path, app_id: &str) -> PathBuf {
     app_socket_dir.join(format!("{}.sock", app_id))
 }

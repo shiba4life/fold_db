@@ -41,6 +41,10 @@ if git diff --cached --name-only | grep -q '\.rs$'; then
     cargo test --test real_integration_tests || { echo "Real integration tests failed!"; exit 1; }
     cd "$REPO_ROOT"
     
+    # Run all tests across the entire workspace
+    echo "Running all workspace tests..."
+    cargo test --workspace || { echo "Workspace tests failed!"; exit 1; }
+    
     echo "All tests passed!"
 else
     echo "No Rust files in commit, skipping tests."

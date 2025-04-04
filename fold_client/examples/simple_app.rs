@@ -4,7 +4,6 @@
 //! launch it, and communicate with the DataFold node.
 
 use fold_client::{FoldClient, FoldClientConfig, Result};
-use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> Result<()> {

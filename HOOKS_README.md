@@ -15,6 +15,7 @@ The pre-commit hook runs before each commit and performs the following checks:
 5. Runs SDK unit tests
 6. Runs SDK integration tests
 7. Runs real integration tests
+8. Runs all tests across the entire workspace with `cargo test --workspace`
 
 If any of these checks fail, the commit will be aborted.
 

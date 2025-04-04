@@ -2,7 +2,6 @@ use datafold_sdk::{
     SocialAppContainer, ContainerConfig, AppPermissions, FieldPermissions,
     MicroVMConfig, MicroVMType
 };
-use datafold_sdk::isolation::ResourceLimits;
 use std::path::PathBuf;
 
 #[tokio::main]
@@ -17,14 +16,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .allow_reads(&["id", "title", "content", "author_id", "created_at"])
             .allow_writes(&["title", "content"]))
         .with_max_trust_distance(2);
-    
-    // Create resource limits
-    let resource_limits = ResourceLimits {
-        max_cpu_percent: 25.0,
-        max_memory_mb: 128,
-        max_storage_mb: 512,
-        max_concurrent_ops: 5,
-    };
     
     // Create VM configuration
     let vm_config = MicroVMConfig::new(

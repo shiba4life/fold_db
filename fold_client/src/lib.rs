@@ -69,7 +69,7 @@ impl From<std::io::Error> for FoldClientError {
 }
 
 /// Configuration for the FoldClient
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FoldClientConfig {
     /// Path to the DataFold node socket
     pub node_socket_path: Option<String>,

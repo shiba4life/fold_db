@@ -4,8 +4,7 @@ use std::collections::HashMap;
 /// Re-exports of schema-related types from the core library
 /// 
 /// This module provides access to the Schema class and related types
-/// from the core library, allowing SDK users to work with schemas directly.
-
+/// from the core library allowing SDK users to work with schemas directly.
 /// Defines the structure, permissions, and payment requirements for a data collection.
 /// 
 /// A Schema is the fundamental building block for data organization in the database.
