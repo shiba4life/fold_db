@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use fold_db::{DataFoldNode, NodeConfig, load_schema_from_file, Operation, MutationType};
+use fold_node::{DataFoldNode, NodeConfig, load_schema_from_file, Operation, MutationType};
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;

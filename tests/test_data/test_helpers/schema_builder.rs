@@ -1,4 +1,4 @@
-use fold_db::testing::{
+use fold_node::testing::{
     SchemaPaymentConfig,
     FieldPaymentConfig,
     ExplicitCounts,

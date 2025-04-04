@@ -1,5 +1,5 @@
-use fold_db::{DataFoldNode, NodeConfig};
-use fold_db::schema::Schema;
+use fold_node::{DataFoldNode, NodeConfig};
+use fold_node::schema::Schema;
 use serde_json::json;
 use tempfile::tempdir;
 

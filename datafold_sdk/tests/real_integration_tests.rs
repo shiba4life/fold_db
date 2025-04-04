@@ -39,7 +39,7 @@ fn init_test_node() -> u16 {
             
             // Launch the node process - using the path relative to the workspace root
             let node_process = Command::new("cargo")
-                .args(["run", "--bin", "datafold_node", "--manifest-path", "../Cargo.toml", "--", 
+                .args(["run", "--bin", "datafold_node", "--manifest-path", "../fold_node/Cargo.toml", "--", 
                        "--port", &port.to_string()])
                 .env("NODE_CONFIG", config_path.to_str().unwrap())
                 .spawn()

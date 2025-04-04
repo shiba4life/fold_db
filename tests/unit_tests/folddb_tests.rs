@@ -1,4 +1,4 @@
-use fold_db::testing::{
+use fold_node::testing::{
     SchemaPaymentConfig,
     FieldPaymentConfig,
     TrustDistanceScaling,
@@ -12,7 +12,7 @@ use fold_db::testing::{
     MutationType,
     FieldType,
 };
-use fold_db::FoldDB;
+use fold_node::FoldDB;
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;

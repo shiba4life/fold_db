@@ -1,14 +1,7 @@
 [package]
-name = "fold_db"
+name = "fold_node"
 version = "0.1.0"
 edition = "2021"
-
-[workspace]
-members = [
-    "datafold_sdk",
-    "fold_client",
-    "fold_node",
-]
 
 [features]
 default = ["mock"]  # Enable mock feature by default
@@ -18,9 +11,8 @@ mock = []  # Feature flag for mock network implementation
 
 [dependencies]
 # SDK
-datafold_sdk = { path = "./datafold_sdk" }
-fold_client = { path = "./fold_client" }
-fold_node = { path = "./fold_node" }
+datafold_sdk = { path = "../datafold_sdk" }
+fold_client = { path = "../fold_client" }
 
 # Cryptography
 ring = "0.16.20"
@@ -49,22 +41,16 @@ libp2p = { version = "0.53", features = [
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "full"] }
-fold_node = { path = "./fold_node", features = ["test-utils"] }  # Enable test-utils for tests
 reqwest = { version = "0.11", features = ["json"] }
 
-[[example]]
-name = "social_app_tcp"
-path = "examples/social_app_tcp.rs"
-
-[[example]]
-name = "social_app_two_nodes"
-path = "examples/social_app_two_nodes.rs"
-
-[[example]]
-name = "sandboxed_app_two_nodes"
-path = "examples/sandboxed_app_two_nodes/main.rs"
-
-
 [lib]
-name = "fold_db"
+name = "fold_node"
 path = "src/lib.rs"
+
+[[bin]]
+name = "datafold_node"
+path = "src/bin/datafold_node.rs"
+
+[[bin]]
+name = "datafold_cli"
+path = "src/bin/datafold_cli.rs"

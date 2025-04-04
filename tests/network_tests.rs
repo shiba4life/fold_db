@@ -1,6 +1,6 @@
-use fold_db::datafold_node::{DataFoldNode, config::NodeConfig};
-use fold_db::network::{NetworkCore, NetworkConfig, SchemaService};
-use fold_db::schema::Schema;
+use fold_node::datafold_node::{DataFoldNode, config::NodeConfig};
+use fold_node::network::{NetworkCore, NetworkConfig, SchemaService};
+use fold_node::schema::Schema;
 use tempfile::tempdir;
 
 #[tokio::test]

@@ -1,4 +1,4 @@
-use fold_db::testing::{Mutation, Query, MutationType};
+use fold_node::testing::{Mutation, Query, MutationType};
 use serde_json::Value;
 use std::collections::HashMap;
 

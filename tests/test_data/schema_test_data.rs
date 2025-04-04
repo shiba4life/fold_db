@@ -1,4 +1,4 @@
-use fold_db::testing::{
+use fold_node::testing::{
     FieldPaymentConfig,
     TrustDistanceScaling,
     PermissionsPolicy,
@@ -6,7 +6,7 @@ use fold_db::testing::{
     SchemaField,
     Schema,
 };
-use fold_db::testing::FieldType;
+use fold_node::testing::FieldType;
 use std::collections::HashMap;
 use uuid::Uuid;
 

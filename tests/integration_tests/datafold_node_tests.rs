@@ -1,4 +1,4 @@
-use fold_db::testing::{
+use fold_node::testing::{
     FieldPaymentConfig,
     TrustDistanceScaling,
     PermissionsPolicy,
@@ -10,7 +10,7 @@ use fold_db::testing::{
     MutationType,
     FieldType,
 };
-use fold_db::{DataFoldNode, NodeConfig};
+use fold_node::{DataFoldNode, NodeConfig};
 use serde_json::json;
 use tempfile::tempdir;
 use std::collections::HashMap;

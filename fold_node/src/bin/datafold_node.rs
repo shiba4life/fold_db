@@ -1,4 +1,4 @@
-use fold_db::{
+use fold_node::{
     datafold_node::{DataFoldNode, TcpServer, config::NodeConfig},
     network::NetworkConfig,
 };
