@@ -89,6 +89,15 @@
 - Simplify permission system
 
 ## Recent Improvements
+- Implemented sandboxed social app:
+  - Created FoldClient for sandboxed access to the DataFold node API
+  - Implemented platform-specific sandbox mechanisms (Linux, macOS, Windows)
+  - Added IPC mechanism for secure communication between apps and FoldClient
+  - Implemented cryptographic authentication and authorization
+  - Added permission enforcement and resource limits
+  - Created comprehensive documentation and examples
+  - Integrated with the social app for secure access to the DataFold node
+
 - Implemented cross-node request forwarding:
   - Added NodeId to PeerId mapping in NetworkCore
   - Enhanced TCP server to check target_node_id in incoming requests
