@@ -7,6 +7,7 @@
 Cargo.lock
 datafold_sdk/Cargo.lock
 social_app_example/Cargo.lock
+**/target/**/*.lock
 
 # IDE
 .vscode/
@@ -19,6 +20,7 @@ Thumbs.db
 
 # Project specific
 /data/
+fold_node/data/
 src/datafold_node/data/db/
 src/datafold_node/data
 /config/
@@ -28,10 +30,9 @@ src/datafold_node/data
 
 # Test data directories
 /test_data/
-/test_data/*/
-/test_data/*/*/
-/test_data/*/*/*/
-/test_data/*/*/*/*/
+/fold_node/test_data/
+/fold_node/tests/test_data/request_forwarding/
+/tests/test_data/
 
 # Example generated files
 examples/*/db/
