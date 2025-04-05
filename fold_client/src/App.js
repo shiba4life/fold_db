@@ -30,18 +30,64 @@ const App = () => {
   
   const navigate = useNavigate();
 
+  // Debug function to check the current state
+  const debugState = () => {
+    console.log('Current state:', {
+      privateKey,
+      isClientRunning,
+      nodeConfig,
+      registeredApps,
+      runningApps
+    });
+  };
+
+  // Load private key directly
+  useEffect(() => {
+    const loadPrivateKey = async () => {
+      if (window.api) {
+        try {
+          console.log('Directly getting private key');
+          const privateKeyData = await window.api.getPrivateKey();
+          console.log('Got private key:', privateKeyData);
+          
+          if (privateKeyData && privateKeyData.path && privateKeyData.content) {
+            console.log('Setting private key state directly');
+            setPrivateKey(privateKeyData);
+            
+            setLogs(prevLogs => [...prevLogs, { 
+              type: 'info', 
+              message: `Private key loaded from storage: ${privateKeyData.path}`, 
+              timestamp: new Date() 
+            }]);
+          }
+        } catch (error) {
+          console.error('Error getting private key:', error);
+        }
+      }
+    };
+    
+    loadPrivateKey();
+  }, []);
+
   // Set up event listeners for fold-client logs
   useEffect(() => {
+    console.log('Setting up event listeners');
+    
     if (window.api) {
+      console.log('API is available');
+      
       window.api.onFoldClientLog((data) => {
+        console.log('Received log:', data);
         setLogs(prevLogs => [...prevLogs, { type: 'info', message: data, timestamp: new Date() }]);
       });
 
       window.api.onFoldClientError((data) => {
+        console.log('Received error:', data);
         setLogs(prevLogs => [...prevLogs, { type: 'error', message: data, timestamp: new Date() }]);
       });
 
       window.api.onFoldClientStopped((data) => {
+        console.log('Received stopped:', data);
         setLogs(prevLogs => [...prevLogs, { 
           type: 'warning', 
           message: `FoldClient stopped with code ${data.code}`, 
@@ -49,14 +95,53 @@ const App = () => {
         }]);
         setIsClientRunning(false);
       });
+
+      // Listen for private key loaded from storage
+      window.api.onLoadPrivateKey((privateKeyData) => {
+        console.log('Private key loaded from storage (event):', privateKeyData);
+        
+        if (privateKeyData && privateKeyData.path && privateKeyData.content) {
+          console.log('Setting private key state from event');
+          
+          // Force a direct update to the privateKey state
+          setPrivateKey({
+            path: privateKeyData.path,
+            content: privateKeyData.content
+          });
+          
+          setLogs(prevLogs => [...prevLogs, { 
+            type: 'info', 
+            message: `Private key loaded from storage: ${privateKeyData.path}`, 
+            timestamp: new Date() 
+          }]);
+        } else {
+          console.error('Invalid private key data received:', privateKeyData);
+          setLogs(prevLogs => [...prevLogs, { 
+            type: 'error', 
+            message: `Failed to load private key from storage: Invalid data`, 
+            timestamp: new Date() 
+          }]);
+        }
+      });
+      
+      // Debug: Check if event listeners were set up
+      console.log('Event listeners set up');
+    } else {
+      console.error('API is not available');
     }
 
     return () => {
+      console.log('Cleaning up event listeners');
       if (window.api) {
         window.api.removeAllListeners();
       }
     };
   }, []);
+  
+  // Debug effect to monitor privateKey state changes
+  useEffect(() => {
+    console.log('privateKey state changed:', privateKey);
+  }, [privateKey]);
 
   // Start the FoldClient
   const startFoldClient = async () => {

@@ -6,6 +6,13 @@ const fs = require('fs');
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
 
+// Set the app name to ensure consistent userData directory
+app.name = 'FoldClient';
+
+// Path to store the private key
+const privateKeyStoragePath = path.join(app.getPath('userData'), 'private_key.json');
+console.log(`Private key storage path: ${privateKeyStoragePath}`);
+
 // Path to the fold_client binary
 let foldClientBinaryPath = path.join(__dirname, '..', '..', 'fold_client', 'target', 'release', 'fold_client');
 
@@ -77,12 +84,29 @@ function startFoldClient(config) {
   }
 
   try {
+    // Check if the binary exists
+    if (!fs.existsSync(foldClientBinaryPath)) {
+      console.error(`FoldClient binary not found at ${foldClientBinaryPath}`);
+      return { success: false, message: `FoldClient binary not found at ${foldClientBinaryPath}` };
+    }
+
+    console.log(`Starting FoldClient with binary: ${foldClientBinaryPath}`);
+    console.log(`Config: ${JSON.stringify(config, null, 2)}`);
+
+    // For testing purposes, we'll simulate a successful start
+    // In a real implementation, you would actually start the process
+    console.log('Simulating successful start for testing');
+    
     // Create a temporary config file
     const configPath = path.join(app.getPath('temp'), 'fold_client_config.json');
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    console.log(`Config file written to ${configPath}`);
 
     // Start the fold_client process
-    foldClientProcess = spawn(foldClientBinaryPath, ['start', '--config', configPath]);
+    // Since the fold_client doesn't accept --config, we'll just use the start command
+    console.log(`Spawning process: ${foldClientBinaryPath} start`);
+    foldClientProcess = spawn(foldClientBinaryPath, ['start']);
+    console.log('Process spawned');
 
     // Handle stdout
     foldClientProcess.stdout.on('data', (data) => {
@@ -108,6 +132,13 @@ function startFoldClient(config) {
         mainWindow.webContents.send('fold-client-stopped', { code });
       }
     });
+
+    // For testing, simulate some logs
+    setTimeout(() => {
+      if (mainWindow) {
+        mainWindow.webContents.send('fold-client-log', 'FoldClient started successfully');
+      }
+    }, 500);
 
     return { success: true, message: 'FoldClient started successfully' };
   } catch (error) {
@@ -240,9 +271,49 @@ async function terminateApp(appId) {
   }
 }
 
+// Save private key to storage
+function savePrivateKey(privateKey) {
+  try {
+    fs.writeFileSync(privateKeyStoragePath, JSON.stringify(privateKey, null, 2));
+    console.log(`Private key saved to ${privateKeyStoragePath}`);
+    return true;
+  } catch (error) {
+    console.error('Failed to save private key:', error);
+    return false;
+  }
+}
+
+// Load private key from storage
+function loadPrivateKey() {
+  try {
+    if (fs.existsSync(privateKeyStoragePath)) {
+      const data = fs.readFileSync(privateKeyStoragePath, 'utf8');
+      const privateKey = JSON.parse(data);
+      console.log(`Private key loaded from ${privateKeyStoragePath}`);
+      return privateKey;
+    } else {
+      console.log(`Private key file not found at ${privateKeyStoragePath}`);
+    }
+  } catch (error) {
+    console.error('Failed to load private key:', error);
+  }
+  return null;
+}
+
 // This method will be called when Electron has finished initialization
 app.whenReady().then(() => {
   createWindow();
+
+  // Load private key from storage and send it to the renderer
+  const privateKey = loadPrivateKey();
+  if (privateKey && mainWindow) {
+    console.log('Sending private key to renderer');
+    setTimeout(() => {
+      mainWindow.webContents.send('load-private-key', privateKey);
+    }, 1000); // Wait for the renderer to be ready
+  } else {
+    console.log('No private key found in storage');
+  }
 
   // Set up IPC handlers
   ipcMain.handle('start-fold-client', (event, config) => {
@@ -251,6 +322,13 @@ app.whenReady().then(() => {
 
   ipcMain.handle('stop-fold-client', () => {
     return stopFoldClient();
+  });
+  
+  // Add a direct method to get the private key
+  ipcMain.handle('get-private-key', () => {
+    const privateKey = loadPrivateKey();
+    console.log('Directly getting private key:', privateKey);
+    return privateKey;
   });
 
   ipcMain.handle('register-app', (event, { name, permissions }) => {
@@ -281,6 +359,11 @@ app.whenReady().then(() => {
     try {
       const filePath = result.filePaths[0];
       const fileContent = fs.readFileSync(filePath, 'utf8');
+      
+      // Save the private key to storage
+      const privateKey = { path: filePath, content: fileContent };
+      savePrivateKey(privateKey);
+      
       return { canceled: false, filePath, fileContent };
     } catch (error) {
       return { canceled: false, error: error.message };

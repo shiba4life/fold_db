@@ -1,6 +1,44 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
-const PrivateKeyManager = ({ privateKey, selectPrivateKeyFile }) => {
+const PrivateKeyManager = ({ privateKey: propPrivateKey, selectPrivateKeyFile }) => {
+  // Use local state to ensure we have the private key
+  const [localPrivateKey, setLocalPrivateKey] = useState(propPrivateKey);
+  
+  // Debug function to log the private key
+  const debugPrivateKey = () => {
+    console.log('Current privateKey state:', localPrivateKey);
+    alert(localPrivateKey ? `Private key loaded: ${localPrivateKey.path}` : 'No private key loaded');
+  };
+
+  // Load private key directly when component mounts
+  useEffect(() => {
+    const loadPrivateKey = async () => {
+      if (window.api && !localPrivateKey) {
+        try {
+          console.log('PrivateKeyManager: Directly getting private key');
+          const privateKeyData = await window.api.getPrivateKey();
+          console.log('PrivateKeyManager: Got private key:', privateKeyData);
+          
+          if (privateKeyData && privateKeyData.path && privateKeyData.content) {
+            console.log('PrivateKeyManager: Setting local private key state');
+            setLocalPrivateKey(privateKeyData);
+          }
+        } catch (error) {
+          console.error('PrivateKeyManager: Error getting private key:', error);
+        }
+      }
+    };
+    
+    loadPrivateKey();
+  }, []);
+  
+  // Update local state when prop changes
+  useEffect(() => {
+    console.log('PrivateKeyManager: propPrivateKey changed:', propPrivateKey);
+    if (propPrivateKey) {
+      setLocalPrivateKey(propPrivateKey);
+    }
+  }, [propPrivateKey]);
   return (
     <div className="private-key-manager">
       <h1 className="mb-4">Private Key Manager</h1>
@@ -11,12 +49,12 @@ const PrivateKeyManager = ({ privateKey, selectPrivateKeyFile }) => {
           Private Key
         </div>
         <div className="card-body">
-          {privateKey ? (
+          {localPrivateKey ? (
             <div className="private-key-section">
               <h5>Current Private Key</h5>
-              <p><strong>File:</strong> {privateKey.path}</p>
+              <p><strong>File:</strong> {localPrivateKey.path}</p>
               <div className="private-key-display">
-                {privateKey.content}
+                {localPrivateKey.content}
               </div>
               
               <div className="mt-3">
@@ -26,6 +64,13 @@ const PrivateKeyManager = ({ privateKey, selectPrivateKeyFile }) => {
                 >
                   <i className="fas fa-exchange-alt me-2"></i>
                   Change Private Key
+                </button>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={debugPrivateKey}
+                >
+                  <i className="fas fa-bug me-2"></i>
+                  Debug
                 </button>
               </div>
             </div>
@@ -37,11 +82,18 @@ const PrivateKeyManager = ({ privateKey, selectPrivateKeyFile }) => {
               </div>
               
               <button 
-                className="btn btn-primary" 
+                className="btn btn-primary me-2" 
                 onClick={selectPrivateKeyFile}
               >
                 <i className="fas fa-file-import me-2"></i>
                 Select Private Key File
+              </button>
+              <button 
+                className="btn btn-secondary" 
+                onClick={debugPrivateKey}
+              >
+                <i className="fas fa-bug me-2"></i>
+                Debug
               </button>
             </div>
           )}

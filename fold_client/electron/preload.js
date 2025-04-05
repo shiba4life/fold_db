@@ -16,17 +16,20 @@ contextBridge.exposeInMainWorld(
     // File operations
     selectPrivateKeyFile: () => ipcRenderer.invoke('select-private-key-file'),
     selectProgramFile: () => ipcRenderer.invoke('select-program-file'),
+    getPrivateKey: () => ipcRenderer.invoke('get-private-key'),
     
     // Event listeners
     onFoldClientLog: (callback) => ipcRenderer.on('fold-client-log', (_, data) => callback(data)),
     onFoldClientError: (callback) => ipcRenderer.on('fold-client-error', (_, data) => callback(data)),
     onFoldClientStopped: (callback) => ipcRenderer.on('fold-client-stopped', (_, data) => callback(data)),
+    onLoadPrivateKey: (callback) => ipcRenderer.on('load-private-key', (_, data) => callback(data)),
     
     // Remove event listeners
     removeAllListeners: () => {
       ipcRenderer.removeAllListeners('fold-client-log');
       ipcRenderer.removeAllListeners('fold-client-error');
       ipcRenderer.removeAllListeners('fold-client-stopped');
+      ipcRenderer.removeAllListeners('load-private-key');
     }
   }
 );

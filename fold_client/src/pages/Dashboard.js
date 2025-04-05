@@ -1,15 +1,47 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 const Dashboard = ({ 
   isClientRunning, 
   startFoldClient, 
   stopFoldClient, 
-  privateKey, 
+  privateKey: propPrivateKey, 
   nodeConfig, 
   registeredApps, 
   runningApps 
 }) => {
+  // Use local state to ensure we have the private key
+  const [localPrivateKey, setLocalPrivateKey] = useState(propPrivateKey);
+  
+  // Load private key directly when component mounts
+  useEffect(() => {
+    const loadPrivateKey = async () => {
+      if (window.api && !localPrivateKey) {
+        try {
+          console.log('Dashboard: Directly getting private key');
+          const privateKeyData = await window.api.getPrivateKey();
+          console.log('Dashboard: Got private key:', privateKeyData);
+          
+          if (privateKeyData && privateKeyData.path && privateKeyData.content) {
+            console.log('Dashboard: Setting local private key state');
+            setLocalPrivateKey(privateKeyData);
+          }
+        } catch (error) {
+          console.error('Dashboard: Error getting private key:', error);
+        }
+      }
+    };
+    
+    loadPrivateKey();
+  }, []);
+  
+  // Update local state when prop changes
+  useEffect(() => {
+    console.log('Dashboard: propPrivateKey changed:', propPrivateKey);
+    if (propPrivateKey) {
+      setLocalPrivateKey(propPrivateKey);
+    }
+  }, [propPrivateKey]);
   return (
     <div className="dashboard">
       <h1 className="mb-4">Dashboard</h1>
@@ -39,14 +71,14 @@ const Dashboard = ({
                 <button 
                   className="btn btn-success" 
                   onClick={startFoldClient}
-                  disabled={!privateKey || !nodeConfig.node_tcp_address}
+                  disabled={!localPrivateKey || !nodeConfig.node_tcp_address}
                 >
                   <i className="fas fa-play me-2"></i>
                   Start FoldClient
                 </button>
               )}
               
-              {!privateKey && (
+              {!localPrivateKey && (
                 <div className="alert alert-warning mt-3">
                   <i className="fas fa-exclamation-triangle me-2"></i>
                   No private key loaded. <Link to="/private-key">Add a private key</Link> to start FoldClient.
@@ -68,11 +100,11 @@ const Dashboard = ({
               Private Key
             </div>
             <div className="card-body">
-              {privateKey ? (
+              {localPrivateKey ? (
                 <div>
-                  <p><strong>File:</strong> {privateKey.path}</p>
+                  <p><strong>File:</strong> {localPrivateKey.path}</p>
                   <div className="private-key-display">
-                    {privateKey.content.substring(0, 100)}...
+                    {localPrivateKey.content.substring(0, 100)}...
                   </div>
                   <Link to="/private-key" className="btn btn-outline-primary mt-3">
                     <i className="fas fa-edit me-2"></i>
