@@ -31,6 +31,7 @@ async fn test_fold_client_creation() {
         allow_filesystem_access: false,
         max_memory_mb: Some(1024),
         max_cpu_percent: Some(50),
+        private_key: None,
     };
     
     // Create a FoldClient
@@ -52,6 +53,7 @@ async fn test_fold_client_with_invalid_config() {
         allow_filesystem_access: false,
         max_memory_mb: Some(1024),
         max_cpu_percent: Some(50),
+        private_key: None,
     };
     
     // Create a FoldClient, which should fail
@@ -80,6 +82,7 @@ async fn test_fold_client_start_stop() {
         allow_filesystem_access: false,
         max_memory_mb: Some(1024),
         max_cpu_percent: Some(50),
+        private_key: None,
     };
     
     // Create a FoldClient
@@ -108,6 +111,7 @@ async fn test_fold_client_register_app() {
         allow_filesystem_access: false,
         max_memory_mb: Some(1024),
         max_cpu_percent: Some(50),
+        private_key: None,
     };
     
     // Create a FoldClient
@@ -156,6 +160,7 @@ async fn test_fold_client_app_lifecycle() {
         allow_filesystem_access: true,
         max_memory_mb: Some(1024),
         max_cpu_percent: Some(50),
+        private_key: None,
     };
     
     // Create a FoldClient

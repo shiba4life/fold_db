@@ -87,6 +87,8 @@ pub struct FoldClientConfig {
     pub max_memory_mb: Option<u64>,
     /// Maximum CPU usage for apps (in percent)
     pub max_cpu_percent: Option<u32>,
+    /// Private key content for authentication with the DataFold node
+    pub private_key: Option<String>,
 }
 
 impl Default for FoldClientConfig {
@@ -103,6 +105,7 @@ impl Default for FoldClientConfig {
             allow_filesystem_access: false,
             max_memory_mb: Some(1024),
             max_cpu_percent: Some(50),
+            private_key: None,
         }
     }
 }

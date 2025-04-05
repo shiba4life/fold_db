@@ -150,9 +150,31 @@ async fn main() -> Result<()> {
                 config.max_cpu_percent = Some(max_cpu);
             }
 
+            // Connect to the actual DataFold node
+            println!("Connecting to DataFold node...");
+            
+            // Log connection details before creating the client
+            let connection_info = match (&config.node_tcp_address, &config.node_socket_path) {
+                (Some((host, port)), _) => {
+                    format!("Using TCP connection to {}:{}", host, port)
+                },
+                (_, Some(socket_path)) => {
+                    format!("Using Unix socket at {}", socket_path)
+                },
+                _ => {
+                    eprintln!("No node connection specified");
+                    return Err(fold_client::FoldClientError::Config("No node connection specified".to_string()));
+                }
+            };
+            
+            println!("{}", connection_info);
+            
             // Create and start the FoldClient
             let mut client = FoldClient::with_config(config)?;
+            
+            // Start the client which will connect to the actual DataFold node
             client.start().await?;
+            println!("Connected to DataFold node successfully");
 
             // Wait for Ctrl+C
             tokio::signal::ctrl_c().await?;

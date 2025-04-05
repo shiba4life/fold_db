@@ -92,20 +92,59 @@ function startFoldClient(config) {
 
     console.log(`Starting FoldClient with binary: ${foldClientBinaryPath}`);
     console.log(`Config: ${JSON.stringify(config, null, 2)}`);
-
-    // For testing purposes, we'll simulate a successful start
-    // In a real implementation, you would actually start the process
-    console.log('Simulating successful start for testing');
     
     // Create a temporary config file
     const configPath = path.join(app.getPath('temp'), 'fold_client_config.json');
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
     console.log(`Config file written to ${configPath}`);
 
-    // Start the fold_client process
-    // Since the fold_client doesn't accept --config, we'll just use the start command
-    console.log(`Spawning process: ${foldClientBinaryPath} start`);
-    foldClientProcess = spawn(foldClientBinaryPath, ['start']);
+    // Prepare the command-line arguments
+    const args = ['start'];
+    
+    // Add connection arguments based on the config
+    if (config.node_tcp_address) {
+      args.push('--node-host', config.node_tcp_address[0]);
+      args.push('--node-port', config.node_tcp_address[1].toString());
+    } else if (config.node_socket_path) {
+      args.push('--node-socket', config.node_socket_path);
+    }
+    
+    // Add private key if available - we'll handle this in the config file instead
+    if (config.private_key) {
+      const privateKeyPath = path.join(app.getPath('temp'), 'private_key.pem');
+      fs.writeFileSync(privateKeyPath, config.private_key);
+      // Note: We're not passing --private-key anymore as it's not supported
+      // The private key will be read from the config file
+    }
+    
+    // Add other configuration options
+    if (config.app_socket_dir) {
+      args.push('--app-socket-dir', config.app_socket_dir);
+    }
+    
+    if (config.app_data_dir) {
+      args.push('--app-data-dir', config.app_data_dir);
+    }
+    
+    if (config.allow_network_access) {
+      args.push('--allow-network-access');
+    }
+    
+    if (config.allow_filesystem_access) {
+      args.push('--allow-filesystem-access');
+    }
+    
+    if (config.max_memory_mb) {
+      args.push('--max-memory', config.max_memory_mb.toString());
+    }
+    
+    if (config.max_cpu_percent) {
+      args.push('--max-cpu', config.max_cpu_percent.toString());
+    }
+
+    // Start the fold_client process with the actual connection to a DataFold node
+    console.log(`Spawning process: ${foldClientBinaryPath} ${args.join(' ')}`);
+    foldClientProcess = spawn(foldClientBinaryPath, args);
     console.log('Process spawned');
 
     // Handle stdout
@@ -133,14 +172,7 @@ function startFoldClient(config) {
       }
     });
 
-    // For testing, simulate some logs
-    setTimeout(() => {
-      if (mainWindow) {
-        mainWindow.webContents.send('fold-client-log', 'FoldClient started successfully');
-      }
-    }, 500);
-
-    return { success: true, message: 'FoldClient started successfully' };
+    return { success: true, message: 'FoldClient started with connection to DataFold node' };
   } catch (error) {
     console.error('Failed to start FoldClient:', error);
     return { success: false, message: `Failed to start FoldClient: ${error.message}` };

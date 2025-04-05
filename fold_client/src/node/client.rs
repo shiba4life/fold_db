@@ -58,9 +58,11 @@ impl NodeClient {
         // Send the request to the node
         match &self.connection {
             NodeConnection::UnixSocket(path) => {
+                println!("Sending request to Unix socket at {}", path.display());
                 self.send_request_unix(request, path).await
             }
             NodeConnection::TcpSocket(host, port) => {
+                println!("Sending request to TCP socket at {}:{}", host, port);
                 self.send_request_tcp(request, host, *port).await
             }
         }
