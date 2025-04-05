@@ -288,9 +288,18 @@ function loadPrivateKey() {
   try {
     if (fs.existsSync(privateKeyStoragePath)) {
       const data = fs.readFileSync(privateKeyStoragePath, 'utf8');
-      const privateKey = JSON.parse(data);
-      console.log(`Private key loaded from ${privateKeyStoragePath}`);
-      return privateKey;
+      try {
+        const privateKey = JSON.parse(data);
+        console.log(`Private key loaded from ${privateKeyStoragePath}`);
+        return privateKey;
+      } catch (parseError) {
+        console.error('Failed to parse private key JSON:', parseError);
+        // If the file exists but is invalid JSON, we should handle this gracefully
+        // Consider backing up the invalid file for debugging
+        const backupPath = `${privateKeyStoragePath}.backup.${Date.now()}`;
+        fs.copyFileSync(privateKeyStoragePath, backupPath);
+        console.log(`Backed up invalid private key file to ${backupPath}`);
+      }
     } else {
       console.log(`Private key file not found at ${privateKeyStoragePath}`);
     }
@@ -307,10 +316,28 @@ app.whenReady().then(() => {
   // Load private key from storage and send it to the renderer
   const privateKey = loadPrivateKey();
   if (privateKey && mainWindow) {
-    console.log('Sending private key to renderer');
-    setTimeout(() => {
+    console.log(`[${new Date().toISOString()}] Private key loaded, waiting for window to load`);
+    console.log('Private key data structure:', JSON.stringify({
+      hasPath: !!privateKey.path,
+      pathLength: privateKey.path ? privateKey.path.length : 0,
+      hasContent: !!privateKey.content,
+      contentLength: privateKey.content ? privateKey.content.length : 0
+    }));
+    
+    // Wait for the window to finish loading before sending the private key
+    console.log(`[${new Date().toISOString()}] About to set up did-finish-load listener`);
+    mainWindow.webContents.on('did-finish-load', () => {
+      console.log(`[${new Date().toISOString()}] did-finish-load event fired`);
+      console.log('Window loaded, sending private key to renderer');
       mainWindow.webContents.send('load-private-key', privateKey);
-    }, 1000); // Wait for the renderer to be ready
+      console.log(`[${new Date().toISOString()}] Private key sent to renderer`);
+    });
+    
+    // Send a test message after a delay to verify IPC is working
+    setTimeout(() => {
+      console.log(`[${new Date().toISOString()}] Sending test IPC message`);
+      mainWindow.webContents.send('test-message', { test: 'This is a test message' });
+    }, 3000);
   } else {
     console.log('No private key found in storage');
   }
@@ -327,7 +354,17 @@ app.whenReady().then(() => {
   // Add a direct method to get the private key
   ipcMain.handle('get-private-key', () => {
     const privateKey = loadPrivateKey();
-    console.log('Directly getting private key:', privateKey);
+    console.log(`[${new Date().toISOString()}] Directly getting private key via IPC`);
+    if (privateKey) {
+      console.log('Private key data structure (direct request):', JSON.stringify({
+        hasPath: !!privateKey.path,
+        pathLength: privateKey.path ? privateKey.path.length : 0,
+        hasContent: !!privateKey.content,
+        contentLength: privateKey.content ? privateKey.content.length : 0
+      }));
+    } else {
+      console.log('No private key found for direct request');
+    }
     return privateKey;
   });
 

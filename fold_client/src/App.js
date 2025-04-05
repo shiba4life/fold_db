@@ -44,14 +44,24 @@ const App = () => {
   // Load private key directly
   useEffect(() => {
     const loadPrivateKey = async () => {
+      console.log(`[${new Date().toISOString()}] App: Attempting to load private key directly`);
+      console.log('App: window.api available:', !!window.api);
+      
       if (window.api) {
         try {
-          console.log('Directly getting private key');
+          console.log(`[${new Date().toISOString()}] App: Directly getting private key`);
           const privateKeyData = await window.api.getPrivateKey();
-          console.log('Got private key:', privateKeyData);
+          console.log(`[${new Date().toISOString()}] App: Got private key:`, privateKeyData);
           
           if (privateKeyData && privateKeyData.path && privateKeyData.content) {
-            console.log('Setting private key state directly');
+            console.log(`[${new Date().toISOString()}] App: Setting private key state directly`);
+            console.log('App: Private key data structure:', JSON.stringify({
+              hasPath: !!privateKeyData.path,
+              pathLength: privateKeyData.path ? privateKeyData.path.length : 0,
+              hasContent: !!privateKeyData.content,
+              contentLength: privateKeyData.content ? privateKeyData.content.length : 0
+            }));
+            
             setPrivateKey(privateKeyData);
             
             setLogs(prevLogs => [...prevLogs, { 
@@ -59,35 +69,54 @@ const App = () => {
               message: `Private key loaded from storage: ${privateKeyData.path}`, 
               timestamp: new Date() 
             }]);
+          } else {
+            console.log(`[${new Date().toISOString()}] App: No valid private key data returned from getPrivateKey`);
+            if (privateKeyData) {
+              console.log('App: Received data structure:', JSON.stringify({
+                hasPath: !!privateKeyData.path,
+                hasContent: !!privateKeyData.content,
+                keys: Object.keys(privateKeyData)
+              }));
+            }
           }
         } catch (error) {
-          console.error('Error getting private key:', error);
+          console.error(`[${new Date().toISOString()}] App: Error getting private key:`, error);
+          setLogs(prevLogs => [...prevLogs, { 
+            type: 'error', 
+            message: `Error loading private key: ${error.message}`, 
+            timestamp: new Date() 
+          }]);
         }
+      } else {
+        console.error(`[${new Date().toISOString()}] App: API not available for loading private key`);
       }
     };
     
+    // Load the private key when the component mounts
     loadPrivateKey();
   }, []);
 
   // Set up event listeners for fold-client logs
   useEffect(() => {
-    console.log('Setting up event listeners');
+    console.log(`[${new Date().toISOString()}] App: Setting up event listeners`);
+    console.log('App: window.api available:', !!window.api);
     
     if (window.api) {
-      console.log('API is available');
+      console.log(`[${new Date().toISOString()}] App: API is available`);
+      console.log('App: API methods:', Object.keys(window.api).join(', '));
       
       window.api.onFoldClientLog((data) => {
-        console.log('Received log:', data);
+        console.log(`[${new Date().toISOString()}] App: Received log:`, data);
         setLogs(prevLogs => [...prevLogs, { type: 'info', message: data, timestamp: new Date() }]);
       });
 
       window.api.onFoldClientError((data) => {
-        console.log('Received error:', data);
+        console.log(`[${new Date().toISOString()}] App: Received error:`, data);
         setLogs(prevLogs => [...prevLogs, { type: 'error', message: data, timestamp: new Date() }]);
       });
 
       window.api.onFoldClientStopped((data) => {
-        console.log('Received stopped:', data);
+        console.log(`[${new Date().toISOString()}] App: Received stopped:`, data);
         setLogs(prevLogs => [...prevLogs, { 
           type: 'warning', 
           message: `FoldClient stopped with code ${data.code}`, 
@@ -98,24 +127,43 @@ const App = () => {
 
       // Listen for private key loaded from storage
       window.api.onLoadPrivateKey((privateKeyData) => {
-        console.log('Private key loaded from storage (event):', privateKeyData);
+        console.log(`[${new Date().toISOString()}] App: Private key loaded from storage (event):`);
+        console.log('App: Private key data structure from event:', JSON.stringify({
+          hasPath: !!privateKeyData?.path,
+          pathLength: privateKeyData?.path ? privateKeyData.path.length : 0,
+          hasContent: !!privateKeyData?.content,
+          contentLength: privateKeyData?.content ? privateKeyData.content.length : 0,
+          keys: privateKeyData ? Object.keys(privateKeyData) : []
+        }));
         
         if (privateKeyData && privateKeyData.path && privateKeyData.content) {
-          console.log('Setting private key state from event');
+          console.log(`[${new Date().toISOString()}] App: Setting private key state from event`);
           
-          // Force a direct update to the privateKey state
-          setPrivateKey({
-            path: privateKeyData.path,
-            content: privateKeyData.content
+          // Only update if we don't already have a private key or if it's different
+          setPrivateKey(currentKey => {
+            // If we already have this exact key, don't update
+            if (currentKey && 
+                currentKey.path === privateKeyData.path && 
+                currentKey.content === privateKeyData.content) {
+              console.log(`[${new Date().toISOString()}] App: Private key already loaded, skipping update`);
+              return currentKey;
+            }
+            
+            // Log the new key being loaded
+            setLogs(prevLogs => [...prevLogs, { 
+              type: 'info', 
+              message: `Private key loaded from storage: ${privateKeyData.path}`, 
+              timestamp: new Date() 
+            }]);
+            
+            // Return the new key
+            return {
+              path: privateKeyData.path,
+              content: privateKeyData.content
+            };
           });
-          
-          setLogs(prevLogs => [...prevLogs, { 
-            type: 'info', 
-            message: `Private key loaded from storage: ${privateKeyData.path}`, 
-            timestamp: new Date() 
-          }]);
         } else {
-          console.error('Invalid private key data received:', privateKeyData);
+          console.error(`[${new Date().toISOString()}] App: Invalid private key data received:`, privateKeyData);
           setLogs(prevLogs => [...prevLogs, { 
             type: 'error', 
             message: `Failed to load private key from storage: Invalid data`, 
@@ -124,19 +172,43 @@ const App = () => {
         }
       });
       
+      // Set up test message listener
+      window.api.testMessage((data) => {
+        console.log(`[${new Date().toISOString()}] App: Test message received:`, data);
+        setLogs(prevLogs => [...prevLogs, { 
+          type: 'info', 
+          message: `Test message received: ${JSON.stringify(data)}`, 
+          timestamp: new Date() 
+        }]);
+        
+        // If we receive a test message but don't have a private key, try to load it again
+        if (!privateKey) {
+          console.log(`[${new Date().toISOString()}] App: No private key loaded, trying again after test message`);
+          window.api.getPrivateKey().then(key => {
+            console.log(`[${new Date().toISOString()}] App: Retry got private key:`, key);
+            if (key && key.path && key.content) {
+              console.log(`[${new Date().toISOString()}] App: Setting private key from retry`);
+              setPrivateKey(key);
+            }
+          }).catch(err => {
+            console.error(`[${new Date().toISOString()}] App: Retry error:`, err);
+          });
+        }
+      });
+      
       // Debug: Check if event listeners were set up
-      console.log('Event listeners set up');
+      console.log(`[${new Date().toISOString()}] App: Event listeners set up`);
     } else {
-      console.error('API is not available');
+      console.error(`[${new Date().toISOString()}] App: API is not available`);
     }
 
     return () => {
-      console.log('Cleaning up event listeners');
+      console.log(`[${new Date().toISOString()}] App: Cleaning up event listeners`);
       if (window.api) {
         window.api.removeAllListeners();
       }
     };
-  }, []);
+  }, [privateKey]);
   
   // Debug effect to monitor privateKey state changes
   useEffect(() => {

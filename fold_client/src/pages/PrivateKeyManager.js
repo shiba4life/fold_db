@@ -10,27 +10,51 @@ const PrivateKeyManager = ({ privateKey: propPrivateKey, selectPrivateKeyFile })
     alert(localPrivateKey ? `Private key loaded: ${localPrivateKey.path}` : 'No private key loaded');
   };
 
-  // Load private key directly when component mounts
+  // Load private key directly when component mounts if not already provided via props
   useEffect(() => {
     const loadPrivateKey = async () => {
+      console.log(`[${new Date().toISOString()}] PrivateKeyManager: Checking if we need to load private key`);
+      console.log('PrivateKeyManager: window.api available:', !!window.api);
+      console.log('PrivateKeyManager: localPrivateKey:', !!localPrivateKey);
+      
+      // Only try to load if we don't already have a key from props and the API is available
       if (window.api && !localPrivateKey) {
         try {
-          console.log('PrivateKeyManager: Directly getting private key');
+          console.log(`[${new Date().toISOString()}] PrivateKeyManager: Directly getting private key`);
           const privateKeyData = await window.api.getPrivateKey();
-          console.log('PrivateKeyManager: Got private key:', privateKeyData);
+          console.log(`[${new Date().toISOString()}] PrivateKeyManager: Got private key:`, privateKeyData);
           
           if (privateKeyData && privateKeyData.path && privateKeyData.content) {
-            console.log('PrivateKeyManager: Setting local private key state');
+            console.log(`[${new Date().toISOString()}] PrivateKeyManager: Setting local private key state`);
+            console.log('PrivateKeyManager: Private key data structure:', JSON.stringify({
+              hasPath: !!privateKeyData.path,
+              pathLength: privateKeyData.path ? privateKeyData.path.length : 0,
+              hasContent: !!privateKeyData.content,
+              contentLength: privateKeyData.content ? privateKeyData.content.length : 0
+            }));
             setLocalPrivateKey(privateKeyData);
+          } else {
+            console.log(`[${new Date().toISOString()}] PrivateKeyManager: No valid private key data returned from getPrivateKey`);
+            if (privateKeyData) {
+              console.log('PrivateKeyManager: Received data structure:', JSON.stringify({
+                hasPath: !!privateKeyData.path,
+                hasContent: !!privateKeyData.content,
+                keys: Object.keys(privateKeyData)
+              }));
+            }
           }
         } catch (error) {
-          console.error('PrivateKeyManager: Error getting private key:', error);
+          console.error(`[${new Date().toISOString()}] PrivateKeyManager: Error getting private key:`, error);
         }
+      } else if (localPrivateKey) {
+        console.log(`[${new Date().toISOString()}] PrivateKeyManager: Already have private key, skipping load`);
+      } else if (!window.api) {
+        console.error(`[${new Date().toISOString()}] PrivateKeyManager: API not available for loading private key`);
       }
     };
     
     loadPrivateKey();
-  }, []);
+  }, [localPrivateKey]);
   
   // Update local state when prop changes
   useEffect(() => {
@@ -89,11 +113,47 @@ const PrivateKeyManager = ({ privateKey: propPrivateKey, selectPrivateKeyFile })
                 Select Private Key File
               </button>
               <button 
-                className="btn btn-secondary" 
+                className="btn btn-secondary me-2" 
                 onClick={debugPrivateKey}
               >
                 <i className="fas fa-bug me-2"></i>
                 Debug
+              </button>
+              <button 
+                className="btn btn-info" 
+                onClick={async () => {
+                  console.log(`[${new Date().toISOString()}] PrivateKeyManager: Directly requesting private key`);
+                  if (window.api) {
+                    try {
+                      const key = await window.api.getPrivateKey();
+                      console.log(`[${new Date().toISOString()}] PrivateKeyManager: Direct private key result:`, key);
+                      if (key && key.path && key.content) {
+                        console.log(`[${new Date().toISOString()}] PrivateKeyManager: Setting key from direct test`);
+                        setLocalPrivateKey(key);
+                        alert(`Direct key load success: ${key.path}`);
+                      } else {
+                        console.log(`[${new Date().toISOString()}] PrivateKeyManager: No valid key returned from direct test`);
+                        alert('No valid key found');
+                        if (key) {
+                          console.log('PrivateKeyManager: Direct test result structure:', JSON.stringify({
+                            hasPath: !!key.path,
+                            hasContent: !!key.content,
+                            keys: Object.keys(key)
+                          }));
+                        }
+                      }
+                    } catch (err) {
+                      console.error(`[${new Date().toISOString()}] PrivateKeyManager: Error in direct key request:`, err);
+                      alert(`Error: ${err.message}`);
+                    }
+                  } else {
+                    console.error(`[${new Date().toISOString()}] PrivateKeyManager: API not available for direct test`);
+                    alert('API not available');
+                  }
+                }}
+              >
+                <i className="fas fa-sync me-2"></i>
+                Test Direct Key Load
               </button>
             </div>
           )}
