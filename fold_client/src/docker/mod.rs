@@ -15,6 +15,26 @@ use bollard::Docker;
 use std::collections::HashMap;
 use std::path::Path;
 
+/// Container creation parameters
+pub struct ContainerParams<'a> {
+    /// Application ID
+    pub app_id: &'a str,
+    /// Working directory
+    pub working_dir: &'a Path,
+    /// Program to run
+    pub program: &'a str,
+    /// Program arguments
+    pub args: &'a [&'a str],
+    /// Environment variables
+    pub env_vars: &'a HashMap<String, String>,
+    /// Whether to allow network access
+    pub allow_network: bool,
+    /// Memory limit in MB (optional)
+    pub memory_limit: Option<u64>,
+    /// CPU limit (optional)
+    pub cpu_limit: Option<u64>,
+}
+
 /// Docker container manager
 #[derive(Clone)]
 pub struct DockerManager {
@@ -44,44 +64,35 @@ impl DockerManager {
         Ok(Self { docker, config })
     }
 
-    /// Create a container for an app
-    pub async fn create_container(
-        &self,
-        app_id: &str,
-        working_dir: &Path,
-        program: &str,
-        args: &[&str],
-        env_vars: &HashMap<String, String>,
-        allow_network: bool,
-        memory_limit: Option<u64>,
-        cpu_limit: Option<u64>,
-    ) -> Result<String> {
-        // Create container options
-        let options = CreateContainerOptions {
-            name: format!("fold_client_{}", app_id),
-            platform: None,
-        };
 
-        // Create host config
-        let mut host_config = HostConfig {
-            auto_remove: Some(self.config.auto_remove),
-            memory: memory_limit.or(Some(self.config.default_memory_limit * 1024 * 1024)).map(|m| m as i64),
-            memory_swap: memory_limit.map(|m| (m * 2 * 1024 * 1024) as i64),
-            cpu_shares: cpu_limit.or(Some(self.config.default_cpu_limit)).map(|c| c as i64),
-            network_mode: Some(if allow_network {
-                self.config.network.clone()
-            } else {
-                "none".to_string()
-            }),
-            mounts: Some(vec![Mount {
-                target: Some("/app".to_string()),
-                source: Some(working_dir.to_string_lossy().to_string()),
-                typ: Some(MountTypeEnum::BIND),
-                read_only: Some(false),
-                ..Default::default()
-            }]),
+/// Create a container for an app
+pub async fn create_container(&self, params: ContainerParams<'_>) -> Result<String> {
+    // Create container options
+    let options = CreateContainerOptions {
+        name: format!("fold_client_{}", params.app_id),
+        platform: None,
+    };
+
+    // Create host config
+    let mut host_config = HostConfig {
+        auto_remove: Some(self.config.auto_remove),
+        memory: params.memory_limit.or(Some(self.config.default_memory_limit * 1024 * 1024)).map(|m| m as i64),
+        memory_swap: params.memory_limit.map(|m| (m * 2 * 1024 * 1024) as i64),
+        cpu_shares: params.cpu_limit.or(Some(self.config.default_cpu_limit)).map(|c| c as i64),
+        network_mode: Some(if params.allow_network {
+            self.config.network.clone()
+        } else {
+            "none".to_string()
+        }),
+        mounts: Some(vec![Mount {
+            target: Some("/app".to_string()),
+            source: Some(params.working_dir.to_string_lossy().to_string()),
+            typ: Some(MountTypeEnum::BIND),
+            read_only: Some(false),
             ..Default::default()
-        };
+        }]),
+        ..Default::default()
+    };
 
         // Set storage limit if supported
         if let Some(storage_limit) = Some(self.config.default_storage_limit * 1024 * 1024) {
@@ -90,25 +101,25 @@ impl DockerManager {
             ]));
         }
 
-        // Create environment variables
-        let env = env_vars
-            .iter()
-            .map(|(k, v)| format!("{}={}", k, v))
-            .collect::<Vec<_>>();
+    // Create environment variables
+    let env = params.env_vars
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, v))
+        .collect::<Vec<_>>();
 
-        // Create container config
-        let container_config = ContainerConfig {
-            image: Some(self.config.base_image.clone()),
-            cmd: Some(
-                std::iter::once(program.to_string())
-                    .chain(args.iter().map(|s| s.to_string()))
-                    .collect(),
-            ),
-            env: Some(env),
-            working_dir: Some("/app".to_string()),
-            host_config: Some(host_config),
-            ..Default::default()
-        };
+    // Create container config
+    let container_config = ContainerConfig {
+        image: Some(self.config.base_image.clone()),
+        cmd: Some(
+            std::iter::once(params.program.to_string())
+                .chain(params.args.iter().map(|s| s.to_string()))
+                .collect(),
+        ),
+        env: Some(env),
+        working_dir: Some("/app".to_string()),
+        host_config: Some(host_config),
+        ..Default::default()
+    };
 
         // Create the container
         let response = self
@@ -258,17 +269,7 @@ impl DockerManager {
 #[async_trait]
 pub trait ContainerManager {
     /// Create a container
-    async fn create_container(
-        &self,
-        app_id: &str,
-        working_dir: &Path,
-        program: &str,
-        args: &[&str],
-        env_vars: &HashMap<String, String>,
-        allow_network: bool,
-        memory_limit: Option<u64>,
-        cpu_limit: Option<u64>,
-    ) -> Result<String>;
+    async fn create_container(&self, params: ContainerParams<'_>) -> Result<String>;
 
     /// Start a container
     async fn start_container(&self, container_id: &str) -> Result<()>;
@@ -291,28 +292,8 @@ pub trait ContainerManager {
 
 #[async_trait]
 impl ContainerManager for DockerManager {
-    async fn create_container(
-        &self,
-        app_id: &str,
-        working_dir: &Path,
-        program: &str,
-        args: &[&str],
-        env_vars: &HashMap<String, String>,
-        allow_network: bool,
-        memory_limit: Option<u64>,
-        cpu_limit: Option<u64>,
-    ) -> Result<String> {
-        self.create_container(
-            app_id,
-            working_dir,
-            program,
-            args,
-            env_vars,
-            allow_network,
-            memory_limit,
-            cpu_limit,
-        )
-        .await
+    async fn create_container(&self, params: ContainerParams<'_>) -> Result<String> {
+        self.create_container(params).await
     }
 
     async fn start_container(&self, container_id: &str) -> Result<()> {

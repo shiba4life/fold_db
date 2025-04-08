@@ -92,18 +92,21 @@ impl ProcessManager {
         // Get the Docker manager
         let docker_manager = self.get_docker_manager().await?;
 
+        // Create container parameters
+        let container_params = crate::docker::ContainerParams {
+            app_id: &app.app_id,
+            working_dir: &working_dir,
+            program,
+            args,
+            env_vars: &env_vars,
+            allow_network: self.docker_config.default_allow_network,
+            memory_limit: None,
+            cpu_limit: None,
+        };
+
         // Create and start the container
         let container_id = docker_manager
-            .create_container(
-                &app.app_id,
-                &working_dir,
-                program,
-                args,
-                &env_vars,
-                self.docker_config.default_allow_network,
-                None,
-                None,
-            )
+            .create_container(container_params)
             .await?;
 
         docker_manager.start_container(&container_id).await?;
