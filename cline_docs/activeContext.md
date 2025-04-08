@@ -14,7 +14,6 @@ Replacing the existing fold_client with a new Docker-based implementation.
      - Simplified implementation leveraging Docker's security features
      - Network isolation capabilities
      - Improved IPC communication through Unix domain sockets
-   - Updated sample_social_app example to work with Docker containers
    - Added comprehensive documentation in DOCKER.md
    - Updated Cargo.toml files to reference the new implementation
 

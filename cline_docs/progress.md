@@ -95,7 +95,6 @@
   - Added resource limits for CPU, memory, and storage
   - Implemented network isolation capabilities
   - Enhanced IPC communication through Unix domain sockets
-  - Updated sample_social_app example to work with Docker
   - Added comprehensive documentation in DOCKER.md
   - Updated all references to fold_client in the codebase
   - Improved cross-platform compatibility (Linux, macOS, Windows)
