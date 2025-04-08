@@ -1,10 +1,24 @@
 # Active Context
 
 ## Current Task
-Implementing and testing cross-node request forwarding to enable communication between nodes.
+Replacing the existing fold_client with a new Docker-based implementation.
 
 ## Recent Changes
-1. Enhanced Pre-commit Hook and Fixed Tests and Linting Issues:
+1. Replaced fold_client with Docker-based Implementation:
+   - Replaced the platform-specific sandbox implementation with a Docker-based approach
+   - Updated all references to fold_client in the codebase to point to the new implementation
+   - Key improvements:
+     - Cross-platform compatibility (Linux, macOS, Windows) with consistent sandboxing
+     - Stronger isolation through Docker containers
+     - Fine-grained resource management (CPU, memory, storage limits)
+     - Simplified implementation leveraging Docker's security features
+     - Network isolation capabilities
+     - Improved IPC communication through Unix domain sockets
+   - Updated sample_social_app example to work with Docker containers
+   - Added comprehensive documentation in DOCKER.md
+   - Updated Cargo.toml files to reference the new implementation
+
+2. Enhanced Pre-commit Hook and Fixed Tests and Linting Issues:
    - Added `cargo test --workspace` to the pre-commit hook to run all tests across the entire workspace
    - Updated HOOKS_README.md to reflect the new test in the pre-commit hook
    - Fixed failing test `unit_tests::folddb_tests::test_write_and_query` by improving error handling in the test helper function
@@ -105,3 +119,21 @@ Implementing and testing cross-node request forwarding to enable communication b
 - Node validation checks
 - Error handling for security violations
 - Configurable connection limits and timeouts
+
+### Docker-based Sandboxing
+1. **Process Isolation**: Docker containers run in isolated namespaces, providing process isolation from the host system and other containers.
+2. **Network Isolation**: Containers can be configured to run with or without network access:
+   - No Network Access: Containers can be configured with the `none` network driver
+   - Limited Network Access: Containers can be configured with a specific Docker network
+3. **File System Isolation**: Docker containers have their own isolated file system with controlled access to host directories.
+4. **Resource Limits**:
+   - CPU Limits: Controls the amount of CPU time the container can use
+   - Memory Limits: Restricts the amount of memory the container can use
+   - Storage Limits: Limits the amount of disk space the container can use
+5. **IPC Communication**: Applications communicate with the FoldClient using a Unix domain socket mounted into the container.
+6. **Container Lifecycle Management**:
+   - Creation: FoldClient creates a Docker container when an application is launched
+   - Starting: FoldClient starts the container after creation
+   - Monitoring: FoldClient monitors the container's status
+   - Stopping: FoldClient stops the container when an application is terminated
+   - Removal: FoldClient removes the container to clean up resources

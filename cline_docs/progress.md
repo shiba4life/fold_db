@@ -89,6 +89,20 @@
 - Simplify permission system
 
 ## Recent Improvements
+- Replaced fold_client with Docker-based implementation:
+  - Replaced platform-specific sandbox mechanisms with Docker containers
+  - Implemented Docker container management using bollard crate
+  - Added resource limits for CPU, memory, and storage
+  - Implemented network isolation capabilities
+  - Enhanced IPC communication through Unix domain sockets
+  - Updated sample_social_app example to work with Docker
+  - Added comprehensive documentation in DOCKER.md
+  - Updated all references to fold_client in the codebase
+  - Improved cross-platform compatibility (Linux, macOS, Windows)
+  - Simplified sandbox implementation by leveraging Docker's security features
+  - Enhanced container lifecycle management (creation, starting, monitoring, stopping, removal)
+  - Added configurable Docker settings through environment variables
+
 - Enhanced development workflow, fixed tests, and addressed linting issues:
   - Added `cargo test --workspace` to the pre-commit hook to run all tests across the entire workspace
   - Updated HOOKS_README.md to reflect the new test in the pre-commit hook

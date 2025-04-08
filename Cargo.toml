@@ -52,17 +52,20 @@ tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "full"] }
 fold_node = { path = "./fold_node", features = ["test-utils"] }  # Enable test-utils for tests
 reqwest = { version = "0.11", features = ["json"] }
 
-[[example]]
-name = "social_app_tcp"
-path = "examples/social_app_tcp.rs"
+# Commented out missing example
+# [[example]]
+# name = "social_app_tcp"
+# path = "examples/social_app_tcp.rs"
 
-[[example]]
-name = "social_app_two_nodes"
-path = "examples/social_app_two_nodes.rs"
+# Commented out missing example
+# [[example]]
+# name = "social_app_two_nodes"
+# path = "examples/social_app_two_nodes.rs"
 
-[[example]]
-name = "sandboxed_app_two_nodes"
-path = "examples/sandboxed_app_two_nodes/main.rs"
+# Commented out missing example
+# [[example]]
+# name = "sandboxed_app_two_nodes"
+# path = "examples/sandboxed_app_two_nodes/main.rs"
 
 
 [lib]

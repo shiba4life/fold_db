@@ -1,215 +1,170 @@
-//! FoldClient - A client for DataFold that provides sandboxed access to the node API
-//!
-//! This is the main executable for the FoldClient.
-
-use clap::{Parser, Subcommand};
-use fold_client::{FoldClient, FoldClientConfig, Result};
+use fold_client::{FoldClient, FoldClientConfig, DockerConfig};
 use std::path::PathBuf;
-
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct Cli {
-    /// Path to the configuration file
-    #[arg(short, long, value_name = "FILE")]
-    config: Option<PathBuf>,
-
-    #[command(subcommand)]
-    command: Commands,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    /// Start the FoldClient
-    Start {
-        /// Path to the DataFold node socket
-        #[arg(long)]
-        node_socket: Option<String>,
-
-        /// Host for the DataFold node TCP connection
-        #[arg(long)]
-        node_host: Option<String>,
-
-        /// Port for the DataFold node TCP connection
-        #[arg(long)]
-        node_port: Option<u16>,
-
-        /// Path to the directory where app sockets will be created
-        #[arg(long)]
-        app_socket_dir: Option<PathBuf>,
-
-        /// Path to the directory where app data will be stored
-        #[arg(long)]
-        app_data_dir: Option<PathBuf>,
-
-        /// Whether to allow network access for apps
-        #[arg(long)]
-        allow_network: bool,
-
-        /// Whether to allow file system access for apps
-        #[arg(long)]
-        allow_filesystem: bool,
-
-        /// Maximum memory usage for apps (in MB)
-        #[arg(long)]
-        max_memory: Option<u64>,
-
-        /// Maximum CPU usage for apps (in percent)
-        #[arg(long)]
-        max_cpu: Option<u32>,
-    },
-    /// Register a new app
-    RegisterApp {
-        /// Name of the app
-        #[arg(short, long)]
-        name: String,
-
-        /// Permissions for the app (comma-separated)
-        #[arg(short, long)]
-        permissions: String,
-    },
-    /// Launch an app
-    LaunchApp {
-        /// ID of the app
-        #[arg(short, long)]
-        id: String,
-
-        /// Path to the program to launch
-        #[arg(short, long)]
-        program: String,
-
-        /// Arguments for the program
-        #[arg(short, long)]
-        args: Vec<String>,
-    },
-    /// Terminate an app
-    TerminateApp {
-        /// ID of the app
-        #[arg(short, long)]
-        id: String,
-    },
-}
+use std::process;
+use tokio::signal;
+use log::{info, error};
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    // Initialize the logger
-    env_logger::init();
+async fn main() {
+    // Initialize logging
+    env_logger::init_from_env(
+        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
+    );
 
-    // Parse command-line arguments
-    let cli = Cli::parse();
+    // Parse command line arguments
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 && (args[1] == "-h" || args[1] == "--help") {
+        print_usage();
+        return;
+    }
 
     // Load configuration
-    let mut config = if let Some(config_path) = cli.config {
-        // Load configuration from file
-        let config_str = std::fs::read_to_string(config_path)?;
-        let config: FoldClientConfig = serde_json::from_str(&config_str)
-            .map_err(|e| fold_client::FoldClientError::Config(format!("Invalid configuration: {}", e)))?;
-        config
-    } else {
-        // Use default configuration
-        FoldClientConfig::default()
-    };
+    let config = load_config().unwrap_or_else(|e| {
+        error!("Failed to load configuration: {}", e);
+        process::exit(1);
+    });
 
-    // Process command
-    match cli.command {
-        Commands::Start {
-            node_socket,
-            node_host,
-            node_port,
-            app_socket_dir,
-            app_data_dir,
-            allow_network,
-            allow_filesystem,
-            max_memory,
-            max_cpu,
-        } => {
-            // Update configuration with command-line options
-            if let Some(node_socket) = node_socket {
-                config.node_socket_path = Some(node_socket);
-                config.node_tcp_address = None;
-            } else if let (Some(host), Some(port)) = (node_host, node_port) {
-                config.node_tcp_address = Some((host, port));
-                config.node_socket_path = None;
-            }
+    // Create the FoldClient
+    let mut client = FoldClient::with_config(config).unwrap_or_else(|e| {
+        error!("Failed to create FoldClient: {}", e);
+        process::exit(1);
+    });
 
-            if let Some(app_socket_dir) = app_socket_dir {
-                config.app_socket_dir = app_socket_dir;
-            }
+    // Start the FoldClient
+    if let Err(e) = client.start().await {
+        error!("Failed to start FoldClient: {}", e);
+        process::exit(1);
+    }
 
-            if let Some(app_data_dir) = app_data_dir {
-                config.app_data_dir = app_data_dir;
-            }
+    info!("FoldClient started successfully");
 
-            config.allow_network_access = allow_network;
-            config.allow_filesystem_access = allow_filesystem;
-
-            if let Some(max_memory) = max_memory {
-                config.max_memory_mb = Some(max_memory);
-            }
-
-            if let Some(max_cpu) = max_cpu {
-                config.max_cpu_percent = Some(max_cpu);
-            }
-
-            // Connect to the actual DataFold node
-            println!("Connecting to DataFold node...");
-            
-            // Log connection details before creating the client
-            let connection_info = match (&config.node_tcp_address, &config.node_socket_path) {
-                (Some((host, port)), _) => {
-                    format!("Using TCP connection to {}:{}", host, port)
-                },
-                (_, Some(socket_path)) => {
-                    format!("Using Unix socket at {}", socket_path)
-                },
-                _ => {
-                    eprintln!("No node connection specified");
-                    return Err(fold_client::FoldClientError::Config("No node connection specified".to_string()));
-                }
-            };
-            
-            println!("{}", connection_info);
-            
-            // Create and start the FoldClient
-            let mut client = FoldClient::with_config(config)?;
-            
-            // Start the client which will connect to the actual DataFold node
-            client.start().await?;
-            println!("Connected to DataFold node successfully");
-
-            // Wait for Ctrl+C
-            tokio::signal::ctrl_c().await?;
-
-            // Stop the FoldClient
-            client.stop().await?;
+    // Wait for Ctrl+C
+    match signal::ctrl_c().await {
+        Ok(()) => {
+            info!("Shutting down...");
         }
-        Commands::RegisterApp { name, permissions } => {
-            // Create the FoldClient
-            let mut client = FoldClient::with_config(config)?;
-
-            // Parse permissions
-            let permissions: Vec<&str> = permissions.split(',').collect();
-
-            // Register the app
-            client.register_app(&name, &permissions).await?;
-        }
-        Commands::LaunchApp { id, program, args } => {
-            // Create the FoldClient
-            let client = FoldClient::with_config(config)?;
-
-            // Convert args to &[&str]
-            let args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-
-            // Launch the app
-            client.launch_app(&id, &program, &args).await?;
-        }
-        Commands::TerminateApp { id } => {
-            // Create the FoldClient
-            let client = FoldClient::with_config(config)?;
-
-            // Terminate the app
-            client.terminate_app(&id).await?;
+        Err(e) => {
+            error!("Failed to listen for Ctrl+C: {}", e);
         }
     }
 
-    Ok(())
+    // Stop the FoldClient
+    if let Err(e) = client.stop().await {
+        error!("Failed to stop FoldClient: {}", e);
+        process::exit(1);
+    }
+
+    info!("FoldClient stopped successfully");
+}
+
+fn print_usage() {
+    println!("FoldClient - A client for DataFold that provides Docker-sandboxed access to the node API");
+    println!();
+    println!("USAGE:");
+    println!("    fold_client [OPTIONS]");
+    println!();
+    println!("OPTIONS:");
+    println!("    -h, --help    Print this help message");
+    println!();
+    println!("ENVIRONMENT VARIABLES:");
+    println!("    FOLD_CLIENT_NODE_SOCKET_PATH    Path to the DataFold node socket");
+    println!("    FOLD_CLIENT_NODE_TCP_HOST       Host for the DataFold node TCP connection");
+    println!("    FOLD_CLIENT_NODE_TCP_PORT       Port for the DataFold node TCP connection");
+    println!("    FOLD_CLIENT_APP_SOCKET_DIR      Path to the directory where app sockets will be created");
+    println!("    FOLD_CLIENT_APP_DATA_DIR        Path to the directory where app data will be stored");
+    println!("    FOLD_CLIENT_DOCKER_HOST         Docker API URL (e.g., unix:///var/run/docker.sock)");
+    println!("    FOLD_CLIENT_DOCKER_NETWORK      Docker network to use for containers");
+    println!("    FOLD_CLIENT_DOCKER_CPU_LIMIT    Default CPU limit for containers (in CPU shares)");
+    println!("    FOLD_CLIENT_DOCKER_MEM_LIMIT    Default memory limit for containers (in MB)");
+    println!("    FOLD_CLIENT_DOCKER_STORAGE_LIMIT Default storage limit for containers (in MB)");
+    println!("    FOLD_CLIENT_DOCKER_ALLOW_NETWORK Whether to enable network access for containers by default");
+    println!("    FOLD_CLIENT_DOCKER_BASE_IMAGE   Base image to use for containers");
+    println!("    FOLD_CLIENT_DOCKER_AUTO_REMOVE  Whether to auto-remove containers when they exit");
+}
+
+fn load_config() -> Result<FoldClientConfig, Box<dyn std::error::Error>> {
+    // Load environment variables from .env file if it exists
+    let _ = dotenv::dotenv();
+
+    // Get the home directory
+    let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
+    let _datafold_dir = home_dir.join(".datafold");
+
+    // Create a default configuration
+    let mut config = FoldClientConfig::default();
+
+    // Override with environment variables
+    if let Ok(socket_path) = std::env::var("FOLD_CLIENT_NODE_SOCKET_PATH") {
+        config.node_socket_path = Some(socket_path);
+        config.node_tcp_address = None;
+    } else if let (Ok(host), Ok(port_str)) = (
+        std::env::var("FOLD_CLIENT_NODE_TCP_HOST"),
+        std::env::var("FOLD_CLIENT_NODE_TCP_PORT"),
+    ) {
+        if let Ok(port) = port_str.parse::<u16>() {
+            config.node_tcp_address = Some((host, port));
+            config.node_socket_path = None;
+        }
+    }
+
+    if let Ok(app_socket_dir) = std::env::var("FOLD_CLIENT_APP_SOCKET_DIR") {
+        config.app_socket_dir = PathBuf::from(app_socket_dir);
+    }
+
+    if let Ok(app_data_dir) = std::env::var("FOLD_CLIENT_APP_DATA_DIR") {
+        config.app_data_dir = PathBuf::from(app_data_dir);
+    }
+
+    // Docker configuration
+    let mut docker_config = DockerConfig::default();
+
+    if let Ok(docker_host) = std::env::var("FOLD_CLIENT_DOCKER_HOST") {
+        docker_config.docker_host = Some(docker_host);
+    }
+
+    if let Ok(network) = std::env::var("FOLD_CLIENT_DOCKER_NETWORK") {
+        docker_config.network = network;
+    }
+
+    if let Ok(cpu_limit_str) = std::env::var("FOLD_CLIENT_DOCKER_CPU_LIMIT") {
+        if let Ok(cpu_limit) = cpu_limit_str.parse::<u64>() {
+            docker_config.default_cpu_limit = cpu_limit;
+        }
+    }
+
+    if let Ok(mem_limit_str) = std::env::var("FOLD_CLIENT_DOCKER_MEM_LIMIT") {
+        if let Ok(mem_limit) = mem_limit_str.parse::<u64>() {
+            docker_config.default_memory_limit = mem_limit;
+        }
+    }
+
+    if let Ok(storage_limit_str) = std::env::var("FOLD_CLIENT_DOCKER_STORAGE_LIMIT") {
+        if let Ok(storage_limit) = storage_limit_str.parse::<u64>() {
+            docker_config.default_storage_limit = storage_limit;
+        }
+    }
+
+    if let Ok(allow_network_str) = std::env::var("FOLD_CLIENT_DOCKER_ALLOW_NETWORK") {
+        if let Ok(allow_network) = allow_network_str.parse::<bool>() {
+            docker_config.default_allow_network = allow_network;
+        }
+    }
+
+    if let Ok(base_image) = std::env::var("FOLD_CLIENT_DOCKER_BASE_IMAGE") {
+        docker_config.base_image = base_image;
+    }
+
+    if let Ok(auto_remove_str) = std::env::var("FOLD_CLIENT_DOCKER_AUTO_REMOVE") {
+        if let Ok(auto_remove) = auto_remove_str.parse::<bool>() {
+            docker_config.auto_remove = auto_remove;
+        }
+    }
+
+    config.docker_config = docker_config;
+
+    // Create the necessary directories
+    std::fs::create_dir_all(&config.app_socket_dir)?;
+    std::fs::create_dir_all(&config.app_data_dir)?;
+
+    Ok(config)
 }

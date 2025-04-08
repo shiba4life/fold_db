@@ -110,3 +110,8 @@ pub struct NodeResponse {
 pub fn get_app_socket_path(app_socket_dir: &std::path::Path, app_id: &str) -> PathBuf {
     app_socket_dir.join(format!("{}.sock", app_id))
 }
+
+/// Get the path to the Docker volume mount for the IPC socket
+pub fn get_docker_socket_mount(app_id: &str) -> String {
+    format!("/tmp/fold_client_sockets/{}.sock", app_id)
+}

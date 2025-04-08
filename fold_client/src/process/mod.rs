@@ -1,62 +1,79 @@
 //! Process module for FoldClient
 //!
-//! This module provides functionality for managing sandboxed processes.
+//! This module provides functionality for managing Docker-sandboxed processes.
 
 use crate::auth::AppRegistration;
+use crate::docker::DockerManager;
+use crate::DockerConfig;
 use crate::Result;
 use crate::FoldClientError;
-use crate::sandbox::{Sandbox, SandboxConfig, create_sandbox};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::process::Child;
 use std::sync::{Arc, Mutex};
 
 /// Process manager for FoldClient
 pub struct ProcessManager {
     /// Directory where app data is stored
     app_data_dir: PathBuf,
-    /// Whether to allow network access for apps
-    allow_network: bool,
-    /// Whether to allow file system access for apps
-    allow_filesystem: bool,
-    /// Maximum memory usage for apps (in MB)
-    max_memory_mb: Option<u64>,
-    /// Maximum CPU usage for apps (in percent)
-    max_cpu_percent: Option<u32>,
-    /// Active processes
-    processes: Arc<Mutex<HashMap<String, ManagedProcess>>>,
-}
-
-/// A managed process
-struct ManagedProcess {
-    /// Child process
-    child: Child,
+    /// Docker configuration
+    docker_config: DockerConfig,
+    /// Docker manager
+    docker_manager: Arc<Mutex<Option<DockerManager>>>,
+    /// Active containers
+    containers: Arc<Mutex<HashMap<String, String>>>,
 }
 
 impl ProcessManager {
     /// Create a new process manager
     pub fn new(
         app_data_dir: PathBuf,
-        allow_network: bool,
-        allow_filesystem: bool,
-        max_memory_mb: Option<u64>,
-        max_cpu_percent: Option<u32>,
+        docker_config: DockerConfig,
     ) -> Result<Self> {
         // Create the app data directory if it doesn't exist
         std::fs::create_dir_all(&app_data_dir)?;
 
         Ok(Self {
             app_data_dir,
-            allow_network,
-            allow_filesystem,
-            max_memory_mb,
-            max_cpu_percent,
-            processes: Arc::new(Mutex::new(HashMap::new())),
+            docker_config,
+            docker_manager: Arc::new(Mutex::new(None)),
+            containers: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
+    /// Initialize the Docker manager
+    async fn init_docker_manager(&self) -> Result<()> {
+        // Check if Docker manager is already initialized
+        {
+            let docker_manager_lock = self.docker_manager.lock().unwrap();
+            if docker_manager_lock.is_some() {
+                return Ok(());
+            }
+        }
+        
+        // Initialize Docker manager
+        let docker_manager = DockerManager::new(self.docker_config.clone()).await?;
+        
+        // Store Docker manager
+        let mut docker_manager_lock = self.docker_manager.lock().unwrap();
+        if docker_manager_lock.is_none() {
+            *docker_manager_lock = Some(docker_manager);
+        }
+        
+        Ok(())
+    }
+
+    /// Get the Docker manager
+    async fn get_docker_manager(&self) -> Result<Arc<DockerManager>> {
+        self.init_docker_manager().await?;
+        let docker_manager = {
+            let docker_manager_lock = self.docker_manager.lock().unwrap();
+            docker_manager_lock.as_ref().unwrap().clone()
+        };
+        Ok(Arc::new(docker_manager))
+    }
+
     /// Launch an app
-    pub fn launch_app(
+    pub async fn launch_app(
         &self,
         app: AppRegistration,
         program: &str,
@@ -70,96 +87,112 @@ impl ProcessManager {
         let mut env_vars = HashMap::new();
         env_vars.insert("FOLD_CLIENT_APP_ID".to_string(), app.app_id.clone());
         env_vars.insert("FOLD_CLIENT_APP_TOKEN".to_string(), app.token.clone());
+        env_vars.insert("FOLD_CLIENT_SOCKET_DIR".to_string(), "/tmp/fold_client_sockets".to_string());
 
-        // Create the sandbox configuration
-        let config = SandboxConfig {
-            working_dir: working_dir.clone(),
-            allow_network: self.allow_network,
-            allow_filesystem: self.allow_filesystem,
-            max_memory_mb: self.max_memory_mb,
-            max_cpu_percent: self.max_cpu_percent,
-            env_vars,
-        };
+        // Get the Docker manager
+        let docker_manager = self.get_docker_manager().await?;
 
-        // Create the sandbox
-        let sandbox = create_sandbox(config)?;
+        // Create and start the container
+        let container_id = docker_manager
+            .create_container(
+                &app.app_id,
+                &working_dir,
+                program,
+                args,
+                &env_vars,
+                self.docker_config.default_allow_network,
+                None,
+                None,
+            )
+            .await?;
 
-        // Launch the app in the sandbox
-        let child = sandbox.run_command(program, args)?;
+        docker_manager.start_container(&container_id).await?;
 
-        // Store the process
-        let mut processes = self.processes.lock().unwrap();
-        processes.insert(
-            app.app_id.clone(),
-            ManagedProcess {
-                child,
-            },
-        );
+        // Store the container ID
+        let mut containers = self.containers.lock().unwrap();
+        containers.insert(app.app_id.clone(), container_id);
 
         Ok(())
     }
 
     /// Terminate an app
-    pub fn terminate_app(&self, app_id: &str) -> Result<()> {
-        // Get the process
-        let mut processes = self.processes.lock().unwrap();
-        let process = processes
-            .remove(app_id)
-            .ok_or_else(|| FoldClientError::Process(format!("App not found: {}", app_id)))?;
+    pub async fn terminate_app(&self, app_id: &str) -> Result<()> {
+        // Get the container ID
+        let container_id = {
+            let containers = self.containers.lock().unwrap();
+            containers
+                .get(app_id)
+                .cloned()
+                .ok_or_else(|| FoldClientError::Process(format!("App not found: {}", app_id)))?
+        };
 
-        // Terminate the process
-        let mut child = process.child;
-        child.kill().map_err(|e| {
-            FoldClientError::Process(format!("Failed to terminate app {}: {}", app_id, e))
-        })?;
+        // Get the Docker manager
+        let docker_manager = self.get_docker_manager().await?;
+
+        // Stop and remove the container
+        docker_manager.stop_container(&container_id).await?;
+        docker_manager.remove_container(&container_id).await?;
+
+        // Remove the container from the map
+        let mut containers = self.containers.lock().unwrap();
+        containers.remove(app_id);
 
         Ok(())
     }
 
     /// Check if an app is running
-    pub fn is_app_running(&self, app_id: &str) -> Result<bool> {
-        // Get the process
-        let processes = self.processes.lock().unwrap();
-        let running = processes.contains_key(app_id);
-        Ok(running)
+    pub async fn is_app_running(&self, app_id: &str) -> Result<bool> {
+        // Get the container ID
+        let container_id = {
+            let containers = self.containers.lock().unwrap();
+            match containers.get(app_id) {
+                Some(id) => id.clone(),
+                None => return Ok(false),
+            }
+        };
+
+        // Get the Docker manager
+        let docker_manager = self.get_docker_manager().await?;
+
+        // Check if the container is running
+        docker_manager.is_container_running(&container_id).await
     }
 
     /// Get the list of running apps
-    pub fn list_running_apps(&self) -> Result<Vec<String>> {
-        // Get the list of app IDs
-        let processes = self.processes.lock().unwrap();
-        let app_ids = processes.keys().cloned().collect();
+    pub async fn list_running_apps(&self) -> Result<Vec<String>> {
+        // Get the Docker manager
+        let docker_manager = self.get_docker_manager().await?;
+
+        // Get the list of containers
+        let container_ids = docker_manager.list_containers().await?;
+
+        // Map container IDs to app IDs
+        let containers = self.containers.lock().unwrap();
+        let app_ids = containers
+            .iter()
+            .filter(|(_, container_id)| container_ids.contains(container_id))
+            .map(|(app_id, _)| app_id.clone())
+            .collect();
+
         Ok(app_ids)
     }
 
     /// Clean up resources for terminated apps
-    pub fn cleanup(&self) -> Result<()> {
-        // Get the list of processes
-        let mut processes = self.processes.lock().unwrap();
+    pub async fn cleanup(&self) -> Result<()> {
+        // Get the Docker manager
+        let docker_manager = self.get_docker_manager().await?;
 
-        // Check each process
-        let mut terminated = Vec::new();
-        for (app_id, process) in processes.iter_mut() {
-            // Try to get the exit status
-            match process.child.try_wait() {
-                Ok(Some(_)) => {
-                    // Process has terminated
-                    terminated.push(app_id.clone());
-                }
-                Ok(None) => {
-                    // Process is still running
-                }
-                Err(e) => {
-                    // Error checking process status
-                    log::error!("Error checking process status for app {}: {}", app_id, e);
-                    terminated.push(app_id.clone());
-                }
-            }
-        }
+        // Clean up containers
+        docker_manager.cleanup_containers().await?;
 
-        // Remove terminated processes
-        for app_id in terminated {
-            processes.remove(&app_id);
+        // Get the list of containers
+        let container_ids = docker_manager.list_containers().await?;
+
+        // Update the containers map
+        {
+            let mut containers = self.containers.lock().unwrap();
+            // Remove containers that no longer exist
+            containers.retain(|_, container_id| container_ids.contains(container_id));
         }
 
         Ok(())

@@ -7,18 +7,23 @@ use crate::ipc::{AppRequest, AppResponse, get_app_socket_path};
 use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
+use thiserror::Error;
 
 /// Error type for IPC client operations
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 pub enum IpcClientError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+    
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
+    
     #[error("Connection error: {0}")]
     Connection(String),
+    
     #[error("Authentication error: {0}")]
     Auth(String),
+    
     #[error("Request error: {0}")]
     Request(String),
 }

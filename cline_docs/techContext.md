@@ -11,10 +11,10 @@
 
 ## Development Setup
 - Rust toolchain required
+- Docker runtime for application containerization
 - No external database dependencies (uses embedded sled)
 - Lightning Network node for payment processing
 - File-based storage system
-- Docker runtime for application containers
 
 ## Technical Constraints
 

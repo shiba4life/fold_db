@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sample Social App</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Sample Social App</h1>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="users">Users</div>
+            <div class="tab" data-tab="posts">Posts</div>
+            <div class="tab" data-tab="create-user">Create User</div>
+            <div class="tab" data-tab="create-post">Create Post</div>
+            <div class="tab" data-tab="add-comment">Add Comment</div>
+            <div class="tab" data-tab="remote-nodes">Remote Nodes</div>
+        </div>
+        
+        <div id="users" class="tab-content active">
+            <h2>Users</h2>
+            <div id="users-list"></div>
+        </div>
+        
+        <div id="posts" class="tab-content">
+            <h2>Posts</h2>
+            <div id="posts-list"></div>
+        </div>
+        
+        <div id="create-user" class="tab-content">
+            <h2>Create User</h2>
+            <div id="create-user-error" class="error"></div>
+            <div id="create-user-success" class="success"></div>
+            <form id="create-user-form">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="full-name">Full Name:</label>
+                    <input type="text" id="full-name" name="full-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="bio">Bio:</label>
+                    <textarea id="bio" name="bio" rows="4"></textarea>
+                </div>
+                <button type="submit">Create User</button>
+            </form>
+        </div>
+        
+        <div id="create-post" class="tab-content">
+            <h2>Create Post</h2>
+            <div id="create-post-error" class="error"></div>
+            <div id="create-post-success" class="success"></div>
+            <form id="create-post-form">
+                <div class="form-group">
+                    <label for="post-author">Author:</label>
+                    <select id="post-author" name="post-author" required>
+                        <option value="">Select an author</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="post-title">Title:</label>
+                    <input type="text" id="post-title" name="post-title" required>
+                </div>
+                <div class="form-group">
+                    <label for="post-content">Content:</label>
+                    <textarea id="post-content" name="post-content" rows="4" required></textarea>
+                </div>
+                <button type="submit">Create Post</button>
+            </form>
+        </div>
+        
+        <div id="add-comment" class="tab-content">
+            <h2>Add Comment</h2>
+            <div id="add-comment-error" class="error"></div>
+            <div id="add-comment-success" class="success"></div>
+            <form id="add-comment-form">
+                <div class="form-group">
+                    <label for="comment-post">Post:</label>
+                    <select id="comment-post" name="comment-post" required>
+                        <option value="">Select a post</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="comment-author">Author:</label>
+                    <select id="comment-author" name="comment-author" required>
+                        <option value="">Select an author</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="comment-content">Content:</label>
+                    <textarea id="comment-content" name="comment-content" rows="4" required></textarea>
+                </div>
+                <button type="submit">Add Comment</button>
+            </form>
+        </div>
+        
+        <div id="remote-nodes" class="tab-content">
+            <h2>Remote Nodes</h2>
+            <div id="remote-nodes-error" class="error"></div>
+            <div id="remote-nodes-success" class="success"></div>
+            <button id="discover-nodes-btn">Discover Remote Nodes</button>
+            <div id="remote-nodes-list"></div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
