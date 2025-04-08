@@ -8,6 +8,7 @@ members = [
     "datafold_sdk",
     "fold_client",
     "fold_node",
+    "social_app",
 ]
 
 [features]

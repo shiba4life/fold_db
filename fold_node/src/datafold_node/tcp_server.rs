@@ -2,7 +2,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
-use serde_json::Value;
+use serde_json::{Value, json};
 use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
 use crate::schema::Schema;
@@ -55,6 +55,9 @@ impl TcpServer {
         mut socket: TcpStream,
         node: Arc<Mutex<DataFoldNode>>,
     ) -> FoldDbResult<()> {
+        // We can't set keepalive directly on tokio's TcpStream, so we'll skip it
+        // In a real implementation, we would use socket2 crate to set keepalive
+        
         loop {
             // Read the request length
             let request_len = match socket.read_u32().await {
@@ -65,28 +68,131 @@ impl TcpServer {
                         println!("Client disconnected");
                         return Ok(());
                     }
+                    println!("Error reading request length: {}", e);
                     return Err(e.into());
                 }
             };
             
+            // Sanity check the request length to prevent OOM
+            if request_len > 10_000_000 { // 10MB limit
+                println!("Request too large: {} bytes", request_len);
+                let error_response = json!({
+                    "error": "Request too large",
+                    "max_size": 10_000_000
+                });
+                let error_bytes = serde_json::to_vec(&error_response)?;
+                socket.write_u32(error_bytes.len() as u32).await?;
+                socket.write_all(&error_bytes).await?;
+                continue;
+            }
+            
             // Read the request
             let mut request_bytes = vec![0u8; request_len];
-            socket.read_exact(&mut request_bytes).await?;
+            match socket.read_exact(&mut request_bytes).await {
+                Ok(_) => {},
+                Err(e) => {
+                    println!("Error reading request: {}", e);
+                    if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                        println!("Client disconnected while reading request");
+                        return Ok(());
+                    }
+                    
+                    // Try to send an error response
+                    let error_response = json!({
+                        "error": format!("Error reading request: {}", e)
+                    });
+                    let error_bytes = serde_json::to_vec(&error_response)?;
+                    
+                    // Ignore errors when sending the error response
+                    let _ = socket.write_u32(error_bytes.len() as u32).await;
+                    let _ = socket.write_all(&error_bytes).await;
+                    
+                    return Err(e.into());
+                }
+            };
             
             // Deserialize the request
-            let request: Value = serde_json::from_slice(&request_bytes)?;
+            let request: Value = match serde_json::from_slice(&request_bytes) {
+                Ok(req) => req,
+                Err(e) => {
+                    println!("Error deserializing request: {}", e);
+                    
+                    // Try to send an error response
+                    let error_response = json!({
+                        "error": format!("Error deserializing request: {}", e)
+                    });
+                    let error_bytes = serde_json::to_vec(&error_response)?;
+                    
+                    // Ignore errors when sending the error response
+                    let _ = socket.write_u32(error_bytes.len() as u32).await;
+                    let _ = socket.write_all(&error_bytes).await;
+                    
+                    continue;
+                }
+            };
             
             // Process the request
-            let response = Self::process_request(&request, node.clone()).await?;
+            let response = match Self::process_request(&request, node.clone()).await {
+                Ok(resp) => resp,
+                Err(e) => {
+                    println!("Error processing request: {}", e);
+                    
+                    // Create an error response
+                    json!({
+                        "error": format!("Error processing request: {}", e)
+                    })
+                }
+            };
             
             // Serialize the response
-            let response_bytes = serde_json::to_vec(&response)?;
+            let response_bytes = match serde_json::to_vec(&response) {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    println!("Error serializing response: {}", e);
+                    
+                    // Try to send an error response
+                    let error_response = json!({
+                        "error": format!("Error serializing response: {}", e)
+                    });
+                    let error_bytes = serde_json::to_vec(&error_response)?;
+                    
+                    // Ignore errors when sending the error response
+                    let _ = socket.write_u32(error_bytes.len() as u32).await;
+                    let _ = socket.write_all(&error_bytes).await;
+                    
+                    continue;
+                }
+            };
             
             // Send the response length
-            socket.write_u32(response_bytes.len() as u32).await?;
+            if let Err(e) = socket.write_u32(response_bytes.len() as u32).await {
+                println!("Error sending response length: {}", e);
+                if e.kind() == std::io::ErrorKind::BrokenPipe {
+                    println!("Client disconnected while sending response length");
+                    return Ok(());
+                }
+                return Err(e.into());
+            }
             
             // Send the response
-            socket.write_all(&response_bytes).await?;
+            if let Err(e) = socket.write_all(&response_bytes).await {
+                println!("Error sending response: {}", e);
+                if e.kind() == std::io::ErrorKind::BrokenPipe {
+                    println!("Client disconnected while sending response");
+                    return Ok(());
+                }
+                return Err(e.into());
+            }
+            
+            // Flush the socket to ensure all data is sent
+            if let Err(e) = socket.flush().await {
+                println!("Error flushing socket: {}", e);
+                if e.kind() == std::io::ErrorKind::BrokenPipe {
+                    println!("Client disconnected while flushing socket");
+                    return Ok(());
+                }
+                return Err(e.into());
+            }
         }
     }
     

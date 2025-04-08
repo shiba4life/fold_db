@@ -14,6 +14,9 @@ mock = []  # Feature flag for mock network implementation
 datafold_sdk = { path = "../datafold_sdk" }
 fold_client = { path = "../fold_client" }
 
+# Utilities
+dirs = "5.0"
+
 # Cryptography
 ring = "0.16.20"
 base64 = "0.21.0"
