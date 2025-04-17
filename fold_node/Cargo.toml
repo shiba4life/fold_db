@@ -10,10 +10,6 @@ simulate-peers = []  # Feature flag for simulating peer discovery
 mock = []  # Feature flag for mock network implementation
 
 [dependencies]
-# SDK
-datafold_sdk = { path = "../datafold_sdk" }
-fold_client = { path = "../fold_client" }
-
 # Utilities
 dirs = "5.0"
 
@@ -26,7 +22,7 @@ sled = "0.34"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "sync", "time", "fs", "signal"] }
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "sync", "time", "fs", "signal", "io-util"] }
 thiserror = "1.0"
 futures = "0.3"
 rand = "0.8"

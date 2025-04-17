@@ -1,1 +1,5 @@
-{"storage_path": "data/db", "default_trust_distance": 1, "network_listen_address": "/ip4/0.0.0.0/tcp/9000"}
+{
+  "storage_path": "data/db",
+  "default_trust_distance": 1,
+  "network_listen_address": "/ip4/0.0.0.0/tcp/9000"
+}

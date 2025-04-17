@@ -29,17 +29,6 @@ if git diff --cached --name-only | grep -q '\.rs$'; then
     echo "Running network tests..."
     cargo test --test network_tests || { echo "Network tests failed!"; exit 1; }
     
-    # Run SDK tests
-    echo "Running SDK unit tests..."
-    cd datafold_sdk
-    cargo test --lib || { echo "SDK unit tests failed!"; exit 1; }
-    
-    echo "Running SDK integration tests..."
-    cargo test --test sdk_tests || { echo "SDK tests failed!"; exit 1; }
-    
-    echo "Running real integration tests..."
-    cargo test --test real_integration_tests || { echo "Real integration tests failed!"; exit 1; }
-    cd "$REPO_ROOT"
     
     # Run all tests across the entire workspace
     echo "Running all workspace tests..."
