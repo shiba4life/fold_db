@@ -362,7 +362,6 @@ impl TcpServer {
                 // Return a success response
                 Ok(serde_json::json!({
                     "success": true,
-                    "id": "123" // TODO: Return the actual ID
                 }))
             }
             "discover_nodes" => {

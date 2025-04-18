@@ -21,8 +21,7 @@ Replacing the existing fold_client with a new Docker-based implementation.
    - Added `cargo test --workspace` to the pre-commit hook to run all tests across the entire workspace
    - Updated HOOKS_README.md to reflect the new test in the pre-commit hook
    - Fixed failing test `unit_tests::folddb_tests::test_write_and_query` by improving error handling in the test helper function
-   - Fixed doctests in `datafold_sdk/src/schema_builder.rs` and `datafold_sdk/src/client.rs` by adding proper imports and async/await syntax
-   - Fixed linting issues across the codebase:
+      - Fixed linting issues across the codebase:
      - Removed unused imports in various files
      - Fixed unused variables by prefixing them with underscore
      - Added `#[allow(dead_code)]` attributes to unused test helper functions
@@ -53,11 +52,7 @@ Replacing the existing fold_client with a new Docker-based implementation.
      - Updated NetworkCore.forward_request to use a fixed port for Node 2
      - Simplified the port determination logic
      - Improved error handling for connection failures
-   - Enhanced the social_app_two_nodes example:
-     - Fixed the check for "Hello from Node 2" post in query results
-     - Improved error handling and logging
-     - Added better verification of cross-node querying
-
+   
 2. Previously Implemented mDNS Discovery:
    - Enhanced NetworkConfig with additional fields for mDNS discovery
    - Implemented discover_nodes method in NetworkCore to actively scan for peers
