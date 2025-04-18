@@ -25,18 +25,6 @@ The tests have been reorganized to place them in their appropriate crates:
 
 Each crate now has its own tests directory:
 
-- **datafold_sdk/tests/**: Tests specific to the SDK functionality
-  - **sdk_tests.rs**: Unit tests for the SDK components
-  - **real_integration_tests.rs**: Integration tests with a real node
-
-- **fold_client/tests/**: Tests specific to the client functionality
-  - **auth_tests.rs**: Tests for authentication
-  - **client_tests.rs**: Tests for client functionality
-  - **ipc_tests.rs**: Tests for IPC communication
-  - **node_tests.rs**: Tests for node interaction
-  - **process_tests.rs**: Tests for process management
-  - **sandbox_tests.rs**: Tests for sandboxing
-
 - **fold_node/tests/**: Tests specific to the node functionality
   - **atom_tests.rs**: Tests for Atom and AtomRef
   - **schema_tests.rs**: Tests for Schema system
@@ -82,6 +70,4 @@ To run tests for a specific crate:
 
 ```bash
 cargo test --package fold_node
-cargo test --package datafold_sdk
-cargo test --package fold_client
 ```
