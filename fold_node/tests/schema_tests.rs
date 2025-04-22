@@ -20,7 +20,10 @@ fn test_schema_field_management() {
     // Verify field was added
     assert!(schema.fields.contains_key(field_name));
     let stored_field = schema.fields.get(field_name).unwrap();
-    assert_eq!(stored_field.get_ref_atom_uuid(), Some("test-uuid".to_string()));
+    assert_eq!(
+        stored_field.get_ref_atom_uuid(),
+        Some("test-uuid".to_string())
+    );
     assert!(stored_field.field_mappers.is_empty());
 }
 
@@ -89,12 +92,16 @@ fn test_schema_persistence() {
     // Create and load a test schema
     let schema = create_test_schema("test_persistence");
     manager.load_schema(schema.clone()).unwrap();
-    
+
     // Test schema retrieval
     let loaded_schema = manager.get_schema("test_persistence").unwrap().unwrap();
     assert_eq!(loaded_schema.name, "test_persistence");
     assert_eq!(
-        loaded_schema.fields.get("test_field").unwrap().get_ref_atom_uuid(),
+        loaded_schema
+            .fields
+            .get("test_field")
+            .unwrap()
+            .get_ref_atom_uuid(),
         Some("test-uuid".to_string())
     );
 
@@ -103,10 +110,10 @@ fn test_schema_persistence() {
     new_manager.load_schemas_from_disk().unwrap();
     let reloaded_schema = new_manager.get_schema("test_persistence").unwrap().unwrap();
     assert_eq!(reloaded_schema.name, "test_persistence");
-    
+
     // Test schema unloading
     assert!(manager.unload_schema("test_persistence").unwrap());
-    
+
     // Verify schema was removed
     let removed_schema = manager.get_schema("test_persistence").unwrap();
     assert!(removed_schema.is_none());

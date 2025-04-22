@@ -40,7 +40,7 @@ pub enum MutationType {
 impl<'de> Deserialize<'de> for MutationType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>
+        D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
         match s.to_lowercase().as_str() {
@@ -50,16 +50,16 @@ impl<'de> Deserialize<'de> for MutationType {
             s if s.starts_with("add_to_collection:") => {
                 let id = s.split(':').nth(1).unwrap_or_default().to_string();
                 Ok(MutationType::AddToCollection(id))
-            },
+            }
             s if s.starts_with("update_to_collection:") => {
                 let id = s.split(':').nth(1).unwrap_or_default().to_string();
                 Ok(MutationType::UpdateToCollection(id))
-            },
+            }
             s if s.starts_with("delete_from_collection:") => {
                 let id = s.split(':').nth(1).unwrap_or_default().to_string();
                 Ok(MutationType::DeleteFromCollection(id))
-            },
-            _ => Err(serde::de::Error::custom("unknown mutation type"))
+            }
+            _ => Err(serde::de::Error::custom("unknown mutation type")),
         }
     }
 }

@@ -4,7 +4,9 @@ use uuid::Uuid;
 
 mod test_data;
 use test_data::test_helpers::operation_builder::{create_mutation, create_query};
-use test_data::test_helpers::schema_builder::{create_field_with_permissions, create_schema_with_fields};
+use test_data::test_helpers::schema_builder::{
+    create_field_with_permissions, create_schema_with_fields,
+};
 use test_data::test_helpers::{cleanup_test_db, setup_and_allow_schema, setup_test_db};
 
 #[test]
@@ -47,10 +49,7 @@ fn test_permission_based_access() {
         ),
     );
 
-    let schema = create_schema_with_fields(
-        "test_schema".to_string(),
-        fields,
-    );
+    let schema = create_schema_with_fields("test_schema".to_string(), fields);
 
     // Load and allow schema
     db.load_schema(schema).expect("Failed to load schema");

@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Protocol name for schema operations
 pub const SCHEMA_PROTOCOL_NAME: &str = "/fold/schema/1.0.0";

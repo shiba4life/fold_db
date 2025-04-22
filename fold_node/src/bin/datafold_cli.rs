@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use fold_node::{DataFoldNode, NodeConfig, load_schema_from_file, Operation, MutationType};
+use fold_node::{load_schema_from_file, DataFoldNode, MutationType, NodeConfig, Operation};
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
@@ -31,15 +31,15 @@ enum Commands {
         /// Schema name to query
         #[arg(short, long, required = true)]
         schema: String,
-        
+
         /// Fields to retrieve (comma-separated)
         #[arg(short, long, required = true, value_delimiter = ',')]
         fields: Vec<String>,
-        
+
         /// Optional filter in JSON format
         #[arg(short = 'i', long)]
         filter: Option<String>,
-        
+
         /// Output format (json or pretty)
         #[arg(short, long, default_value = "pretty")]
         output: String,
@@ -49,11 +49,11 @@ enum Commands {
         /// Schema name to mutate
         #[arg(short, long, required = true)]
         schema: String,
-        
+
         /// Mutation type (create, update, delete)
         #[arg(short, long, required = true)]
         mutation_type: String,
-        
+
         /// Data in JSON format
         #[arg(short, long, required = true)]
         data: String,
@@ -68,59 +68,68 @@ enum Commands {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-    
+
     // Load node configuration
     println!("Loading config from: {}", cli.config);
     let config_str = fs::read_to_string(&cli.config)?;
     let config: NodeConfig = serde_json::from_str(&config_str)?;
-    
+
     // Initialize node
     println!("Initializing DataFold Node...");
     let mut node = DataFoldNode::load(config)?;
     println!("Node initialized with ID: {}", node.get_node_id());
-    
+
     // Process command
     match cli.command {
         Commands::LoadSchema { path } => {
             println!("Loading schema from: {}", path.display());
             load_schema_from_file(path, &mut node)?;
             println!("Schema loaded successfully");
-        },
+        }
         Commands::ListSchemas {} => {
             let schemas = node.list_schemas()?;
             println!("Loaded schemas:");
             for schema in schemas {
                 println!("  - {}", schema.name);
             }
-        },
-        Commands::Query { schema, fields, filter, output } => {
+        }
+        Commands::Query {
+            schema,
+            fields,
+            filter,
+            output,
+        } => {
             println!("Executing query on schema: {}", schema);
-            
+
             let filter_value = if let Some(filter_str) = filter {
                 Some(serde_json::from_str(&filter_str)?)
             } else {
                 None
             };
-            
+
             let operation = Operation::Query {
                 schema,
                 fields,
                 filter: filter_value,
             };
-            
+
             let result = node.execute_operation(operation)?;
-            
+
             if output == "json" {
                 println!("{}", result);
             } else {
                 println!("{}", serde_json::to_string_pretty(&result)?);
             }
-        },
-        Commands::Mutate { schema, mutation_type, data } => {
+        }
+        Commands::Mutate {
+            schema,
+            mutation_type,
+            data,
+        } => {
             println!("Executing mutation on schema: {}", schema);
-            
+
             let data_value: Value = serde_json::from_str(&data)?;
-            
+
             let mutation_type = match mutation_type.to_lowercase().as_str() {
                 "create" => MutationType::Create,
                 "update" => MutationType::Update,
@@ -139,31 +148,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
                 _ => return Err("Invalid mutation type. Use 'create', 'update', 'delete', or collection operations".into())
             };
-            
+
             let operation = Operation::Mutation {
                 schema,
                 data: data_value,
                 mutation_type,
             };
-            
+
             node.execute_operation(operation)?;
             println!("Mutation executed successfully");
-        },
+        }
         Commands::Execute { path } => {
             println!("Executing operation from file: {}", path.display());
             let operation_str = fs::read_to_string(path)?;
             let operation: Operation = serde_json::from_str(&operation_str)?;
-            
+
             let result = node.execute_operation(operation)?;
-            
+
             if !result.is_null() {
                 println!("Result:");
                 println!("{}", serde_json::to_string_pretty(&result)?);
             } else {
                 println!("Operation executed successfully");
             }
-        },
+        }
     }
-    
+
     Ok(())
 }

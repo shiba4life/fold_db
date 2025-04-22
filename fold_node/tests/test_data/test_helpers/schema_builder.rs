@@ -1,12 +1,6 @@
 use fold_node::testing::{
-    SchemaPaymentConfig,
-    FieldPaymentConfig,
-    ExplicitCounts,
-    PermissionsPolicy,
-    TrustDistance,
-    SchemaField,
-    Schema,
-    FieldType,
+    ExplicitCounts, FieldPaymentConfig, FieldType, PermissionsPolicy, Schema, SchemaField,
+    SchemaPaymentConfig, TrustDistance,
 };
 use std::collections::HashMap;
 
@@ -31,13 +25,11 @@ pub fn create_field_with_permissions(
         FieldPaymentConfig::default(),
         HashMap::new(),
         Some(FieldType::Single),
-    ).with_ref_atom_uuid(ref_atom_uuid)
+    )
+    .with_ref_atom_uuid(ref_atom_uuid)
 }
 
-pub fn create_schema_with_fields(
-    name: String,
-    fields: HashMap<String, SchemaField>,
-) -> Schema {
+pub fn create_schema_with_fields(name: String, fields: HashMap<String, SchemaField>) -> Schema {
     Schema::new(name)
         .with_fields(fields)
         .with_payment_config(SchemaPaymentConfig::default())

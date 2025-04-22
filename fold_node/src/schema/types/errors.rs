@@ -1,5 +1,5 @@
-use std::fmt;
 use serde::Serialize;
+use std::fmt;
 
 #[derive(Debug, Clone, Serialize)]
 pub enum SchemaError {

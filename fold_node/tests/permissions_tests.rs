@@ -1,18 +1,7 @@
 use fold_node::testing::{
-    SchemaPaymentConfig,
-    FieldPaymentConfig,
+    ExplicitCounts, FieldPaymentConfig, FieldType, Mutation, MutationType, PermissionWrapper,
+    PermissionsPolicy, Query, Schema, SchemaCore, SchemaField, SchemaPaymentConfig, TrustDistance,
     TrustDistanceScaling,
-    TrustDistance,
-    PermissionWrapper,
-    PermissionsPolicy,
-    SchemaCore,
-    Mutation,
-    Query,
-    SchemaField,
-    Schema,
-    ExplicitCounts,
-    MutationType,
-    FieldType,
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -37,7 +26,8 @@ fn test_permission_wrapper_query() {
         create_default_payment_config(),
         HashMap::new(),
         Some(FieldType::Single),
-    ).with_ref_atom_uuid("test_ref".to_string())
+    )
+    .with_ref_atom_uuid("test_ref".to_string())
     .with_field_mappers(HashMap::new());
     fields.insert("test_field".to_string(), field);
 
@@ -95,7 +85,8 @@ fn test_permission_wrapper_no_requirement() {
         create_default_payment_config(),
         HashMap::new(),
         Some(FieldType::Single),
-    ).with_ref_atom_uuid("test_ref".to_string())
+    )
+    .with_ref_atom_uuid("test_ref".to_string())
     .with_field_mappers(HashMap::new());
     fields.insert("test_field".to_string(), field);
 
@@ -150,7 +141,8 @@ fn test_permission_wrapper_mutation() {
         create_default_payment_config(),
         HashMap::new(),
         Some(FieldType::Single),
-    ).with_ref_atom_uuid("test_ref".to_string())
+    )
+    .with_ref_atom_uuid("test_ref".to_string())
     .with_field_mappers(HashMap::new());
     fields.insert("test_field".to_string(), field);
 

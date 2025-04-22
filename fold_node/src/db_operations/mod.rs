@@ -1,7 +1,7 @@
-use serde::{de::DeserializeOwned, Serialize};
-use serde_json::Value;
 use crate::atom::{Atom, AtomRef, AtomRefCollection, AtomStatus};
 use crate::schema::SchemaError;
+use serde::{de::DeserializeOwned, Serialize};
+use serde_json::Value;
 
 /// Helper struct for database operations
 pub struct DbOperations {
@@ -21,14 +21,9 @@ impl DbOperations {
     }
 
     /// Generic function to store a serializable item in the database
-    pub fn store_item<T: Serialize>(
-        &self,
-        key: &str,
-        item: &T,
-    ) -> Result<(), SchemaError> {
-        let bytes = serde_json::to_vec(item).map_err(|e| {
-            SchemaError::InvalidData(format!("Failed to serialize item: {}", e))
-        })?;
+    pub fn store_item<T: Serialize>(&self, key: &str, item: &T) -> Result<(), SchemaError> {
+        let bytes = serde_json::to_vec(item)
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize item: {}", e)))?;
 
         self.db
             .insert(key.as_bytes(), bytes)
@@ -38,10 +33,7 @@ impl DbOperations {
     }
 
     /// Generic function to retrieve a deserializable item from the database
-    pub fn get_item<T: DeserializeOwned>(
-        &self,
-        key: &str,
-    ) -> Result<Option<T>, SchemaError> {
+    pub fn get_item<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>, SchemaError> {
         match self.db.get(key.as_bytes()) {
             Ok(Some(bytes)) => {
                 let item = serde_json::from_slice(&bytes).map_err(|e| {
@@ -66,11 +58,7 @@ impl DbOperations {
         content: Value,
         status: Option<AtomStatus>,
     ) -> Result<Atom, SchemaError> {
-        let mut atom = Atom::new(
-            schema_name.to_string(),
-            source_pub_key,
-            content,
-        );
+        let mut atom = Atom::new(schema_name.to_string(), source_pub_key, content);
 
         // Only set prev_atom_uuid if it's Some
         if let Some(prev_uuid) = prev_atom_uuid {

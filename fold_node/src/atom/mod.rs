@@ -7,7 +7,7 @@ mod atom_ref;
 pub use atom_ref::{AtomRef, AtomRefBehavior, AtomRefCollection, AtomRefStatus};
 
 /// An immutable data container that represents a single version of content in the database.
-/// 
+///
 /// Atoms are the fundamental building blocks of the database's immutable data storage system.
 /// Each Atom contains:
 /// - A unique identifier
@@ -16,7 +16,7 @@ pub use atom_ref::{AtomRef, AtomRefBehavior, AtomRefCollection, AtomRefStatus};
 /// - Creation timestamp
 /// - Optional reference to a previous version
 /// - The actual content data
-/// 
+///
 /// Atoms form a chain of versions through their `prev_atom_uuid` references, enabling
 /// complete version history tracking. Once created, an Atom's content cannot be modified,
 /// ensuring data immutability.
@@ -39,22 +39,18 @@ pub enum AtomStatus {
 
 impl Atom {
     /// Creates a new Atom with the given parameters.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `source_schema_name` - Name of the schema that defines this Atom's structure
     /// * `source_pub_key` - Public key of the entity creating this Atom
     /// * `content` - The actual data content stored in this Atom
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// A new Atom instance with a generated UUID and current timestamp
     #[must_use]
-    pub fn new(
-        source_schema_name: String,
-        source_pub_key: String,
-        content: Value,
-    ) -> Self {
+    pub fn new(source_schema_name: String, source_pub_key: String, content: Value) -> Self {
         Self {
             uuid: Uuid::new_v4().to_string(),
             source_schema_name,
@@ -79,7 +75,7 @@ impl Atom {
     }
 
     /// Returns a reference to the Atom's content.
-    /// 
+    ///
     /// This method provides read-only access to the stored data,
     /// maintaining the immutability principle.
     #[must_use]
@@ -92,15 +88,15 @@ impl Atom {
     }
 
     /// Applies a transformation to the Atom's content and returns the result.
-    /// 
+    ///
     /// Currently supports:
     /// - "lowercase": Converts string content to lowercase
-    /// 
+    ///
     /// If the transformation is not recognized or cannot be applied,
     /// returns a clone of the original content.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `transform` - The name of the transformation to apply
     #[must_use]
     pub fn get_transformed_content(&self, transform: &str) -> Value {
@@ -117,7 +113,7 @@ impl Atom {
     }
 
     /// Returns the unique identifier of this Atom.
-    /// 
+    ///
     /// This UUID uniquely identifies this specific version of the data
     /// and is used by AtomRefs to point to the current version.
     #[must_use]
@@ -126,7 +122,7 @@ impl Atom {
     }
 
     /// Returns the name of the schema that defines this Atom's structure.
-    /// 
+    ///
     /// The schema name is used to validate the content structure and
     /// determine applicable permissions and payment requirements.
     #[must_use]
@@ -135,7 +131,7 @@ impl Atom {
     }
 
     /// Returns the public key of the entity that created this Atom.
-    /// 
+    ///
     /// This is used for authentication and permission validation
     /// when accessing or modifying the data.
     #[must_use]
@@ -144,7 +140,7 @@ impl Atom {
     }
 
     /// Returns the timestamp when this Atom was created.
-    /// 
+    ///
     /// This timestamp is used for auditing and version history tracking.
     #[must_use]
     pub const fn created_at(&self) -> DateTime<Utc> {
@@ -152,7 +148,7 @@ impl Atom {
     }
 
     /// Returns the UUID of the previous version of this data, if any.
-    /// 
+    ///
     /// This forms the chain of version history, allowing traversal
     /// through all previous versions of the data.
     #[must_use]
@@ -195,10 +191,8 @@ mod tests {
             json!({"version": 1}),
         );
 
-        let second_atom = Atom::with_prev_version(
-            first_atom.clone(),
-            first_atom.uuid().to_string(),
-        );
+        let second_atom =
+            Atom::with_prev_version(first_atom.clone(), first_atom.uuid().to_string());
 
         assert_eq!(
             second_atom.prev_atom_uuid(),
@@ -225,7 +219,8 @@ mod tests {
             "test_schema".to_string(),
             "test_key".to_string(),
             json!({"test": false}),
-        ).with_prev_version(atom.uuid().to_string());
+        )
+        .with_prev_version(atom.uuid().to_string());
 
         let mut updated_ref = atom_ref.clone();
         updated_ref.set_atom_uuid(new_atom.uuid().to_string());
@@ -255,12 +250,24 @@ mod tests {
         collection.set_atom_uuid("1".to_string(), atoms[1].uuid().to_string());
         collection.set_atom_uuid("2".to_string(), atoms[2].uuid().to_string());
 
-        assert_eq!(collection.get_atom_uuid("0"), Some(&atoms[0].uuid().to_string()));
-        assert_eq!(collection.get_atom_uuid("1"), Some(&atoms[1].uuid().to_string()));
-        assert_eq!(collection.get_atom_uuid("2"), Some(&atoms[2].uuid().to_string()));
+        assert_eq!(
+            collection.get_atom_uuid("0"),
+            Some(&atoms[0].uuid().to_string())
+        );
+        assert_eq!(
+            collection.get_atom_uuid("1"),
+            Some(&atoms[1].uuid().to_string())
+        );
+        assert_eq!(
+            collection.get_atom_uuid("2"),
+            Some(&atoms[2].uuid().to_string())
+        );
 
         // Test removal
-        assert_eq!(collection.remove_atom_uuid("1"), Some(atoms[1].uuid().to_string()));
+        assert_eq!(
+            collection.remove_atom_uuid("1"),
+            Some(atoms[1].uuid().to_string())
+        );
         assert_eq!(collection.get_atom_uuid("1"), None);
 
         // Test behavior trait

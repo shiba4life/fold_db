@@ -4,35 +4,35 @@ use crate::fees::{
 };
 
 /// Calculates the required payment amount for accessing a specific field.
-/// 
+///
 /// The payment calculation incorporates multiple factors:
 /// 1. Base market rate
 /// 2. Schema-level multiplier
 /// 3. Field-level multiplier
 /// 4. Trust distance scaling
 /// 5. Minimum payment thresholds
-/// 
+///
 /// The calculation follows this sequence:
 /// 1. Validate trust distance
 /// 2. Apply base rate and multipliers
 /// 3. Calculate trust distance scaling
 /// 4. Apply minimum thresholds
 /// 5. Validate final payment amount
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `global_config` - System-wide payment configuration
 /// * `market_rate` - Current market base rate
 /// * `schema_payment` - Schema-level payment configuration
 /// * `field_payment` - Field-specific payment configuration
 /// * `trust_distance` - Trust distance from requester to data owner
-/// 
+///
 /// # Returns
-/// 
+///
 /// A Result containing the calculated payment amount in satoshis
-/// 
+///
 /// # Errors
-/// 
+///
 /// Returns an Error if:
 /// - The trust distance is negative
 /// - The base payment calculation overflows
@@ -89,30 +89,30 @@ pub fn calculate_field_payment(
 }
 
 /// Calculates the total payment required for a query accessing multiple fields.
-/// 
+///
 /// This function:
 /// 1. Calculates individual payments for each field
 /// 2. Sums the payments while checking for overflow
 /// 3. Applies system-wide minimum threshold
-/// 
+///
 /// The total payment considers:
 /// - Individual field payment calculations
 /// - Different trust distances per field
 /// - System-wide minimum payment requirement
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `global_config` - System-wide payment configuration
 /// * `market_rate` - Current market base rate
 /// * `schema_payment` - Schema-level payment configuration
 /// * `field_payments` - Vector of (field config, trust distance) pairs
-/// 
+///
 /// # Returns
-/// 
+///
 /// A Result containing the total payment amount in satoshis
-/// 
+///
 /// # Errors
-/// 
+///
 /// Returns an Error if:
 /// - Any individual field payment calculation fails
 /// - The sum of payments overflows u64

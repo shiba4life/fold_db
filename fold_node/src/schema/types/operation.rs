@@ -1,6 +1,6 @@
+use crate::schema::types::MutationType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::schema::types::MutationType;
 
 /// Represents an operation that can be performed on the database
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,5 +17,5 @@ pub enum Operation {
         schema: String,
         data: Value,
         mutation_type: MutationType,
-    }
+    },
 }

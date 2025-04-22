@@ -1,14 +1,14 @@
 use crate::permissions::permission_manager::PermissionManager;
-use crate::schema::SchemaCore;
 use crate::schema::types::{Mutation, Query, SchemaError};
+use crate::schema::SchemaCore;
 
 /// Provides a high-level interface for permission validation on schema operations.
-/// 
+///
 /// The PermissionWrapper coordinates between:
 /// - Schema-level operations (queries and mutations)
 /// - Field-level permission policies
 /// - The underlying permission manager
-/// 
+///
 /// It handles:
 /// - Schema validation and lookup
 /// - Field existence verification
@@ -20,12 +20,12 @@ pub struct PermissionWrapper {
 }
 
 /// Result of a field-level permission check.
-/// 
+///
 /// Contains:
 /// - The field name being checked
 /// - Whether access is allowed
 /// - Any error that occurred during the check
-/// 
+///
 /// This structure provides detailed feedback about why
 /// a permission check succeeded or failed.
 #[derive(Debug, Clone)]
@@ -46,7 +46,7 @@ impl PermissionWrapper {
     }
 
     /// Checks if a query operation has permission to access a specific field.
-    /// 
+    ///
     /// This method performs a complete permission check by:
     /// 1. Verifying the schema exists
     /// 2. Checking the field exists in the schema
@@ -54,15 +54,15 @@ impl PermissionWrapper {
     ///    - The requesting public key
     ///    - The field's permission policy
     ///    - The trust distance from the requester
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `query` - The query operation being validated
     /// * `field_name` - Name of the field being accessed
     /// * `schema_manager` - Manager containing schema definitions
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// A FieldPermissionResult containing the check result and any errors
     pub fn check_query_field_permission(
         &self,
@@ -122,7 +122,7 @@ impl PermissionWrapper {
     }
 
     /// Checks if a mutation operation has permission to modify a specific field.
-    /// 
+    ///
     /// This method performs a complete permission check by:
     /// 1. Verifying the schema exists
     /// 2. Checking the field exists in the schema
@@ -130,18 +130,18 @@ impl PermissionWrapper {
     ///    - The requesting public key
     ///    - The field's permission policy
     ///    - The trust distance from the requester
-    /// 
+    ///
     /// Write permission checks are typically stricter than read checks,
     /// as they involve modifying data.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `mutation` - The mutation operation being validated
     /// * `field_name` - Name of the field being modified
     /// * `schema_manager` - Manager containing schema definitions
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// A FieldPermissionResult containing the check result and any errors
     pub fn check_mutation_field_permission(
         &self,

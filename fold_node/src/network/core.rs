@@ -3,9 +3,9 @@ use crate::network::error::{NetworkError, NetworkResult};
 use crate::network::schema_protocol::SCHEMA_PROTOCOL_NAME;
 use crate::network::schema_service::SchemaService;
 use libp2p::PeerId;
+use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
-use serde_json::Value;
 
 /// Core network component for P2P communication
 pub struct NetworkCore {
@@ -34,7 +34,7 @@ impl NetworkCore {
     pub async fn new(config: NetworkConfig) -> NetworkResult<Self> {
         // Generate a random peer ID for now
         let local_peer_id = PeerId::random();
-        
+
         Ok(Self {
             schema_service: SchemaService::new(),
             local_peer_id,
@@ -47,18 +47,18 @@ impl NetworkCore {
             mock_peers: HashMap::new(),
         })
     }
-    
+
     /// Register a node ID with a peer ID
     pub fn register_node_id(&mut self, node_id: &str, peer_id: PeerId) {
         self.node_to_peer_map.insert(node_id.to_string(), peer_id);
         self.peer_to_node_map.insert(peer_id, node_id.to_string());
     }
-    
+
     /// Get the peer ID for a node ID
     pub fn get_peer_id_for_node(&self, node_id: &str) -> Option<PeerId> {
         self.node_to_peer_map.get(node_id).cloned()
     }
-    
+
     /// Get the node ID for a peer ID
     pub fn get_node_id_for_peer(&self, peer_id: &PeerId) -> Option<String> {
         self.peer_to_node_map.get(peer_id).cloned()
@@ -83,40 +83,45 @@ impl NetworkCore {
     pub async fn run(&mut self, listen_address: &str) -> NetworkResult<()> {
         println!("Network service started on {}", listen_address);
         println!("Using protocol: {}", SCHEMA_PROTOCOL_NAME);
-        
+
         // Set up mDNS discovery if enabled
         if self.config.enable_mdns {
             println!("mDNS discovery enabled");
             println!("Discovery port: {}", self.config.discovery_port);
-            println!("Announcement interval: {:?}", self.config.announcement_interval);
-            
+            println!(
+                "Announcement interval: {:?}",
+                self.config.announcement_interval
+            );
+
             // In a real implementation, this would:
             // 1. Create a libp2p swarm with mDNS discovery
             // 2. Start listening for mDNS announcements
             // 3. Announce this node via mDNS
             // 4. Add discovered peers to known_peers
-            
+
             // Start a background task for periodic announcements
             let announcement_interval = self.config.announcement_interval;
             let discovery_port = self.config.discovery_port;
             let local_peer_id = self.local_peer_id;
-            
+
             // This is a placeholder for the actual implementation
             // In a real implementation, this would start a background task
             // that periodically announces this node via mDNS
             tokio::spawn(async move {
-                println!("Starting mDNS announcements on port {} every {:?}", 
-                    discovery_port, announcement_interval);
-                
+                println!(
+                    "Starting mDNS announcements on port {} every {:?}",
+                    discovery_port, announcement_interval
+                );
+
                 loop {
                     // Simulate mDNS announcement
                     println!("SIMULATION: Announcing peer {} via mDNS", local_peer_id);
-                    
+
                     // Wait for the next announcement
                     tokio::time::sleep(announcement_interval).await;
                 }
             });
-            
+
             // For now, we'll simulate peer discovery
             if cfg!(feature = "simulate-peers") {
                 println!("SIMULATION: Generating random peers for demonstration");
@@ -129,7 +134,7 @@ impl NetworkCore {
         } else {
             println!("mDNS discovery disabled");
         }
-        
+
         Ok(())
     }
 
@@ -146,42 +151,45 @@ impl NetworkCore {
                 return Ok(peer_service.check_schemas(&schema_names));
             }
         }
-        
+
         // Check if the peer is known
         if !self.known_peers.contains(&peer_id) {
-            return Err(NetworkError::ConnectionError(format!("Peer not found: {}", peer_id)));
+            return Err(NetworkError::ConnectionError(format!(
+                "Peer not found: {}",
+                peer_id
+            )));
         }
-        
+
         // This is a placeholder for the actual implementation
         // In a real implementation, this would:
         // 1. Create a request message
         // 2. Send the request to the peer
         // 3. Wait for the response
         // 4. Parse and return the response
-        
+
         // For now, just simulate a response with a random subset of schemas
         let available_schemas = schema_names
             .iter()
             .filter(|_| rand::random::<bool>())
             .cloned()
             .collect();
-        
+
         // Simulate network delay
         tokio::time::sleep(Duration::from_millis(100)).await;
-        
+
         Ok(available_schemas)
     }
-    
+
     /// Add a known peer to the network
     pub fn add_known_peer(&mut self, peer_id: PeerId) {
         self.known_peers.insert(peer_id);
     }
-    
+
     /// Get the set of known peers
     pub fn known_peers(&self) -> &HashSet<PeerId> {
         &self.known_peers
     }
-    
+
     /// Forward a request to another node
     pub async fn forward_request(
         &mut self,
@@ -190,67 +198,88 @@ impl NetworkCore {
     ) -> NetworkResult<Value> {
         // Check if the peer is known
         if !self.known_peers.contains(&peer_id) {
-            return Err(NetworkError::ConnectionError(format!("Peer not found: {}", peer_id)));
+            return Err(NetworkError::ConnectionError(format!(
+                "Peer not found: {}",
+                peer_id
+            )));
         }
-        
+
         // Get the operation type from the request
-        let operation = request.get("operation")
+        let operation = request
+            .get("operation")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| NetworkError::ProtocolError("Missing operation in request".to_string()))?;
-            
+            .ok_or_else(|| {
+                NetworkError::ProtocolError("Missing operation in request".to_string())
+            })?;
+
         // Get the node ID for this peer if available
-        let node_id = self.get_node_id_for_peer(&peer_id)
+        let node_id = self
+            .get_node_id_for_peer(&peer_id)
             .unwrap_or_else(|| peer_id.to_string());
-            
-        println!("Forwarding {} request to node {} (peer {})", operation, node_id, peer_id);
-        
+
+        println!(
+            "Forwarding {} request to node {} (peer {})",
+            operation, node_id, peer_id
+        );
+
         // For now, we'll use a direct TCP connection to the target node
         // In a real implementation, this would use the libp2p request-response protocol
-        
+
         // For simplicity, we'll always connect to Node 2 (port 8002)
         // In a real implementation, we would use a more sophisticated approach
         // to determine the correct port for each node
         let target_address = "127.0.0.1:8002".to_string();
-        
+
         println!("Connecting to target node at {}", target_address);
-        
+
         // Connect to the target node
         let stream = match tokio::net::TcpStream::connect(&target_address).await {
             Ok(stream) => stream,
             Err(e) => {
-                return Err(NetworkError::ConnectionError(
-                    format!("Failed to connect to target node at {}: {}", target_address, e)
-                ));
+                return Err(NetworkError::ConnectionError(format!(
+                    "Failed to connect to target node at {}: {}",
+                    target_address, e
+                )));
             }
         };
-        
+
         // Send the request to the target node
         let result = Self::send_request_to_node(stream, request.clone()).await;
-        
+
         match result {
             Ok(response) => {
                 println!("Received response from target node");
                 Ok(response)
-            },
+            }
             Err(e) => {
                 println!("Error forwarding request to target node: {}", e);
-                
+
                 // If we can't connect to the target node, fall back to simulated responses
                 println!("Falling back to simulated response");
-                
+
                 match operation {
                     "query" => {
                         // Get the schema and fields from the request
-                        let schema = request.get("params")
+                        let schema = request
+                            .get("params")
                             .and_then(|v| v.get("schema"))
                             .and_then(|v| v.as_str())
-                            .ok_or_else(|| NetworkError::ProtocolError("Missing schema in query request".to_string()))?;
-                            
-                        let fields = request.get("params")
+                            .ok_or_else(|| {
+                                NetworkError::ProtocolError(
+                                    "Missing schema in query request".to_string(),
+                                )
+                            })?;
+
+                        let fields = request
+                            .get("params")
                             .and_then(|v| v.get("fields"))
                             .and_then(|v| v.as_array())
-                            .ok_or_else(|| NetworkError::ProtocolError("Missing fields in query request".to_string()))?;
-                            
+                            .ok_or_else(|| {
+                                NetworkError::ProtocolError(
+                                    "Missing fields in query request".to_string(),
+                                )
+                            })?;
+
                         // Return a simulated query result
                         Ok(serde_json::json!({
                             "results": [
@@ -270,14 +299,19 @@ impl NetworkCore {
                             "peer_id": peer_id.to_string(),
                             "simulated": true
                         }))
-                    },
+                    }
                     "mutation" => {
                         // Get the schema from the request
-                        let schema = request.get("params")
+                        let schema = request
+                            .get("params")
                             .and_then(|v| v.get("schema"))
                             .and_then(|v| v.as_str())
-                            .ok_or_else(|| NetworkError::ProtocolError("Missing schema in mutation request".to_string()))?;
-                            
+                            .ok_or_else(|| {
+                                NetworkError::ProtocolError(
+                                    "Missing schema in mutation request".to_string(),
+                                )
+                            })?;
+
                         // Return a simulated mutation result
                         Ok(serde_json::json!({
                             "success": true,
@@ -288,7 +322,7 @@ impl NetworkCore {
                             "peer_id": peer_id.to_string(),
                             "simulated": true
                         }))
-                    },
+                    }
                     _ => {
                         // For other operations, return a generic response
                         Ok(serde_json::json!({
@@ -305,61 +339,74 @@ impl NetworkCore {
             }
         }
     }
-    
+
     /// Send a request to a node over a TCP connection
     async fn send_request_to_node(
         mut stream: tokio::net::TcpStream,
         request: Value,
     ) -> NetworkResult<Value> {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
-        
+
         // Serialize the request
-        let request_bytes = serde_json::to_vec(&request)
-            .map_err(|e| NetworkError::ProtocolError(format!("Failed to serialize request: {}", e)))?;
-        
+        let request_bytes = serde_json::to_vec(&request).map_err(|e| {
+            NetworkError::ProtocolError(format!("Failed to serialize request: {}", e))
+        })?;
+
         // Send the request length
-        stream.write_u32(request_bytes.len() as u32).await
-            .map_err(|e| NetworkError::ConnectionError(format!("Failed to send request length: {}", e)))?;
-        
+        stream
+            .write_u32(request_bytes.len() as u32)
+            .await
+            .map_err(|e| {
+                NetworkError::ConnectionError(format!("Failed to send request length: {}", e))
+            })?;
+
         // Send the request
-        stream.write_all(&request_bytes).await
+        stream
+            .write_all(&request_bytes)
+            .await
             .map_err(|e| NetworkError::ConnectionError(format!("Failed to send request: {}", e)))?;
-        
+
         // Read the response length
-        let response_len = stream.read_u32().await
-            .map_err(|e| NetworkError::ConnectionError(format!("Failed to read response length: {}", e)))? as usize;
-        
+        let response_len = stream.read_u32().await.map_err(|e| {
+            NetworkError::ConnectionError(format!("Failed to read response length: {}", e))
+        })? as usize;
+
         // Read the response
         let mut response_bytes = vec![0u8; response_len];
-        stream.read_exact(&mut response_bytes).await
-            .map_err(|e| NetworkError::ConnectionError(format!("Failed to read response: {}", e)))?;
-        
+        stream.read_exact(&mut response_bytes).await.map_err(|e| {
+            NetworkError::ConnectionError(format!("Failed to read response: {}", e))
+        })?;
+
         // Deserialize the response
-        let response = serde_json::from_slice(&response_bytes)
-            .map_err(|e| NetworkError::ProtocolError(format!("Failed to deserialize response: {}", e)))?;
-        
+        let response = serde_json::from_slice(&response_bytes).map_err(|e| {
+            NetworkError::ProtocolError(format!("Failed to deserialize response: {}", e))
+        })?;
+
         Ok(response)
     }
-    
+
     /// Actively scan for peers using mDNS
     pub async fn discover_nodes(&mut self) -> NetworkResult<Vec<PeerId>> {
         if !self.config.enable_mdns {
             println!("mDNS discovery is disabled, no peers will be discovered");
             return Ok(Vec::new());
         }
-        
-        println!("Scanning for peers using mDNS on port {}", self.config.discovery_port);
-        
+
+        println!(
+            "Scanning for peers using mDNS on port {}",
+            self.config.discovery_port
+        );
+
         // In a real implementation, this would:
         // 1. Send out mDNS queries
         // 2. Wait for responses
         // 3. Add discovered peers to known_peers
         // 4. Return the list of discovered peers
-        
+
         // For now, we'll simulate peer discovery
         if cfg!(feature = "simulate-peers") {
             println!("SIMULATION: Generating random peers for demonstration");
-            
+
             // Generate 0-3 random peers
             let num_peers = rand::random::<u8>() % 4;
             for _ in 0..num_peers {
@@ -368,14 +415,14 @@ impl NetworkCore {
                 println!("SIMULATION: Discovered peer: {}", peer_id);
             }
         }
-        
+
         // Simulate network delay
         tokio::time::sleep(Duration::from_millis(200)).await;
-        
+
         // Return the current set of known peers
         Ok(self.known_peers.iter().cloned().collect())
     }
-    
+
     /// Add a mock peer for testing
     #[cfg(test)]
     pub fn add_mock_peer(&mut self, peer_id: PeerId, schema_service: SchemaService) {

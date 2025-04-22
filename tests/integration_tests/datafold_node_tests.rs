@@ -1,19 +1,11 @@
 use fold_node::testing::{
-    FieldPaymentConfig,
-    TrustDistanceScaling,
-    PermissionsPolicy,
-    TrustDistance,
-    SchemaField,
-    Mutation,
-    Query,
-    Schema,
-    MutationType,
-    FieldType,
+    FieldPaymentConfig, FieldType, Mutation, MutationType, PermissionsPolicy, Query, Schema,
+    SchemaField, TrustDistance, TrustDistanceScaling,
 };
 use fold_node::{DataFoldNode, NodeConfig};
 use serde_json::json;
-use tempfile::tempdir;
 use std::collections::HashMap;
+use tempfile::tempdir;
 
 fn create_test_node() -> DataFoldNode {
     let dir = tempdir().unwrap();
@@ -30,10 +22,7 @@ fn create_test_schema() -> Schema {
 
     // Add name field
     let name_field = SchemaField::new(
-        PermissionsPolicy::new(
-            TrustDistance::Distance(1),
-            TrustDistance::Distance(1),
-        ),
+        PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
         Some(FieldType::Single),
@@ -42,10 +31,7 @@ fn create_test_schema() -> Schema {
 
     // Add email field
     let email_field = SchemaField::new(
-        PermissionsPolicy::new(
-            TrustDistance::Distance(1),
-            TrustDistance::Distance(1),
-        ),
+        PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
         Some(FieldType::Single),
@@ -148,7 +134,10 @@ fn test_version_history() {
     // Get initial schema to see the field's ref_atom_uuid
     let initial_schema = node.get_schema("user_profile").unwrap().unwrap();
     let initial_name_field = initial_schema.fields.get("name").unwrap();
-    println!("Initial name field ref_atom_uuid: {:?}", initial_name_field.get_ref_atom_uuid());
+    println!(
+        "Initial name field ref_atom_uuid: {:?}",
+        initial_name_field.get_ref_atom_uuid()
+    );
 
     // Create initial data
     let mutation1 = Mutation {
@@ -165,7 +154,10 @@ fn test_version_history() {
     // Get schema after first mutation to check ref_atom_uuid
     let schema_after_create = node.get_schema("user_profile").unwrap().unwrap();
     let name_field_after_create = schema_after_create.fields.get("name").unwrap();
-    println!("Name field ref_atom_uuid after create: {:?}", name_field_after_create.get_ref_atom_uuid());
+    println!(
+        "Name field ref_atom_uuid after create: {:?}",
+        name_field_after_create.get_ref_atom_uuid()
+    );
 
     // Query current value
     let query1 = Query {
@@ -202,7 +194,10 @@ fn test_version_history() {
     // Get schema after update to check ref_atom_uuid
     let schema_after_update = node.get_schema("user_profile").unwrap().unwrap();
     let name_field_after_update = schema_after_update.fields.get("name").unwrap();
-    println!("Name field ref_atom_uuid after update: {:?}", name_field_after_update.get_ref_atom_uuid());
+    println!(
+        "Name field ref_atom_uuid after update: {:?}",
+        name_field_after_update.get_ref_atom_uuid()
+    );
 
     // Get history using the actual ref_atom_uuid
     let history = node.get_history(&name_field_after_update.get_ref_atom_uuid().unwrap());

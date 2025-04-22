@@ -1,16 +1,6 @@
 use fold_node::testing::{
-    SchemaPaymentConfig,
-    FieldPaymentConfig,
-    TrustDistanceScaling,
-    ExplicitCounts,
-    PermissionsPolicy,
-    TrustDistance,
-    SchemaField,
-    Mutation,
-    Query,
-    Schema,
-    MutationType,
-    FieldType,
+    ExplicitCounts, FieldPaymentConfig, FieldType, Mutation, MutationType, PermissionsPolicy,
+    Query, Schema, SchemaField, SchemaPaymentConfig, TrustDistance, TrustDistanceScaling,
 };
 use serde_json::json;
 use std::collections::HashMap;
@@ -169,7 +159,8 @@ fn test_atom_history() {
             create_default_payment_config(),
             HashMap::new(),
             Some(FieldType::Single),
-        ).with_ref_atom_uuid(field_uuid.clone()),
+        )
+        .with_ref_atom_uuid(field_uuid.clone()),
     );
 
     let schema = Schema {

@@ -3,38 +3,38 @@ use std::fmt;
 use std::io;
 
 /// Unified error type for the entire application.
-/// 
+///
 /// This error type centralizes all possible errors that can occur in the application,
 /// providing a consistent interface for error handling and propagation.
-/// 
+///
 /// Each variant represents a specific category of errors, with associated context
 /// to help with debugging and error reporting.
 #[derive(Debug)]
 pub enum FoldDbError {
     /// Errors related to schema operations
     Schema(SchemaError),
-    
+
     /// Errors related to database operations
     Database(String),
-    
+
     /// Errors related to permission checks
     Permission(String),
-    
+
     /// Errors related to configuration
     Config(String),
-    
+
     /// Errors related to network operations
     Network(NetworkErrorKind),
-    
+
     /// Errors related to IO operations
     Io(io::Error),
-    
+
     /// Errors related to serialization/deserialization
     Serialization(String),
-    
+
     /// Errors related to payment processing
     Payment(String),
-    
+
     /// Other errors that don't fit into the above categories
     Other(String),
 }
@@ -44,25 +44,25 @@ pub enum FoldDbError {
 pub enum NetworkErrorKind {
     /// Error with the network connection
     Connection(String),
-    
+
     /// Error with node discovery
     Discovery(String),
-    
+
     /// Error with message serialization/deserialization
     Message(String),
-    
+
     /// Error with node authentication
     Authentication(String),
-    
+
     /// Error with trust validation
     Trust(String),
-    
+
     /// Error with the node configuration
     Config(String),
-    
+
     /// Timeout error
     Timeout(String),
-    
+
     /// Protocol error
     Protocol(String),
 }
@@ -136,7 +136,9 @@ impl From<crate::network::NetworkError> for NetworkErrorKind {
             crate::network::NetworkError::ProtocolError(msg) => NetworkErrorKind::Protocol(msg),
             crate::network::NetworkError::RequestFailed(msg) => NetworkErrorKind::Message(msg),
             crate::network::NetworkError::RemoteError(msg) => NetworkErrorKind::Protocol(msg),
-            crate::network::NetworkError::TimeoutError => NetworkErrorKind::Timeout("Request timed out".to_string()),
+            crate::network::NetworkError::TimeoutError => {
+                NetworkErrorKind::Timeout("Request timed out".to_string())
+            }
             crate::network::NetworkError::InvalidPeerId(msg) => NetworkErrorKind::Connection(msg),
             crate::network::NetworkError::Libp2pError(msg) => NetworkErrorKind::Protocol(msg),
         }

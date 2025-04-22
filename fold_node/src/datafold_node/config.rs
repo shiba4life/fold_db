@@ -1,7 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
 
-        /// Configuration for a DataFoldNode instance.
+/// Configuration for a DataFoldNode instance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeConfig {
     /// Path where the node will store its data
@@ -27,7 +27,7 @@ impl NodeConfig {
             network_listen_address: default_network_listen_address(),
         }
     }
-    
+
     /// Set the network listening address
     pub fn with_network_listen_address(mut self, address: &str) -> Self {
         self.network_listen_address = address.to_string();

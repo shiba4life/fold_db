@@ -35,7 +35,8 @@ fn test_atom_with_prev_reference() {
         "test_schema".to_string(),
         "test_key".to_string(),
         json!({"version": 2}),
-    ).with_prev_version(first_atom.uuid().to_string());
+    )
+    .with_prev_version(first_atom.uuid().to_string());
 
     assert_eq!(
         second_atom.prev_atom_uuid(),
@@ -58,14 +59,12 @@ fn test_atom_ref_creation_and_update() {
         "test_schema".to_string(),
         "test_key".to_string(),
         json!({"test": false}),
-    ).with_prev_version(atom.uuid().to_string());
+    )
+    .with_prev_version(atom.uuid().to_string());
 
     let mut updated_ref = atom_ref.clone();
     updated_ref.set_atom_uuid(new_atom.uuid().to_string());
 
-    assert_eq!(
-        updated_ref.get_atom_uuid(),
-        &new_atom.uuid().to_string()
-    );
+    assert_eq!(updated_ref.get_atom_uuid(), &new_atom.uuid().to_string());
     assert!(updated_ref.updated_at() >= atom_ref.updated_at());
 }

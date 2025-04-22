@@ -1,19 +1,21 @@
 pub mod atom_manager;
-pub mod field_manager;
 pub mod collection_manager;
 pub mod context;
+pub mod field_manager;
 
-use serde_json::Value;
+use crate::atom::{Atom, AtomRefBehavior};
 use crate::db_operations::DbOperations;
 use crate::permissions::PermissionWrapper;
+use crate::schema::types::{Mutation, MutationType, Query};
 use crate::schema::SchemaCore;
-use crate::schema::types::{Mutation, Query, MutationType};
 use crate::schema::{Schema, SchemaError};
-use crate::atom::{Atom, AtomRefBehavior};
+use serde_json;
+use serde_json::Value;
+use uuid::Uuid;
 
 use self::atom_manager::AtomManager;
-use self::field_manager::FieldManager;
 use self::collection_manager::CollectionManager;
+use self::field_manager::FieldManager;
 
 /// The main database coordinator that manages schemas, permissions, and data storage.
 pub struct FoldDB {
@@ -22,9 +24,44 @@ pub struct FoldDB {
     pub(crate) collection_manager: CollectionManager,
     pub(crate) schema_manager: SchemaCore,
     permission_wrapper: PermissionWrapper,
+    /// Tree for storing metadata such as node_id
+    metadata_tree: sled::Tree,
+    /// Tree for storing per-node schema permissions
+    permissions_tree: sled::Tree,
 }
 
 impl FoldDB {
+    /// Retrieves or generates and persists the node identifier.
+    pub fn get_node_id(&self) -> Result<String, sled::Error> {
+        if let Some(bytes) = self.metadata_tree.get("node_id")? {
+            let id = String::from_utf8(bytes.to_vec()).unwrap_or_else(|_| String::new());
+            if !id.is_empty() {
+                return Ok(id);
+            }
+        }
+        let new_id = Uuid::new_v4().to_string();
+        self.metadata_tree.insert("node_id", new_id.as_bytes())?;
+        self.metadata_tree.flush()?;
+        Ok(new_id)
+    }
+
+    /// Retrieves the list of permitted schemas for the given node.
+    pub fn get_schema_permissions(&self, node_id: &str) -> Vec<String> {
+        if let Ok(Some(bytes)) = self.permissions_tree.get(node_id) {
+            if let Ok(list) = serde_json::from_slice::<Vec<String>>(&bytes) {
+                return list;
+            }
+        }
+        Vec::new()
+    }
+
+    /// Sets the permitted schemas for the given node.
+    pub fn set_schema_permissions(&self, node_id: &str, schemas: &[String]) -> sled::Result<()> {
+        let bytes = serde_json::to_vec(schemas).unwrap();
+        self.permissions_tree.insert(node_id, bytes)?;
+        self.permissions_tree.flush()?;
+        Ok(())
+    }
     /// Creates a new FoldDB instance with the specified storage path.
     pub fn new(path: &str) -> sled::Result<Self> {
         let db = match sled::open(path) {
@@ -38,7 +75,10 @@ impl FoldDB {
             }
         };
 
-        let db_ops = DbOperations::new(db);
+        let metadata_tree = db.open_tree("metadata")?;
+        let permissions_tree = db.open_tree("node_id_schema_permissions")?;
+
+        let db_ops = DbOperations::new(db.clone());
         let atom_manager = AtomManager::new(db_ops);
         let field_manager = FieldManager::new(atom_manager.clone());
         let collection_manager = CollectionManager::new(field_manager.clone());
@@ -51,29 +91,31 @@ impl FoldDB {
             collection_manager,
             schema_manager,
             permission_wrapper: PermissionWrapper::new(),
+            metadata_tree,
+            permissions_tree,
         })
     }
 
     pub fn load_schema(&mut self, schema: Schema) -> Result<(), SchemaError> {
         let name = schema.name.clone();
         self.schema_manager.load_schema(schema)?;
-        
+
         // Get the atom refs that need to be persisted
         let atom_refs = self.schema_manager.map_fields(&name)?;
-        
+
         // Persist each atom ref
         for atom_ref in atom_refs {
             let aref_uuid = atom_ref.uuid().to_string();
             let atom_uuid = atom_ref.get_atom_uuid().clone();
-            
+
             // Store the atom ref in the database
-            self.atom_manager.update_atom_ref(
-                &aref_uuid,
-                atom_uuid,
-                "system".to_string(),
-            ).map_err(|e| SchemaError::InvalidData(format!("Failed to persist atom ref: {}", e)))?;
+            self.atom_manager
+                .update_atom_ref(&aref_uuid, atom_uuid, "system".to_string())
+                .map_err(|e| {
+                    SchemaError::InvalidData(format!("Failed to persist atom ref: {}", e))
+                })?;
         }
-        
+
         Ok(())
     }
 
@@ -89,27 +131,47 @@ impl FoldDB {
     }
 
     pub fn query_schema(&self, query: Query) -> Vec<Result<Value, SchemaError>> {
-        query.fields.iter().map(|field_name| {
-            let perm_result = self.permission_wrapper.check_query_field_permission(
-                &query,
-                field_name,
-                &self.schema_manager,
-            );
+        query
+            .fields
+            .iter()
+            .map(|field_name| {
+                // Trust distance 0 bypasses permission checks
+                let perm_allowed = if query.trust_distance == 0 {
+                    true
+                } else {
+                    let perm = self.permission_wrapper.check_query_field_permission(
+                        &query,
+                        field_name,
+                        &self.schema_manager,
+                    );
+                    perm.allowed
+                };
 
-            if !perm_result.allowed {
-                return Err(perm_result.error.unwrap_or(SchemaError::InvalidPermission(
-                    "Unknown permission error".to_string(),
-                )));
-            }
+                if !perm_allowed {
+                    let err = self
+                        .permission_wrapper
+                        .check_query_field_permission(&query, field_name, &self.schema_manager)
+                        .error
+                        .unwrap_or(SchemaError::InvalidPermission(
+                            "Unknown permission error".to_string(),
+                        ));
+                    return Err(err);
+                }
 
-            let schema = match self.schema_manager.get_schema(&query.schema_name) {
-                Ok(Some(schema)) => schema,
-                Ok(None) => return Err(SchemaError::NotFound(format!("Schema {} not found", query.schema_name))),
-                Err(e) => return Err(e),
-            };
+                let schema = match self.schema_manager.get_schema(&query.schema_name) {
+                    Ok(Some(schema)) => schema,
+                    Ok(None) => {
+                        return Err(SchemaError::NotFound(format!(
+                            "Schema {} not found",
+                            query.schema_name
+                        )))
+                    }
+                    Err(e) => return Err(e),
+                };
 
-            self.field_manager.get_field_value(&schema, field_name)
-        }).collect()
+                self.field_manager.get_field_value(&schema, field_name)
+            })
+            .collect()
     }
 
     pub fn write_schema(&mut self, mutation: Mutation) -> Result<(), SchemaError> {
@@ -117,18 +179,22 @@ impl FoldDB {
             return Err(SchemaError::InvalidData("No fields to write".to_string()));
         }
 
-        let schema = self.schema_manager.get_schema(&mutation.schema_name)?
-            .ok_or_else(|| SchemaError::NotFound(format!("Schema {} not found", mutation.schema_name)))?;
+        let schema = self
+            .schema_manager
+            .get_schema(&mutation.schema_name)?
+            .ok_or_else(|| {
+                SchemaError::NotFound(format!("Schema {} not found", mutation.schema_name))
+            })?;
 
         for (field_name, value) in mutation.fields_and_values.iter() {
-            let perm_result = self.permission_wrapper.check_mutation_field_permission(
+            let perm = self.permission_wrapper.check_mutation_field_permission(
                 &mutation,
                 field_name,
                 &self.schema_manager,
             );
-
-            if !perm_result.allowed {
-                return Err(perm_result.error.unwrap_or(SchemaError::InvalidPermission(
+            // Bypass permission checks when trust distance is zero
+            if mutation.trust_distance != 0 && !perm.allowed {
+                return Err(perm.error.unwrap_or(SchemaError::InvalidPermission(
                     "Unknown permission error".to_string(),
                 )));
             }
@@ -189,7 +255,10 @@ impl FoldDB {
         Ok(())
     }
 
-    pub fn get_atom_history(&self, aref_uuid: &str) -> Result<Vec<Atom>, Box<dyn std::error::Error>> {
+    pub fn get_atom_history(
+        &self,
+        aref_uuid: &str,
+    ) -> Result<Vec<Atom>, Box<dyn std::error::Error>> {
         self.atom_manager.get_atom_history(aref_uuid)
     }
 }

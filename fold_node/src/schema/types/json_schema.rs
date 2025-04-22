@@ -1,11 +1,11 @@
 use crate::fees::payment_config::SchemaPaymentConfig;
-use crate::schema::types::fields::FieldType;
 use crate::fees::types::config::FieldPaymentConfig;
 use crate::fees::types::config::TrustDistanceScaling;
 use crate::permissions::types::policy::{ExplicitCounts, PermissionsPolicy, TrustDistance};
+use crate::schema::types::fields::FieldType;
+use crate::schema::types::SchemaError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::schema::types::SchemaError;
 
 /// Represents a complete JSON schema definition
 #[derive(Debug, Clone, Serialize, Deserialize)]

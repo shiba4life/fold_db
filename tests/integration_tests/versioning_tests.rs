@@ -2,8 +2,12 @@ use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::test_data::test_helpers::operation_builder::{create_query, create_single_field_mutation};
-use crate::test_data::test_helpers::schema_builder::{create_field_with_permissions, create_schema_with_fields};
+use crate::test_data::test_helpers::operation_builder::{
+    create_query, create_single_field_mutation,
+};
+use crate::test_data::test_helpers::schema_builder::{
+    create_field_with_permissions, create_schema_with_fields,
+};
 use crate::test_data::test_helpers::{cleanup_test_db, setup_and_allow_schema, setup_test_db};
 
 #[test]
@@ -29,10 +33,7 @@ fn test_schema_versioning_with_permissions() {
         ),
     );
 
-    let schema = create_schema_with_fields(
-        "test_schema".to_string(),
-        fields,
-    );
+    let schema = create_schema_with_fields("test_schema".to_string(), fields);
 
     // Load and allow schema
     db.load_schema(schema).expect("Failed to load schema");
@@ -68,7 +69,7 @@ fn test_schema_versioning_with_permissions() {
         .fields
         .iter()
         .cloned()
-        .zip(trusted_results.into_iter())
+        .zip(trusted_results)
         .collect();
 
     let versioned_result = trusted_results.get("versioned_field").unwrap();
@@ -87,7 +88,7 @@ fn test_schema_versioning_with_permissions() {
         .fields
         .iter()
         .cloned()
-        .zip(untrusted_results.into_iter())
+        .zip(untrusted_results)
         .collect();
 
     assert!(untrusted_results.get("versioned_field").unwrap().is_err());

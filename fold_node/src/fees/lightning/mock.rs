@@ -29,7 +29,7 @@ impl LightningClient for MockLightningClient {
         hold_invoice: bool,
     ) -> Result<LightningPaymentRequest, Error> {
         let _ = memo; // Acknowledge the parameter to avoid unused variable warning
-        // Generate a mock payment hash
+                      // Generate a mock payment hash
         let payment_hash = Uuid::new_v4().to_string();
 
         Ok(LightningPaymentRequest {

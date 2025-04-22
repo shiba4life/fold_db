@@ -17,22 +17,22 @@ pub struct AtomRefUpdate {
 }
 
 /// A trait defining the common behavior for atom references.
-/// 
+///
 /// This trait provides the interface for both single atom references
 /// and collections of atom references.
 pub trait AtomRefBehavior {
     /// Returns the unique identifier of this reference
     fn uuid(&self) -> &str;
-    
+
     /// Returns the timestamp of the last update
     fn updated_at(&self) -> DateTime<Utc>;
-    
+
     /// Returns the status of this reference
     fn status(&self) -> &AtomRefStatus;
-    
+
     /// Sets the status of this reference
     fn set_status(&mut self, status: &AtomRefStatus, source_pub_key: String);
-    
+
     /// Returns the update history
     fn update_history(&self) -> &Vec<AtomRefUpdate>;
 }
@@ -187,8 +187,8 @@ impl AtomRefBehavior for AtomRefCollection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
     use crate::atom::Atom;
+    use serde_json::json;
 
     #[test]
     fn test_atom_ref_creation_and_update() {
@@ -237,12 +237,24 @@ mod tests {
         collection.set_atom_uuid("1".to_string(), atoms[1].uuid().to_string());
         collection.set_atom_uuid("2".to_string(), atoms[2].uuid().to_string());
 
-        assert_eq!(collection.get_atom_uuid("0"), Some(&atoms[0].uuid().to_string()));
-        assert_eq!(collection.get_atom_uuid("1"), Some(&atoms[1].uuid().to_string()));
-        assert_eq!(collection.get_atom_uuid("2"), Some(&atoms[2].uuid().to_string()));
+        assert_eq!(
+            collection.get_atom_uuid("0"),
+            Some(&atoms[0].uuid().to_string())
+        );
+        assert_eq!(
+            collection.get_atom_uuid("1"),
+            Some(&atoms[1].uuid().to_string())
+        );
+        assert_eq!(
+            collection.get_atom_uuid("2"),
+            Some(&atoms[2].uuid().to_string())
+        );
 
         // Test removal
-        assert_eq!(collection.remove_atom_uuid("1"), Some(atoms[1].uuid().to_string()));
+        assert_eq!(
+            collection.remove_atom_uuid("1"),
+            Some(atoms[1].uuid().to_string())
+        );
         assert_eq!(collection.get_atom_uuid("1"), None);
 
         // Test behavior trait

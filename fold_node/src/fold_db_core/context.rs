@@ -1,10 +1,10 @@
+use super::atom_manager::AtomManager;
+use crate::atom::{AtomRef, AtomRefCollection, AtomStatus};
+use crate::schema::types::fields::FieldType;
+use crate::schema::Schema;
+use crate::schema::SchemaError;
 use serde_json::Value;
 use uuid::Uuid;
-use crate::schema::types::fields::FieldType;
-use crate::schema::SchemaError;
-use crate::schema::Schema;
-use crate::atom::{AtomRef, AtomRefCollection, AtomStatus};
-use super::atom_manager::AtomManager;
 
 pub struct AtomContext<'a> {
     schema: &'a Schema,
@@ -14,7 +14,12 @@ pub struct AtomContext<'a> {
 }
 
 impl<'a> AtomContext<'a> {
-    pub fn new(schema: &'a Schema, field: &'a str, source_pub_key: String, atom_manager: &'a mut AtomManager) -> Self {
+    pub fn new(
+        schema: &'a Schema,
+        field: &'a str,
+        source_pub_key: String,
+        atom_manager: &'a mut AtomManager,
+    ) -> Self {
         Self {
             schema,
             field,
@@ -23,8 +28,12 @@ impl<'a> AtomContext<'a> {
         }
     }
 
-    pub fn get_field_def(&self) -> Result<&'a crate::schema::types::fields::SchemaField, SchemaError> {
-        self.schema.fields.get(self.field)
+    pub fn get_field_def(
+        &self,
+    ) -> Result<&'a crate::schema::types::fields::SchemaField, SchemaError> {
+        self.schema
+            .fields
+            .get(self.field)
             .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", self.field)))
     }
 
@@ -56,15 +65,21 @@ impl<'a> AtomContext<'a> {
     pub fn get_prev_atom_uuid(&self, aref_uuid: &str) -> Result<String, SchemaError> {
         let ref_atoms = self.atom_manager.get_ref_atoms();
         let guard = ref_atoms.lock().unwrap();
-        let aref = guard.get(aref_uuid)
+        let aref = guard
+            .get(aref_uuid)
             .ok_or_else(|| SchemaError::InvalidData("AtomRef not found".to_string()))?;
         Ok(aref.get_atom_uuid().to_string())
     }
 
-    pub fn get_prev_collection_atom_uuid(&self, aref_uuid: &str, id: &str) -> Result<String, SchemaError> {
+    pub fn get_prev_collection_atom_uuid(
+        &self,
+        aref_uuid: &str,
+        id: &str,
+    ) -> Result<String, SchemaError> {
         let ref_collections = self.atom_manager.get_ref_collections();
         let guard = ref_collections.lock().unwrap();
-        let aref = guard.get(aref_uuid)
+        let aref = guard
+            .get(aref_uuid)
             .ok_or_else(|| SchemaError::InvalidData("AtomRefCollection not found".to_string()))?;
         aref.get_atom_uuid(id)
             .ok_or_else(|| SchemaError::InvalidData("Atom not found".to_string()))
@@ -77,32 +92,39 @@ impl<'a> AtomContext<'a> {
         content: Value,
         status: Option<AtomStatus>,
     ) -> Result<(), SchemaError> {
-        let atom = self.atom_manager.create_atom(
-            &self.schema.name,
-            self.source_pub_key.clone(),
-            prev_atom_uuid,
-            content,
-            status,
-        ).map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+        let atom = self
+            .atom_manager
+            .create_atom(
+                &self.schema.name,
+                self.source_pub_key.clone(),
+                prev_atom_uuid,
+                content,
+                status,
+            )
+            .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
 
         let aref_uuid = self.get_or_create_atom_ref()?;
         let field_def = self.get_field_def()?;
 
         match field_def.field_type() {
             FieldType::Single => {
-                self.atom_manager.update_atom_ref(
-                    &aref_uuid,
-                    atom.uuid().to_string(),
-                    self.source_pub_key.clone(),
-                ).map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+                self.atom_manager
+                    .update_atom_ref(
+                        &aref_uuid,
+                        atom.uuid().to_string(),
+                        self.source_pub_key.clone(),
+                    )
+                    .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
             }
             FieldType::Collection => {
-                self.atom_manager.update_atom_ref_collection(
-                    &aref_uuid,
-                    atom.uuid().to_string(),
-                    "0".to_string(),
-                    self.source_pub_key.clone(),
-                ).map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+                self.atom_manager
+                    .update_atom_ref_collection(
+                        &aref_uuid,
+                        atom.uuid().to_string(),
+                        "0".to_string(),
+                        self.source_pub_key.clone(),
+                    )
+                    .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
             }
         }
 
@@ -116,22 +138,27 @@ impl<'a> AtomContext<'a> {
         status: Option<AtomStatus>,
         id: String,
     ) -> Result<(), SchemaError> {
-        let atom = self.atom_manager.create_atom(
-            &self.schema.name,
-            self.source_pub_key.clone(),
-            prev_atom_uuid,
-            content,
-            status,
-        ).map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+        let atom = self
+            .atom_manager
+            .create_atom(
+                &self.schema.name,
+                self.source_pub_key.clone(),
+                prev_atom_uuid,
+                content,
+                status,
+            )
+            .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
 
         let aref_uuid = self.get_or_create_atom_ref()?;
 
-        self.atom_manager.update_atom_ref_collection(
-            &aref_uuid,
-            atom.uuid().to_string(),
-            id,
-            self.source_pub_key.clone(),
-        ).map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+        self.atom_manager
+            .update_atom_ref_collection(
+                &aref_uuid,
+                atom.uuid().to_string(),
+                id,
+                self.source_pub_key.clone(),
+            )
+            .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
 
         Ok(())
     }

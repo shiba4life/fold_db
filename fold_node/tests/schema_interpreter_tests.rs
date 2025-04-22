@@ -1,6 +1,5 @@
 use fold_node::testing::SchemaCore;
 
-
 #[test]
 fn test_invalid_schema_validation() {
     let invalid_json_str = r#"{

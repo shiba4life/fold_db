@@ -43,16 +43,17 @@ pub fn get_test_db_path() -> String {
 
     // Create the database directory
     fs::create_dir_all(&db_path).expect("Failed to create database directory");
-    
+
     // Create schemas subdirectory with proper error handling
     let schemas_dir = db_path.join("schemas");
     match fs::create_dir_all(&schemas_dir) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
             eprintln!("Warning: Failed to create schemas directory: {}", e);
             // Try an alternative approach
             let schemas_path = db_path.to_string_lossy().into_owned() + "/schemas";
-            fs::create_dir_all(schemas_path).expect("Failed to create schemas directory with alternative method");
+            fs::create_dir_all(schemas_path)
+                .expect("Failed to create schemas directory with alternative method");
         }
     }
 
