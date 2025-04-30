@@ -19,22 +19,3 @@ pub enum SchemaResponse {
     Error(String),
 }
 
-/// Codec for schema protocol messages
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct SchemaCodec;
-
-#[allow(dead_code)]
-impl SchemaCodec {
-    /// Create a new schema codec
-    #[allow(dead_code)]
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl Default for SchemaCodec {
-    fn default() -> Self {
-        Self::new()
-    }
-}
