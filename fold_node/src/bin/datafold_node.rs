@@ -6,6 +6,32 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
+/// Main entry point for the DataFold Node server.
+///
+/// This function starts a DataFold node server that listens for incoming
+/// connections on the specified ports. It initializes the node, loads
+/// configuration, sets up the network layer, and starts the TCP server.
+///
+/// # Command-Line Arguments
+///
+/// * `--port <PORT>` - Port for the P2P network (default: 9000)
+/// * `--tcp-port <PORT>` - Port for the TCP server (default: 9000)
+///
+/// # Environment Variables
+///
+/// * `NODE_CONFIG` - Path to the node configuration file (default: config/node_config.json)
+///
+/// # Returns
+///
+/// A `Result` indicating success or failure.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// * The configuration file cannot be read or parsed
+/// * The node cannot be initialized
+/// * The network layer cannot be initialized
+/// * The TCP server cannot be started
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting DataFold Node...");

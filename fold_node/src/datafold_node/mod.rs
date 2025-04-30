@@ -1,3 +1,14 @@
+//! A DataFold node is a self-contained instance that can store data, process
+//! queries and mutations, and communicate with other nodes. Each node has:
+//!
+//! 1. A local database for storing data
+//! 2. A schema system for defining data structure
+//! 3. A network layer for communicating with other nodes
+//! 4. A TCP server for external client connections
+//!
+//! Nodes can operate independently or as part of a network, with trust
+//! relationships defining how they share and access data.
+
 pub mod config;
 pub mod error;
 pub mod loader;

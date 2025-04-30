@@ -9,7 +9,45 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
 
-/// TCP server for the DataFold node
+/// TCP server for the DataFold node.
+///
+/// TcpServer provides a TCP-based interface for external clients to interact
+/// with a DataFold node. It handles connection management, request parsing,
+/// and response formatting.
+///
+/// # Features
+///
+/// * Connection handling for multiple clients
+/// * JSON-based request/response protocol
+/// * Request forwarding to other nodes
+/// * Error handling and recovery
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use fold_node::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
+/// use fold_node::error::FoldDbResult;
+/// use std::path::PathBuf;
+///
+/// #[tokio::main]
+/// async fn main() -> FoldDbResult<()> {
+///     // Create a node first
+///     let config = NodeConfig {
+///         storage_path: PathBuf::from("data"),
+///         default_trust_distance: 1,
+///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
+///     };
+///     let node = DataFoldNode::new(config)?;
+///     
+///     // Create a new TCP server on port 9000
+///     let tcp_server = TcpServer::new(node, 9000).await?;
+///
+///     // Run the server (this will block until the server is stopped)
+///     tcp_server.run().await?;
+///     
+///     Ok(())
+/// }
+/// ```
 pub struct TcpServer {
     /// The DataFold node
     node: Arc<Mutex<DataFoldNode>>,
@@ -18,7 +56,47 @@ pub struct TcpServer {
 }
 
 impl TcpServer {
-    /// Create a new TCP server
+    /// Create a new TCP server.
+    ///
+    /// This method creates a new TCP server that listens on the specified port.
+    /// It binds to 127.0.0.1 (localhost) and starts listening for incoming connections.
+    /// The server uses the provided DataFoldNode to process client requests.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The DataFoldNode instance to use for processing requests
+    /// * `port` - The port number to listen on
+    ///
+    /// # Returns
+    ///
+    /// A `FoldDbResult` containing the new TcpServer instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `FoldDbError` if:
+    /// * There is an error binding to the specified port
+    /// * The port is already in use
+    /// * There is insufficient permission to bind to the port
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use fold_node::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
+    /// use fold_node::error::FoldDbResult;
+    /// use std::path::PathBuf;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> FoldDbResult<()> {
+    ///     let config = NodeConfig {
+    ///         storage_path: PathBuf::from("data"),
+    ///         default_trust_distance: 1,
+    ///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
+    ///     };
+    ///     let node = DataFoldNode::new(config)?;
+    ///     let tcp_server = TcpServer::new(node, 9000).await?;
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn new(node: DataFoldNode, port: u16) -> FoldDbResult<Self> {
         let addr = format!("127.0.0.1:{}", port);
         let listener = TcpListener::bind(&addr).await?;
@@ -30,7 +108,43 @@ impl TcpServer {
         })
     }
 
-    /// Run the TCP server
+    /// Run the TCP server.
+    ///
+    /// This method starts the TCP server and begins accepting client connections.
+    /// It runs in an infinite loop, spawning a new task for each client connection.
+    /// Each connection is handled independently, allowing multiple clients to
+    /// connect simultaneously.
+    ///
+    /// # Returns
+    ///
+    /// A `FoldDbResult` indicating success or failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `FoldDbError` if:
+    /// * There is an error accepting a connection
+    /// * There is an error creating a new task
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use fold_node::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
+    /// use fold_node::error::FoldDbResult;
+    /// use std::path::PathBuf;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> FoldDbResult<()> {
+    ///     let config = NodeConfig {
+    ///         storage_path: PathBuf::from("data"),
+    ///         default_trust_distance: 1,
+    ///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
+    ///     };
+    ///     let node = DataFoldNode::new(config)?;
+    ///     let tcp_server = TcpServer::new(node, 9000).await?;
+    ///     tcp_server.run().await?;
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn run(&self) -> FoldDbResult<()> {
         println!("TCP server running...");
 
@@ -50,7 +164,36 @@ impl TcpServer {
         }
     }
 
-    /// Handle a client connection
+    /// Handle a client connection.
+    ///
+    /// This method handles a single client connection to the TCP server.
+    /// It runs in a loop, reading requests from the client, processing them,
+    /// and sending responses back. The loop continues until the client
+    /// disconnects or an error occurs.
+    ///
+    /// The communication protocol is:
+    /// 1. Read a 32-bit unsigned integer representing the request length
+    /// 2. Read the request data (JSON)
+    /// 3. Process the request
+    /// 4. Write a 32-bit unsigned integer representing the response length
+    /// 5. Write the response data (JSON)
+    ///
+    /// # Arguments
+    ///
+    /// * `socket` - The TCP socket for the client connection
+    /// * `node` - The DataFoldNode to use for processing requests
+    ///
+    /// # Returns
+    ///
+    /// A `FoldDbResult` indicating success or failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `FoldDbError` if:
+    /// * There is an error reading from the socket
+    /// * There is an error writing to the socket
+    /// * There is an error processing a request
+    /// * The request is too large (exceeds 10MB)
     async fn handle_connection(
         mut socket: TcpStream,
         node: Arc<Mutex<DataFoldNode>>,
@@ -197,7 +340,40 @@ impl TcpServer {
         }
     }
 
-    /// Process a request
+    /// Process a request from a client.
+    ///
+    /// This function handles the processing of JSON requests from clients.
+    /// It extracts the operation type from the request, checks if the request
+    /// should be forwarded to another node, and then executes the appropriate
+    /// operation on the local node or forwards it to the target node.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The JSON request to process
+    /// * `node` - The DataFoldNode to use for processing the request
+    ///
+    /// # Returns
+    ///
+    /// A `FoldDbResult` containing the JSON response to send back to the client.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `FoldDbError` if:
+    /// * The operation is missing from the request
+    /// * The operation is unknown or invalid
+    /// * There is an error processing the request
+    /// * There is an error forwarding the request to another node
+    ///
+    /// # Supported Operations
+    ///
+    /// * `list_schemas` - List all schemas loaded in the node
+    /// * `get_schema` - Get a specific schema by name
+    /// * `create_schema` - Create a new schema
+    /// * `update_schema` - Update an existing schema
+    /// * `delete_schema` - Delete a schema
+    /// * `query` - Execute a query against a schema
+    /// * `mutation` - Execute a mutation against a schema
+    /// * `discover_nodes` - Discover other nodes in the network
     async fn process_request(
         request: &Value,
         node: Arc<Mutex<DataFoldNode>>,

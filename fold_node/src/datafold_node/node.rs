@@ -10,7 +10,50 @@ use crate::network::{NetworkConfig, NetworkCore, PeerId};
 use crate::schema::types::{Mutation, Operation, Query};
 use crate::schema::{Schema, SchemaError};
 
-/// A node in the FoldDB distributed database system.
+/// A node in the DataFold distributed database system.
+///
+/// DataFoldNode combines database storage, schema management, and networking
+/// capabilities into a complete node implementation. It can operate independently
+/// or as part of a network of nodes, with trust relationships defining data access.
+///
+/// # Features
+///
+/// * Schema loading and management
+/// * Query and mutation execution
+/// * Network communication with other nodes
+/// * Permission management for schemas
+/// * Request forwarding to trusted nodes
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use fold_node::datafold_node::{DataFoldNode, NodeConfig};
+/// use fold_node::schema::{Schema, types::Operation};
+/// use fold_node::error::FoldDbResult;
+/// use std::path::PathBuf;
+/// use std::collections::HashMap;
+///
+/// fn main() -> FoldDbResult<()> {
+///     // Create a new node with default configuration
+///     let config = NodeConfig::new(PathBuf::from("data"));
+///     let mut node = DataFoldNode::new(config)?;
+///
+///     // Create and load a schema
+///     let schema = Schema::new("user_profile".to_string());
+///
+///     // Load the schema
+///     node.load_schema(schema)?;
+///
+///     // Execute a query
+///     let operation = Operation::Query {
+///         schema: "user_profile".to_string(),
+///         fields: vec!["username".to_string(), "email".to_string()],
+///         filter: None,
+///     };
+///     let result = node.execute_operation(operation)?;
+///     Ok(())
+/// }
+/// ```
 #[derive(Clone)]
 pub struct DataFoldNode {
     /// The underlying database instance for data storage and operations
@@ -60,6 +103,46 @@ impl DataFoldNode {
     }
 
     /// Loads a schema into the database and grants this node permission.
+    ///
+    /// This function loads a schema into the database, making it available for
+    /// queries and mutations. It also grants the local node permission to access
+    /// the schema.
+    ///
+    /// # Arguments
+    ///
+    /// * `schema` - The schema to load
+    ///
+    /// # Returns
+    ///
+    /// A `FoldDbResult` indicating success or failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `FoldDbError` if:
+    /// * There is an error loading the schema into the database
+    /// * There is an error granting permission to the local node
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use fold_node::datafold_node::{DataFoldNode, NodeConfig};
+    /// use fold_node::schema::Schema;
+    /// use fold_node::error::FoldDbResult;
+    /// use std::path::PathBuf;
+    /// use std::collections::HashMap;
+    ///
+    /// fn main() -> FoldDbResult<()> {
+    ///     let config = NodeConfig::new(PathBuf::from("data"));
+    ///     let mut node = DataFoldNode::new(config)?;
+    ///     
+    ///     // Create a schema
+    ///     let schema = Schema::new("user_profile".to_string());
+    ///
+    ///     // Load the schema
+    ///     node.load_schema(schema)?;
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn load_schema(&mut self, schema: Schema) -> FoldDbResult<()> {
         let schema_name = schema.name.clone();
         let mut db = self
@@ -73,6 +156,63 @@ impl DataFoldNode {
     }
 
     /// Executes an operation (query or mutation) on the database.
+    ///
+    /// This function processes a schema operation, which can be either a query
+    /// to retrieve data or a mutation to modify data. It handles permission
+    /// checking, operation routing, and result formatting.
+    ///
+    /// # Arguments
+    ///
+    /// * `operation` - The operation to execute, either a Query or Mutation
+    ///
+    /// # Returns
+    ///
+    /// A `FoldDbResult` containing the JSON result of the operation.
+    /// For queries, this will be an array of values for the requested fields.
+    /// For mutations, this will typically be null or a success indicator.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `FoldDbError` if:
+    /// * The schema does not exist
+    /// * The operation is not permitted
+    /// * There is an error executing the operation
+    /// * The result cannot be serialized
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use fold_node::datafold_node::{DataFoldNode, NodeConfig};
+    /// use fold_node::schema::types::{Operation, MutationType};
+    /// use fold_node::error::FoldDbResult;
+    /// use std::path::PathBuf;
+    /// use serde_json::json;
+    ///
+    /// fn main() -> FoldDbResult<()> {
+    ///     let config = NodeConfig::new(PathBuf::from("data"));
+    ///     let mut node = DataFoldNode::new(config)?;
+    ///
+    ///     // Execute a query
+    ///     let query_op = Operation::Query {
+    ///         schema: "user_profile".to_string(),
+    ///         fields: vec!["username".to_string(), "email".to_string()],
+    ///         filter: None,
+    ///     };
+    ///     let query_result = node.execute_operation(query_op)?;
+    ///
+    ///     // Execute a mutation
+    ///     let mutation_op = Operation::Mutation {
+    ///         schema: "user_profile".to_string(),
+    ///         data: json!({
+    ///             "username": "new_user",
+    ///             "email": "user@example.com"
+    ///         }),
+    ///         mutation_type: MutationType::Create,
+    ///     };
+    ///     let mutation_result = node.execute_operation(mutation_op)?;
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn execute_operation(&mut self, operation: Operation) -> FoldDbResult<Value> {
         println!("Executing operation: {:?}", operation);
         match operation {

@@ -1,3 +1,30 @@
+//! # DataFold Node Library
+//! 
+//! This library implements the core functionality of the DataFold distributed data platform.
+//! It provides a schema-based data storage and query system with distributed networking capabilities.
+//!
+//! ## Core Components
+//!
+//! * `atom` - Atomic data storage units that form the foundation of the database
+//! * `datafold_node` - Node implementation with TCP server and configuration
+//! * `db_operations` - Database operation handlers
+//! * `error` - Error types and handling
+//! * `fees` - Payment and fee calculation system
+//! * `fold_db_core` - Core database functionality
+//! * `network` - P2P networking layer for node communication
+//! * `permissions` - Access control and permission management
+//! * `schema` - Schema definition, validation, and execution
+//!
+//! ## Architecture
+//!
+//! DataFold uses a distributed architecture where each node can store and process data
+//! according to defined schemas. Nodes can communicate with each other to share and
+//! replicate data, with permissions controlling access to different schemas and operations.
+//!
+//! The system is built around the concept of schemas that define the structure of data
+//! and the operations that can be performed on it. Each schema has fields with associated
+//! permissions and payment requirements.
+
 pub mod atom;
 pub mod datafold_node;
 pub mod db_operations;

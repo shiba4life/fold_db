@@ -7,7 +7,41 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
-/// Core network component for P2P communication
+/// Core network component for P2P communication between DataFold nodes.
+///
+/// NetworkCore manages peer connections, discovery, and message routing in the
+/// DataFold network. It provides the foundation for distributed operations across
+/// multiple nodes.
+///
+/// # Features
+///
+/// * Peer discovery using mDNS
+/// * Connection management for known peers
+/// * Message routing between nodes
+/// * Schema availability checking
+/// * Request forwarding to appropriate nodes
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use fold_node::network::{NetworkCore, NetworkConfig, NetworkResult};
+/// use libp2p::PeerId;
+///
+/// #[tokio::main]
+/// async fn main() -> NetworkResult<()> {
+///     let config = NetworkConfig::new("/ip4/0.0.0.0/tcp/9000")
+///         .with_mdns(true)
+///         .with_request_timeout(30);
+///
+///     let mut network = NetworkCore::new(config).await?;
+///     network.run("/ip4/0.0.0.0/tcp/9000").await?;
+///
+///     // Check schemas on a remote peer (peer_id would come from discovery)
+///     let peer_id = PeerId::random(); // Just for example
+///     let available_schemas = network.check_schemas(peer_id, vec!["user_profile".to_string()]).await?;
+///     Ok(())
+/// }
+/// ```
 pub struct NetworkCore {
     /// Schema service for handling schema operations
     schema_service: SchemaService,
@@ -138,7 +172,46 @@ impl NetworkCore {
         Ok(())
     }
 
-    /// Check which schemas are available on a remote peer
+    /// Check which schemas are available on a remote peer.
+    ///
+    /// This function sends a request to a remote peer to check which schemas
+    /// from the provided list are available on that peer. It returns a subset
+    /// of the input schema names that are available on the remote peer.
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_id` - The ID of the peer to check
+    /// * `schema_names` - A list of schema names to check for availability
+    ///
+    /// # Returns
+    ///
+    /// A `NetworkResult` containing a vector of available schema names.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `NetworkError` if:
+    /// * The peer is not found in the known peers list
+    /// * There is a connection error when contacting the peer
+    /// * There is a protocol error in the request/response
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use fold_node::network::{NetworkCore, NetworkConfig, NetworkResult};
+    /// use libp2p::PeerId;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> NetworkResult<()> {
+    ///     let config = NetworkConfig::new("/ip4/0.0.0.0/tcp/9000");
+    ///     let mut network = NetworkCore::new(config).await?;
+    ///     
+    ///     let peer_id = PeerId::random(); // In practice, this comes from discovery
+    ///     let schemas_to_check = vec!["user_profile".to_string(), "posts".to_string()];
+    ///     let available_schemas = network.check_schemas(peer_id, schemas_to_check).await?;
+    ///     println!("Available schemas: {:?}", available_schemas);
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn check_schemas(
         &mut self,
         peer_id: PeerId,
@@ -190,7 +263,52 @@ impl NetworkCore {
         &self.known_peers
     }
 
-    /// Forward a request to another node
+    /// Forward a request to another node.
+    ///
+    /// This function forwards a JSON request to another node in the network.
+    /// It handles connection establishment, request serialization, and response
+    /// deserialization.
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_id` - The ID of the peer to forward the request to
+    /// * `request` - The JSON request to forward
+    ///
+    /// # Returns
+    ///
+    /// A `NetworkResult` containing the JSON response from the remote node.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `NetworkError` if:
+    /// * The peer is not found in the known peers list
+    /// * There is a connection error when contacting the peer
+    /// * There is a protocol error in the request/response
+    /// * The response cannot be deserialized
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use fold_node::network::{NetworkCore, NetworkConfig};
+    /// use libp2p::PeerId;
+    /// 
+    /// # tokio_test::block_on(async {
+    /// # let mut network = NetworkCore::new(NetworkConfig::default()).await?;
+    /// # let peer_id = PeerId::random();
+    /// # network.add_known_peer(peer_id);
+    /// let request = serde_json::json!({
+    ///     "operation": "query",
+    ///     "params": {
+    ///         "schema": "user_profile",
+    ///         "fields": ["username", "email"]
+    ///     }
+    /// });
+    ///
+    /// let response = network.forward_request(peer_id, request).await?;
+    /// println!("Response: {:?}", response);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # });
+    /// ```
     pub async fn forward_request(
         &mut self,
         peer_id: PeerId,

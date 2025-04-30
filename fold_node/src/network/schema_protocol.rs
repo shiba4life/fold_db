@@ -32,3 +32,9 @@ impl SchemaCodec {
         Self {}
     }
 }
+
+impl Default for SchemaCodec {
+    fn default() -> Self {
+        Self::new()
+    }
+}

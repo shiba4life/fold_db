@@ -66,6 +66,32 @@ enum Commands {
     },
 }
 
+/// Main entry point for the DataFold CLI.
+///
+/// This function parses command-line arguments, initializes a DataFold node,
+/// and executes the requested command. It supports various operations such as
+/// loading schemas, listing schemas, executing queries and mutations, and more.
+///
+/// # Command-Line Arguments
+///
+/// * `-c, --config <PATH>` - Path to the node configuration file (default: config/node_config.json)
+/// * Subcommands:
+///   * `load-schema <PATH>` - Load a schema from a JSON file
+///   * `list-schemas` - List all loaded schemas
+///   * `query` - Execute a query operation
+///   * `mutate` - Execute a mutation operation
+///   * `execute <PATH>` - Load an operation from a JSON file
+///
+/// # Returns
+///
+/// A `Result` indicating success or failure.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// * The configuration file cannot be read or parsed
+/// * The node cannot be initialized
+/// * There is an error executing the requested command
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
