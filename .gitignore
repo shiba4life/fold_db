@@ -74,3 +74,17 @@ logs
 # Debug files
 *.pdb
 tests/test_data/
+fold_node/debug_output.txt
+fold_node/debug_output2.txt
+fold_node/output.txt
+fold_node/simple_output.txt
+fold_node/transform_output.txt
+fold_node/tmp/
+
+# Rust analyzer
+rust-project.json
+
+# Coverage reports
+coverage/
+*.profraw
+*.profdata

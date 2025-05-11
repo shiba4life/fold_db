@@ -1,0 +1,68 @@
+// Transform DSL Grammar
+
+// Whitespace and comments
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* ~ "\n" }
+
+// Literals
+number = @{ int ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
+    int = { ("+" | "-")? ~ ASCII_DIGIT+ }
+
+string = @{ "\"" ~ inner_string ~ "\"" }
+    inner_string = @{ (!("\"" | "\\") ~ ANY)* ~ (escape ~ (!("\"" | "\\") ~ ANY)*)* }
+    escape = @{ "\\" ~ ("\"" | "\\" | "n" | "r" | "t") }
+
+boolean = { "true" | "false" }
+null = { "null" }
+
+// Identifiers
+identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+
+// Operators
+add_op = { "+" | "-" }
+mul_op = { "*" | "/" }
+pow_op = { "^" }
+comp_op = { "==" | "!=" | "<=" | ">=" | "<" | ">" }
+logic_op = { "&&" | "||" }
+
+// Function calls
+function_call = { identifier ~ "(" ~ (expr ~ ("," ~ expr)*)? ~ ")" }
+
+// Field access
+field_access = { identifier ~ ("." ~ identifier)+ }
+
+// If expression
+if_expr = { "if" ~ expr ~ "then" ~ expr ~ ("else" ~ expr)? }
+
+// Let binding
+let_expr = { "let" ~ identifier ~ "=" ~ expr ~ ";" ~ expr }
+
+// Return statement
+return_expr = { "return" ~ expr }
+
+// Expressions
+expr = { logic_expr }
+
+logic_expr = { comparison_expr ~ (logic_op ~ comparison_expr)* }
+comparison_expr = { arithmetic_expr ~ (comp_op ~ arithmetic_expr)* }
+arithmetic_expr = { term ~ (add_op ~ term)* }
+term = { power ~ (mul_op ~ power)* }
+power = { factor ~ (pow_op ~ factor)* }
+factor = _{ unary | primary }
+unary = { ("-" | "!") ~ factor }
+
+primary = _{ 
+    literal |
+    function_call |
+    field_access |
+    if_expr |
+    let_expr |
+    return_expr |
+    identifier |
+    "(" ~ expr ~ ")"
+}
+
+literal = { number | string | boolean | null }
+
+// Program (entry point)
+program = { SOI ~ expr ~ (";" ~ expr)* ~ EOI }

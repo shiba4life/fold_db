@@ -28,6 +28,8 @@ futures = "0.3"
 rand = "0.8"
 tempfile = "3.8"
 clap = { version = "4.4", features = ["derive"] }
+pest = "2.7"
+pest_derive = "2.7"
 # P2P Networking
 libp2p = { version = "0.53", features = [
     "mdns",
@@ -54,3 +56,7 @@ path = "src/bin/datafold_node.rs"
 [[bin]]
 name = "datafold_cli"
 path = "src/bin/datafold_cli.rs"
+
+[[example]]
+name = "auto_transform_demo"
+path = "examples/auto_transform_demo.rs"

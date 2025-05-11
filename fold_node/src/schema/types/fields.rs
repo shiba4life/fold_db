@@ -17,6 +17,7 @@ impl fmt::Display for FieldType {
 }
 use crate::fees::types::config::FieldPaymentConfig;
 use crate::permissions::types::policy::PermissionsPolicy;
+use crate::schema::types::Transform;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -51,6 +52,10 @@ pub struct SchemaField {
     /// Mappings for field transformations and schema evolution
     /// Keys are source schema names, values are source field names
     pub field_mappers: HashMap<String, String>,
+    
+    /// Optional transform for this field
+    /// Defines how data from source fields is processed to produce a derived value
+    pub transform: Option<Transform>,
 }
 
 impl SchemaField {
@@ -83,6 +88,7 @@ impl SchemaField {
             ref_atom_uuid: Some(Uuid::new_v4().to_string()),
             field_mappers,
             field_type: field_type.unwrap_or(FieldType::Single),
+            transform: None,
         }
     }
 
@@ -147,5 +153,40 @@ impl SchemaField {
 
     pub fn set_ref_atom_uuid(&mut self, ref_atom_uuid: String) {
         self.ref_atom_uuid = Some(ref_atom_uuid);
+    }
+    
+    /// Sets a transform for this field.
+    ///
+    /// This builder method adds a transform that defines how data from
+    /// source fields is processed to produce a derived value.
+    ///
+    /// # Arguments
+    ///
+    /// * `transform` - The transform to apply to this field
+    ///
+    /// # Returns
+    ///
+    /// The field instance with the transform set
+    pub fn with_transform(mut self, transform: Transform) -> Self {
+        self.transform = Some(transform);
+        self
+    }
+    
+    /// Gets the transform for this field, if any.
+    ///
+    /// # Returns
+    ///
+    /// An optional reference to the transform
+    pub fn get_transform(&self) -> Option<&Transform> {
+        self.transform.as_ref()
+    }
+    
+    /// Sets the transform for this field.
+    ///
+    /// # Arguments
+    ///
+    /// * `transform` - The transform to apply to this field
+    pub fn set_transform(&mut self, transform: Transform) {
+        self.transform = Some(transform);
     }
 }

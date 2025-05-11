@@ -4,6 +4,7 @@ use crate::fees::types::config::TrustDistanceScaling;
 use crate::permissions::types::policy::{ExplicitCounts, PermissionsPolicy, TrustDistance};
 use crate::schema::types::fields::FieldType;
 use crate::schema::types::SchemaError;
+use crate::schema::types::Transform;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -24,6 +25,25 @@ pub struct JsonSchemaField {
     pub field_mappers: HashMap<String, String>,
     #[serde(default = "default_field_type")]
     pub field_type: FieldType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transform: Option<JsonTransform>,
+}
+
+/// JSON representation of a transform
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JsonTransform {
+    /// The transform logic expressed in the DSL
+    pub logic: String,
+    
+    /// Whether this transform is reversible
+    pub reversible: bool,
+    
+    /// Optional signature for verification
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    
+    /// Whether payment is required for this transform
+    pub payment_required: bool,
 }
 
 /// JSON representation of permission policy
@@ -64,6 +84,19 @@ impl From<JsonFieldPaymentConfig> for FieldPaymentConfig {
             base_multiplier: json.base_multiplier,
             trust_distance_scaling: json.trust_distance_scaling,
             min_payment: json.min_payment,
+        }
+    }
+}
+
+impl From<JsonTransform> for Transform {
+    fn from(json: JsonTransform) -> Self {
+        Self {
+            logic: json.logic,
+            reversible: json.reversible,
+            signature: json.signature,
+            payment_required: json.payment_required,
+            input_dependencies: Vec::new(),
+            output_reference: None,
         }
     }
 }
@@ -114,6 +147,18 @@ impl JsonSchemaDefinition {
             // Trust distances are already non-negative due to u32 type
             // No additional validation needed for TrustDistance::Distance
             // as the type system ensures it's always valid
+            
+            // Validate transform if present
+            if let Some(transform) = &field.transform {
+                // For now, just check that the logic is not empty
+                if transform.logic.is_empty() {
+                    return Err(SchemaError::InvalidField(format!(
+                        "Field {field_name} transform logic cannot be empty"
+                    )));
+                }
+                
+                // TODO: Add more validation for transform logic syntax
+            }
         }
 
         Ok(())

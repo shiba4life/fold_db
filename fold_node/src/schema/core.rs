@@ -293,13 +293,20 @@ impl SchemaCore {
 
     /// Converts a JSON schema field to a SchemaField.
     fn convert_field(json_field: JsonSchemaField) -> SchemaField {
-        SchemaField::new(
+        let mut field = SchemaField::new(
             json_field.permission_policy.into(),
             json_field.payment_config.into(),
             json_field.field_mappers,
             Some(json_field.field_type),
         )
-        .with_ref_atom_uuid(json_field.ref_atom_uuid)
+        .with_ref_atom_uuid(json_field.ref_atom_uuid);
+        
+        // Add transform if present
+        if let Some(json_transform) = json_field.transform {
+            field = field.with_transform(json_transform.into());
+        }
+        
+        field
     }
 
     /// Interprets a JSON schema definition and converts it to a Schema.
