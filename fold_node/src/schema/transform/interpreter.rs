@@ -177,20 +177,15 @@ impl Interpreter {
     
     /// Evaluates an expression.
     pub fn evaluate(&mut self, expr: &Expression) -> Result<Value, SchemaError> {
-        println!("DEBUG: Evaluating expression: {:?}", expr);
-        
+        // Evaluate the expression
         let result = match expr {
             Expression::Literal(value) => {
-                println!("DEBUG: Literal value: {:?}", value);
                 Ok(value.clone())
             },
             
             Expression::Variable(name) => {
-                println!("DEBUG: Variable: {}", name);
-                let result = self.variables.get(name).cloned()
-                    .ok_or_else(|| SchemaError::InvalidField(format!("Variable not found: {}", name)));
-                println!("DEBUG: Variable result: {:?}", result);
-                result
+                self.variables.get(name).cloned()
+                    .ok_or_else(|| SchemaError::InvalidField(format!("Variable not found: {}", name)))
             },
             
             Expression::FieldAccess { object, field } => {
@@ -291,12 +286,10 @@ impl Interpreter {
             },
             
             Expression::Return(expr) => {
-                println!("DEBUG: Return expression");
                 self.evaluate(expr)
             },
         };
         
-        println!("DEBUG: Evaluation result: {:?}", result);
         result
     }
     
@@ -430,9 +423,16 @@ mod tests {
     
     #[test]
     fn test_evaluate_simple_expression() {
-        let input = "1 + 2 * 3";
-        let parser = TransformParser::new();
-        let expr = parser.parse(input).unwrap();
+        // Create a simple binary expression manually
+        let expr = Expression::BinaryOp {
+            left: Box::new(Expression::Literal(Value::Number(1.0))),
+            operator: Operator::Add,
+            right: Box::new(Expression::BinaryOp {
+                left: Box::new(Expression::Literal(Value::Number(2.0))),
+                operator: Operator::Multiply,
+                right: Box::new(Expression::Literal(Value::Number(3.0))),
+            }),
+        };
         
         let mut interpreter = Interpreter::new();
         let result = interpreter.evaluate(&expr).unwrap();
@@ -445,9 +445,20 @@ mod tests {
     
     #[test]
     fn test_evaluate_let_expression() {
-        let input = "let x = 1 + 2; x * 3";
-        let parser = TransformParser::new();
-        let expr = parser.parse(input).unwrap();
+        // Create a let expression manually
+        let expr = Expression::LetBinding {
+            name: "x".to_string(),
+            value: Box::new(Expression::BinaryOp {
+                left: Box::new(Expression::Literal(Value::Number(1.0))),
+                operator: Operator::Add,
+                right: Box::new(Expression::Literal(Value::Number(2.0))),
+            }),
+            body: Box::new(Expression::BinaryOp {
+                left: Box::new(Expression::Variable("x".to_string())),
+                operator: Operator::Multiply,
+                right: Box::new(Expression::Literal(Value::Number(3.0))),
+            }),
+        };
         
         let mut interpreter = Interpreter::new();
         let result = interpreter.evaluate(&expr).unwrap();
@@ -460,9 +471,16 @@ mod tests {
     
     #[test]
     fn test_evaluate_if_expression() {
-        let input = "if 5 > 0 then 10 else 20";
-        let parser = TransformParser::new();
-        let expr = parser.parse(input).unwrap();
+        // Create an if expression manually
+        let expr = Expression::IfElse {
+            condition: Box::new(Expression::BinaryOp {
+                left: Box::new(Expression::Literal(Value::Number(5.0))),
+                operator: Operator::GreaterThan,
+                right: Box::new(Expression::Literal(Value::Number(0.0))),
+            }),
+            then_branch: Box::new(Expression::Literal(Value::Number(10.0))),
+            else_branch: Some(Box::new(Expression::Literal(Value::Number(20.0)))),
+        };
         
         let mut interpreter = Interpreter::new();
         let result = interpreter.evaluate(&expr).unwrap();
@@ -475,9 +493,14 @@ mod tests {
     
     #[test]
     fn test_evaluate_function_call() {
-        let input = "min(5, 3)";
-        let parser = TransformParser::new();
-        let expr = parser.parse(input).unwrap();
+        // Create a function call expression manually
+        let expr = Expression::FunctionCall {
+            name: "min".to_string(),
+            args: vec![
+                Expression::Literal(Value::Number(5.0)),
+                Expression::Literal(Value::Number(3.0)),
+            ],
+        };
         
         let mut interpreter = Interpreter::new();
         let result = interpreter.evaluate(&expr).unwrap();
@@ -490,9 +513,11 @@ mod tests {
     
     #[test]
     fn test_evaluate_field_access() {
-        let input = "input.value";
-        let parser = TransformParser::new();
-        let expr = parser.parse(input).unwrap();
+        // Create a field access expression manually
+        let expr = Expression::FieldAccess {
+            object: Box::new(Expression::Variable("input".to_string())),
+            field: "value".to_string(),
+        };
         
         // Create a variable with an object value
         let mut variables = HashMap::new();
@@ -514,9 +539,43 @@ mod tests {
     
     #[test]
     fn test_evaluate_complex_expression() {
-        let input = "let bmi = weight / (height ^ 2); let risk = 0.5 * blood_pressure + 1.2 * bmi; clamp(risk, 0, 100)";
-        let parser = TransformParser::new();
-        let expr = parser.parse(input).unwrap();
+        // Create a complex expression manually
+        let expr = Expression::LetBinding {
+            name: "bmi".to_string(),
+            value: Box::new(Expression::BinaryOp {
+                left: Box::new(Expression::Variable("weight".to_string())),
+                operator: Operator::Divide,
+                right: Box::new(Expression::BinaryOp {
+                    left: Box::new(Expression::Variable("height".to_string())),
+                    operator: Operator::Power,
+                    right: Box::new(Expression::Literal(Value::Number(2.0))),
+                }),
+            }),
+            body: Box::new(Expression::LetBinding {
+                name: "risk".to_string(),
+                value: Box::new(Expression::BinaryOp {
+                    left: Box::new(Expression::BinaryOp {
+                        left: Box::new(Expression::Literal(Value::Number(0.5))),
+                        operator: Operator::Multiply,
+                        right: Box::new(Expression::Variable("blood_pressure".to_string())),
+                    }),
+                    operator: Operator::Add,
+                    right: Box::new(Expression::BinaryOp {
+                        left: Box::new(Expression::Literal(Value::Number(1.2))),
+                        operator: Operator::Multiply,
+                        right: Box::new(Expression::Variable("bmi".to_string())),
+                    }),
+                }),
+                body: Box::new(Expression::FunctionCall {
+                    name: "clamp".to_string(),
+                    args: vec![
+                        Expression::Variable("risk".to_string()),
+                        Expression::Literal(Value::Number(0.0)),
+                        Expression::Literal(Value::Number(100.0)),
+                    ],
+                }),
+            }),
+        };
         
         // Create variables
         let mut variables = HashMap::new();

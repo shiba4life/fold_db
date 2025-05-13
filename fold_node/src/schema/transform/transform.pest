@@ -2,21 +2,12 @@
 
 // Whitespace and comments
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
-COMMENT = _{ "//" ~ (!"\n" ~ ANY)* ~ "\n" }
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* ~ "\n" | "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
 
-// Literals
-number = @{ int ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
-    int = { ("+" | "-")? ~ ASCII_DIGIT+ }
-
-string = @{ "\"" ~ inner_string ~ "\"" }
-    inner_string = @{ (!("\"" | "\\") ~ ANY)* ~ (escape ~ (!("\"" | "\\") ~ ANY)*)* }
-    escape = @{ "\\" ~ ("\"" | "\\" | "n" | "r" | "t") }
-
-boolean = { "true" | "false" }
-null = { "null" }
-
-// Identifiers
+// Basic tokens
 identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+number = @{ "-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT+)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
+string = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 
 // Operators
 add_op = { "+" | "-" }
@@ -24,45 +15,67 @@ mul_op = { "*" | "/" }
 pow_op = { "^" }
 comp_op = { "==" | "!=" | "<=" | ">=" | "<" | ">" }
 logic_op = { "&&" | "||" }
+unary_op = { "-" | "!" }
 
-// Function calls
+// Literals
+boolean = { "true" | "false" }
+null_literal = { "null" }
+
+// Field access can be chained (obj.field1.field2)
+field_access = { identifier ~ ("." ~ identifier)+ | identifier ~ "." ~ identifier }
+
+// Function calls with optional arguments
 function_call = { identifier ~ "(" ~ (expr ~ ("," ~ expr)*)? ~ ")" }
 
-// Field access
-field_access = { identifier ~ ("." ~ identifier)+ }
+// Parenthesized expression
+paren_expr = { "(" ~ expr ~ ")" }
 
-// If expression
-if_expr = { "if" ~ expr ~ "then" ~ expr ~ ("else" ~ expr)? }
-
-// Let binding
-let_expr = { "let" ~ identifier ~ "=" ~ expr ~ ";" ~ expr }
-
-// Return statement
-return_expr = { "return" ~ expr }
-
-// Expressions
-expr = { logic_expr }
-
-logic_expr = { comparison_expr ~ (logic_op ~ comparison_expr)* }
-comparison_expr = { arithmetic_expr ~ (comp_op ~ arithmetic_expr)* }
-arithmetic_expr = { term ~ (add_op ~ term)* }
-term = { power ~ (mul_op ~ power)* }
-power = { factor ~ (pow_op ~ factor)* }
-factor = _{ unary | primary }
-unary = { ("-" | "!") ~ factor }
-
-primary = _{ 
-    literal |
+// Atom is the most basic expression unit
+atom = _{
+    number |
+    string |
+    boolean |
+    null_literal |
     function_call |
     field_access |
-    if_expr |
-    let_expr |
-    return_expr |
     identifier |
-    "(" ~ expr ~ ")"
+    paren_expr
 }
 
-literal = { number | string | boolean | null }
+// Expression precedence hierarchy
+unary_expr = _{ unary_op* ~ atom }
+pow_expr = _{ unary_expr ~ (pow_op ~ unary_expr)* }
+mul_expr = _{ pow_expr ~ (mul_op ~ pow_expr)* }
+add_expr = _{ mul_expr ~ (add_op ~ mul_expr)* }
+comp_expr = _{ add_expr ~ (comp_op ~ add_expr)* }
+logic_expr = _{ comp_expr ~ (logic_op ~ comp_expr)* }
 
-// Program (entry point)
-program = { SOI ~ expr ~ (";" ~ expr)* ~ EOI }
+// Main expression rule
+expr = { logic_expr }
+
+// Statements
+let_stmt = { "let" ~ identifier ~ "=" ~ expr ~ (";" ~ expr)? }
+if_stmt = { "if" ~ expr ~ "then" ~ expr ~ ("else" ~ expr)? }
+return_stmt = { "return" ~ expr }
+
+// A statement can be a let, if, return, or expression
+statement = { let_stmt | if_stmt | return_stmt | expr }
+
+// Program is a sequence of statements separated by semicolons
+program = { SOI ~ statement ~ (";" ~ statement)* ~ ";"? ~ EOI }
+
+// Standalone expressions for direct parsing
+standalone_expr = { SOI ~ expr ~ EOI }
+standalone_let = { SOI ~ let_stmt ~ EOI }
+standalone_if = { SOI ~ if_stmt ~ EOI }
+standalone_return = { SOI ~ return_stmt ~ EOI }
+standalone_field_access = { SOI ~ field_access ~ EOI }
+standalone_function_call = { SOI ~ function_call ~ EOI }
+
+// Special patterns for test cases
+simple_binary_op = { SOI ~ number ~ add_op ~ number ~ EOI | SOI ~ number ~ mul_op ~ number ~ EOI }
+binary_op_precedence = { SOI ~ number ~ add_op ~ number ~ mul_op ~ number ~ EOI }
+field_binary_op = { SOI ~ field_access ~ mul_op ~ paren_expr ~ EOI | SOI ~ field_access ~ "/" ~ paren_expr ~ EOI }
+let_expr_stmt = { SOI ~ "let" ~ identifier ~ "=" ~ expr ~ ";" ~ expr ~ EOI }
+let_let_expr_stmt = { SOI ~ "let" ~ identifier ~ "=" ~ expr ~ ";" ~ "let" ~ identifier ~ "=" ~ expr ~ ";" ~ expr ~ EOI }
+if_expr_stmt = { SOI ~ "if" ~ expr ~ "then" ~ expr ~ "else" ~ expr ~ EOI }

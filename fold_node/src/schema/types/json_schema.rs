@@ -97,6 +97,7 @@ impl From<JsonTransform> for Transform {
             payment_required: json.payment_required,
             input_dependencies: Vec::new(),
             output_reference: None,
+            parsed_expr: None,
         }
     }
 }

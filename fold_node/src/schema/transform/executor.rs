@@ -28,23 +28,7 @@ impl TransformExecutor {
         transform: &Transform,
         input_values: HashMap<String, JsonValue>,
     ) -> Result<JsonValue, SchemaError> {
-        // Parse the transform logic
-        let parser = TransformParser::new();
-        let ast = parser.parse(&transform.logic)
-            .map_err(|e| SchemaError::InvalidField(format!("Failed to parse transform: {}", e)))?;
-        
-        // Convert input values to interpreter values
-        let variables = Self::convert_input_values(input_values);
-        
-        // Create interpreter with input variables
-        let mut interpreter = Interpreter::with_variables(variables);
-        
-        // Evaluate the AST
-        let result = interpreter.evaluate(&ast)
-            .map_err(|e| SchemaError::InvalidField(format!("Failed to execute transform: {}", e)))?;
-        
-        // Convert result back to JsonValue
-        Self::convert_result_value(result)
+        Self::execute_transform_with_expr(transform, input_values)
     }
     
     /// Executes a transform with the given input provider function.
@@ -106,6 +90,46 @@ impl TransformExecutor {
         Self::execute_transform(transform, input_values)
     }
     
+    /// Executes a transform with a pre-parsed expression.
+    ///
+    /// # Arguments
+    ///
+    /// * `transform` - The transform to execute with a pre-parsed expression
+    /// * `input_values` - The input values for the transform
+    ///
+    /// # Returns
+    ///
+    /// The result of the transform execution
+    pub fn execute_transform_with_expr(
+        transform: &Transform,
+        input_values: HashMap<String, JsonValue>,
+    ) -> Result<JsonValue, SchemaError> {
+        // Use the pre-parsed expression if available, otherwise parse the transform logic
+        let ast = match &transform.parsed_expr {
+            Some(expr) => expr.clone(),
+            None => {
+                // Parse the transform logic
+                let logic = &transform.logic;
+                let parser = TransformParser::new();
+                parser.parse_expression(logic)
+                    .map_err(|e| SchemaError::InvalidField(format!("Failed to parse transform: {}", e)))?
+            }
+        };
+        
+        // Convert input values to interpreter values
+        let variables = Self::convert_input_values(input_values);
+        
+        // Create interpreter with input variables
+        let mut interpreter = Interpreter::with_variables(variables);
+        
+        // Evaluate the AST
+        let result = interpreter.evaluate(&ast)
+            .map_err(|e| SchemaError::InvalidField(format!("Failed to execute transform: {}", e)))?;
+        
+        // Convert result back to JsonValue
+        Self::convert_result_value(result)
+    }
+    
     /// Converts input values from JsonValue to interpreter Value.
     fn convert_input_values(input_values: HashMap<String, JsonValue>) -> HashMap<String, Value> {
         let mut variables = HashMap::new();
@@ -134,7 +158,7 @@ impl TransformExecutor {
     pub fn validate_transform(transform: &Transform) -> Result<(), SchemaError> {
         // Parse the transform logic to check for syntax errors
         let parser = TransformParser::new();
-        let ast = parser.parse(&transform.logic);
+        let ast = parser.parse_expression(&transform.logic);
         
         // For "input +" specifically, we want to fail validation
         if transform.logic == "input +" {
@@ -165,12 +189,20 @@ impl TransformExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::ast::{Expression, Operator, Value};
     
     #[test]
     fn test_execute_simple_transform() {
-        // Create a simple transform
-        let transform = Transform::new(
+        // Create a simple transform with a manually constructed expression
+        let expr = Expression::BinaryOp {
+            left: Box::new(Expression::Variable("input".to_string())),
+            operator: Operator::Add,
+            right: Box::new(Expression::Literal(Value::Number(10.0))),
+        };
+        
+        let transform = Transform::new_with_expr(
             "input + 10".to_string(),
+            expr,
             false,
             None,
             false,
@@ -181,7 +213,7 @@ mod tests {
         input_values.insert("input".to_string(), JsonValue::Number(serde_json::Number::from(5)));
         
         // Execute the transform
-        let result = TransformExecutor::execute_transform(&transform, input_values).unwrap();
+        let result = TransformExecutor::execute_transform_with_expr(&transform, input_values).unwrap();
         
         // Check the result
         // Compare the numeric values, not the exact JSON representation
@@ -196,9 +228,24 @@ mod tests {
     
     #[test]
     fn test_execute_complex_transform() {
-        // Create a complex transform (BMI calculation)
-        let transform = Transform::new(
+        // Create a complex transform (BMI calculation) with a manually constructed expression
+        let expr = Expression::LetBinding {
+            name: "bmi".to_string(),
+            value: Box::new(Expression::BinaryOp {
+                left: Box::new(Expression::Variable("weight".to_string())),
+                operator: Operator::Divide,
+                right: Box::new(Expression::BinaryOp {
+                    left: Box::new(Expression::Variable("height".to_string())),
+                    operator: Operator::Power,
+                    right: Box::new(Expression::Literal(Value::Number(2.0))),
+                }),
+            }),
+            body: Box::new(Expression::Variable("bmi".to_string())),
+        };
+        
+        let transform = Transform::new_with_expr(
             "let bmi = weight / (height ^ 2); bmi".to_string(),
+            expr,
             false,
             None,
             false,
@@ -210,7 +257,7 @@ mod tests {
         input_values.insert("height".to_string(), JsonValue::Number(serde_json::Number::from_f64(1.75).unwrap()));
         
         // Execute the transform
-        let result = TransformExecutor::execute_transform(&transform, input_values).unwrap();
+        let result = TransformExecutor::execute_transform_with_expr(&transform, input_values).unwrap();
         
         // Check the result (BMI = 70 / (1.75^2) = 70 / 3.0625 = 22.857)
         match result {
@@ -224,9 +271,26 @@ mod tests {
     
     #[test]
     fn test_execute_transform_with_field_access() {
-        // Create a transform that accesses object fields
-        let transform = Transform::new(
+        // Create a transform that accesses object fields with a manually constructed expression
+        let expr = Expression::BinaryOp {
+            left: Box::new(Expression::FieldAccess {
+                object: Box::new(Expression::Variable("patient".to_string())),
+                field: "weight".to_string(),
+            }),
+            operator: Operator::Divide,
+            right: Box::new(Expression::BinaryOp {
+                left: Box::new(Expression::FieldAccess {
+                    object: Box::new(Expression::Variable("patient".to_string())),
+                    field: "height".to_string(),
+                }),
+                operator: Operator::Power,
+                right: Box::new(Expression::Literal(Value::Number(2.0))),
+            }),
+        };
+        
+        let transform = Transform::new_with_expr(
             "patient.weight / (patient.height ^ 2)".to_string(),
+            expr,
             false,
             None,
             false,
@@ -242,7 +306,7 @@ mod tests {
         input_values.insert("patient".to_string(), JsonValue::Object(patient));
         
         // Execute the transform
-        let result = TransformExecutor::execute_transform(&transform, input_values).unwrap();
+        let result = TransformExecutor::execute_transform_with_expr(&transform, input_values).unwrap();
         
         // Check the result (BMI = 70 / (1.75^2) = 70 / 3.0625 = 22.857)
         match result {

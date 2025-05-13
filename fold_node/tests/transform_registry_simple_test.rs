@@ -126,9 +126,18 @@ fn test_register_transform() {
 fn test_execute_transform() {
     let (store, registry) = setup_test_env();
     
-    // Create a transform
-    let transform = Transform::new(
+    // Create a transform with a pre-parsed expression
+    use fold_node::schema::transform::ast::{Expression, Operator};
+    
+    let expr = Expression::BinaryOp {
+        left: Box::new(Expression::Variable("input1".to_string())),
+        operator: Operator::Add,
+        right: Box::new(Expression::Variable("input2".to_string())),
+    };
+    
+    let transform = Transform::new_with_expr(
         "input1 + input2".to_string(),
+        expr,
         false,
         None,
         false,

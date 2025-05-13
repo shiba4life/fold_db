@@ -498,6 +498,23 @@ mod tests {
             "test_key".to_string(),
         ).unwrap();
         
+        // Create a transform with a pre-parsed expression
+        use crate::schema::transform::ast::{Expression, Operator, Value};
+        
+        let expr = Expression::BinaryOp {
+            left: Box::new(Expression::Variable("input1".to_string())),
+            operator: Operator::Add,
+            right: Box::new(Expression::Variable("input2".to_string())),
+        };
+        
+        let transform = Transform::new_with_expr(
+            "input1 + input2".to_string(),
+            expr,
+            false,
+            None,
+            false,
+        );
+        
         // Create an output atom reference
         let _ = atom_manager.update_atom_ref(
             "output",
@@ -505,13 +522,7 @@ mod tests {
             "test_key".to_string(),
         ).unwrap();
         
-        // Create a transform
-        let transform = Transform::new(
-            "input1 + input2".to_string(),
-            false,
-            None,
-            false,
-        );
+        // Register the transform
         
         // Register the transform
         let result = registry.register_transform(

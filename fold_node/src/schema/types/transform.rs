@@ -49,6 +49,10 @@ pub struct Transform {
     /// Output reference for this transform
     #[serde(skip)]
     pub output_reference: Option<String>,
+    
+    /// The parsed expression (not serialized)
+    #[serde(skip)]
+    pub parsed_expr: Option<crate::schema::transform::ast::Expression>,
 }
 
 impl Transform {
@@ -78,6 +82,39 @@ impl Transform {
             payment_required,
             input_dependencies: Vec::new(),
             output_reference: None,
+            parsed_expr: None,
+        }
+    }
+    
+    /// Creates a new Transform with a pre-parsed expression.
+    ///
+    /// # Arguments
+    ///
+    /// * `logic` - The transform logic expressed in the DSL
+    /// * `parsed_expr` - The pre-parsed expression
+    /// * `reversible` - Whether this transform is reversible
+    /// * `signature` - Optional signature for verification
+    /// * `payment_required` - Whether payment is required for this transform
+    ///
+    /// # Returns
+    ///
+    /// A new Transform instance
+    #[must_use]
+    pub fn new_with_expr(
+        logic: String,
+        parsed_expr: crate::schema::transform::ast::Expression,
+        reversible: bool,
+        signature: Option<String>,
+        payment_required: bool,
+    ) -> Self {
+        Self {
+            logic,
+            reversible,
+            signature,
+            payment_required,
+            input_dependencies: Vec::new(),
+            output_reference: None,
+            parsed_expr: Some(parsed_expr),
         }
     }
     
@@ -111,6 +148,7 @@ impl Transform {
             payment_required,
             input_dependencies,
             output_reference,
+            parsed_expr: None,
         }
     }
     
