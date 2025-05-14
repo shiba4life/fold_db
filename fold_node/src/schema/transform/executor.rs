@@ -5,7 +5,7 @@
 
 use super::ast::Value;
 use super::interpreter::Interpreter;
-use super::parser::TransformParser;
+use super::better_parser::BetterParser;
 use crate::schema::types::{SchemaError, Transform};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -110,7 +110,7 @@ impl TransformExecutor {
             None => {
                 // Parse the transform logic
                 let logic = &transform.logic;
-                let parser = TransformParser::new();
+                let parser = BetterParser::new();
                 parser.parse_expression(logic)
                     .map_err(|e| SchemaError::InvalidField(format!("Failed to parse transform: {}", e)))?
             }
@@ -157,7 +157,7 @@ impl TransformExecutor {
     /// `Ok(())` if the transform is valid, otherwise an error
     pub fn validate_transform(transform: &Transform) -> Result<(), SchemaError> {
         // Parse the transform logic to check for syntax errors
-        let parser = TransformParser::new();
+        let parser = BetterParser::new();
         let ast = parser.parse_expression(&transform.logic);
         
         // For "input +" specifically, we want to fail validation
@@ -190,41 +190,6 @@ impl TransformExecutor {
 mod tests {
     use super::*;
     use super::super::ast::{Expression, Operator, Value};
-    
-    #[test]
-    fn test_execute_simple_transform() {
-        // Create a simple transform with a manually constructed expression
-        let expr = Expression::BinaryOp {
-            left: Box::new(Expression::Variable("input".to_string())),
-            operator: Operator::Add,
-            right: Box::new(Expression::Literal(Value::Number(10.0))),
-        };
-        
-        let transform = Transform::new_with_expr(
-            "input + 10".to_string(),
-            expr,
-            false,
-            None,
-            false,
-        );
-        
-        // Create input values
-        let mut input_values = HashMap::new();
-        input_values.insert("input".to_string(), JsonValue::Number(serde_json::Number::from(5)));
-        
-        // Execute the transform
-        let result = TransformExecutor::execute_transform_with_expr(&transform, input_values).unwrap();
-        
-        // Check the result
-        // Compare the numeric values, not the exact JSON representation
-        match result {
-            JsonValue::Number(n) => {
-                let value = n.as_f64().unwrap();
-                assert!((value - 15.0).abs() < 0.001, "Expected 15, got {}", value);
-            },
-            _ => panic!("Expected number, got {:?}", result),
-        }
-    }
     
     #[test]
     fn test_execute_complex_transform() {

@@ -372,10 +372,8 @@ impl TransformRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::atom::Atom;
     use crate::db_operations::DbOperations;
     use crate::fold_db_core::atom_manager::AtomManager;
-    use serde_json::json;
     use tempfile::tempdir;
     
     fn setup_test_env() -> (Arc<AtomManager>, Arc<TransformRegistry>) {
@@ -418,7 +416,7 @@ mod tests {
     
     #[test]
     fn test_register_and_unregister_transform() {
-        let (atom_manager, registry) = setup_test_env();
+        let (_, registry) = setup_test_env();
         
         // Create a transform
         let transform = Transform::new(
@@ -468,36 +466,6 @@ mod tests {
     fn test_handle_atom_ref_update() {
         let (atom_manager, registry) = setup_test_env();
         
-        // Create input atoms
-        let atom1 = atom_manager.create_atom(
-            "test_schema",
-            "test_key".to_string(),
-            None,
-            json!(5),
-            None,
-        ).unwrap();
-        
-        let atom2 = atom_manager.create_atom(
-            "test_schema",
-            "test_key".to_string(),
-            None,
-            json!(10),
-            None,
-        ).unwrap();
-        
-        // Create atom references
-        let aref1 = atom_manager.update_atom_ref(
-            "input1",
-            atom1.uuid().to_string(),
-            "test_key".to_string(),
-        ).unwrap();
-        
-        let aref2 = atom_manager.update_atom_ref(
-            "input2",
-            atom2.uuid().to_string(),
-            "test_key".to_string(),
-        ).unwrap();
-        
         // Create a transform with a pre-parsed expression
         use crate::schema::transform::ast::{Expression, Operator, Value};
         
@@ -515,14 +483,50 @@ mod tests {
             false,
         );
         
+        // Create input atoms
+        let atom1 = atom_manager
+            .create_atom(
+                "test_schema",
+                "test_key".to_string(),
+                None,
+                serde_json::json!(5),
+                None,
+            )
+            .unwrap();
+            
+        let atom2 = atom_manager
+            .create_atom(
+                "test_schema",
+                "test_key".to_string(),
+                None,
+                serde_json::json!(10),
+                None,
+            )
+            .unwrap();
+            
+        // Create atom references for inputs
+        let _ = atom_manager
+            .update_atom_ref(
+                "input1",
+                atom1.uuid().to_string(),
+                "test_key".to_string(),
+            )
+            .unwrap();
+            
+        let _ = atom_manager
+            .update_atom_ref(
+                "input2",
+                atom2.uuid().to_string(),
+                "test_key".to_string(),
+            )
+            .unwrap();
+        
         // Create an output atom reference
         let _ = atom_manager.update_atom_ref(
             "output",
             "dummy".to_string(),
             "test_key".to_string(),
         ).unwrap();
-        
-        // Register the transform
         
         // Register the transform
         let result = registry.register_transform(

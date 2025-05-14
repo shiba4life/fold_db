@@ -2,8 +2,6 @@
 mod tests {
     use crate::schema::transform::{TransformRegistry, GetAtomFn, CreateAtomFn, UpdateAtomRefFn};
     use crate::schema::types::Transform;
-    use crate::atom::{Atom, AtomRef};
-    use serde_json::json;
     use std::sync::Arc;
 
     #[test]

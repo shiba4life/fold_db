@@ -418,7 +418,6 @@ impl Interpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::parser::TransformParser;
     use serde_json::Value as JsonValue;
     
     #[test]

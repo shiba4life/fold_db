@@ -1,0 +1,53 @@
+// Better Transform DSL Grammar
+// A simpler, more robust grammar for the transform DSL
+
+// Whitespace and comments
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* ~ "\n" | "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
+
+// Basic tokens
+identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+number = @{ "-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT+)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
+string = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+boolean = @{ "true" | "false" }
+null = @{ "null" }
+
+// Operators with clear precedence
+add_op = { "+" | "-" }
+mul_op = { "*" | "/" }
+pow_op = { "^" }
+comp_op = { "==" | "!=" | "<=" | ">=" | "<" | ">" }
+logic_op = { "&&" | "||" }
+unary_op = { "-" | "!" }
+
+// Field access (obj.field)
+field_access = { identifier ~ ("." ~ identifier)+ }
+
+// Function call with arguments
+function_call = { identifier ~ "(" ~ (expr ~ ("," ~ expr)*)? ~ ")" }
+
+// Atoms (basic values)
+atom = {
+    number |
+    string |
+    boolean |
+    null |
+    function_call |
+    field_access |
+    identifier |
+    "(" ~ expr ~ ")"
+}
+
+// Expression precedence hierarchy (bottom-up)
+unary_expr = { unary_op* ~ atom }
+pow_expr = { unary_expr ~ (pow_op ~ unary_expr)* }
+mul_expr = { pow_expr ~ (mul_op ~ pow_expr)* }
+add_expr = { mul_expr ~ (add_op ~ mul_expr)* }
+comp_expr = { add_expr ~ (comp_op ~ add_expr)* }
+logic_expr = { comp_expr ~ (logic_op ~ comp_expr)* }
+
+// Main expression rule
+expr = { logic_expr }
+
+// Complete expression with start/end markers
+complete_expr = _{ SOI ~ expr ~ EOI }

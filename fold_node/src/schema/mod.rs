@@ -29,7 +29,7 @@ pub mod transform;
 // Public re-exports
 pub use core::SchemaCore;
 pub use types::{errors::SchemaError, schema::Schema, Transform};
-pub use transform::{Expression, Value, Operator, UnaryOperator, Interpreter, TransformParser, TransformExecutor};
+pub use transform::{Expression, Value, Operator, UnaryOperator, Interpreter, TransformExecutor};
 pub use crate::{Operation, MutationType};
 
 /// Public prelude module containing types needed by tests and external code
