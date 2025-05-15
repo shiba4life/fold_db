@@ -1,12 +1,12 @@
 //! Tests for the better transform parser and interpreter.
 
 use super::ast::{Expression, Operator, Value};
-use super::better_parser::BetterParser;
+use super::parser::BetterParser;
 use super::interpreter::Interpreter;
 use std::collections::HashMap;
 
 #[test]
-fn test_better_parser_and_interpreter() {
+fn test_parser_and_interpreter() {
     // Create a parser and interpreter
     let parser = BetterParser::new();
     let mut interpreter = Interpreter::new();
@@ -59,7 +59,7 @@ fn test_better_parser_and_interpreter() {
 }
 
 #[test]
-fn test_better_parser_with_complex_expressions() {
+fn test_parser_with_complex_expressions() {
     let parser = BetterParser::new();
     
     // Test a more complex expression

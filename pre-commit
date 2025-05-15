@@ -35,6 +35,15 @@ if git diff --cached --name-only | grep -q '\.rs$'; then
     cargo test --workspace || { echo "Workspace tests failed!"; exit 1; }
     
     echo "All tests passed!"
+
+    # Run fold_node examples for sanity
+    echo "Running fold_node examples..."
+    cargo run --manifest-path fold_node/Cargo.toml --example auto_transform_demo || { echo "auto_transform_demo example failed!"; exit 1; }
+    cargo run --manifest-path fold_node/Cargo.toml --example complex_transform_dsl || { echo "complex_transform_dsl example failed!"; exit 1; }
+    cargo run --manifest-path fold_node/Cargo.toml --example transform_dsl_samples || { echo "transform_dsl_samples example failed!"; exit 1; }
+    cargo run --manifest-path fold_node/Cargo.toml --example transform_logic_test || { echo "transform_logic_test example failed!"; exit 1; }
+    cargo run --manifest-path fold_node/Cargo.toml --example transform_registry_demo || { echo "transform_registry_demo example failed!"; exit 1; }
+    echo "Fold_node examples passed!"
 else
     echo "No Rust files in commit, skipping tests."
 fi

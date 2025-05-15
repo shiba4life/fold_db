@@ -14,7 +14,7 @@ use pest_derive::Parser;
 
 /// Parser for the transform DSL.
 #[derive(Parser)]
-#[grammar = "src/schema/transform/better_transform.pest"]
+#[grammar = "src/schema/transform/transform.pest"]
 pub struct BetterParser;
 
 impl BetterParser {

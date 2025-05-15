@@ -5,7 +5,7 @@
 
 use super::ast::Value;
 use super::interpreter::Interpreter;
-use super::better_parser::BetterParser;
+use super::parser::BetterParser;
 use crate::schema::types::{SchemaError, Transform};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;

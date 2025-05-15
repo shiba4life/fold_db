@@ -1,9 +1,0 @@
-// Simple arithmetic grammar
-WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
-add_op    = { "+" | "-" }
-mul_op    = { "*" | "/" }
-number    = @{ ASCII_DIGIT+ }
-calc      = { SOI ~ expr ~ EOI }
-expr      = { term ~ (add_op ~ term)* }
-term      = { factor ~ (mul_op ~ factor)* }
-factor    = { number | "(" ~ expr ~ ")" }

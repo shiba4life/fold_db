@@ -20,21 +20,17 @@
 //! 3. An executor that handles the integration with the schema system
 
 pub mod ast;
-pub mod better_parser;
+pub mod parser;
 pub mod interpreter;
 pub mod executor;
 pub mod registry;
-pub mod simple_parser;
 #[cfg(test)]
-mod simple_test;
-#[cfg(test)]
-mod better_test;
+mod parser_test;
 
 // Public re-exports
 pub use ast::{Expression, Value, Operator, UnaryOperator, TransformDeclaration};
 pub use interpreter::Interpreter;
-pub use better_parser::BetterParser;
+pub use parser::BetterParser;
 pub use executor::TransformExecutor;
 pub use registry::{TransformRegistry, GetAtomFn, CreateAtomFn, UpdateAtomRefFn};
 pub use crate::schema::types::Transform;
-pub use simple_parser::calculate;
