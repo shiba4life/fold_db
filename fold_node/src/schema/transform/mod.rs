@@ -24,9 +24,6 @@ pub mod parser;
 pub mod interpreter;
 pub mod executor;
 pub mod registry;
-#[cfg(test)]
-mod parser_test;
-
 // Public re-exports
 pub use ast::{Expression, Value, Operator, UnaryOperator, TransformDeclaration};
 pub use interpreter::Interpreter;

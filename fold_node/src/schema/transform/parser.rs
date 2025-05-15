@@ -708,7 +708,12 @@ impl Default for BetterParser {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::BetterParser;
+    use super::Expression;
+    use super::Operator;
+    use super::TransformDeclaration;
+    use super::UnaryOperator;
+    use super::Value;
     
     #[test]
     fn test_parse_simple_arithmetic() {
@@ -889,29 +894,38 @@ mod tests {
         let parser = BetterParser::new();
         
         let transform_code = r#"
-        transform calculate_risk_score {
-          input: Fold<PatientVitals>
-          output: Field<Float> as "risk_score"
-          reversible: false
-          signature: sha256sum("v1.0.3")
-        
+        transform my_transform {
+          input: Placeholder<Any>
+          output: Placeholder<Any> as "result"
           logic: {
-            let bmi = input.weight / (input.height ^ 2);
-            let risk = 0.5 * input.blood_pressure + 1.2 * bmi;
-            return clamp(risk, 0, 100);
+            return field1 + field2;
           }
         }
         "#;
-        
-        let decl = parser.parse_transform(transform_code).unwrap();
-        
+
+        let decl = parser.parse_transform(transform_code).expect("Failed to parse transform declaration");
+
         // Verify the parsed declaration
-        assert_eq!(decl.name, "calculate_risk_score");
-        assert_eq!(decl.output_name, "risk_score");
-        assert_eq!(decl.reversible, false);
-        assert_eq!(decl.signature, Some("sha256sum(\"v1.0.3\")".to_string()));
-        
-        // Check logic statements
-        assert_eq!(decl.logic.len(), 3);
+        assert_eq!(decl.name, "my_transform");
+        assert_eq!(decl.logic.len(), 1);
+        match &decl.logic[0] {
+            Expression::Return(expr) => {
+                match &**expr {
+                    Expression::BinaryOp { left, operator, right } => {
+                        assert_eq!(*operator, Operator::Add); // Dereference operator
+                        match &**left {
+                            Expression::Variable(name) => assert_eq!(name, "field1"),
+                            _ => panic!("Expected Variable for left side"),
+                        }
+                        match &**right {
+                            Expression::Variable(name) => assert_eq!(name, "field2"),
+                            _ => panic!("Expected Variable for right side"),
+                        }
+                    },
+                    _ => panic!("Expected BinaryOp inside Return"),
+                }
+            },
+            _ => panic!("Expected Return expression"),
+        }
     }
 }

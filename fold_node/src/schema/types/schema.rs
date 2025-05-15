@@ -259,4 +259,40 @@ mod tests {
             _ => panic!("Expected Distance variant"),
         }
     }
+#[test]
+    fn test_schema_deserialization_with_field_transforms() {
+        let json_input = "{
+            \"name\": \"test_schema_with_transforms\",
+            \"fields\": {
+                \"calculated_field\": {
+                    \"permission_policy\": {
+                        \"read_policy\": { \"Distance\": 0 },
+                        \"write_policy\": { \"Distance\": 0 }
+                    },
+                    \"payment_config\": {
+                        \"base_multiplier\": 0.5,
+                        \"trust_distance_scaling\": \"None\",
+                        \"min_payment\": null
+                    },
+                    \"ref_atom_uuid\": null,
+                    \"field_type\": \"Single\",
+                    \"field_mappers\": {},
+                    \"transform\": \"transform temp_calc { output: Placeholder<Any> as \\\"val\\\" logic: { return 1; } }\"
+                }
+            },
+            \"payment_config\": {
+                \"base_multiplier\": 1.0,
+                \"min_payment_threshold\": 0
+            }
+        }";
+
+        let schema: Schema = serde_json::from_str(json_input).expect("Failed to deserialize schema");
+
+        assert_eq!(schema.name, "test_schema_with_transforms");
+        assert_eq!(schema.fields.len(), 1);
+
+        let calculated_field = schema.fields.get("calculated_field").expect("calculated_field not found");
+        assert!(calculated_field.transform.is_some());
+        assert_eq!(calculated_field.transform.as_ref().unwrap().logic, "return 1");
+    }
 }

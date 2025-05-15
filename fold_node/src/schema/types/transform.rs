@@ -291,3 +291,38 @@ impl Transform {
     }
     
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::schema::transform::ast::{Expression, Value, Operator, TransformDeclaration};
+
+    #[test]
+    fn test_transform_from_declaration() {
+        let declaration = TransformDeclaration {
+            name: "test_transform".to_string(),
+            output_name: "output".to_string(),
+            logic: vec![
+                Expression::Return(Box::new(Expression::BinaryOp {
+                    left: Box::new(Expression::Variable("field1".to_string())),
+                    operator: Operator::Add,
+                    right: Box::new(Expression::Variable("field2".to_string())),
+                })),
+            ],
+            reversible: false,
+            signature: None,
+        };
+
+        let transform = Transform::from_declaration(declaration);
+
+        assert_eq!(transform.name, "test_transform");
+        assert_eq!(transform.output_name, Some("output".to_string()));
+        assert_eq!(transform.logic, "return (field1 + field2)"); // Removed trailing semicolon
+        assert_eq!(transform.reversible, false);
+        assert!(transform.signature.is_none());
+        assert_eq!(transform.payment_required, false); // payment_required is hardcoded to false in from_declaration
+        assert!(transform.input_dependencies.is_empty()); // input_dependencies is not populated in from_declaration
+        assert!(transform.output_reference.is_none());
+        assert!(transform.parsed_expr.is_none()); // parsed_expr is not populated in from_declaration
+        assert!(transform.parsed_declaration.is_some());
+    }
+}
