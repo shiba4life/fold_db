@@ -2,7 +2,7 @@
 //!
 //! This example demonstrates various transform DSL samples and parses them.
 
-use fold_node::schema::transform::{BetterParser, Interpreter, Value};
+use fold_node::schema::transform::{TransformParser, Interpreter, Value};
 use std::collections::HashMap;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("====================\n");
 
     // Create a parser
-    let parser = BetterParser::new();
+    let parser = TransformParser::new();
     eprintln!("Parser created");
 
     // Sample 1: Simple arithmetic expression
@@ -108,7 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn test_expression(id: usize, name: &str, expr_str: &str, parser: &BetterParser) {
+fn test_expression(id: usize, name: &str, expr_str: &str, parser: &TransformParser) {
     eprintln!("Sample {}: {}", id, name);
     eprintln!("Expression: {}", expr_str);
     
@@ -129,7 +129,7 @@ fn test_expression(id: usize, name: &str, expr_str: &str, parser: &BetterParser)
     eprintln!();
 }
 
-fn test_expression_with_variables(id: usize, name: &str, expr_str: &str, parser: &BetterParser) {
+fn test_expression_with_variables(id: usize, name: &str, expr_str: &str, parser: &TransformParser) {
     eprintln!("Sample {}: {}", id, name);
     eprintln!("Expression: {}", expr_str);
     
@@ -156,7 +156,7 @@ fn test_expression_with_variables(id: usize, name: &str, expr_str: &str, parser:
     eprintln!();
 }
 
-fn test_expression_with_object(id: usize, name: &str, expr_str: &str, parser: &BetterParser) {
+fn test_expression_with_object(id: usize, name: &str, expr_str: &str, parser: &TransformParser) {
     eprintln!("Sample {}: {}", id, name);
     eprintln!("Expression: {}", expr_str);
     
@@ -186,7 +186,7 @@ fn test_expression_with_object(id: usize, name: &str, expr_str: &str, parser: &B
     eprintln!();
 }
 
-fn test_transform(id: usize, name: &str, transform_str: &str, parser: &BetterParser) {
+fn test_transform(id: usize, name: &str, transform_str: &str, parser: &TransformParser) {
     eprintln!("Sample {}: {}", id, name);
     eprintln!("Transform:\n{}", transform_str);
     

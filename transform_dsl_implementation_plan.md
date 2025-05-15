@@ -144,7 +144,7 @@ string_expr = { string | function_call }
 Extend the parser to handle the full transform declaration:
 
 ```rust
-impl BetterParser {
+impl TransformParser {
     /// Parses a transform declaration.
     pub fn parse_transform(&self, input: &str) -> Result<TransformDeclaration, SchemaError> {
         // Parse the input using the transform_decl rule

@@ -2,7 +2,7 @@
 //!
 //! This example focuses on testing the parsing of the logic block in transform declarations.
 
-use fold_node::schema::transform::{BetterParser, Interpreter, Value};
+use fold_node::schema::transform::{TransformParser, Interpreter, Value};
 use std::collections::HashMap;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("========================\n");
 
     // Create a parser
-    let parser = BetterParser::new();
+    let parser = TransformParser::new();
     println!("Parser created");
 
     // Test expression parsing

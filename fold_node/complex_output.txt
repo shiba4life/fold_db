@@ -1,7 +1,7 @@
 warning: methods `parse_stmt`, `parse_if_stmt`, `parse_let_stmt`, `parse_return_stmt`, `parse_expr_stmt`, and `parse_comp_op` are never used
    --> fold_node/src/schema/transform/better_parser.rs:356:8
     |
-20  | impl BetterParser {
+20  | impl TransformParser {
     | ----------------- methods in this implementation
 ...
 356 |     fn parse_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {

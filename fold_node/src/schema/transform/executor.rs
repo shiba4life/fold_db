@@ -5,7 +5,7 @@
 
 use super::ast::Value;
 use super::interpreter::Interpreter;
-use super::parser::BetterParser;
+use super::parser::TransformParser;
 use crate::schema::types::{SchemaError, Transform};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -110,7 +110,7 @@ impl TransformExecutor {
             None => {
                 // Parse the transform logic
                 let logic = &transform.logic;
-                let parser = BetterParser::new();
+                let parser = TransformParser::new();
                 parser.parse_expression(logic)
                     .map_err(|e| SchemaError::InvalidField(format!("Failed to parse transform: {}", e)))?
             }
@@ -157,7 +157,7 @@ impl TransformExecutor {
     /// `Ok(())` if the transform is valid, otherwise an error
     pub fn validate_transform(transform: &Transform) -> Result<(), SchemaError> {
         // Parse the transform logic to check for syntax errors
-        let parser = BetterParser::new();
+        let parser = TransformParser::new();
         let ast = parser.parse_expression(&transform.logic);
         
         // For "input +" specifically, we want to fail validation

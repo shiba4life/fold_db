@@ -3,7 +3,7 @@
 //! This example demonstrates a more complex transform DSL with multiple expressions,
 //! including let statements and return statements.
 
-use fold_node::schema::transform::{BetterParser, Interpreter, Value};
+use fold_node::schema::transform::{TransformParser, Interpreter, Value};
 use std::collections::HashMap;
 use serde_json::json;
 
@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("============================\n");
 
     // Create a parser
-    let parser = BetterParser::new();
+    let parser = TransformParser::new();
     println!("Parser created");
 
     // Complex transform with multiple expressions

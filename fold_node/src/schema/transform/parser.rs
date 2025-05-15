@@ -15,9 +15,9 @@ use pest_derive::Parser;
 /// Parser for the transform DSL.
 #[derive(Parser)]
 #[grammar = "src/schema/transform/transform.pest"]
-pub struct BetterParser;
+pub struct TransformParser;
 
-impl BetterParser {
+impl TransformParser {
     /// Creates a new parser.
     pub fn new() -> Self {
         Self
@@ -671,7 +671,7 @@ impl BetterParser {
         // Get the base type and generic parameter
         let _base_type = pairs.next().unwrap().as_str().to_string();
         let _generic_param = pairs.next().unwrap().as_str().to_string();
-        
+
         // We no longer create an OutputType, just validate the syntax
         Ok(())
     }
@@ -700,7 +700,7 @@ impl BetterParser {
     }
 }
 
-impl Default for BetterParser {
+impl Default for TransformParser {
     fn default() -> Self {
         Self::new()
     }
@@ -708,7 +708,7 @@ impl Default for BetterParser {
 
 #[cfg(test)]
 mod tests {
-    use super::BetterParser;
+    use super::TransformParser;
     use super::Expression;
     use super::Operator;
     use super::TransformDeclaration;
@@ -717,7 +717,7 @@ mod tests {
     
     #[test]
     fn test_parse_simple_arithmetic() {
-        let parser = BetterParser::new();
+        let parser = TransformParser::new();
         
         // Test basic arithmetic
         let expr = parser.parse_expression("2 + 3").unwrap();
@@ -754,7 +754,7 @@ mod tests {
     
     #[test]
     fn test_parse_variables() {
-        let parser = BetterParser::new();
+        let parser = TransformParser::new();
         
         // Test variable reference
         let expr = parser.parse_expression("x").unwrap();
@@ -771,7 +771,7 @@ mod tests {
     
     #[test]
     fn test_parse_field_access() {
-        let parser = BetterParser::new();
+        let parser = TransformParser::new();
         
         // Test field access
         let expr = parser.parse_expression("obj.field").unwrap();
@@ -793,7 +793,7 @@ mod tests {
     
     #[test]
     fn test_parse_function_calls() {
-        let parser = BetterParser::new();
+        let parser = TransformParser::new();
         
         // Test function call with no arguments
         let expr = parser.parse_expression("func()").unwrap();
@@ -833,7 +833,7 @@ mod tests {
     
     #[test]
     fn test_parse_comparison_and_logic() {
-        let parser = BetterParser::new();
+        let parser = TransformParser::new();
         
         // Test comparison
         let expr = parser.parse_expression("x > 5").unwrap();
@@ -862,7 +862,7 @@ mod tests {
     
     #[test]
     fn test_parse_unary_operators() {
-        let parser = BetterParser::new();
+        let parser = TransformParser::new();
         
         // Test negation
         let expr = parser.parse_expression("-x").unwrap();
@@ -891,7 +891,7 @@ mod tests {
     
     #[test]
     fn test_parse_transform_declaration() {
-        let parser = BetterParser::new();
+        let parser = TransformParser::new();
         
         let transform_code = r#"
         transform my_transform {

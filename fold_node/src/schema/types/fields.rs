@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::fees::types::config::FieldPaymentConfig;
 use crate::permissions::types::policy::PermissionsPolicy;
 use crate::schema::types::Transform;
-use crate::schema::transform::parser::BetterParser; // Import BetterParser
+use crate::schema::transform::parser::TransformParser; // Import TransformParser
 
 #[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq)] // Explicitly use serde::Deserialize
 #[serde(rename_all = "PascalCase")]
@@ -80,7 +80,7 @@ impl<'de> Deserialize<'de> for SchemaField {
         let helper = SchemaFieldHelper::deserialize(deserializer)?;
 
         let parsed_transform = helper.transform.map(|transform_logic| {
-            let parser = BetterParser::new();
+            let parser = TransformParser::new();
             match parser.parse_transform(&transform_logic) {
                 Ok(declaration) => Ok(Transform::from_declaration(declaration)),
                 Err(e) => Err(serde::de::Error::custom(format!("Error parsing transform: {}", e))), // Include SchemaError details

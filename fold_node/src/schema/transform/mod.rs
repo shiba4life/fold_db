@@ -27,7 +27,7 @@ pub mod registry;
 // Public re-exports
 pub use ast::{Expression, Value, Operator, UnaryOperator, TransformDeclaration};
 pub use interpreter::Interpreter;
-pub use parser::BetterParser;
+pub use parser::TransformParser;
 pub use executor::TransformExecutor;
 pub use registry::{TransformRegistry, GetAtomFn, CreateAtomFn, UpdateAtomRefFn};
 pub use crate::schema::types::Transform;
