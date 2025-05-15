@@ -1,5 +1,5 @@
 // Better Transform DSL Grammar
-// A simpler, more robust grammar for the transform DSL
+// A comprehensive grammar for the transform DSL
 
 // Whitespace and comments
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
@@ -51,3 +51,43 @@ expr = { logic_expr }
 
 // Complete expression with start/end markers
 complete_expr = _{ SOI ~ expr ~ EOI }
+
+// Statement types
+let_stmt = { "let" ~ identifier ~ "=" ~ expr }
+return_stmt = { "return" ~ expr }
+expr_stmt = { expr }
+
+// Statement
+stmt = { (let_stmt | return_stmt | if_stmt | expr_stmt) ~ ";" }
+
+// If statement
+if_stmt = { "if" ~ expr ~ "{" ~ stmt* ~ "}" ~ ("else" ~ "if" ~ expr ~ "{" ~ stmt* ~ "}")* ~ ("else" ~ "{" ~ stmt* ~ "}")? }
+
+// Block of statements
+stmt_block = { stmt* }
+
+// Type expression (e.g., Fold<PatientVitals>)
+type_expr = { identifier ~ "<" ~ identifier ~ ">" }
+
+
+// Transform declaration components
+input_decl = { "input" ~ ":" ~ type_expr }
+output_decl = { "output" ~ ":" ~ type_expr ~ "as" ~ string }
+reversible_decl = { "reversible" ~ ":" ~ boolean }
+signature_decl = { "signature" ~ ":" ~ (string | function_call) }
+// Logic declaration
+logic_decl = { "logic" ~ ":" ~ "{" ~ stmt* ~ "}" }
+
+// Transform declaration
+transform_decl = {
+    "transform" ~ identifier ~ "{" ~
+    input_decl? ~
+    output_decl ~
+    reversible_decl? ~
+    signature_decl? ~
+    logic_decl ~
+    "}"
+}
+
+// Complete transform declaration with start/end markers
+complete_transform = _{ SOI ~ transform_decl ~ EOI }

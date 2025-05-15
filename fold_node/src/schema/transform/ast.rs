@@ -244,3 +244,45 @@ impl fmt::Display for Expression {
         }
     }
 }
+
+/// Represents a transform declaration in the DSL.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TransformDeclaration {
+    /// The name of the transform
+    pub name: String,
+    
+    /// The output name (e.g., "risk_score")
+    pub output_name: String,
+    
+    /// Whether the transform is reversible
+    pub reversible: bool,
+    
+    /// The signature for verification
+    pub signature: Option<String>,
+    
+    /// The transform logic
+    pub logic: Vec<Expression>,
+}
+
+impl fmt::Display for TransformDeclaration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "transform {} {{", self.name)?;
+        writeln!(f, "  output as \"{}\"", self.output_name)?;
+        
+        writeln!(f, "  reversible: {}", self.reversible)?;
+        
+        if let Some(sig) = &self.signature {
+            writeln!(f, "  signature: {}", sig)?;
+        }
+        
+        writeln!(f, "  logic: {{")?;
+        for expr in &self.logic {
+            writeln!(f, "    {}", expr)?;
+        }
+        writeln!(f, "  }}")?;
+        
+        write!(f, "}}")
+    }
+}
+
+// InputType and OutputType structs have been removed as they are no longer needed

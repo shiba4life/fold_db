@@ -1,0 +1,83 @@
+warning: methods `parse_stmt`, `parse_if_stmt`, `parse_let_stmt`, `parse_return_stmt`, `parse_expr_stmt`, and `parse_comp_op` are never used
+   --> fold_node/src/schema/transform/better_parser.rs:356:8
+    |
+20  | impl BetterParser {
+    | ----------------- methods in this implementation
+...
+356 |     fn parse_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+    |        ^^^^^^^^^^
+...
+369 |     fn parse_if_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+    |        ^^^^^^^^^^^^^
+...
+448 |     fn parse_let_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+    |        ^^^^^^^^^^^^^^
+...
+467 |     fn parse_return_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+    |        ^^^^^^^^^^^^^^^^^
+...
+478 |     fn parse_expr_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+    |        ^^^^^^^^^^^^^^^
+...
+671 |     fn parse_comp_op(&self, pair: Pair<Rule>) -> Result<Operator, SchemaError> {
+    |        ^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `fold_node` (lib) generated 1 warning
+warning: unused imports: `Interpreter` and `Value`
+ --> fold_node/examples/transform_logic_test.rs:5:50
+  |
+5 | use fold_node::schema::transform::{BetterParser, Interpreter, Value};
+  |                                                  ^^^^^^^^^^^  ^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `std::collections::HashMap`
+ --> fold_node/examples/transform_logic_test.rs:6:5
+  |
+6 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `fold_node` (example "transform_logic_test") generated 2 warnings (run `cargo fix --example "transform_logic_test"` to apply 2 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running `/Users/tomtang/projects/engram/datafold/target/debug/examples/transform_logic_test`
+Transform Logic Block Test
+========================
+
+Parser created
+
+Testing expression parsing: 'input.value * 2'
+Expression parsed successfully!
+AST: BinaryOp { left: FieldAccess { object: Variable("input"), field: "value" }, operator: Multiply, right: Literal(Number(2.0)) }
+
+Testing transform with logic: 
+
+    transform simple_transform {
+      output: Field<Float> as "result"
+      logic: { input.value * 2; }
+    }
+    
+Transform parsed successfully!
+Transform name: simple_transform
+Output name: result
+Logic statements: 1
+Statement 1: BinaryOp { left: FieldAccess { object: Variable("input"), field: "value" }, operator: Multiply, right: Literal(Number(2.0)) }
+
+Let's debug the logic block parsing:
+Logic block: { input.value * 2; }
+
+Minimal transform:
+
+    transform test {
+      output: Field<Float> as "test"
+      logic: { input.value * 2; }
+    }
+    
+Transform parsed successfully!
+Logic statements: 1
+Statement 1: BinaryOp { left: FieldAccess { object: Variable("input"), field: "value" }, operator: Multiply, right: Literal(Number(2.0)) }
+
+Checking the parser implementation for logic_decl:
+According to the grammar, logic_decl = { "logic" ~ ":" ~ "{" ~ (expr ~ ";")* ~ "}" }
+But the parser implementation only handles let_stmt and return_stmt, not regular expressions.

@@ -1,0 +1,116 @@
+warning: methods `parse_stmt`, `parse_if_stmt`, `parse_let_stmt`, `parse_return_stmt`, `parse_expr_stmt`, and `parse_comp_op` are never used
+   --> fold_node/src/schema/transform/better_parser.rs:356:8
+    |
+20  | impl BetterParser {
+    | ----------------- methods in this implementation
+...
+356 |     fn parse_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+    |        ^^^^^^^^^^
+...
+369 |     fn parse_if_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+    |        ^^^^^^^^^^^^^
+...
+448 |     fn parse_let_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+    |        ^^^^^^^^^^^^^^
+...
+467 |     fn parse_return_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+    |        ^^^^^^^^^^^^^^^^^
+...
+478 |     fn parse_expr_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+    |        ^^^^^^^^^^^^^^^
+...
+671 |     fn parse_comp_op(&self, pair: Pair<Rule>) -> Result<Operator, SchemaError> {
+    |        ^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `fold_node` (lib) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running `/Users/tomtang/projects/engram/datafold/target/debug/examples/transform_dsl_samples`
+Transform DSL Samples
+====================
+
+Parser created
+Sample 1: Simple Arithmetic
+Expression: 2 + 3 * 4
+Parsed successfully!
+AST: BinaryOp { left: Literal(Number(2.0)), operator: Add, right: BinaryOp { left: Literal(Number(3.0)), operator: Multiply, right: Literal(Number(4.0)) } }
+Result: Number(14.0)
+
+Sample 2: Variables
+Expression: x + y * z
+Parsed successfully!
+AST: BinaryOp { left: Variable("x"), operator: Add, right: BinaryOp { left: Variable("y"), operator: Multiply, right: Variable("z") } }
+Result with x=10, y=5, z=15: Number(85.0)
+
+Sample 3: Function Calls
+Expression: min(max(x, y), z + 10)
+Parsed successfully!
+AST: FunctionCall { name: "min", args: [FunctionCall { name: "max", args: [Variable("x"), Variable("y")] }, BinaryOp { left: Variable("z"), operator: Add, right: Literal(Number(10.0)) }] }
+Result with x=10, y=5, z=15: Number(10.0)
+
+Sample 4: Field Access (BMI calculation)
+Expression: patient.height / (patient.weight ^ 2)
+Parsed successfully!
+AST: BinaryOp { left: FieldAccess { object: Variable("patient"), field: "height" }, operator: Divide, right: BinaryOp { left: FieldAccess { object: Variable("patient"), field: "weight" }, operator: Power, right: Literal(Number(2.0)) } }
+Result: Number(0.03571428571428571)
+
+Sample 5: Simple Transform
+Transform:
+
+    transform simple_transform {
+      input: Fold<PatientVitals>
+      output: Field<Float> as "result"
+      reversible: false
+      
+      logic: {
+        input.value * 2;
+      }
+    }
+    
+Parsed successfully!
+Transform name: simple_transform
+Output name: result
+Reversible: false
+Logic statements: 1
+Evaluating statement 1: BinaryOp { left: FieldAccess { object: Variable("input"), field: "value" }, operator: Multiply, right: Literal(Number(2.0)) }
+  Result: Number(20.0)
+
+Sample 6: Add Values Transform
+Transform:
+
+    transform add_values {
+      input: Fold<Values>
+      output: Field<Float> as "sum"
+      reversible: false
+      
+      logic: {
+        input.value1 + input.value2;
+      }
+    }
+    
+Parsed successfully!
+Transform name: add_values
+Output name: sum
+Reversible: false
+Logic statements: 1
+Evaluating statement 1: BinaryOp { left: FieldAccess { object: Variable("input"), field: "value1" }, operator: Add, right: FieldAccess { object: Variable("input"), field: "value2" } }
+  Result: Number(12.0)
+
+
+Examining logic block parsing:
+Logic statements count: 1
+Statement 1: BinaryOp { left: FieldAccess { object: Variable("input"), field: "value" }, operator: Multiply, right: Literal(Number(2.0)) }
+
+Let's debug the logic block parsing:
+Expression parsed successfully: BinaryOp { left: FieldAccess { object: Variable("input"), field: "value" }, operator: Multiply, right: Literal(Number(2.0)) }
+Transform with expression:
+
+            transform expr_test {
+              output: Field<Float> as "test"
+              logic: { input.value * 2; }
+            }
+            
+Transform parsed successfully!
+Logic statements: 1
+Statement 1: BinaryOp { left: FieldAccess { object: Variable("input"), field: "value" }, operator: Multiply, right: Literal(Number(2.0)) }

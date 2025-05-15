@@ -31,7 +31,7 @@ mod simple_test;
 mod better_test;
 
 // Public re-exports
-pub use ast::{Expression, Value, Operator, UnaryOperator};
+pub use ast::{Expression, Value, Operator, UnaryOperator, TransformDeclaration};
 pub use interpreter::Interpreter;
 pub use better_parser::BetterParser;
 pub use executor::TransformExecutor;

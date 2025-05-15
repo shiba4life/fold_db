@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use crate::schema::transform::ast::TransformDeclaration;
 
 /// Represents a transformation that can be applied to field values.
 ///
@@ -30,6 +31,14 @@ use std::collections::HashSet;
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transform {
+    /// The name of the transform
+    #[serde(default)]
+    pub name: String,
+    
+    /// The output name (e.g., "risk_score")
+    #[serde(default)]
+    pub output_name: Option<String>,
+    
     /// The transform logic expressed in the DSL
     pub logic: String,
     
@@ -53,6 +62,10 @@ pub struct Transform {
     /// The parsed expression (not serialized)
     #[serde(skip)]
     pub parsed_expr: Option<crate::schema::transform::ast::Expression>,
+    
+    /// The parsed transform declaration (not serialized)
+    #[serde(skip)]
+    pub parsed_declaration: Option<TransformDeclaration>,
 }
 
 impl Transform {
@@ -76,6 +89,8 @@ impl Transform {
         payment_required: bool,
     ) -> Self {
         Self {
+            name: String::new(),
+            output_name: None,
             logic,
             reversible,
             signature,
@@ -83,6 +98,7 @@ impl Transform {
             input_dependencies: Vec::new(),
             output_reference: None,
             parsed_expr: None,
+            parsed_declaration: None,
         }
     }
     
@@ -108,6 +124,8 @@ impl Transform {
         payment_required: bool,
     ) -> Self {
         Self {
+            name: String::new(),
+            output_name: None,
             logic,
             reversible,
             signature,
@@ -115,6 +133,7 @@ impl Transform {
             input_dependencies: Vec::new(),
             output_reference: None,
             parsed_expr: Some(parsed_expr),
+            parsed_declaration: None,
         }
     }
     
@@ -142,6 +161,8 @@ impl Transform {
         output_reference: Option<String>,
     ) -> Self {
         Self {
+            name: String::new(),
+            output_name: None,
             logic,
             reversible,
             signature,
@@ -149,6 +170,7 @@ impl Transform {
             input_dependencies,
             output_reference,
             parsed_expr: None,
+            parsed_declaration: None,
         }
     }
     
@@ -216,4 +238,56 @@ impl Transform {
         
         dependencies
     }
+    /// Creates a new Transform from a TransformDeclaration.
+    ///
+    /// # Arguments
+    ///
+    /// * `declaration` - The transform declaration
+    ///
+    /// # Returns
+    ///
+    /// A new Transform instance
+    #[must_use]
+    pub fn from_declaration(declaration: TransformDeclaration) -> Self {
+        // Extract logic from the declaration
+        let logic = declaration.logic.iter()
+            .map(|expr| format!("{}", expr))
+            .collect::<Vec<_>>()
+            .join("\n");
+        
+        // Set payment requirement to false since it's been removed
+        let payment_required = false;
+        
+        Self {
+            name: declaration.name.clone(),
+            output_name: Some(declaration.output_name.clone()),
+            logic,
+            reversible: declaration.reversible,
+            signature: declaration.signature.clone(),
+            payment_required,
+            input_dependencies: Vec::new(), // Will be populated later
+            output_reference: None,
+            parsed_expr: None, // Will be populated later
+            parsed_declaration: Some(declaration),
+        }
+    }
+    
+    /// Gets the name of the transform.
+    ///
+    /// # Returns
+    ///
+    /// The name of the transform
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
+    
+    /// Gets the output name of the transform.
+    ///
+    /// # Returns
+    ///
+    /// The output name of the transform, if any
+    pub fn get_output_name(&self) -> Option<&str> {
+        self.output_name.as_deref()
+    }
+    
 }

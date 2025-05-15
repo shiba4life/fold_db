@@ -268,21 +268,20 @@ impl Interpreter {
                 let val = self.evaluate(value)?;
                 
                 // Save the old value if it exists
-                let old_value = self.variables.get(name).cloned();
+                let _old_value = self.variables.get(name).cloned();
                 
                 // Set the new value
-                self.variables.insert(name.clone(), val);
+                self.variables.insert(name.clone(), val.clone());
                 
-                // Evaluate the body
-                let result = self.evaluate(body);
-                
-                // Restore the old value or remove the variable
-                match old_value {
-                    Some(v) => self.variables.insert(name.clone(), v),
-                    None => self.variables.remove(name),
-                };
-                
-                result
+                // If the body is Null, just return the value (for sequential evaluation)
+                // Don't restore the old value or remove the variable for sequential evaluation
+                // This allows variables to persist between statements in the transform logic
+                if let Expression::Literal(Value::Null) = **body {
+                    Ok(val)
+                } else {
+                    // Otherwise evaluate the body
+                    self.evaluate(body)
+                }
             },
             
             Expression::Return(expr) => {

@@ -91,6 +91,8 @@ impl From<JsonFieldPaymentConfig> for FieldPaymentConfig {
 impl From<JsonTransform> for Transform {
     fn from(json: JsonTransform) -> Self {
         Self {
+            name: String::new(),
+            output_name: None,
             logic: json.logic,
             reversible: json.reversible,
             signature: json.signature,
@@ -98,6 +100,7 @@ impl From<JsonTransform> for Transform {
             input_dependencies: Vec::new(),
             output_reference: None,
             parsed_expr: None,
+            parsed_declaration: None,
         }
     }
 }

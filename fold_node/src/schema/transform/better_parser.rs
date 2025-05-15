@@ -3,7 +3,10 @@
 //! This module implements a cleaner, more robust parser for the transform DSL using PEST.
 //! It converts a string of DSL code into an Abstract Syntax Tree (AST).
 
-use super::ast::{Expression, Operator, UnaryOperator, Value};
+use super::ast::{
+    Expression, Operator, TransformDeclaration,
+    UnaryOperator, Value
+};
 use crate::schema::types::SchemaError;
 use pest::Parser;
 use pest::iterators::Pair;
@@ -20,7 +23,7 @@ impl BetterParser {
         Self
     }
     
-    /// Parses the input into an AST.
+    /// Parses the input into an expression AST.
     pub fn parse_expression(&self, input: &str) -> Result<Expression, SchemaError> {
         // Parse the input using the complete_expr rule
         let pairs = Self::parse(Rule::complete_expr, input)
@@ -31,6 +34,19 @@ impl BetterParser {
         
         // Convert the parse tree to an AST
         self.build_ast(expr_pair)
+    }
+    
+    /// Parses the input into a transform declaration AST.
+    pub fn parse_transform(&self, input: &str) -> Result<TransformDeclaration, SchemaError> {
+        // Parse the input using the complete_transform rule
+        let pairs = Self::parse(Rule::complete_transform, input)
+            .map_err(|e| SchemaError::InvalidField(format!("Parse error: {}", e)))?;
+        
+        // Get the transform declaration from the parse result
+        let transform_pair = pairs.into_iter().next().unwrap();
+        
+        // Convert the parse tree to a TransformDeclaration
+        self.build_transform_decl(transform_pair)
     }
     
     /// Builds an AST from a parse tree.
@@ -336,6 +352,352 @@ impl BetterParser {
             args,
         })
     }
+    /// Parses a statement.
+    #[allow(dead_code)]
+    fn parse_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+        let inner = pair.into_inner().next().unwrap();
+        
+        match inner.as_rule() {
+            Rule::let_stmt => self.parse_let_stmt(inner),
+            Rule::return_stmt => self.parse_return_stmt(inner),
+            Rule::if_stmt => self.parse_if_stmt(inner),
+            Rule::expr_stmt => self.parse_expr_stmt(inner),
+            _ => Err(SchemaError::InvalidField(format!("Unexpected rule in statement: {:?}", inner.as_rule()))),
+        }
+    }
+    
+    /// Parses an if statement.
+    #[allow(dead_code)]
+    fn parse_if_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+        let mut pairs = pair.into_inner();
+        
+        // Get the condition
+        let condition_pair = pairs.next().unwrap();
+        let condition = self.build_ast(condition_pair)?;
+        
+        // Get the then branch statements
+        let mut then_stmts = Vec::new();
+        
+        // Parse each statement in the then block
+        for stmt_pair in pairs.by_ref() {
+            if stmt_pair.as_rule() == Rule::stmt {
+                then_stmts.push(self.parse_stmt(stmt_pair)?);
+            } else {
+                // We've reached the else branch or the end
+                break;
+            }
+        }
+        
+        // Create a sequence of expressions for the then branch
+        let then_expr = if then_stmts.is_empty() {
+            Expression::Literal(Value::Null)
+        } else {
+            let mut result = then_stmts.remove(0);
+            for stmt in then_stmts {
+                // For simplicity, we'll just use a let binding with a dummy variable
+                // to sequence the expressions
+                result = Expression::LetBinding {
+                    name: "_".to_string(),
+                    value: Box::new(result),
+                    body: Box::new(stmt),
+                };
+            }
+            result
+        };
+        
+        // Check if there's an else branch
+        let else_expr = if pairs.peek().is_some() {
+            let mut else_stmts = Vec::new();
+            
+            // Parse each statement in the else block
+            for stmt_pair in pairs {
+                if stmt_pair.as_rule() == Rule::stmt {
+                    else_stmts.push(self.parse_stmt(stmt_pair)?);
+                } else {
+                    break;
+                }
+            }
+            
+            // Create a sequence of expressions for the else branch
+            if !else_stmts.is_empty() {
+                let mut result = else_stmts.remove(0);
+                for stmt in else_stmts {
+                    // For simplicity, we'll just use a let binding with a dummy variable
+                    // to sequence the expressions
+                    result = Expression::LetBinding {
+                        name: "_".to_string(),
+                        value: Box::new(result),
+                        body: Box::new(stmt),
+                    };
+                }
+                Some(Box::new(result))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        
+        // Create the if-else expression
+        Ok(Expression::IfElse {
+            condition: Box::new(condition),
+            then_branch: Box::new(then_expr),
+            else_branch: else_expr,
+        })
+    }
+    
+    /// Parses a let statement.
+    #[allow(dead_code)]
+    fn parse_let_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+        let mut pairs = pair.into_inner();
+        
+        // Get the variable name
+        let name = pairs.next().unwrap().as_str().to_string();
+        
+        // Get the value expression
+        let value_pair = pairs.next().unwrap();
+        let value = self.build_ast(value_pair)?;
+        
+        // Create a let binding with a dummy body (will be replaced later)
+        Ok(Expression::LetBinding {
+            name,
+            value: Box::new(value),
+            body: Box::new(Expression::Literal(Value::Null)),
+        })
+    }
+    
+    /// Parses a return statement.
+    #[allow(dead_code)]
+    fn parse_return_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+        let mut pairs = pair.into_inner();
+        
+        // Get the return expression
+        let expr_pair = pairs.next().unwrap();
+        let expr = self.build_ast(expr_pair)?;
+        
+        Ok(Expression::Return(Box::new(expr)))
+    }
+    
+    /// Parses an expression statement.
+    #[allow(dead_code)]
+    fn parse_expr_stmt(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
+        let mut pairs = pair.into_inner();
+        
+        // Get the expression
+        let expr_pair = pairs.next().unwrap();
+        self.build_ast(expr_pair)
+    }
+    
+    /// Builds a TransformDeclaration from a parse tree.
+    fn build_transform_decl(&self, pair: Pair<Rule>) -> Result<TransformDeclaration, SchemaError> {
+        match pair.as_rule() {
+            Rule::complete_transform => {
+                // Get the transform_decl inside the complete_transform
+                let decl_pair = pair.into_inner().next().unwrap();
+                self.build_transform_decl(decl_pair)
+            },
+            Rule::transform_decl => {
+                let mut pairs = pair.into_inner();
+                
+                // Get the transform name
+                let name = pairs.next().unwrap().as_str().to_string();
+                
+                // Initialize optional fields with default values
+                let mut output_name = None;
+                let mut reversible = false;
+                let mut signature = None;
+                let mut logic = Vec::new();
+                
+                // Parse the transform components
+                for pair in pairs {
+                    match pair.as_rule() {
+                        Rule::input_decl => {
+                            // Input type is no longer stored, but we still need to parse it for validation
+                            self.parse_input_decl(pair)?;
+                        },
+                        Rule::output_decl => {
+                            let (_, out_name) = self.parse_output_decl(pair)?;
+                            output_name = Some(out_name);
+                        },
+                        Rule::reversible_decl => {
+                            reversible = self.parse_reversible_decl(pair)?;
+                        },
+                        Rule::signature_decl => {
+                            signature = Some(self.parse_signature_decl(pair)?);
+                        },
+                        Rule::logic_decl => {
+                            logic = self.parse_logic_decl(pair)?;
+                        },
+                        _ => return Err(SchemaError::InvalidField(format!("Unexpected rule in transform declaration: {:?}", pair.as_rule()))),
+                    }
+                }
+                
+                // Validate required fields
+                let output_name = output_name.ok_or_else(|| SchemaError::InvalidField("Missing output name".to_string()))?;
+                
+                // Create the transform declaration
+                Ok(TransformDeclaration {
+                    name,
+                    output_name,
+                    reversible,
+                    signature,
+                    logic,
+                })
+            },
+            _ => Err(SchemaError::InvalidField(format!("Unexpected rule: {:?}", pair.as_rule()))),
+        }
+    }
+    
+    /// Parses an input declaration.
+    fn parse_input_decl(&self, pair: Pair<Rule>) -> Result<(), SchemaError> {
+        let mut pairs = pair.into_inner();
+        
+        // Get the type expression
+        let type_expr_pair = pairs.next().unwrap();
+        // We still parse the type expression for validation, but we don't return it
+        self.parse_type_expr(type_expr_pair)?;
+        Ok(())
+    }
+    
+    /// Parses an output declaration.
+    fn parse_output_decl(&self, pair: Pair<Rule>) -> Result<((), String), SchemaError> {
+        let mut pairs = pair.into_inner();
+        
+        // Get the type expression
+        let type_expr_pair = pairs.next().unwrap();
+        // We still parse the output type expression for validation, but we don't return it
+        self.parse_output_type_expr(type_expr_pair)?;
+        
+        // Get the output name
+        let name_pair = pairs.next().unwrap();
+        let name = self.parse_string_literal(name_pair)?;
+        
+        Ok(((), name))
+    }
+    
+    /// Parses a reversible declaration.
+    fn parse_reversible_decl(&self, pair: Pair<Rule>) -> Result<bool, SchemaError> {
+        let mut pairs = pair.into_inner();
+        
+        // Get the boolean value
+        let bool_pair = pairs.next().unwrap();
+        match bool_pair.as_str() {
+            "true" => Ok(true),
+            "false" => Ok(false),
+            _ => Err(SchemaError::InvalidField(format!("Invalid boolean: {}", bool_pair.as_str()))),
+        }
+    }
+    
+    /// Parses a signature declaration.
+    fn parse_signature_decl(&self, pair: Pair<Rule>) -> Result<String, SchemaError> {
+        let mut pairs = pair.into_inner();
+        
+        // Get the signature expression
+        let sig_expr_pair = pairs.next().unwrap();
+        
+        match sig_expr_pair.as_rule() {
+            Rule::string => self.parse_string_literal(sig_expr_pair),
+            Rule::function_call => {
+                // For function calls like sha256sum("v1.0.3"), just return the raw text
+                Ok(sig_expr_pair.as_str().to_string())
+            },
+            _ => Err(SchemaError::InvalidField(format!("Invalid signature: {:?}", sig_expr_pair.as_rule()))),
+        }
+    }
+    
+    /// Parses a logic declaration.
+    fn parse_logic_decl(&self, pair: Pair<Rule>) -> Result<Vec<Expression>, SchemaError> {
+        let pairs = pair.into_inner();
+        let mut exprs = Vec::new();
+        
+        // Parse each statement in the logic block
+        for stmt_pair in pairs {
+            if stmt_pair.as_rule() == Rule::stmt {
+                let inner_pair = stmt_pair.into_inner().next().unwrap();
+                
+                match inner_pair.as_rule() {
+                    Rule::let_stmt => {
+                        // Parse let statement
+                        let mut inner_pairs = inner_pair.into_inner();
+                        let name = inner_pairs.next().unwrap().as_str().to_string();
+                        let expr_pair = inner_pairs.next().unwrap();
+                        let expr = self.build_ast(expr_pair)?;
+                        
+                        exprs.push(Expression::LetBinding {
+                            name,
+                            value: Box::new(expr),
+                            body: Box::new(Expression::Literal(Value::Null)), // Placeholder
+                        });
+                    },
+                    Rule::return_stmt => {
+                        // Parse return statement
+                        let expr_pair = inner_pair.into_inner().next().unwrap();
+                        let expr = self.build_ast(expr_pair)?;
+                        
+                        exprs.push(Expression::Return(Box::new(expr)));
+                    },
+                    Rule::expr_stmt => {
+                        // Parse expression statement
+                        let expr_pair = inner_pair.into_inner().next().unwrap();
+                        let expr = self.build_ast(expr_pair)?;
+                        exprs.push(expr);
+                    },
+                    _ => {
+                        // Skip other rules
+                    }
+                }
+            }
+        }
+        
+        Ok(exprs)
+    }
+    
+    /// Parses a type expression (e.g., Fold<PatientVitals>).
+    fn parse_type_expr(&self, pair: Pair<Rule>) -> Result<(), SchemaError> {
+        let mut pairs = pair.into_inner();
+        
+        // Get the base type and generic parameter
+        let _base_type = pairs.next().unwrap().as_str().to_string();
+        let _generic_param = pairs.next().unwrap().as_str().to_string();
+        
+        // We no longer create an InputType, just validate the syntax
+        Ok(())
+    }
+    
+    /// Parses an output type expression (e.g., Field<Float>).
+    fn parse_output_type_expr(&self, pair: Pair<Rule>) -> Result<(), SchemaError> {
+        let mut pairs = pair.into_inner();
+        
+        // Get the base type and generic parameter
+        let _base_type = pairs.next().unwrap().as_str().to_string();
+        let _generic_param = pairs.next().unwrap().as_str().to_string();
+        
+        // We no longer create an OutputType, just validate the syntax
+        Ok(())
+    }
+    
+    
+    /// Parses a comparison operator.
+    #[allow(dead_code)]
+    fn parse_comp_op(&self, pair: Pair<Rule>) -> Result<Operator, SchemaError> {
+        match pair.as_str() {
+            "==" => Ok(Operator::Equal),
+            "!=" => Ok(Operator::NotEqual),
+            "<" => Ok(Operator::LessThan),
+            "<=" => Ok(Operator::LessThanOrEqual),
+            ">" => Ok(Operator::GreaterThan),
+            ">=" => Ok(Operator::GreaterThanOrEqual),
+            _ => Err(SchemaError::InvalidField(format!("Unknown comparison operator: {}", pair.as_str()))),
+        }
+    }
+    
+    /// Parses a string literal.
+    fn parse_string_literal(&self, pair: Pair<Rule>) -> Result<String, SchemaError> {
+        // Remove the surrounding quotes
+        let s = pair.as_str();
+        let s = &s[1..s.len()-1];
+        Ok(s.to_string())
+    }
 }
 
 impl Default for BetterParser {
@@ -520,5 +882,36 @@ mod tests {
                 expr: Box::new(Expression::Variable("x".to_string())),
             }),
         });
+    }
+    
+    #[test]
+    fn test_parse_transform_declaration() {
+        let parser = BetterParser::new();
+        
+        let transform_code = r#"
+        transform calculate_risk_score {
+          input: Fold<PatientVitals>
+          output: Field<Float> as "risk_score"
+          reversible: false
+          signature: sha256sum("v1.0.3")
+        
+          logic: {
+            let bmi = input.weight / (input.height ^ 2);
+            let risk = 0.5 * input.blood_pressure + 1.2 * bmi;
+            return clamp(risk, 0, 100);
+          }
+        }
+        "#;
+        
+        let decl = parser.parse_transform(transform_code).unwrap();
+        
+        // Verify the parsed declaration
+        assert_eq!(decl.name, "calculate_risk_score");
+        assert_eq!(decl.output_name, "risk_score");
+        assert_eq!(decl.reversible, false);
+        assert_eq!(decl.signature, Some("sha256sum(\"v1.0.3\")".to_string()));
+        
+        // Check logic statements
+        assert_eq!(decl.logic.len(), 3);
     }
 }
