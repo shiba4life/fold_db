@@ -1,0 +1,97 @@
+<!-- Samples Tab Component -->
+<div id="samplesTab" class="tab-content">
+    <div class="samples-container">
+        <div class="samples-nav">
+            <button class="samples-nav-button active" data-sample-type="schemas">Schemas</button>
+            <button class="samples-nav-button" data-sample-type="queries">Queries</button>
+            <button class="samples-nav-button" data-sample-type="mutations">Mutations</button>
+        </div>
+        
+        <div class="samples-content">
+            <!-- Schema Samples -->
+            <div id="schemaSamples" class="sample-list active">
+                <h3>Sample Schemas</h3>
+                <div class="sample-items" id="schemaItems">
+                    <!-- Sample items will be loaded here dynamically -->
+                    <div class="status info">
+                        <span class="loading"></span>
+                        <span>Loading sample schemas...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Query Samples -->
+            <div id="querySamples" class="sample-list">
+                <h3>Sample Queries</h3>
+                <div class="sample-items" id="queryItems">
+                    <!-- Sample items will be loaded here dynamically -->
+                    <div class="status info">
+                        <span class="loading"></span>
+                        <span>Loading sample queries...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mutation Samples -->
+            <div id="mutationSamples" class="sample-list">
+                <h3>Sample Mutations</h3>
+                <div class="sample-items" id="mutationItems">
+                    <!-- Sample items will be loaded here dynamically -->
+                    <div class="status info">
+                        <span class="loading"></span>
+                        <span>Loading sample mutations...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sample Preview Modal -->
+    <div id="samplePreviewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="previewTitle">Sample Preview</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="previewDescription" class="preview-description"></div>
+                <pre id="previewCode" class="preview-code"></pre>
+            </div>
+            <div class="modal-footer">
+                <button id="loadSampleBtn" class="btn btn-primary">Load Sample</button>
+                <button class="btn btn-secondary close-modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Add icons to buttons
+    document.addEventListener('DOMContentLoaded', () => {
+        // Make sure sample tabs are properly set up
+        const schemaSamples = document.getElementById('schemaSamples');
+        const querySamples = document.getElementById('querySamples');
+        const mutationSamples = document.getElementById('mutationSamples');
+        
+        if (schemaSamples && querySamples && mutationSamples) {
+            schemaSamples.classList.add('active');
+            querySamples.classList.remove('active');
+            mutationSamples.classList.remove('active');
+        }
+        
+        // Set up modal close buttons
+        document.querySelectorAll('.close-modal').forEach(button => {
+            button.addEventListener('click', () => {
+                document.getElementById('samplePreviewModal').style.display = 'none';
+            });
+        });
+        
+        // Close modal when clicking outside of it
+        window.addEventListener('click', (event) => {
+            const modal = document.getElementById('samplePreviewModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    });
+</script>

@@ -40,6 +40,11 @@ libp2p = { version = "0.53", features = [
     "tokio"
 ]}
 
+# HTTP Server
+actix-web = "4.3"
+actix-files = "0.6"
+actix-cors = "0.6"
+
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "full"] }
 reqwest = { version = "0.11", features = ["json"] }
@@ -56,6 +61,10 @@ path = "src/bin/datafold_node.rs"
 [[bin]]
 name = "datafold_cli"
 path = "src/bin/datafold_cli.rs"
+
+[[bin]]
+name = "datafold_http_server"
+path = "src/bin/datafold_http_server.rs"
 
 [[example]]
 name = "auto_transform_demo"

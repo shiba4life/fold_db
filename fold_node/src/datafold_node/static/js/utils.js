@@ -98,10 +98,33 @@ function handleApiError(error) {
 async function apiRequest(url, options = {}) {
     try {
         const response = await fetch(url, options);
-        const data = await response.json();
+        
+        // Handle 404 errors specifically
+        if (response.status === 404) {
+            console.warn(`API endpoint not found: ${url}`);
+            throw new Error(`API endpoint not found: ${url}`);
+        }
+        
+        // Try to parse JSON response
+        let data;
+        try {
+            data = await response.json();
+        } catch (parseError) {
+            console.error('Failed to parse API response as JSON:', parseError);
+            throw new Error('Invalid API response format');
+        }
+        
+        // Log the response data for debugging
+        console.log('API Response:', data);
         
         if (data.error) {
             throw new Error(data.error);
+        }
+        
+        // If data field is missing and this isn't an error response,
+        // wrap the response in a data field
+        if (!data.hasOwnProperty('data') && !data.error) {
+            return { data };
         }
         
         return data;

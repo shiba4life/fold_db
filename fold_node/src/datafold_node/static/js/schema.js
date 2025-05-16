@@ -62,24 +62,38 @@ const exampleSchema = {
  * Load the list of schemas from the API
  */
 async function loadSchemaList() {
+    console.log('loadSchemaList function called');
     const schemaListDiv = document.getElementById('schemaList');
     
     // If the element doesn't exist yet, try again later
     if (!schemaListDiv) {
-        console.log('Schema list element not found, retrying in 500ms');
+        console.warn('Schema list element not found, retrying in 500ms');
         setTimeout(loadSchemaList, 500);
         return;
     }
     
     try {
+        console.log('Showing loading indicator');
         utils.showLoading(schemaListDiv);
         
+        console.log('Fetching schemas from API');
         const response = await utils.apiRequest('/api/schemas');
+        console.log('API response received:', response);
+        
+        // Check if response data exists and is an array
+        if (!response.data) {
+            throw new Error('Invalid response format: missing data');
+        }
+        if (!Array.isArray(response.data)) {
+            throw new Error('Invalid response format: data is not an array');
+        }
         
         if (response.data.length === 0) {
+            console.log('No schemas found');
             schemaListDiv.className = 'status';
-            schemaListDiv.textContent = 'No schemas loaded';
+            schemaListDiv.textContent = 'No schemas loaded. Please add a schema.';
         } else {
+            console.log(`${response.data.length} schemas found, rendering list`);
             schemaListDiv.innerHTML = response.data.map(schema => `
                 <div class="schema-item collapsed" onclick="utils.toggleSchema(this)">
                     <h3>
@@ -91,13 +105,11 @@ async function loadSchemaList() {
             `).join('');
         }
     } catch (error) {
-        if (schemaListDiv) {
-            schemaListDiv.className = 'status error';
-            schemaListDiv.textContent = error.message;
-        } else {
-            console.error('Error loading schemas:', error);
-        }
+        console.error('Error loading schemas:', error);
+        schemaListDiv.className = 'status error';
+        schemaListDiv.textContent = `Error loading schemas: ${error.message}`;
     }
+    console.log('loadSchemaList function completed');
 }
 
 /**

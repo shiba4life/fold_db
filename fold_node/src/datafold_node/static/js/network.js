@@ -8,15 +8,26 @@
  */
 async function initNetwork(config) {
     try {
-        await utils.apiRequest('/api/network/init', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(config)
-        });
+        try {
+            await utils.apiRequest('/api/network/init', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(config)
+            });
+            
+            utils.displayResult('Network initialized successfully');
+        } catch (apiError) {
+            // Handle API endpoint not found errors
+            if (apiError.message && apiError.message.includes('API endpoint not found')) {
+                utils.displayResult('Network API not available in this version', true);
+            } else {
+                // Re-throw other errors
+                throw apiError;
+            }
+        }
         
-        utils.displayResult('Network initialized successfully');
         // Update network status
         await getNetworkStatus();
     } catch (error) {
@@ -29,11 +40,23 @@ async function initNetwork(config) {
  */
 async function startNetwork() {
     try {
-        await utils.apiRequest('/api/network/start', {
-            method: 'POST'
-        });
+        try {
+            await utils.apiRequest('/api/network/start', {
+                method: 'POST'
+            });
+            
+            utils.displayResult('Network started successfully');
+        } catch (apiError) {
+            // Handle API endpoint not found errors
+            if (apiError.message && apiError.message.includes('API endpoint not found')) {
+                utils.displayResult('Network API not available in this version', false);
+                utils.showNotification('Network functionality is not available in this version', 'info');
+            } else {
+                // Re-throw other errors
+                throw apiError;
+            }
+        }
         
-        utils.displayResult('Network started successfully');
         // Update network status
         await getNetworkStatus();
     } catch (error) {
@@ -46,11 +69,23 @@ async function startNetwork() {
  */
 async function stopNetwork() {
     try {
-        await utils.apiRequest('/api/network/stop', {
-            method: 'POST'
-        });
+        try {
+            await utils.apiRequest('/api/network/stop', {
+                method: 'POST'
+            });
+            
+            utils.displayResult('Network stopped successfully');
+        } catch (apiError) {
+            // Handle API endpoint not found errors
+            if (apiError.message && apiError.message.includes('API endpoint not found')) {
+                utils.displayResult('Network API not available in this version', false);
+                utils.showNotification('Network functionality is not available in this version', 'info');
+            } else {
+                // Re-throw other errors
+                throw apiError;
+            }
+        }
         
-        utils.displayResult('Network stopped successfully');
         // Update network status
         await getNetworkStatus();
     } catch (error) {
@@ -63,35 +98,76 @@ async function stopNetwork() {
  */
 async function getNetworkStatus() {
     try {
-        const response = await utils.apiRequest('/api/network/status');
+        // Try to get network status from API
+        try {
+            const response = await utils.apiRequest('/api/network/status');
+            
+            const statusDiv = document.getElementById('networkStatus');
+            if (statusDiv) {
+                // Check if response data exists
+                if (response && response.data) {
+                    const status = response.data;
+                    
+                    statusDiv.innerHTML = `
+                        <div class="network-status">
+                            <div class="status-card">
+                                <h4>Node ID</h4>
+                                <p>${status.node_id || 'Not initialized'}</p>
+                            </div>
+                            <div class="status-card">
+                                <h4>Status</h4>
+                                <p>${status.initialized ? 'Initialized' : 'Not initialized'}</p>
+                            </div>
+                            <div class="status-card">
+                                <h4>Connected Nodes</h4>
+                                <p>${status.connected_nodes_count || 0}</p>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    displayNetworkNotAvailable(statusDiv);
+                }
+            }
+            
+            return response ? response.data : null;
+        } catch (apiError) {
+            // Silently handle API endpoint not found errors
+            if (apiError.message && apiError.message.includes('API endpoint not found')) {
+                const statusDiv = document.getElementById('networkStatus');
+                if (statusDiv) {
+                    displayNetworkNotAvailable(statusDiv);
+                }
+                return null;
+            } else {
+                // Re-throw other errors
+                throw apiError;
+            }
+        }
+    } catch (error) {
+        console.warn('Network status not available:', error.message);
         
+        // Display error message in the network status div
         const statusDiv = document.getElementById('networkStatus');
         if (statusDiv) {
-            const status = response.data;
-            
-            statusDiv.innerHTML = `
-                <div class="network-status">
-                    <div class="status-card">
-                        <h4>Node ID</h4>
-                        <p>${status.node_id || 'Not initialized'}</p>
-                    </div>
-                    <div class="status-card">
-                        <h4>Status</h4>
-                        <p>${status.initialized ? 'Initialized' : 'Not initialized'}</p>
-                    </div>
-                    <div class="status-card">
-                        <h4>Connected Nodes</h4>
-                        <p>${status.connected_nodes_count}</p>
-                    </div>
-                </div>
-            `;
+            displayNetworkNotAvailable(statusDiv);
         }
         
-        return response.data;
-    } catch (error) {
-        console.error('Error getting network status:', error);
         return null;
     }
+}
+
+/**
+ * Display a message that network functionality is not available
+ * @param {HTMLElement} element - The element to display the message in
+ */
+function displayNetworkNotAvailable(element) {
+    element.innerHTML = `
+        <div class="network-status">
+            <div class="status-info">
+                <p>Network API not available in this version.</p>
+            </div>
+        </div>
+    `;
 }
 
 /**
@@ -99,12 +175,24 @@ async function getNetworkStatus() {
  */
 async function discoverNodes() {
     try {
-        const response = await utils.apiRequest('/api/network/discover', {
-            method: 'POST'
-        });
-        
-        utils.displayResult(response.data);
-        return response.data;
+        try {
+            const response = await utils.apiRequest('/api/network/discover', {
+                method: 'POST'
+            });
+            
+            utils.displayResult(response.data);
+            return response.data;
+        } catch (apiError) {
+            // Handle API endpoint not found errors
+            if (apiError.message && apiError.message.includes('API endpoint not found')) {
+                utils.displayResult('Network discovery API not available in this version', false);
+                utils.showNotification('Network discovery is not available in this version', 'info');
+            } else {
+                // Re-throw other errors
+                throw apiError;
+            }
+            return null;
+        }
     } catch (error) {
         utils.displayResult(error.message, true);
         return null;
@@ -117,17 +205,29 @@ async function discoverNodes() {
  */
 async function connectToNode(nodeId) {
     try {
-        await utils.apiRequest('/api/network/connect', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                node_id: nodeId
-            })
-        });
+        try {
+            await utils.apiRequest('/api/network/connect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    node_id: nodeId
+                })
+            });
+            
+            utils.displayResult(`Connected to node ${nodeId}`);
+        } catch (apiError) {
+            // Handle API endpoint not found errors
+            if (apiError.message && apiError.message.includes('API endpoint not found')) {
+                utils.displayResult('Network connection API not available in this version', false);
+                utils.showNotification('Network connection is not available in this version', 'info');
+            } else {
+                // Re-throw other errors
+                throw apiError;
+            }
+        }
         
-        utils.displayResult(`Connected to node ${nodeId}`);
         // Update network status
         await getNetworkStatus();
     } catch (error) {
@@ -140,10 +240,22 @@ async function connectToNode(nodeId) {
  */
 async function listNodes() {
     try {
-        const response = await utils.apiRequest('/api/network/nodes');
-        
-        utils.displayResult(response.data);
-        return response.data;
+        try {
+            const response = await utils.apiRequest('/api/network/nodes');
+            
+            utils.displayResult(response.data);
+            return response.data;
+        } catch (apiError) {
+            // Handle API endpoint not found errors
+            if (apiError.message && apiError.message.includes('API endpoint not found')) {
+                utils.displayResult('Network nodes API not available in this version', false);
+                utils.showNotification('Network nodes listing is not available in this version', 'info');
+            } else {
+                // Re-throw other errors
+                throw apiError;
+            }
+            return null;
+        }
     } catch (error) {
         utils.displayResult(error.message, true);
         return null;

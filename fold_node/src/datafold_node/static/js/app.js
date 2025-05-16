@@ -11,16 +11,22 @@ document.addEventListener('DOMContentLoaded', () => {
  * Initialize the application
  */
 function initApp() {
-    // Wait for components to be loaded before setting up event listeners
-    setTimeout(() => {
-        // Set up event listeners
-        setupEventListeners();
-        
-        // Load initial data
-        loadInitialData();
-        
-        console.log('DataFold Node UI initialized');
-    }, 500);
+    // Set up event listeners immediately
+    setupEventListeners();
+    
+    // Use a more reliable method to ensure DOM is fully loaded
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', onDOMLoaded);
+    } else {
+        onDOMLoaded();
+    }
+}
+
+function onDOMLoaded() {
+    // Load initial data
+    loadInitialData();
+    
+    console.log('DataFold Node UI initialized');
 }
 
 /**
@@ -96,6 +102,11 @@ function setupEventListeners() {
 function loadInitialData() {
     // Load schema list
     schemaModule.loadSchemaList();
+    
+    // Load sample data if the samples module exists
+    if (window.samplesModule && window.samplesModule.initSamplesTab) {
+        samplesModule.initSamplesTab();
+    }
     
     // Load network status if the element exists
     if (document.getElementById('networkStatus')) {

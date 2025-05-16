@@ -313,6 +313,7 @@ impl DataFoldNode {
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
         let schema_names = db.schema_manager.list_schemas()?;
+        println!("Schema names from schema_manager: {:?}", schema_names);
         let mut schemas = Vec::new();
         for name in schema_names {
             if let Some(schema) = db.schema_manager.get_schema(&name)? {
