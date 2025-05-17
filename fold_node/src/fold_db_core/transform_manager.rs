@@ -83,8 +83,12 @@ impl TransformManager {
         let transform_json = serde_json::to_vec(&transform)
             .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize transform: {}", e)))?;
         
-        self.transforms_tree.insert(transform_id.as_bytes(), transform_json)?;
-        self.transforms_tree.flush()?;
+        self.transforms_tree
+            .insert(transform_id.as_bytes(), transform_json)
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to store transform: {}", e)))?;
+        self.transforms_tree
+            .flush()
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush transform tree: {}", e)))?;
         
         // Update in-memory cache
         {

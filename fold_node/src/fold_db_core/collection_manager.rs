@@ -30,7 +30,13 @@ impl CollectionManager {
             &mut self.field_manager.atom_manager,
         );
         ctx.validate_field_type(FieldType::Collection)?;
-        ctx.create_and_update_collection_atom(None, content, None, id)
+        ctx.create_and_update_collection_atom(None, content.clone(), None, id.clone())?;
+
+        if let Some(tm) = self.field_manager.get_transform_manager() {
+            tm.execute_field_transforms(&schema.name, field, &content)?;
+        }
+
+        Ok(())
     }
 
     pub fn update_collection_field_value(
@@ -52,7 +58,13 @@ impl CollectionManager {
         let aref_uuid = ctx.get_or_create_atom_ref()?;
         let prev_atom_uuid = ctx.get_prev_collection_atom_uuid(&aref_uuid, &id)?;
 
-        ctx.create_and_update_collection_atom(Some(prev_atom_uuid), content, None, id)
+        ctx.create_and_update_collection_atom(Some(prev_atom_uuid), content.clone(), None, id.clone())?;
+
+        if let Some(tm) = self.field_manager.get_transform_manager() {
+            tm.execute_field_transforms(&schema.name, field, &content)?;
+        }
+
+        Ok(())
     }
 
     pub fn delete_collection_field_value(
@@ -77,8 +89,14 @@ impl CollectionManager {
             Some(prev_atom_uuid),
             Value::Null,
             Some(AtomStatus::Deleted),
-            id,
-        )
+            id.clone(),
+        )?;
+
+        if let Some(tm) = self.field_manager.get_transform_manager() {
+            tm.execute_field_transforms(&schema.name, field, &Value::Null)?;
+        }
+
+        Ok(())
     }
 }
 
