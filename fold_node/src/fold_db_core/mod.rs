@@ -2,11 +2,13 @@ pub mod atom_manager;
 pub mod collection_manager;
 pub mod context;
 pub mod field_manager;
+pub mod transform_manager;
 
+use std::sync::Arc;
 use crate::atom::{Atom, AtomRefBehavior};
 use crate::db_operations::DbOperations;
 use crate::permissions::PermissionWrapper;
-use crate::schema::types::{Mutation, MutationType, Query};
+use crate::schema::types::{Mutation, MutationType, Query, Transform};
 use crate::schema::SchemaCore;
 use crate::schema::{Schema, SchemaError};
 use serde_json;
@@ -23,6 +25,7 @@ pub struct FoldDB {
     pub(crate) field_manager: FieldManager,
     pub(crate) collection_manager: CollectionManager,
     pub(crate) schema_manager: SchemaCore,
+    pub(crate) transform_manager: transform_manager::TransformManager,
     permission_wrapper: PermissionWrapper,
     /// Tree for storing metadata such as node_id
     metadata_tree: sled::Tree,
@@ -77,12 +80,38 @@ impl FoldDB {
 
         let metadata_tree = db.open_tree("metadata")?;
         let permissions_tree = db.open_tree("node_id_schema_permissions")?;
+        let transforms_tree = db.open_tree("transforms")?;
 
         let db_ops = DbOperations::new(db.clone());
         let atom_manager = AtomManager::new(db_ops);
         let field_manager = FieldManager::new(atom_manager.clone());
         let collection_manager = CollectionManager::new(field_manager.clone());
         let schema_manager = SchemaCore::new(path);
+        let atom_manager_clone = atom_manager.clone();
+        let get_atom_fn = Arc::new(move |aref_uuid: &str| {
+            atom_manager_clone.get_latest_atom(aref_uuid)
+        });
+
+        let atom_manager_clone = atom_manager.clone();
+        let create_atom_fn = Arc::new(move |schema_name: &str,
+                                           source_pub_key: String,
+                                           prev_atom_uuid: Option<String>,
+                                           content: Value,
+                                           status: Option<crate::atom::AtomStatus>| {
+            atom_manager_clone.create_atom(schema_name, source_pub_key, prev_atom_uuid, content, status)
+        });
+
+        let atom_manager_clone = atom_manager.clone();
+        let update_atom_ref_fn = Arc::new(move |aref_uuid: &str, atom_uuid: String, source_pub_key: String| {
+            atom_manager_clone.update_atom_ref(aref_uuid, atom_uuid, source_pub_key)
+        });
+
+        let transform_manager = transform_manager::TransformManager::new(
+            transforms_tree,
+            get_atom_fn,
+            create_atom_fn,
+            update_atom_ref_fn,
+        );
         let _ = schema_manager.load_schemas_from_disk();
 
         Ok(Self {
@@ -90,10 +119,22 @@ impl FoldDB {
             field_manager,
             collection_manager,
             schema_manager,
+            transform_manager,
             permission_wrapper: PermissionWrapper::new(),
             metadata_tree,
             permissions_tree,
         })
+    }
+
+    /// Registers a transform with its input and output atom references
+    pub fn register_transform(
+        &mut self,
+        transform_id: String,
+        transform: Transform,
+        input_arefs: Vec<String>,
+        output_aref: String,
+    ) -> Result<(), SchemaError> {
+        self.transform_manager.register_transform(transform_id, transform, input_arefs, output_aref)
     }
 
     pub fn load_schema(&mut self, schema: Schema) -> Result<(), SchemaError> {
@@ -208,6 +249,8 @@ impl FoldDB {
                         value.clone(),
                         mutation.pub_key.clone(),
                     )?;
+                    // Execute transforms after field creation
+                    self.transform_manager.execute_field_transforms(&mutation.schema_name, field_name, value)?;
                 }
                 MutationType::Update => {
                     self.field_manager.update_field(
@@ -216,6 +259,8 @@ impl FoldDB {
                         value.clone(),
                         mutation.pub_key.clone(),
                     )?;
+                    // Execute transforms after field update
+                    self.transform_manager.execute_field_transforms(&mutation.schema_name, field_name, value)?;
                 }
                 MutationType::Delete => {
                     self.field_manager.delete_field(
@@ -223,6 +268,8 @@ impl FoldDB {
                         field_name,
                         mutation.pub_key.clone(),
                     )?;
+                    // Execute transforms after field deletion with null value
+                    self.transform_manager.execute_field_transforms(&mutation.schema_name, field_name, &serde_json::Value::Null)?;
                 }
                 MutationType::AddToCollection(ref id) => {
                     self.collection_manager.add_collection_field_value(
@@ -232,6 +279,8 @@ impl FoldDB {
                         mutation.pub_key.clone(),
                         id.clone(),
                     )?;
+                    // Execute transforms after collection addition
+                    self.transform_manager.execute_field_transforms(&mutation.schema_name, field_name, value)?;
                 }
                 MutationType::UpdateToCollection(ref id) => {
                     self.collection_manager.update_collection_field_value(
@@ -241,6 +290,8 @@ impl FoldDB {
                         mutation.pub_key.clone(),
                         id.clone(),
                     )?;
+                    // Execute transforms after collection update
+                    self.transform_manager.execute_field_transforms(&mutation.schema_name, field_name, value)?;
                 }
                 MutationType::DeleteFromCollection(ref id) => {
                     self.collection_manager.delete_collection_field_value(
@@ -249,6 +300,8 @@ impl FoldDB {
                         mutation.pub_key.clone(),
                         id.clone(),
                     )?;
+                    // Execute transforms after collection deletion with null value
+                    self.transform_manager.execute_field_transforms(&mutation.schema_name, field_name, &serde_json::Value::Null)?;
                 }
             }
         }

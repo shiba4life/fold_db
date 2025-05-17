@@ -2,8 +2,7 @@
 //!
 //! This example focuses on testing the parsing of the logic block in transform declarations.
 
-use fold_node::schema::transform::{TransformParser, Interpreter, Value};
-use std::collections::HashMap;
+use fold_node::transform::TransformParser;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Transform Logic Block Test");

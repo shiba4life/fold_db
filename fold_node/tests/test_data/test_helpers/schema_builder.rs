@@ -4,6 +4,7 @@ use fold_node::testing::{
 };
 use std::collections::HashMap;
 
+#[allow(dead_code)]
 pub fn create_field_with_permissions(
     ref_atom_uuid: String,
     read_distance: u32,
@@ -29,6 +30,7 @@ pub fn create_field_with_permissions(
     .with_ref_atom_uuid(ref_atom_uuid)
 }
 
+#[allow(dead_code)]
 pub fn create_schema_with_fields(name: String, fields: HashMap<String, SchemaField>) -> Schema {
     Schema::new(name)
         .with_fields(fields)

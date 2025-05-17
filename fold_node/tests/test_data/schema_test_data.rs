@@ -5,10 +5,12 @@ use fold_node::testing::{
 use std::collections::HashMap;
 use uuid::Uuid;
 
+#[allow(dead_code)]
 pub fn create_default_payment_config() -> FieldPaymentConfig {
     FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
 }
 
+#[allow(dead_code)]
 pub fn create_test_schema(name: &str) -> Schema {
     let mut schema = Schema::new(name.to_string());
     let field_name = "test_field".to_string();
@@ -24,6 +26,7 @@ pub fn create_test_schema(name: &str) -> Schema {
     schema
 }
 
+#[allow(dead_code)]
 pub fn create_user_profile_schema() -> Schema {
     let mut schema = Schema::new("user_profile".to_string());
 
@@ -72,6 +75,7 @@ pub fn create_user_profile_schema() -> Schema {
     schema
 }
 
+#[allow(dead_code)]
 pub fn create_multi_field_schema() -> Schema {
     let mut schema = Schema::new("test_schema".to_string());
 
