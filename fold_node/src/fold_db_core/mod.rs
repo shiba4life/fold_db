@@ -18,6 +18,7 @@ use uuid::Uuid;
 use self::atom_manager::AtomManager;
 use self::collection_manager::CollectionManager;
 use self::field_manager::FieldManager;
+use self::transform_manager::TransformManager;
 
 /// The main database coordinator that manages schemas, permissions, and data storage.
 pub struct FoldDB {
@@ -25,7 +26,7 @@ pub struct FoldDB {
     pub(crate) field_manager: FieldManager,
     pub(crate) collection_manager: CollectionManager,
     pub(crate) schema_manager: SchemaCore,
-    pub(crate) transform_manager: transform_manager::TransformManager,
+    pub(crate) transform_manager: Arc<TransformManager>,
     permission_wrapper: PermissionWrapper,
     /// Tree for storing metadata such as node_id
     metadata_tree: sled::Tree,
@@ -106,12 +107,14 @@ impl FoldDB {
             atom_manager_clone.update_atom_ref(aref_uuid, atom_uuid, source_pub_key)
         });
 
-        let transform_manager = transform_manager::TransformManager::new(
+        let transform_manager = Arc::new(TransformManager::new(
             transforms_tree,
             get_atom_fn,
             create_atom_fn,
             update_atom_ref_fn,
-        );
+        ));
+
+        field_manager.set_transform_manager(Arc::clone(&transform_manager));
         let _ = schema_manager.load_schemas_from_disk();
 
         Ok(Self {
@@ -249,8 +252,6 @@ impl FoldDB {
                         value.clone(),
                         mutation.pub_key.clone(),
                     )?;
-                    // Execute transforms after field creation
-                    self.transform_manager.execute_field_transforms(&mutation.schema_name, field_name, value)?;
                 }
                 MutationType::Update => {
                     self.field_manager.update_field(
@@ -259,8 +260,6 @@ impl FoldDB {
                         value.clone(),
                         mutation.pub_key.clone(),
                     )?;
-                    // Execute transforms after field update
-                    self.transform_manager.execute_field_transforms(&mutation.schema_name, field_name, value)?;
                 }
                 MutationType::Delete => {
                     self.field_manager.delete_field(
@@ -268,8 +267,6 @@ impl FoldDB {
                         field_name,
                         mutation.pub_key.clone(),
                     )?;
-                    // Execute transforms after field deletion with null value
-                    self.transform_manager.execute_field_transforms(&mutation.schema_name, field_name, &serde_json::Value::Null)?;
                 }
                 MutationType::AddToCollection(ref id) => {
                     self.collection_manager.add_collection_field_value(
@@ -279,8 +276,6 @@ impl FoldDB {
                         mutation.pub_key.clone(),
                         id.clone(),
                     )?;
-                    // Execute transforms after collection addition
-                    self.transform_manager.execute_field_transforms(&mutation.schema_name, field_name, value)?;
                 }
                 MutationType::UpdateToCollection(ref id) => {
                     self.collection_manager.update_collection_field_value(
@@ -290,8 +285,6 @@ impl FoldDB {
                         mutation.pub_key.clone(),
                         id.clone(),
                     )?;
-                    // Execute transforms after collection update
-                    self.transform_manager.execute_field_transforms(&mutation.schema_name, field_name, value)?;
                 }
                 MutationType::DeleteFromCollection(ref id) => {
                     self.collection_manager.delete_collection_field_value(
@@ -300,8 +293,6 @@ impl FoldDB {
                         mutation.pub_key.clone(),
                         id.clone(),
                     )?;
-                    // Execute transforms after collection deletion with null value
-                    self.transform_manager.execute_field_transforms(&mutation.schema_name, field_name, &serde_json::Value::Null)?;
                 }
             }
         }

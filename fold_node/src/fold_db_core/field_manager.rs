@@ -1,18 +1,34 @@
 use super::atom_manager::AtomManager;
 use super::context::AtomContext;
+use super::transform_manager::TransformManager;
 use crate::atom::AtomStatus;
 use crate::schema::types::fields::FieldType;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
 use serde_json::Value;
 
+use std::sync::{Arc, RwLock};
+
 pub struct FieldManager {
     pub(super) atom_manager: AtomManager,
+    transform_manager: Arc<RwLock<Option<Arc<TransformManager>>>>,
 }
 
 impl FieldManager {
     pub fn new(atom_manager: AtomManager) -> Self {
-        Self { atom_manager }
+        Self { 
+            atom_manager,
+            transform_manager: Arc::new(RwLock::new(None)),
+        }
+    }
+
+    pub fn set_transform_manager(&self, manager: Arc<TransformManager>) {
+        let mut guard = self.transform_manager.write().unwrap();
+        *guard = Some(manager);
+    }
+
+    pub fn get_transform_manager(&self) -> Option<Arc<TransformManager>> {
+        self.transform_manager.read().unwrap().clone()
     }
 
     pub fn get_or_create_atom_ref(
@@ -103,7 +119,13 @@ impl FieldManager {
                 .map(|aref| aref.get_atom_uuid().to_string())
         };
 
-        ctx.create_and_update_atom(prev_atom_uuid, content, None)
+        ctx.create_and_update_atom(prev_atom_uuid, content.clone(), None)?;
+
+        if let Some(tm) = self.get_transform_manager() {
+            tm.execute_field_transforms(&schema.name, field, &content)?;
+        }
+
+        Ok(())
     }
 
     pub fn update_field(
@@ -125,7 +147,13 @@ impl FieldManager {
         let aref_uuid = ctx.get_or_create_atom_ref()?;
         let prev_atom_uuid = ctx.get_prev_atom_uuid(&aref_uuid)?;
 
-        ctx.create_and_update_atom(Some(prev_atom_uuid), content, None)
+        ctx.create_and_update_atom(Some(prev_atom_uuid), content.clone(), None)?;
+
+        if let Some(tm) = self.get_transform_manager() {
+            tm.execute_field_transforms(&schema.name, field, &content)?;
+        }
+
+        Ok(())
     }
 
     pub fn delete_field(
@@ -146,7 +174,13 @@ impl FieldManager {
         let aref_uuid = ctx.get_or_create_atom_ref()?;
         let prev_atom_uuid = ctx.get_prev_atom_uuid(&aref_uuid)?;
 
-        ctx.create_and_update_atom(Some(prev_atom_uuid), Value::Null, Some(AtomStatus::Deleted))
+        ctx.create_and_update_atom(Some(prev_atom_uuid), Value::Null, Some(AtomStatus::Deleted))?;
+
+        if let Some(tm) = self.get_transform_manager() {
+            tm.execute_field_transforms(&schema.name, field, &Value::Null)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -154,6 +188,7 @@ impl Clone for FieldManager {
     fn clone(&self) -> Self {
         Self {
             atom_manager: self.atom_manager.clone(),
+            transform_manager: Arc::clone(&self.transform_manager),
         }
     }
 }
