@@ -36,7 +36,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(transform) => {
             println!("Transform parsed successfully!");
             println!("Transform name: {}", transform.name);
-            println!("Output name: {}", transform.output_name);
             println!("Logic statements: {}", transform.logic.len());
             
             for (i, stmt) in transform.logic.iter().enumerate() {

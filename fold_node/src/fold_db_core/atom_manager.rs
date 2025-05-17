@@ -1,16 +1,14 @@
 use crate::atom::{Atom, AtomRef, AtomRefCollection, AtomStatus};
 use crate::db_operations::DbOperations;
-use crate::schema::transform::TransformRegistry;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 
 pub struct AtomManager {
     db_ops: Arc<DbOperations>,
     atoms: Arc<Mutex<HashMap<String, Atom>>>,
     ref_atoms: Arc<Mutex<HashMap<String, AtomRef>>>,
     ref_collections: Arc<Mutex<HashMap<String, AtomRefCollection>>>,
-    transform_registry: RwLock<Option<Arc<TransformRegistry>>>,
 }
 
 impl AtomManager {
@@ -42,7 +40,6 @@ impl AtomManager {
             atoms: Arc::new(Mutex::new(atoms)),
             ref_atoms: Arc::new(Mutex::new(ref_atoms)),
             ref_collections: Arc::new(Mutex::new(ref_collections)),
-            transform_registry: RwLock::new(None),
         }
     }
 
@@ -127,18 +124,6 @@ impl AtomManager {
             .unwrap()
             .insert(aref_uuid.to_string(), aref.clone());
         
-        // Execute any transforms that depend on this atom reference
-        if let Some(registry) = self.transform_registry.read().unwrap().as_ref() {
-            let results = registry.handle_atom_ref_update(aref_uuid);
-            
-            // Log any transform execution errors
-            for result in results {
-                if let Err(e) = result {
-                    eprintln!("Error executing transform: {}", e);
-                }
-            }
-        }
-        
         Ok(aref)
     }
 
@@ -170,20 +155,7 @@ impl AtomManager {
     pub fn get_atoms(&self) -> Arc<Mutex<HashMap<String, Atom>>> {
         Arc::clone(&self.atoms)
     }
-    
-    /// Sets the transform registry for this atom manager.
-    ///
-    /// This method is used to set up the transform registry after the atom manager
-    /// has been created, to avoid circular dependencies.
-    pub fn set_transform_registry(&self, registry: Arc<TransformRegistry>) {
-        let mut transform_registry = self.transform_registry.write().unwrap();
-        *transform_registry = Some(registry);
-    }
-    
-    /// Gets a reference to the transform registry, if one has been set.
-    pub fn get_transform_registry(&self) -> Option<Arc<TransformRegistry>> {
-        self.transform_registry.read().unwrap().clone()
-    }
+
 }
 
 impl Clone for AtomManager {
@@ -193,7 +165,6 @@ impl Clone for AtomManager {
             atoms: Arc::clone(&self.atoms),
             ref_atoms: Arc::clone(&self.ref_atoms),
             ref_collections: Arc::clone(&self.ref_collections),
-            transform_registry: RwLock::new(self.transform_registry.read().unwrap().clone()),
         }
     }
 }

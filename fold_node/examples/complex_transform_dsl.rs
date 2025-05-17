@@ -36,7 +36,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(transform) => {
             println!("Transform parsed successfully!");
             println!("Transform name: {}", transform.name);
-            println!("Output name: {}", transform.output_name);
             println!("Reversible: {}", transform.reversible);
             if let Some(sig) = &transform.signature {
                 println!("Signature: {}", sig);
@@ -92,7 +91,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(transform) => {
             println!("Transform parsed successfully!");
             println!("Transform name: {}", transform.name);
-            println!("Output name: {}", transform.output_name);
             println!("Logic statements: {}", transform.logic.len());
             
             // Create input object for evaluation

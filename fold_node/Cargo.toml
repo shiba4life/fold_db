@@ -69,3 +69,15 @@ path = "src/bin/datafold_http_server.rs"
 [[example]]
 name = "auto_transform_demo"
 path = "examples/auto_transform_demo.rs"
+
+[[example]]
+name = "transform_dsl_samples"
+path = "examples/transform_dsl_samples.rs"
+
+[[example]]
+name = "transform_logic_test"
+path = "examples/transform_logic_test.rs"
+
+[[example]]
+name = "complex_transform_dsl"
+path = "examples/complex_transform_dsl.rs"

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use crate::schema::transform::ast::TransformDeclaration;
+use crate::transform::ast::TransformDeclaration;
 
 /// Represents a transformation that can be applied to field values.
 ///
@@ -35,10 +35,6 @@ pub struct Transform {
     #[serde(default)]
     pub name: String,
     
-    /// The output name (e.g., "risk_score")
-    #[serde(default)]
-    pub output_name: Option<String>,
-    
     /// The transform logic expressed in the DSL
     pub logic: String,
     
@@ -61,7 +57,7 @@ pub struct Transform {
     
     /// The parsed expression (not serialized)
     #[serde(skip)]
-    pub parsed_expr: Option<crate::schema::transform::ast::Expression>,
+    pub parsed_expr: Option<crate::transform::ast::Expression>,
     
     /// The parsed transform declaration (not serialized)
     #[serde(skip)]
@@ -90,7 +86,6 @@ impl Transform {
     ) -> Self {
         Self {
             name: String::new(),
-            output_name: None,
             logic,
             reversible,
             signature,
@@ -118,14 +113,13 @@ impl Transform {
     #[must_use]
     pub fn new_with_expr(
         logic: String,
-        parsed_expr: crate::schema::transform::ast::Expression,
+        parsed_expr: crate::transform::ast::Expression,
         reversible: bool,
         signature: Option<String>,
         payment_required: bool,
     ) -> Self {
         Self {
             name: String::new(),
-            output_name: None,
             logic,
             reversible,
             signature,
@@ -162,7 +156,6 @@ impl Transform {
     ) -> Self {
         Self {
             name: String::new(),
-            output_name: None,
             logic,
             reversible,
             signature,
@@ -219,20 +212,30 @@ impl Transform {
     ///
     /// A set of potential input dependencies
     pub fn analyze_dependencies(&self) -> HashSet<String> {
-        // This is a very simple implementation that just looks for words in the logic
-        // A real implementation would parse the logic and extract actual variable references
         let mut dependencies = HashSet::new();
         
-        // Split the logic by non-alphanumeric characters
-        for word in self.logic.split(|c: char| !c.is_alphanumeric()) {
-            if !word.is_empty() && !word.chars().next().unwrap().is_numeric() {
-                // Skip keywords and operators
-                match word {
-                    "let" | "if" | "else" | "return" | "true" | "false" | "null" => continue,
-                    _ => {}
+        // Split by dots to handle schema.field format
+        for part in self.logic.split(|c: char| !c.is_alphanumeric() && c != '.') {
+            if part.is_empty() || part.chars().next().unwrap().is_numeric() {
+                continue;
+            }
+            
+            // Skip keywords and operators
+            match part {
+                "let" | "if" | "else" | "return" | "true" | "false" | "null" => continue,
+                _ => {}
+            }
+            
+            // If it contains a dot, it's a schema.field reference
+            if part.contains('.') {
+                let parts: Vec<&str> = part.split('.').collect();
+                if parts.len() == 2 {
+                    // Add just the field name, not the schema prefix
+                    dependencies.insert(parts[1].to_string());
                 }
-                
-                dependencies.insert(word.to_string());
+            } else {
+                // For backward compatibility, add the whole part if it's not a schema.field
+                dependencies.insert(part.to_string());
             }
         }
         
@@ -260,7 +263,6 @@ impl Transform {
         
         Self {
             name: declaration.name.clone(),
-            output_name: Some(declaration.output_name.clone()),
             logic,
             reversible: declaration.reversible,
             signature: declaration.signature.clone(),
@@ -281,26 +283,16 @@ impl Transform {
         &self.name
     }
     
-    /// Gets the output name of the transform.
-    ///
-    /// # Returns
-    ///
-    /// The output name of the transform, if any
-    pub fn get_output_name(&self) -> Option<&str> {
-        self.output_name.as_deref()
-    }
-    
 }
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::transform::ast::{Expression, Value, Operator, TransformDeclaration};
+    use crate::transform::ast::{Expression, Operator, TransformDeclaration};
 
     #[test]
     fn test_transform_from_declaration() {
         let declaration = TransformDeclaration {
             name: "test_transform".to_string(),
-            output_name: "output".to_string(),
             logic: vec![
                 Expression::Return(Box::new(Expression::BinaryOp {
                     left: Box::new(Expression::Variable("field1".to_string())),
@@ -315,7 +307,6 @@ mod tests {
         let transform = Transform::from_declaration(declaration);
 
         assert_eq!(transform.name, "test_transform");
-        assert_eq!(transform.output_name, Some("output".to_string()));
         assert_eq!(transform.logic, "return (field1 + field2)"); // Removed trailing semicolon
         assert_eq!(transform.reversible, false);
         assert!(transform.signature.is_none());

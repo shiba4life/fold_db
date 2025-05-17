@@ -92,7 +92,6 @@ impl From<JsonTransform> for Transform {
     fn from(json: JsonTransform) -> Self {
         Self {
             name: String::new(),
-            output_name: None,
             logic: json.logic,
             reversible: json.reversible,
             signature: json.signature,

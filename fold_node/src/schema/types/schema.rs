@@ -277,7 +277,7 @@ mod tests {
                     \"ref_atom_uuid\": null,
                     \"field_type\": \"Single\",
                     \"field_mappers\": {},
-                    \"transform\": \"transform temp_calc { output: Placeholder<Any> as \\\"val\\\" logic: { return 1; } }\"
+                    \"transform\": \"transform temp_calc { logic: { return 1; } }\"
                 }
             },
             \"payment_config\": {

@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::fees::types::config::FieldPaymentConfig;
 use crate::permissions::types::policy::PermissionsPolicy;
 use crate::schema::types::Transform;
-use crate::schema::transform::parser::TransformParser; // Import TransformParser
+use crate::transform::parser::TransformParser; // Import TransformParser
 
 #[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq)] // Explicitly use serde::Deserialize
 #[serde(rename_all = "PascalCase")]
@@ -237,7 +237,7 @@ impl SchemaField {
 mod tests {
     use super::*;
     use crate::fees::types::TrustDistanceScaling;
-    use crate::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+    use crate::permissions::types::policy::PermissionsPolicy;
     use serde_json;
 
     fn create_default_payment_config() -> FieldPaymentConfig {
@@ -334,7 +334,7 @@ mod tests {
             "ref_atom_uuid": "some-uuid",
             "field_type": "Single",
             "field_mappers": {},
-            "transform": "transform temp { output: Placeholder<Any> as \"out\" logic: { return field1 * 2; } }"
+            "transform": "transform temp { logic: { return field1 * 2; } }"
         }"#;
 
         let field: SchemaField = serde_json::from_str(json_input).unwrap();

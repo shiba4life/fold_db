@@ -192,7 +192,6 @@ fn test_transform(id: usize, name: &str, transform_str: &str, parser: &Transform
         Ok(transform) => {
             eprintln!("Parsed successfully!");
             eprintln!("Transform name: {}", transform.name);
-            eprintln!("Output name: {}", transform.output_name);
             eprintln!("Reversible: {}", transform.reversible);
             if let Some(sig) = transform.signature {
                 eprintln!("Signature: {}", sig);

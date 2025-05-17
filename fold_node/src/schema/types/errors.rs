@@ -27,3 +27,9 @@ impl fmt::Display for SchemaError {
 }
 
 impl std::error::Error for SchemaError {}
+
+impl From<sled::Error> for SchemaError {
+    fn from(error: sled::Error) -> Self {
+        SchemaError::InvalidData(format!("Database error: {}", error))
+    }
+}

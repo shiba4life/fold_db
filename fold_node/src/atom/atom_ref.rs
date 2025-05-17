@@ -260,4 +260,5 @@ mod tests {
         // Test behavior trait
         assert!(collection.updated_at() > Utc::now() - chrono::Duration::seconds(1));
     }
+
 }

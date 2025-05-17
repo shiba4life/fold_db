@@ -189,11 +189,30 @@ impl Interpreter {
             },
             
             Expression::FieldAccess { object, field } => {
-                let obj = self.evaluate(object)?;
+                // Handle schema.field references
+                if let Expression::Variable(schema_name) = &**object {
+                    // Look up schema.field in variables
+                    let key = format!("{}.{}", schema_name, field);
+                    if let Some(value) = self.variables.get(&key) {
+                        return Ok(value.clone());
+                    }
+                    
+                    // Check if the schema name is a variable containing an object
+                    if let Some(Value::Object(map)) = self.variables.get(schema_name) {
+                        if let Some(value) = map.get(field) {
+                            return Ok(Value::from(value.clone()));
+                        }
+                    }
+                    
+                    // Fall back to looking up just the field name
+                    return self.variables.get(field).cloned()
+                        .ok_or_else(|| SchemaError::InvalidField(format!("Field not found: {}", field)));
+                }
                 
+                // Handle regular object field access
+                let obj = self.evaluate(object)?;
                 match obj {
                     Value::Object(map) => {
-                        // Look for the field in the map by string key
                         if let Some(value) = map.get(field) {
                             Ok(Value::from(value.clone()))
                         } else {

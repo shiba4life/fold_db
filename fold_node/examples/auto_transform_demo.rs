@@ -31,7 +31,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(transform) => {
             eprintln!("Transform parsed successfully!");
             eprintln!("Name: {}", transform.name);
-            eprintln!("Output name: {}", transform.output_name);
             
             // Create test input
             let mut variables = HashMap::new();

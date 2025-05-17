@@ -251,9 +251,6 @@ pub struct TransformDeclaration {
     /// The name of the transform
     pub name: String,
     
-    /// The output name (e.g., "risk_score")
-    pub output_name: String,
-    
     /// Whether the transform is reversible
     pub reversible: bool,
     
@@ -267,8 +264,6 @@ pub struct TransformDeclaration {
 impl fmt::Display for TransformDeclaration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "transform {} {{", self.name)?;
-        writeln!(f, "  output as \"{}\"", self.output_name)?;
-        
         writeln!(f, "  reversible: {}", self.reversible)?;
         
         if let Some(sig) = &self.signature {

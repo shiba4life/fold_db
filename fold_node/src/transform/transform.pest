@@ -66,13 +66,7 @@ if_stmt = { "if" ~ expr ~ "{" ~ stmt* ~ "}" ~ ("else" ~ "if" ~ expr ~ "{" ~ stmt
 // Block of statements
 stmt_block = { stmt* }
 
-// Type expression (e.g., Fold<PatientVitals>)
-type_expr = { identifier ~ "<" ~ identifier ~ ">" }
-
-
 // Transform declaration components
-input_decl = { "input" ~ ":" ~ type_expr }
-output_decl = { "output" ~ ":" ~ type_expr ~ "as" ~ string }
 reversible_decl = { "reversible" ~ ":" ~ boolean }
 signature_decl = { "signature" ~ ":" ~ (string | function_call) }
 // Logic declaration
@@ -81,8 +75,6 @@ logic_decl = { "logic" ~ ":" ~ "{" ~ stmt* ~ "}" }
 // Transform declaration
 transform_decl = {
     "transform" ~ identifier ~ "{" ~
-    input_decl? ~
-    output_decl ~
     reversible_decl? ~
     signature_decl? ~
     logic_decl ~

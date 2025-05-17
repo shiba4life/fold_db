@@ -14,7 +14,7 @@ use pest_derive::Parser;
 
 /// Parser for the transform DSL.
 #[derive(Parser)]
-#[grammar = "src/schema/transform/transform.pest"]
+#[grammar = "transform/transform.pest"]
 pub struct TransformParser;
 
 impl TransformParser {
@@ -502,8 +502,6 @@ impl TransformParser {
                 // Get the transform name
                 let name = pairs.next().unwrap().as_str().to_string();
                 
-                // Initialize optional fields with default values
-                let mut output_name = None;
                 let mut reversible = false;
                 let mut signature = None;
                 let mut logic = Vec::new();
@@ -511,14 +509,6 @@ impl TransformParser {
                 // Parse the transform components
                 for pair in pairs {
                     match pair.as_rule() {
-                        Rule::input_decl => {
-                            // Input type is no longer stored, but we still need to parse it for validation
-                            self.parse_input_decl(pair)?;
-                        },
-                        Rule::output_decl => {
-                            let (_, out_name) = self.parse_output_decl(pair)?;
-                            output_name = Some(out_name);
-                        },
                         Rule::reversible_decl => {
                             reversible = self.parse_reversible_decl(pair)?;
                         },
@@ -532,13 +522,9 @@ impl TransformParser {
                     }
                 }
                 
-                // Validate required fields
-                let output_name = output_name.ok_or_else(|| SchemaError::InvalidField("Missing output name".to_string()))?;
-                
                 // Create the transform declaration
                 Ok(TransformDeclaration {
                     name,
-                    output_name,
                     reversible,
                     signature,
                     logic,
@@ -546,33 +532,6 @@ impl TransformParser {
             },
             _ => Err(SchemaError::InvalidField(format!("Unexpected rule: {:?}", pair.as_rule()))),
         }
-    }
-    
-    /// Parses an input declaration.
-    fn parse_input_decl(&self, pair: Pair<Rule>) -> Result<(), SchemaError> {
-        let mut pairs = pair.into_inner();
-        
-        // Get the type expression
-        let type_expr_pair = pairs.next().unwrap();
-        // We still parse the type expression for validation, but we don't return it
-        self.parse_type_expr(type_expr_pair)?;
-        Ok(())
-    }
-    
-    /// Parses an output declaration.
-    fn parse_output_decl(&self, pair: Pair<Rule>) -> Result<((), String), SchemaError> {
-        let mut pairs = pair.into_inner();
-        
-        // Get the type expression
-        let type_expr_pair = pairs.next().unwrap();
-        // We still parse the output type expression for validation, but we don't return it
-        self.parse_output_type_expr(type_expr_pair)?;
-        
-        // Get the output name
-        let name_pair = pairs.next().unwrap();
-        let name = self.parse_string_literal(name_pair)?;
-        
-        Ok(((), name))
     }
     
     /// Parses a reversible declaration.
@@ -650,46 +609,7 @@ impl TransformParser {
         }
         
         Ok(exprs)
-    }
-    
-    /// Parses a type expression (e.g., Fold<PatientVitals>).
-    fn parse_type_expr(&self, pair: Pair<Rule>) -> Result<(), SchemaError> {
-        let mut pairs = pair.into_inner();
-        
-        // Get the base type and generic parameter
-        let _base_type = pairs.next().unwrap().as_str().to_string();
-        let _generic_param = pairs.next().unwrap().as_str().to_string();
-        
-        // We no longer create an InputType, just validate the syntax
-        Ok(())
-    }
-    
-    /// Parses an output type expression (e.g., Field<Float>).
-    fn parse_output_type_expr(&self, pair: Pair<Rule>) -> Result<(), SchemaError> {
-        let mut pairs = pair.into_inner();
-        
-        // Get the base type and generic parameter
-        let _base_type = pairs.next().unwrap().as_str().to_string();
-        let _generic_param = pairs.next().unwrap().as_str().to_string();
-
-        // We no longer create an OutputType, just validate the syntax
-        Ok(())
-    }
-    
-    
-    /// Parses a comparison operator.
-    #[allow(dead_code)]
-    fn parse_comp_op(&self, pair: Pair<Rule>) -> Result<Operator, SchemaError> {
-        match pair.as_str() {
-            "==" => Ok(Operator::Equal),
-            "!=" => Ok(Operator::NotEqual),
-            "<" => Ok(Operator::LessThan),
-            "<=" => Ok(Operator::LessThanOrEqual),
-            ">" => Ok(Operator::GreaterThan),
-            ">=" => Ok(Operator::GreaterThanOrEqual),
-            _ => Err(SchemaError::InvalidField(format!("Unknown comparison operator: {}", pair.as_str()))),
-        }
-    }
+    }    
     
     /// Parses a string literal.
     fn parse_string_literal(&self, pair: Pair<Rule>) -> Result<String, SchemaError> {
@@ -711,7 +631,6 @@ mod tests {
     use super::TransformParser;
     use super::Expression;
     use super::Operator;
-    use super::TransformDeclaration;
     use super::UnaryOperator;
     use super::Value;
     
@@ -895,8 +814,6 @@ mod tests {
         
         let transform_code = r#"
         transform my_transform {
-          input: Placeholder<Any>
-          output: Placeholder<Any> as "result"
           logic: {
             return field1 + field2;
           }

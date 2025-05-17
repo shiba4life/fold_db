@@ -135,7 +135,15 @@ impl TransformExecutor {
         let mut variables = HashMap::new();
         
         for (name, value) in input_values {
-            variables.insert(name, Value::from(value));
+            // Handle both schema.field format and regular field names
+            variables.insert(name.clone(), Value::from(value.clone()));
+            
+            // If the name contains a dot, it's in schema.field format
+            if let Some((schema, field)) = name.split_once('.') {
+                // Add both schema.field and field entries
+                variables.insert(format!("{}.{}", schema, field), Value::from(value.clone()));
+                variables.insert(field.to_string(), Value::from(value));
+            }
         }
         
         variables
