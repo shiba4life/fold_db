@@ -3,7 +3,7 @@
 //! This example demonstrates a more complex transform DSL with multiple expressions,
 //! including let statements and return statements.
 
-use fold_node::schema::transform::{TransformParser, Interpreter, Value};
+use fold_node::transform::{TransformParser, Interpreter, Value};
 use std::collections::HashMap;
 use serde_json::json;
 
@@ -18,8 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Complex transform with multiple expressions
     let complex_transform = r#"
     transform calculate_bmi {
-      input: Fold<PatientVitals>
-      output: Field<Float> as "bmi"
+      output: "bmi"
       reversible: false
       signature: sha256sum("v1.0.0")
       
@@ -72,8 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Risk score transform with more complex logic
     let risk_score_transform = r#"
     transform calculate_risk_score {
-      input: Fold<PatientData>
-      output: Field<Float> as "risk_score"
+      output: "risk_score"
       reversible: false
       signature: sha256sum("v1.0.1")
       

@@ -2,7 +2,7 @@
 //!
 //! This example demonstrates various transform DSL samples and parses them.
 
-use fold_node::schema::transform::{TransformParser, Interpreter, Value};
+use fold_node::transform::{TransformParser, Interpreter, Value};
 use std::collections::HashMap;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -32,8 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Sample 5: Simple transform declaration
     let sample5 = r#"
     transform simple_transform {
-      input: Fold<PatientVitals>
-      output: Field<Float> as "result"
+      output: "result"
       reversible: false
       
       logic: {
@@ -46,8 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Sample 6: Another simple transform
     let sample6 = r#"
     transform add_values {
-      input: Fold<Values>
-      output: Field<Float> as "sum"
+      output: "sum"
       reversible: false
       
       logic: {
@@ -61,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("\nExamining logic block parsing:");
     match parser.parse_transform(r#"
     transform test {
-      output: Field<Float> as "test"
+      output: "test"
       logic: { input.value * 2; }
     }
     "#) {
@@ -84,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Now let's see if we can create a transform with this expression
             let transform_str = format!(r#"
             transform expr_test {{
-              output: Field<Float> as "test"
+              output: "test"
               logic: {{ {}; }}
             }}
             "#, expr_str);

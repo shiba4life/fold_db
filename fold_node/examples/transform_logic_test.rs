@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Test transform with simple logic
     let transform_str = r#"
     transform simple_transform {
-      output: Field<Float> as "result"
+      output: "result"
       logic: { input.value * 2; }
     }
     "#;
@@ -54,7 +54,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a minimal transform to test
     let minimal_transform = format!(r#"
     transform test {{
-      output: Field<Float> as "test"
+      output: "test"
       logic: {}
     }}
     "#, logic_block);
