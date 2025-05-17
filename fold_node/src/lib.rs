@@ -34,6 +34,7 @@ pub mod fold_db_core;
 pub mod network;
 pub mod permissions;
 pub mod schema;
+pub mod transform;
 pub mod testing;
 
 // Re-export main types for convenience
@@ -48,3 +49,4 @@ pub use network::{NetworkConfig, NetworkCore, NetworkError, NetworkResult, PeerI
 pub use schema::types::operation::Operation;
 pub use schema::types::operations::MutationType;
 pub use schema::Schema;
+// Test comment
