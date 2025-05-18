@@ -106,10 +106,7 @@ impl AppLogger {
             return;
         }
 
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let timestamp = Self::current_timestamp();
 
         let entry = SecurityLogEntry {
             timestamp,
@@ -152,10 +149,7 @@ impl AppLogger {
             return;
         }
 
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let timestamp = Self::current_timestamp();
 
         let entry = OperationLogEntry {
             timestamp,
@@ -190,10 +184,7 @@ impl AppLogger {
             return;
         }
 
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let timestamp = Self::current_timestamp();
 
         let entry = json!({
             "timestamp": timestamp,
@@ -204,6 +195,13 @@ impl AppLogger {
 
         // Print to console
         println!("DEBUG: {}", entry);
+    }
+
+    fn current_timestamp() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
     }
 
     fn write_to_log(&self, log_path: &str, message: &str) {
