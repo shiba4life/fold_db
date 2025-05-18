@@ -8,7 +8,7 @@ use fold_db::datafold_node::config::NodeConfig;
 use fold_db::datafold_node::app_server::AppServer;
 use fold_db::datafold_node::app_server::errors::{AppError, AppErrorType, AppErrorResponse};
 use fold_db::datafold_node::app_server::logging::{AppLogger, LogLevel};
-use fold_db::datafold_node::app_server::middleware::signature;
+use fold_db::datafold_node::app_server::middleware::verify_signature;
 
 // Helper function to create a test node
 fn create_test_node() -> Arc<Mutex<DataFoldNode>> {
@@ -45,7 +45,7 @@ async fn test_app_server_creation() {
 async fn test_signature_verification() {
     // Test the placeholder signature verification
     // This will be replaced with actual verification later
-    let result = signature::verify_signature("test-signature", "test-public-key", "test-message");
+    let result = verify_signature("test-signature", "test-public-key", "test-message");
     
     // Currently it should always return true
     assert!(result);
