@@ -39,46 +39,21 @@ impl AppServer {
         // Apply CORS
         let routes = api.with(create_cors());
 
-        // Try ports in sequence until we find one that works
-        let mut current_port = port;
-        let max_port = port + 10; // Try up to 10 ports
-        
-        while current_port <= max_port {
-            let socket_addr = std::net::SocketAddr::from((std::net::Ipv4Addr::new(127, 0, 0, 1), current_port));
-            println!("Attempting to start App server on port {}", current_port);
-            
-            // Try to bind to the port using a standard TcpListener first
-            match std::net::TcpListener::bind(socket_addr) {
-                Ok(listener) => {
-                    // Port is available, close the test listener
-                    drop(listener);
-                    
-                    println!("Successfully bound to port {}", current_port);
-                    println!("App server running at http://127.0.0.1:{}", current_port);
-                    
-                    // Start the warp server
-                    warp::serve(routes.clone())
-                        .run(socket_addr)
-                        .await;
-                    
-                    println!("App server stopped");
-                    return Ok(());
-                },
-                Err(e) => {
-                    if e.kind() == std::io::ErrorKind::AddrInUse {
-                        println!("Port {} is already in use, trying next port...", current_port);
-                        current_port += 1;
-                    } else {
-                        return Err(Box::new(e));
-                    }
-                }
-            }
-        }
-        
-        Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::AddrInUse,
-            format!("Could not find an available port in range {}-{}", port, max_port)
-        )))
+        // Determine the port to use. If `port` is 0 let the OS decide,
+        // otherwise try to find an available port within a small range.
+        let chosen_port = if port == 0 {
+            0
+        } else {
+            find_available_port(port, 10)?
+        };
+
+        let socket_addr = std::net::SocketAddr::from((std::net::Ipv4Addr::new(127, 0, 0, 1), chosen_port));
+        let (addr, server) = warp::serve(routes).bind_ephemeral(socket_addr);
+
+        println!("App server running at http://{}", addr);
+        server.await;
+        println!("App server stopped");
+        Ok(())
     }
 
     fn create_api_routes(
@@ -110,4 +85,24 @@ impl AppServer {
         // Combine all routes
         status.or(execute)
     }
+}
+
+fn find_available_port(start_port: u16, attempts: u16) -> Result<u16, std::io::Error> {
+    for offset in 0..=attempts {
+        let port = start_port + offset;
+        let addr = std::net::SocketAddr::from((std::net::Ipv4Addr::new(127, 0, 0, 1), port));
+        match std::net::TcpListener::bind(addr) {
+            Ok(listener) => {
+                drop(listener);
+                return Ok(port);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => continue,
+            Err(e) => return Err(e),
+        }
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AddrInUse,
+        format!("Could not find an available port in range {}-{}", start_port, start_port + attempts),
+    ))
 }
