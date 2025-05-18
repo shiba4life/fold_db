@@ -65,6 +65,42 @@ target/release/datafold_node \
 
 Once running, use the CLI or HTTP/TCP clients to interact.
 
+### Running the HTTP Server and Web UI
+
+Build the HTTP server binary and start it on your machine:
+
+```bash
+cargo build --release --bin datafold_http_server
+NODE_CONFIG=config/node_config.json \
+  target/release/datafold_http_server --port 9001
+```
+
+The server hosts a web UI at `http://localhost:9001`. Open this URL in your browser to
+interact with DataFold without using the CLI.
+
+### Loading Sample Data
+
+The UI includes a **Samples** tab with one‑click loading for schemas,
+queries, and mutations. Use this tab to quickly populate your node with
+the bundled examples or to preview them before loading.
+
+Sample JSON files live under
+`fold_node/src/datafold_node/samples/data/`. Add your own files to this
+directory to make them available in the Samples tab.
+
+### Network Features
+
+The **Network** tab exposes new peer‑to‑peer features:
+
+- Initialize the networking layer with custom settings
+- Start or stop networking services
+- View current status and connected nodes
+- Discover peers on the local network
+- Connect directly to a node by ID
+
+These operations map to the `/api/network/*` endpoints served by
+`datafold_http_server`.
+
 ## Running Tests
 
 Run all unit and integration tests across the workspace:
