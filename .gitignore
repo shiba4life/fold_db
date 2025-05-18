@@ -86,6 +86,7 @@ rust-project.json
 
 # Coverage reports
 coverage/
+target/llvm-cov/
 *.profraw
 *.profdata
 vendor/
