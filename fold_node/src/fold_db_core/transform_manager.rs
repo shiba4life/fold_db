@@ -1,6 +1,7 @@
 use crate::atom::{Atom, AtomRef};
 use crate::schema::types::{Transform, SchemaError};
 use crate::transform::TransformExecutor;
+use super::transform_orchestrator::TransformRunner;
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
@@ -282,6 +283,12 @@ impl TransformManager {
         self.execute_transform(transform_id)
     }
 
+    /// Returns true if a transform with the given id is registered.
+    pub fn transform_exists(&self, transform_id: &str) -> bool {
+        let registered_transforms = self.registered_transforms.read().unwrap();
+        registered_transforms.contains_key(transform_id)
+    }
+
     /// Gets all transforms that depend on the specified atom reference.
     pub fn get_dependent_transforms(&self, aref_uuid: &str) -> HashSet<String> {
         let aref_to_transforms = self.aref_to_transforms.read().unwrap();
@@ -307,7 +314,7 @@ impl TransformManager {
     }
 
     /// Execute transforms for a specific schema field
-    pub fn execute_field_transforms(
+pub fn execute_field_transforms(
         &self,
         schema_name: &str,
         field_name: &str,
@@ -327,5 +334,15 @@ impl TransformManager {
         }
 
         Ok(())
+    }
+}
+
+impl TransformRunner for TransformManager {
+    fn execute_transform_now(&self, transform_id: &str) -> Result<JsonValue, SchemaError> {
+        TransformManager::execute_transform_now(self, transform_id)
+    }
+
+    fn transform_exists(&self, transform_id: &str) -> bool {
+        TransformManager::transform_exists(self, transform_id)
     }
 }

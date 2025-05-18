@@ -8,17 +8,20 @@ use crate::schema::SchemaError;
 use serde_json::Value;
 
 use std::sync::{Arc, RwLock};
+use super::transform_orchestrator::TransformOrchestrator;
 
 pub struct FieldManager {
     pub(super) atom_manager: AtomManager,
     transform_manager: Arc<RwLock<Option<Arc<TransformManager>>>>,
+    orchestrator: Arc<RwLock<Option<Arc<TransformOrchestrator>>>>,
 }
 
 impl FieldManager {
     pub fn new(atom_manager: AtomManager) -> Self {
-        Self { 
+        Self {
             atom_manager,
             transform_manager: Arc::new(RwLock::new(None)),
+            orchestrator: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -29,6 +32,15 @@ impl FieldManager {
 
     pub fn get_transform_manager(&self) -> Option<Arc<TransformManager>> {
         self.transform_manager.read().unwrap().clone()
+    }
+
+    pub fn set_orchestrator(&self, orchestrator: Arc<TransformOrchestrator>) {
+        let mut guard = self.orchestrator.write().unwrap();
+        *guard = Some(orchestrator);
+    }
+
+    pub fn get_orchestrator(&self) -> Option<Arc<TransformOrchestrator>> {
+        self.orchestrator.read().unwrap().clone()
     }
 
     pub fn get_or_create_atom_ref(
@@ -121,8 +133,8 @@ impl FieldManager {
 
         ctx.create_and_update_atom(prev_atom_uuid, content.clone(), None)?;
 
-        if let Some(tm) = self.get_transform_manager() {
-            tm.execute_field_transforms(&schema.name, field, &content)?;
+        if let Some(orc) = self.get_orchestrator() {
+            orc.add_task(&schema.name, field);
         }
 
         Ok(())
@@ -149,8 +161,8 @@ impl FieldManager {
 
         ctx.create_and_update_atom(Some(prev_atom_uuid), content.clone(), None)?;
 
-        if let Some(tm) = self.get_transform_manager() {
-            tm.execute_field_transforms(&schema.name, field, &content)?;
+        if let Some(orc) = self.get_orchestrator() {
+            orc.add_task(&schema.name, field);
         }
 
         Ok(())
@@ -176,8 +188,8 @@ impl FieldManager {
 
         ctx.create_and_update_atom(Some(prev_atom_uuid), Value::Null, Some(AtomStatus::Deleted))?;
 
-        if let Some(tm) = self.get_transform_manager() {
-            tm.execute_field_transforms(&schema.name, field, &Value::Null)?;
+        if let Some(orc) = self.get_orchestrator() {
+            orc.add_task(&schema.name, field);
         }
 
         Ok(())
@@ -189,6 +201,7 @@ impl Clone for FieldManager {
         Self {
             atom_manager: self.atom_manager.clone(),
             transform_manager: Arc::clone(&self.transform_manager),
+            orchestrator: Arc::clone(&self.orchestrator),
         }
     }
 }

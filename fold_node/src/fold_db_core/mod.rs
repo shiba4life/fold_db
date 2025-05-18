@@ -3,6 +3,7 @@ pub mod collection_manager;
 pub mod context;
 pub mod field_manager;
 pub mod transform_manager;
+pub mod transform_orchestrator;
 
 use std::sync::Arc;
 use crate::atom::{Atom, AtomRefBehavior};
@@ -20,6 +21,7 @@ use self::atom_manager::AtomManager;
 use self::collection_manager::CollectionManager;
 use self::field_manager::FieldManager;
 use self::transform_manager::TransformManager;
+use self::transform_orchestrator::TransformOrchestrator;
 
 /// The main database coordinator that manages schemas, permissions, and data storage.
 pub struct FoldDB {
@@ -28,6 +30,7 @@ pub struct FoldDB {
     pub(crate) collection_manager: CollectionManager,
     pub(crate) schema_manager: SchemaCore,
     pub(crate) transform_manager: Arc<TransformManager>,
+    pub(crate) transform_orchestrator: Arc<TransformOrchestrator>,
     permission_wrapper: PermissionWrapper,
     /// Tree for storing metadata such as node_id
     metadata_tree: sled::Tree,
@@ -116,6 +119,8 @@ impl FoldDB {
         ));
 
         field_manager.set_transform_manager(Arc::clone(&transform_manager));
+        let orchestrator = Arc::new(TransformOrchestrator::new(transform_manager.clone()));
+        field_manager.set_orchestrator(Arc::clone(&orchestrator));
         let _ = schema_manager.load_schemas_from_disk();
 
         Ok(Self {
@@ -124,6 +129,7 @@ impl FoldDB {
             collection_manager,
             schema_manager,
             transform_manager,
+            transform_orchestrator: orchestrator,
             permission_wrapper: PermissionWrapper::new(),
             metadata_tree,
             permissions_tree,
