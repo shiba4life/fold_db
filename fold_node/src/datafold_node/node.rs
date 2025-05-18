@@ -1,4 +1,5 @@
 use serde_json::Value;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -66,6 +67,14 @@ pub struct DataFoldNode {
     node_id: String,
     /// Network layer for P2P communication
     network: Option<Arc<tokio::sync::Mutex<NetworkCore>>>,
+}
+
+/// Basic status information about the network layer
+#[derive(Debug, Clone, Serialize)]
+pub struct NetworkStatus {
+    pub node_id: String,
+    pub initialized: bool,
+    pub connected_nodes_count: usize,
 }
 
 impl DataFoldNode {
@@ -683,6 +692,27 @@ impl DataFoldNode {
                 "Network not initialized".to_string(),
             )))
         }
+    }
+
+    /// Simple method to connect to another node
+    pub async fn connect_to_node(&mut self, node_id: &str) -> FoldDbResult<()> {
+        self.add_trusted_node(node_id)
+    }
+
+    /// Retrieve basic network status information
+    pub async fn get_network_status(&self) -> FoldDbResult<NetworkStatus> {
+        let initialized = self.network.is_some();
+        let connected_nodes_count = if let Some(network) = &self.network {
+            let guard = network.lock().await;
+            guard.known_peers().len()
+        } else {
+            0
+        };
+        Ok(NetworkStatus {
+            node_id: self.node_id.clone(),
+            initialized,
+            connected_nodes_count,
+        })
     }
 
     /// Gets the unique identifier for this node.

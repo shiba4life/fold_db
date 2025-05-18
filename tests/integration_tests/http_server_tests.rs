@@ -102,3 +102,74 @@ async fn test_sample_endpoints() {
     handle.abort();
 }
 
+#[tokio::test]
+async fn test_network_endpoints() {
+    let (handle, addr, _tmp) = start_server().await;
+    let client = Client::new();
+
+    let config = serde_json::json!({
+        "listen_address": "/ip4/127.0.0.1/tcp/0",
+        "discovery_port": 0,
+        "max_connections": 5,
+        "connection_timeout_secs": 1,
+        "announcement_interval_secs": 1,
+        "enable_discovery": false
+    });
+    let resp = client
+        .post(format!("http://{}/api/network/init", addr))
+        .json(&config)
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let body: Value = resp.json().await.unwrap();
+    assert!(body.get("success").is_some());
+
+    let resp = client
+        .post(format!("http://{}/api/network/start", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+
+    let resp = client
+        .get(format!("http://{}/api/network/status", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let status: Value = resp.json().await.unwrap();
+    assert!(status.get("data").is_some());
+    let node_id = status["data"]["node_id"].as_str().unwrap().to_string();
+
+    let resp = client
+        .post(format!("http://{}/api/network/connect", addr))
+        .json(&serde_json::json!({"node_id": node_id}))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+
+    let resp = client
+        .post(format!("http://{}/api/network/discover", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+
+    let resp = client
+        .get(format!("http://{}/api/network/nodes", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+
+    let _ = client
+        .post(format!("http://{}/api/network/stop", addr))
+        .send()
+        .await
+        .unwrap();
+
+    handle.abort();
+}
+

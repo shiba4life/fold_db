@@ -2,6 +2,7 @@ use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
 use crate::schema::types::Operation;
 use crate::schema::Schema;
+use crate::network::NetworkConfig;
 
 use actix_cors::Cors;
 use actix_files::Files;
@@ -10,7 +11,8 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio::fs;
 
 /// HTTP server for the DataFold node.
@@ -27,7 +29,7 @@ use tokio::fs;
 /// * One-click loading of sample data
 pub struct DataFoldHttpServer {
     /// The DataFold node
-    node: Arc<Mutex<DataFoldNode>>,
+    node: Arc<tokio::sync::Mutex<DataFoldNode>>,
     /// The HTTP server bind address
     bind_address: String,
     /// The sample data manager
@@ -194,7 +196,7 @@ impl SampleManager {
 /// Shared application state for the HTTP server.
 struct AppState {
     /// The DataFold node
-    node: Arc<Mutex<DataFoldNode>>,
+    node: Arc<tokio::sync::Mutex<DataFoldNode>>,
     /// The sample data manager
     sample_manager: SampleManager,
 }
@@ -294,7 +296,18 @@ impl DataFoldHttpServer {
                         .route("/samples/mutations", web::get().to(list_mutation_samples))
                         .route("/samples/schema/{name}", web::get().to(get_schema_sample))
                         .route("/samples/query/{name}", web::get().to(get_query_sample))
-                        .route("/samples/mutation/{name}", web::get().to(get_mutation_sample)),
+                        .route("/samples/mutation/{name}", web::get().to(get_mutation_sample))
+                        // Network endpoints
+                        .service(
+                            web::scope("/network")
+                                .route("/init", web::post().to(init_network))
+                                .route("/start", web::post().to(start_network))
+                                .route("/stop", web::post().to(stop_network))
+                                .route("/status", web::get().to(get_network_status))
+                                .route("/connect", web::post().to(connect_to_node))
+                                .route("/discover", web::post().to(discover_nodes))
+                                .route("/nodes", web::get().to(list_nodes))
+                        ),
                 )
                 // Static files
                 .service(Files::new("/static", "src/datafold_node/static").index_file("index.html"))
@@ -315,15 +328,7 @@ impl DataFoldHttpServer {
 /// List all schemas.
 async fn list_schemas(state: web::Data<AppState>) -> impl Responder {
     println!("Received request to list schemas");
-    let node_guard = match state.node.lock() {
-        Ok(guard) => guard,
-        Err(_) => {
-            println!("Failed to acquire lock on node");
-            return HttpResponse::InternalServerError().json(json!({
-                "error": "Failed to acquire lock on node"
-            }));
-        }
-    };
+    let node_guard = state.node.lock().await;
 
     match node_guard.list_schemas() {
         Ok(schemas) => {
@@ -345,14 +350,7 @@ async fn list_schemas(state: web::Data<AppState>) -> impl Responder {
 /// Get a schema by name.
 async fn get_schema(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
     let name = path.into_inner();
-    let node_guard = match state.node.lock() {
-        Ok(guard) => guard,
-        Err(_) => {
-            return HttpResponse::InternalServerError().json(json!({
-                "error": "Failed to acquire lock on node"
-            }));
-        }
-    };
+    let node_guard = state.node.lock().await;
 
     match node_guard.get_schema(&name) {
         Ok(Some(schema)) => HttpResponse::Ok().json(schema),
@@ -367,14 +365,7 @@ async fn get_schema(path: web::Path<String>, state: web::Data<AppState>) -> impl
 
 /// Create a new schema.
 async fn create_schema(schema: web::Json<Schema>, state: web::Data<AppState>) -> impl Responder {
-    let mut node_guard = match state.node.lock() {
-        Ok(guard) => guard,
-        Err(_) => {
-            return HttpResponse::InternalServerError().json(json!({
-                "error": "Failed to acquire lock on node"
-            }));
-        }
-    };
+    let mut node_guard = state.node.lock().await;
 
     match node_guard.load_schema(schema.into_inner()) {
         Ok(_) => HttpResponse::Created().json(json!({
@@ -402,14 +393,7 @@ async fn update_schema(
         }));
     }
 
-    let mut node_guard = match state.node.lock() {
-        Ok(guard) => guard,
-        Err(_) => {
-            return HttpResponse::InternalServerError().json(json!({
-                "error": "Failed to acquire lock on node"
-            }));
-        }
-    };
+    let mut node_guard = state.node.lock().await;
 
     // First remove the existing schema
     let _ = node_guard.remove_schema(&name);
@@ -428,14 +412,7 @@ async fn update_schema(
 /// Delete a schema.
 async fn delete_schema(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
     let name = path.into_inner();
-    let mut node_guard = match state.node.lock() {
-        Ok(guard) => guard,
-        Err(_) => {
-            return HttpResponse::InternalServerError().json(json!({
-                "error": "Failed to acquire lock on node"
-            }));
-        }
-    };
+    let mut node_guard = state.node.lock().await;
 
     match node_guard.remove_schema(&name) {
         Ok(_) => HttpResponse::Ok().json(json!({
@@ -469,14 +446,7 @@ async fn execute_operation(
         }
     };
 
-    let mut node_guard = match state.node.lock() {
-        Ok(guard) => guard,
-        Err(_) => {
-            return HttpResponse::InternalServerError().json(json!({
-                "error": "Failed to acquire lock on node"
-            }));
-        }
-    };
+    let mut node_guard = state.node.lock().await;
 
     match node_guard.execute_operation(operation) {
         Ok(result) => HttpResponse::Ok().json(json!({
@@ -509,14 +479,7 @@ async fn execute_query(query: web::Json<Value>, state: web::Data<AppState>) -> i
         }
     };
 
-    let mut node_guard = match state.node.lock() {
-        Ok(guard) => guard,
-        Err(_) => {
-            return HttpResponse::InternalServerError().json(json!({
-                "error": "Failed to acquire lock on node"
-            }));
-        }
-    };
+    let mut node_guard = state.node.lock().await;
 
     match node_guard.execute_operation(operation) {
         Ok(result) => HttpResponse::Ok().json(json!({
@@ -549,14 +512,7 @@ async fn execute_mutation(mutation: web::Json<Value>, state: web::Data<AppState>
         }
     };
 
-    let mut node_guard = match state.node.lock() {
-        Ok(guard) => guard,
-        Err(_) => {
-            return HttpResponse::InternalServerError().json(json!({
-                "error": "Failed to acquire lock on node"
-            }));
-        }
-    };
+    let mut node_guard = state.node.lock().await;
 
     match node_guard.execute_operation(operation) {
         Ok(_) => HttpResponse::Ok().json(json!({
@@ -616,6 +572,113 @@ async fn get_mutation_sample(path: web::Path<String>, state: web::Data<AppState>
         None => HttpResponse::NotFound().json(json!({
             "error": format!("Sample mutation '{}' not found", name)
         })),
+    }
+}
+
+#[derive(Deserialize)]
+struct NetworkConfigPayload {
+    listen_address: String,
+    discovery_port: Option<u16>,
+    max_connections: Option<usize>,
+    connection_timeout_secs: Option<u64>,
+    announcement_interval_secs: Option<u64>,
+    enable_discovery: Option<bool>,
+}
+
+#[derive(Deserialize)]
+struct ConnectRequest {
+    node_id: String,
+}
+
+async fn init_network(
+    config: web::Json<NetworkConfigPayload>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    let mut node = state.node.lock().await;
+
+    let mut network_config = NetworkConfig::new(&config.listen_address);
+    if let Some(port) = config.discovery_port {
+        network_config = network_config.with_discovery_port(port);
+    }
+    if let Some(max) = config.max_connections {
+        network_config = network_config.with_max_connections(max);
+    }
+    if let Some(timeout) = config.connection_timeout_secs {
+        network_config =
+            network_config.with_connection_timeout(std::time::Duration::from_secs(timeout));
+    }
+    if let Some(interval) = config.announcement_interval_secs {
+        network_config =
+            network_config.with_announcement_interval(std::time::Duration::from_secs(interval));
+    }
+    if let Some(enable) = config.enable_discovery {
+        network_config = network_config.with_mdns(enable);
+    }
+
+    match node.init_network(network_config).await {
+        Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "error": format!("Failed to init network: {}", e) })),
+    }
+}
+
+async fn start_network(state: web::Data<AppState>) -> impl Responder {
+    let node = state.node.lock().await;
+    match node.start_network().await {
+        Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "error": format!("Failed to start network: {}", e) })),
+    }
+}
+
+async fn stop_network(state: web::Data<AppState>) -> impl Responder {
+    let node = state.node.lock().await;
+    match node.stop_network().await {
+        Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "error": format!("Failed to stop network: {}", e) })),
+    }
+}
+
+async fn get_network_status(state: web::Data<AppState>) -> impl Responder {
+    let node = state.node.lock().await;
+    match node.get_network_status().await {
+        Ok(status) => HttpResponse::Ok().json(json!({ "data": status })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "error": format!("Failed to get network status: {}", e) })),
+    }
+}
+
+async fn connect_to_node(
+    req: web::Json<ConnectRequest>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    let mut node = state.node.lock().await;
+    match node.connect_to_node(&req.node_id).await {
+        Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "error": format!("Failed to connect to node: {}", e) })),
+    }
+}
+
+async fn discover_nodes(state: web::Data<AppState>) -> impl Responder {
+    let node = state.node.lock().await;
+    match node.discover_nodes().await {
+        Ok(peers) => {
+            let peers: Vec<String> = peers.into_iter().map(|p| p.to_string()).collect();
+            HttpResponse::Ok().json(json!({ "data": peers }))
+        }
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "error": format!("Failed to discover nodes: {}", e) })),
+    }
+}
+
+async fn list_nodes(state: web::Data<AppState>) -> impl Responder {
+    let node = state.node.lock().await;
+    match node.get_known_nodes().await {
+        Ok(nodes) => HttpResponse::Ok().json(json!({ "data": nodes })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "error": format!("Failed to list nodes: {}", e) })),
     }
 }
 
