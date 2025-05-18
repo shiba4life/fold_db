@@ -1,5 +1,7 @@
 use crate::datafold_node::DataFoldNode;
-use crate::schema::Schema;
+use crate::schema::{Schema, SchemaCore};
+use crate::schema::types::JsonSchemaDefinition;
+use serde_json;
 use std::fs;
 use std::path::Path;
 
@@ -47,8 +49,17 @@ pub fn load_schema_from_file<P: AsRef<Path>>(
     node: &mut DataFoldNode,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let schema_str = fs::read_to_string(path.as_ref())?;
-    let schema: Schema = serde_json::from_str(&schema_str)?;
-    node.load_schema(schema)?;
+    match serde_json::from_str::<Schema>(&schema_str) {
+        Ok(schema) => {
+            node.load_schema(schema)?;
+        }
+        Err(_) => {
+            let json_schema: JsonSchemaDefinition = serde_json::from_str(&schema_str)?;
+            let core = SchemaCore::default();
+            let schema = core.interpret_schema(json_schema)?;
+            node.load_schema(schema)?;
+        }
+    }
     Ok(())
 }
 
@@ -83,6 +94,69 @@ mod tests {
 
         let mut node = DataFoldNode::new(config)?;
         load_schema_from_file(&schema_path, &mut node)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_schema_with_transform_object() -> Result<(), Box<dyn std::error::Error>> {
+        let test_dir = tempdir()?;
+        let db_path = test_dir.path().join("test_db");
+
+        // Create a schema that includes a transform object
+        let schema_path = test_dir.path().join("transform_schema.json");
+        let test_schema = r#"{
+            "name": "transform_schema",
+            "fields": {
+                "computed": {
+                    "permission_policy": {
+                        "read_policy": { "Distance": 0 },
+                        "write_policy": { "Distance": 0 },
+                        "explicit_read_policy": null,
+                        "explicit_write_policy": null
+                    },
+                    "ref_atom_uuid": "calc_uuid",
+                    "payment_config": {
+                        "base_multiplier": 1.0,
+                        "trust_distance_scaling": { "None": null },
+                        "min_payment": null
+                    },
+                    "field_mappers": {},
+                    "field_type": "Single",
+                    "transform": {
+                        "logic": "4 + 5",
+                        "reversible": false,
+                        "signature": null,
+                        "payment_required": false
+                    }
+                }
+            },
+            "payment_config": {
+                "base_multiplier": 1.0,
+                "min_payment_threshold": 0
+            }
+        }"#;
+        fs::write(&schema_path, test_schema)?;
+
+        let config = NodeConfig {
+            storage_path: db_path.into(),
+            default_trust_distance: 1,
+            network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
+        };
+
+        let mut node = DataFoldNode::new(config)?;
+        load_schema_from_file(&schema_path, &mut node)?;
+
+        // Verify the schema was loaded with the transform
+        let loaded_schema = node
+            .get_schema("transform_schema")?
+            .expect("schema not found");
+        let field = loaded_schema
+            .fields
+            .get("computed")
+            .expect("field not found");
+        assert!(field.transform.is_some());
+        assert_eq!(field.transform.as_ref().unwrap().logic, "4 + 5");
+
         Ok(())
     }
 }

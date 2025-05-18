@@ -88,3 +88,4 @@ rust-project.json
 coverage/
 *.profraw
 *.profdata
+vendor/
