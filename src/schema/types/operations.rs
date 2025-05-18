@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::fmt;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Query {
@@ -37,6 +39,17 @@ pub enum MutationType {
     DeleteFromCollection(String),
 }
 
+#[derive(Debug, Clone)]
+pub struct ParseMutationTypeError(String);
+
+impl fmt::Display for ParseMutationTypeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid mutation type '{}'. Use 'create', 'update', 'delete', or collection operations", self.0)
+    }
+}
+
+impl std::error::Error for ParseMutationTypeError {}
+
 impl<'de> Deserialize<'de> for MutationType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -60,6 +73,31 @@ impl<'de> Deserialize<'de> for MutationType {
                 Ok(MutationType::DeleteFromCollection(id))
             },
             _ => Err(serde::de::Error::custom("unknown mutation type"))
+        }
+    }
+}
+
+impl FromStr for MutationType {
+    type Err = ParseMutationTypeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "create" => Ok(MutationType::Create),
+            "update" => Ok(MutationType::Update),
+            "delete" => Ok(MutationType::Delete),
+            s if s.starts_with("add_to_collection:") => {
+                let id = s.split(':').nth(1).unwrap_or_default().to_string();
+                Ok(MutationType::AddToCollection(id))
+            },
+            s if s.starts_with("update_to_collection:") => {
+                let id = s.split(':').nth(1).unwrap_or_default().to_string();
+                Ok(MutationType::UpdateToCollection(id))
+            },
+            s if s.starts_with("delete_from_collection:") => {
+                let id = s.split(':').nth(1).unwrap_or_default().to_string();
+                Ok(MutationType::DeleteFromCollection(id))
+            },
+            _ => Err(ParseMutationTypeError(s.to_string())),
         }
     }
 }

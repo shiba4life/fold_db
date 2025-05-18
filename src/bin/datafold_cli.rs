@@ -121,24 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             
             let data_value: Value = serde_json::from_str(&data)?;
             
-            let mutation_type = match mutation_type.to_lowercase().as_str() {
-                "create" => MutationType::Create,
-                "update" => MutationType::Update,
-                "delete" => MutationType::Delete,
-                s if s.starts_with("add_to_collection:") => {
-                    let id = s.split(':').nth(1).unwrap_or_default().to_string();
-                    MutationType::AddToCollection(id)
-                },
-                s if s.starts_with("update_to_collection:") => {
-                    let id = s.split(':').nth(1).unwrap_or_default().to_string();
-                    MutationType::UpdateToCollection(id)
-                },
-                s if s.starts_with("delete_from_collection:") => {
-                    let id = s.split(':').nth(1).unwrap_or_default().to_string();
-                    MutationType::DeleteFromCollection(id)
-                },
-                _ => return Err("Invalid mutation type. Use 'create', 'update', 'delete', or collection operations".into())
-            };
+            let mutation_type: MutationType = mutation_type.parse()?;
             
             let operation = Operation::Mutation {
                 schema,
