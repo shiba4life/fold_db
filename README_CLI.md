@@ -97,7 +97,7 @@ datafold_cli mutate --schema <SCHEMA> --mutation-type <MUTATION_TYPE> --data <DA
 
 Options:
 - `-s, --schema <SCHEMA>`: Schema name to mutate
-- `-m, --mutation-type <MUTATION_TYPE>`: Mutation type (create, update, delete, add_to_collection:<ID>, update_to_collection:<ID>, delete_from_collection:<ID>)
+- `-m, --mutation-type <MUTATION_TYPE>`: Mutation type (see `--help` for allowed values)
 - `-d, --data <DATA>`: Data in JSON format
 
 Mutation types:
