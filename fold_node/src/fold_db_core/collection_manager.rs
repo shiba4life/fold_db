@@ -32,10 +32,6 @@ impl CollectionManager {
         ctx.validate_field_type(FieldType::Collection)?;
         ctx.create_and_update_collection_atom(None, content.clone(), None, id.clone())?;
 
-        if let Some(orc) = self.field_manager.get_orchestrator() {
-            orc.add_task(&schema.name, field);
-        }
-
         Ok(())
     }
 
@@ -59,10 +55,6 @@ impl CollectionManager {
         let prev_atom_uuid = ctx.get_prev_collection_atom_uuid(&aref_uuid, &id)?;
 
         ctx.create_and_update_collection_atom(Some(prev_atom_uuid), content.clone(), None, id.clone())?;
-
-        if let Some(orc) = self.field_manager.get_orchestrator() {
-            orc.add_task(&schema.name, field);
-        }
 
         Ok(())
     }
@@ -91,10 +83,6 @@ impl CollectionManager {
             Some(AtomStatus::Deleted),
             id.clone(),
         )?;
-
-        if let Some(orc) = self.field_manager.get_orchestrator() {
-            orc.add_task(&schema.name, field);
-        }
 
         Ok(())
     }

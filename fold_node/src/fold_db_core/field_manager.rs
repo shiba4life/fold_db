@@ -133,10 +133,6 @@ impl FieldManager {
 
         ctx.create_and_update_atom(prev_atom_uuid, content.clone(), None)?;
 
-        if let Some(orc) = self.get_orchestrator() {
-            orc.add_task(&schema.name, field);
-        }
-
         Ok(())
     }
 
@@ -161,10 +157,6 @@ impl FieldManager {
 
         ctx.create_and_update_atom(Some(prev_atom_uuid), content.clone(), None)?;
 
-        if let Some(orc) = self.get_orchestrator() {
-            orc.add_task(&schema.name, field);
-        }
-
         Ok(())
     }
 
@@ -187,10 +179,6 @@ impl FieldManager {
         let prev_atom_uuid = ctx.get_prev_atom_uuid(&aref_uuid)?;
 
         ctx.create_and_update_atom(Some(prev_atom_uuid), Value::Null, Some(AtomStatus::Deleted))?;
-
-        if let Some(orc) = self.get_orchestrator() {
-            orc.add_task(&schema.name, field);
-        }
 
         Ok(())
     }

@@ -363,6 +363,8 @@ impl FoldDB {
                     )?;
                 }
             }
+
+            self.transform_orchestrator.add_task(&schema.name, field_name);
         }
         Ok(())
     }
@@ -372,5 +374,10 @@ impl FoldDB {
         aref_uuid: &str,
     ) -> Result<Vec<Atom>, Box<dyn std::error::Error>> {
         self.atom_manager.get_atom_history(aref_uuid)
+    }
+
+    /// Returns the number of queued transform tasks.
+    pub fn orchestrator_len(&self) -> usize {
+        self.transform_orchestrator.len()
     }
 }
