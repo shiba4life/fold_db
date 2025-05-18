@@ -1,0 +1,10 @@
+{
+  "type": "mutation",
+  "schema": "UserProfile",
+  "mutation_type": "update",
+  "data": {
+    "username": "johndoe",
+    "bio": "Senior software engineer and blockchain enthusiast",
+    "location": "New York, NY"
+  }
+}

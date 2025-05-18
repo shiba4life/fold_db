@@ -7,18 +7,29 @@ const sampleDescriptions = {
     // Schema descriptions
     'UserProfile': 'A basic user profile schema with common fields like username, email, and bio. Includes various permission policies to demonstrate different access levels.',
     'ProductCatalog': 'A product catalog schema suitable for e-commerce applications. Includes fields for product details, pricing, and inventory management.',
-    'UserProfile2': 'An extended user profile schema with additional fields and more complex permission policies.',
-    'UserProfile3': 'A user profile schema with collection fields and custom field mappers.',
+    'BlogPost': 'A blog post schema demonstrating collection fields for tags and comments.',
+    'SocialMediaPost': 'A social media post schema with permissions on likes and comments.',
+    'FinancialTransaction': 'A financial transaction schema with strict payment policies.',
     
     // Query descriptions
     'BasicUserQuery': 'A simple query to retrieve basic user information without any filtering.',
-    'UserProfileQuery1': 'A query to retrieve user profile information with specific fields.',
-    'UserProfileQuery2': 'A filtered query to retrieve user profiles matching specific criteria.',
+    'FilteredUserQuery': 'A query to retrieve user information filtered by age.',
+    'ProductCategoryQuery': 'Retrieve products belonging to a specific category.',
+    'RecentBlogPostsQuery': 'Find blog posts published after a given date.',
+    'PopularSocialPostsQuery': 'Retrieve popular social media posts.',
+    'TransactionHistoryQuery': 'Get transactions where a user is sender or recipient.',
     
     // Mutation descriptions
-    'CreateUser': 'A mutation to create a new user profile with basic information.',
-    'UserProfileMutation1': 'A mutation to update an existing user profile.',
-    'UserProfileMutation2': 'A mutation to delete a user profile.'
+    'CreateUser': 'Create a new user profile with complete information.',
+    'UpdateUser': 'Update specific fields of an existing user profile.',
+    'CreateProduct': 'Add a new product to the catalog.',
+    'UpdateProductInventory': 'Update the price or inventory of a product.',
+    'CreateBlogPost': 'Create a new blog post with tags.',
+    'DeleteBlogPost': 'Delete a blog post by title.',
+    'CreateSocialPost': 'Create a new social media post.',
+    'AddLikeToSocialPost': 'Add a like to an existing social post.',
+    'CreateFinancialTransaction': 'Create a new financial transaction.',
+    'UpdateTransactionStatus': 'Update the status of a financial transaction.'
 };
 
 /**

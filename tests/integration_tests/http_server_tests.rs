@@ -91,6 +91,7 @@ async fn test_sample_endpoints() {
     assert!(resp.status().is_success());
     let schemas: Value = resp.json().await.unwrap();
     assert!(schemas.as_array().unwrap().contains(&Value::String("UserProfile".to_string())));
+    assert!(schemas.as_array().unwrap().contains(&Value::String("ProductCatalog".to_string())));
     let resp = client
         .get(format!("http://{}/api/samples/schema/UserProfile", addr))
         .send()
@@ -99,6 +100,16 @@ async fn test_sample_endpoints() {
     assert!(resp.status().is_success());
     let schema: Value = resp.json().await.unwrap();
     assert_eq!(schema["name"], "UserProfile");
+
+    // Verify second sample as well
+    let resp = client
+        .get(format!("http://{}/api/samples/schema/ProductCatalog", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let schema: Value = resp.json().await.unwrap();
+    assert_eq!(schema["name"], "ProductCatalog");
     handle.abort();
 }
 
