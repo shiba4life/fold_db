@@ -77,7 +77,11 @@ impl SampleManager {
 
     /// Load sample schemas from the examples directory.
     async fn load_schema_samples(&mut self) {
-        let examples_dir = Path::new("src/datafold_node/examples");
+        // Use an absolute path to the examples directory so the server can be
+        // started from any working directory without failing to locate the
+        // sample files.
+        let examples_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/datafold_node/examples");
         
         // Load schema1.json
         if let Ok(content) = fs::read_to_string(examples_dir.join("schema1.json")).await {
@@ -110,7 +114,10 @@ impl SampleManager {
 
     /// Load sample queries from the examples directory.
     async fn load_query_samples(&mut self) {
-        let examples_dir = Path::new("src/datafold_node/examples");
+        // Use the crate's manifest directory so tests and binaries can locate
+        // the example files regardless of the current working directory.
+        let examples_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/datafold_node/examples");
         
         // Load query1.json
         if let Ok(content) = fs::read_to_string(examples_dir.join("query1.json")).await {
@@ -131,7 +138,10 @@ impl SampleManager {
 
     /// Load sample mutations from the examples directory.
     async fn load_mutation_samples(&mut self) {
-        let examples_dir = Path::new("src/datafold_node/examples");
+        // Use the crate's manifest directory so tests and binaries can locate
+        // the example files regardless of the current working directory.
+        let examples_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/datafold_node/examples");
         
         // Load mutation1.json
         if let Ok(content) = fs::read_to_string(examples_dir.join("mutation1.json")).await {
@@ -606,5 +616,17 @@ async fn get_mutation_sample(path: web::Path<String>, state: web::Data<AppState>
         None => HttpResponse::NotFound().json(json!({
             "error": format!("Sample mutation '{}' not found", name)
         })),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SampleManager;
+
+    /// Ensure the sample manager loads schema samples from disk.
+    #[tokio::test]
+    async fn sample_manager_loads_schemas() {
+        let manager = SampleManager::new().await;
+        assert!(!manager.list_schema_samples().is_empty());
     }
 }
