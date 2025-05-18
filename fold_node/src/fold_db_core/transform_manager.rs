@@ -274,6 +274,14 @@ impl TransformManager {
         Ok(result)
     }
 
+    /// Executes a registered transform immediately and updates its output.
+    pub fn execute_transform_now(
+        &self,
+        transform_id: &str,
+    ) -> Result<JsonValue, SchemaError> {
+        self.execute_transform(transform_id)
+    }
+
     /// Gets all transforms that depend on the specified atom reference.
     pub fn get_dependent_transforms(&self, aref_uuid: &str) -> HashSet<String> {
         let aref_to_transforms = self.aref_to_transforms.read().unwrap();

@@ -14,6 +14,7 @@ use crate::schema::{Schema, SchemaError};
 use serde_json;
 use serde_json::Value;
 use uuid::Uuid;
+use regex::Regex;
 
 use self::atom_manager::AtomManager;
 use self::collection_manager::CollectionManager;
@@ -140,6 +141,63 @@ impl FoldDB {
         self.transform_manager.register_transform(transform_id, transform, input_arefs, output_aref)
     }
 
+    fn register_transforms_for_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
+        for (field_name, field) in &schema.fields {
+            if let Some(transform) = field.get_transform() {
+                let output_aref = field.get_ref_atom_uuid().ok_or_else(|| {
+                    SchemaError::InvalidData(format!(
+                        "Field {} missing atom reference",
+                        field_name
+                    ))
+                })?;
+
+                let mut input_arefs = Vec::new();
+
+                let cross_re = Regex::new(r"([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)").unwrap();
+                let mut seen_cross = std::collections::HashSet::new();
+                for cap in cross_re.captures_iter(&transform.logic) {
+                    let schema_name = cap[1].to_string();
+                    let field_dep = cap[2].to_string();
+                    seen_cross.insert(field_dep.clone());
+                    if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
+                        if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
+                            if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
+                                input_arefs.push(dep_aref);
+                            }
+                        }
+                    }
+                }
+
+                for dep in transform.analyze_dependencies() {
+                    if seen_cross.contains(&dep) {
+                        continue;
+                    }
+                    let schema_name = schema.name.clone();
+                    let field_dep = dep;
+
+                    if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
+                        if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
+                            if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
+                                input_arefs.push(dep_aref);
+                            }
+                        }
+                    }
+                }
+
+                let transform_id = format!("{}.{}", schema.name, field_name);
+                self.transform_manager.register_transform(
+                    transform_id.clone(),
+                    transform.clone(),
+                    input_arefs,
+                    output_aref,
+                )?;
+                let _ = self.transform_manager.execute_transform_now(&transform_id);
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn load_schema(&mut self, schema: Schema) -> Result<(), SchemaError> {
         let name = schema.name.clone();
         self.schema_manager.load_schema(schema)?;
@@ -158,6 +216,10 @@ impl FoldDB {
                 .map_err(|e| {
                     SchemaError::InvalidData(format!("Failed to persist atom ref: {}", e))
                 })?;
+        }
+
+        if let Some(loaded_schema) = self.schema_manager.get_schema(&name)? {
+            self.register_transforms_for_schema(&loaded_schema)?;
         }
 
         Ok(())
