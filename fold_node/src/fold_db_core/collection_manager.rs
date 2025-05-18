@@ -32,8 +32,8 @@ impl CollectionManager {
         ctx.validate_field_type(FieldType::Collection)?;
         ctx.create_and_update_collection_atom(None, content.clone(), None, id.clone())?;
 
-        if let Some(tm) = self.field_manager.get_transform_manager() {
-            tm.execute_field_transforms(&schema.name, field, &content)?;
+        if let Some(orc) = self.field_manager.get_orchestrator() {
+            orc.add_task(&schema.name, field);
         }
 
         Ok(())
@@ -60,8 +60,8 @@ impl CollectionManager {
 
         ctx.create_and_update_collection_atom(Some(prev_atom_uuid), content.clone(), None, id.clone())?;
 
-        if let Some(tm) = self.field_manager.get_transform_manager() {
-            tm.execute_field_transforms(&schema.name, field, &content)?;
+        if let Some(orc) = self.field_manager.get_orchestrator() {
+            orc.add_task(&schema.name, field);
         }
 
         Ok(())
@@ -92,8 +92,8 @@ impl CollectionManager {
             id.clone(),
         )?;
 
-        if let Some(tm) = self.field_manager.get_transform_manager() {
-            tm.execute_field_transforms(&schema.name, field, &Value::Null)?;
+        if let Some(orc) = self.field_manager.get_orchestrator() {
+            orc.add_task(&schema.name, field);
         }
 
         Ok(())
