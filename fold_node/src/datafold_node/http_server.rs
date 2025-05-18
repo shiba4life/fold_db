@@ -67,96 +67,40 @@ impl SampleManager {
 
     /// Load sample data from files.
     async fn load_samples(&mut self) {
-        // Load sample schemas from examples directory
-        self.load_schema_samples().await;
-        
-        // Load sample queries from examples directory
-        self.load_query_samples().await;
-        
-        // Load sample mutations from examples directory
-        self.load_mutation_samples().await;
-    }
+        let samples_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/datafold_node/samples/data");
 
-    /// Load sample schemas from the examples directory.
-    async fn load_schema_samples(&mut self) {
-        // Use an absolute path to the examples directory so the server can be
-        // started from any working directory without failing to locate the
-        // sample files.
-        let examples_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("src/datafold_node/examples");
-        
-        // Load schema1.json
-        if let Ok(content) = fs::read_to_string(examples_dir.join("schema1.json")).await {
-            if let Ok(schema) = serde_json::from_str::<Value>(&content) {
-                self.schemas.insert("UserProfile".to_string(), schema);
-            }
-        }
-        
-        // Load schema2.json
-        if let Ok(content) = fs::read_to_string(examples_dir.join("schema2.json")).await {
-            if let Ok(schema) = serde_json::from_str::<Value>(&content) {
-                self.schemas.insert("ProductCatalog".to_string(), schema);
-            }
-        }
-        
-        // Load user_profile_schema.json
-        if let Ok(content) = fs::read_to_string(examples_dir.join("user_profile_schema.json")).await {
-            if let Ok(schema) = serde_json::from_str::<Value>(&content) {
-                self.schemas.insert("UserProfile2".to_string(), schema);
-            }
-        }
-        
-        // Load user_profile2_schema.json
-        if let Ok(content) = fs::read_to_string(examples_dir.join("user_profile2_schema.json")).await {
-            if let Ok(schema) = serde_json::from_str::<Value>(&content) {
-                self.schemas.insert("UserProfile3".to_string(), schema);
-            }
-        }
-    }
+        let mut entries = match fs::read_dir(&samples_dir).await {
+            Ok(e) => e,
+            Err(_) => return,
+        };
 
-    /// Load sample queries from the examples directory.
-    async fn load_query_samples(&mut self) {
-        // Use the crate's manifest directory so tests and binaries can locate
-        // the example files regardless of the current working directory.
-        let examples_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("src/datafold_node/examples");
-        
-        // Load query1.json
-        if let Ok(content) = fs::read_to_string(examples_dir.join("query1.json")).await {
-            if let Ok(query) = serde_json::from_str::<Value>(&content) {
-                self.queries.insert("BasicUserQuery".to_string(), query);
-            }
-        }
-        
-        // Load user_profile_queries.json
-        if let Ok(content) = fs::read_to_string(examples_dir.join("user_profile_queries.json")).await {
-            if let Ok(queries) = serde_json::from_str::<Vec<Value>>(&content) {
-                for (i, query) in queries.into_iter().enumerate() {
-                    self.queries.insert(format!("UserProfileQuery{}", i + 1), query);
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            if let Ok(ft) = entry.file_type().await {
+                if !ft.is_file() {
+                    continue;
                 }
             }
-        }
-    }
 
-    /// Load sample mutations from the examples directory.
-    async fn load_mutation_samples(&mut self) {
-        // Use the crate's manifest directory so tests and binaries can locate
-        // the example files regardless of the current working directory.
-        let examples_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("src/datafold_node/examples");
-        
-        // Load mutation1.json
-        if let Ok(content) = fs::read_to_string(examples_dir.join("mutation1.json")).await {
-            if let Ok(mutation) = serde_json::from_str::<Value>(&content) {
-                self.mutations.insert("CreateUser".to_string(), mutation);
-            }
-        }
-        
-        // Load user_profile_mutations.json
-        if let Ok(content) = fs::read_to_string(examples_dir.join("user_profile_mutations.json")).await {
-            if let Ok(mutations) = serde_json::from_str::<Vec<Value>>(&content) {
-                for (i, mutation) in mutations.into_iter().enumerate() {
-                    self.mutations.insert(format!("UserProfileMutation{}", i + 1), mutation);
+            if let Ok(content) = fs::read_to_string(entry.path()).await {
+                if let Ok(value) = serde_json::from_str::<Value>(&content) {
+                    let name = entry
+                        .file_name()
+                        .to_string_lossy()
+                        .trim_end_matches(".json")
+                        .to_string();
+
+                    match value.get("type").and_then(|v| v.as_str()) {
+                        Some("query") => {
+                            self.queries.insert(name, value);
+                        }
+                        Some("mutation") => {
+                            self.mutations.insert(name, value);
+                        }
+                        _ => {
+                            self.schemas.insert(name, value);
+                        }
+                    }
                 }
             }
         }
@@ -690,6 +634,8 @@ mod tests {
     #[tokio::test]
     async fn sample_manager_loads_schemas() {
         let manager = SampleManager::new().await;
-        assert!(!manager.list_schema_samples().is_empty());
+        let schemas = manager.list_schema_samples();
+        assert!(schemas.contains(&"UserProfile".to_string()));
+        assert!(schemas.contains(&"ProductCatalog".to_string()));
     }
 }
