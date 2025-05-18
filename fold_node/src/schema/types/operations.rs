@@ -1,3 +1,4 @@
+use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -27,13 +28,16 @@ impl Query {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ValueEnum)]
 pub enum MutationType {
     Create,
     Update,
     Delete,
+    #[clap(skip)]
     AddToCollection(String),
+    #[clap(skip)]
     UpdateToCollection(String),
+    #[clap(skip)]
     DeleteFromCollection(String),
 }
 
