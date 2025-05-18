@@ -107,3 +107,103 @@ impl DbOperations {
         Ok(aref)
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::atom::AtomRefBehavior;
+    use serde::{Deserialize, Serialize};
+    use serde_json::json;
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct TestStruct {
+        value: String,
+    }
+
+    fn create_temp_db() -> DbOperations {
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        DbOperations::new(db)
+    }
+
+    #[test]
+    fn test_store_and_get_item() {
+        let db_ops = create_temp_db();
+        let item = TestStruct { value: "hello".to_string() };
+        db_ops.store_item("key1", &item).unwrap();
+        let retrieved: Option<TestStruct> = db_ops.get_item("key1").unwrap();
+        assert_eq!(retrieved, Some(item));
+    }
+
+    #[test]
+    fn test_create_atom_persists() {
+        let db_ops = create_temp_db();
+        let content = json!({"field": 1});
+        let atom = db_ops
+            .create_atom("TestSchema", "owner".to_string(), None, content.clone(), None)
+            .unwrap();
+        let stored: Option<Atom> = db_ops.get_item(atom.uuid()).unwrap();
+        assert!(stored.is_some());
+        assert_eq!(stored.unwrap().content(), &content);
+    }
+
+    #[test]
+    fn test_update_atom_ref_persists() {
+        let db_ops = create_temp_db();
+        let atom1 = db_ops
+            .create_atom("TestSchema", "owner".to_string(), None, json!({"v": 1}), None)
+            .unwrap();
+        let mut aref = db_ops
+            .update_atom_ref("ref1", atom1.uuid().to_string(), "owner".to_string())
+            .unwrap();
+        assert_eq!(aref.get_atom_uuid(), &atom1.uuid().to_string());
+
+        let atom2 = db_ops
+            .create_atom("TestSchema", "owner".to_string(), None, json!({"v": 2}), None)
+            .unwrap();
+        aref = db_ops
+            .update_atom_ref("ref1", atom2.uuid().to_string(), "owner".to_string())
+            .unwrap();
+
+        let stored: Option<AtomRef> = db_ops.get_item("ref1").unwrap();
+        let stored = stored.unwrap();
+        assert_eq!(stored.uuid(), aref.uuid());
+        assert_eq!(stored.get_atom_uuid(), &atom2.uuid().to_string());
+    }
+
+    #[test]
+    fn test_update_atom_ref_collection_persists() {
+        let db_ops = create_temp_db();
+        let atom1 = db_ops
+            .create_atom("TestSchema", "owner".to_string(), None, json!({"idx": 1}), None)
+            .unwrap();
+        let atom2 = db_ops
+            .create_atom("TestSchema", "owner".to_string(), None, json!({"idx": 2}), None)
+            .unwrap();
+
+        let mut collection = db_ops
+            .update_atom_ref_collection(
+                "col1",
+                atom1.uuid().to_string(),
+                "a".to_string(),
+                "owner".to_string(),
+            )
+            .unwrap();
+        assert_eq!(collection.get_atom_uuid("a"), Some(&atom1.uuid().to_string()));
+
+        collection = db_ops
+            .update_atom_ref_collection(
+                "col1",
+                atom2.uuid().to_string(),
+                "b".to_string(),
+                "owner".to_string(),
+            )
+            .unwrap();
+
+        let stored: Option<AtomRefCollection> = db_ops.get_item("col1").unwrap();
+        let stored = stored.unwrap();
+        assert_eq!(stored.uuid(), collection.uuid());
+        assert_eq!(stored.get_atom_uuid("a"), Some(&atom1.uuid().to_string()));
+        assert_eq!(stored.get_atom_uuid("b"), Some(&atom2.uuid().to_string()));
+    }
+}
