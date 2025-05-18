@@ -100,10 +100,33 @@ Options:
 - `-m, --mutation-type <MUTATION_TYPE>`: Mutation type (see `--help` for allowed values)
 - `-d, --data <DATA>`: Data in JSON format
 
+Mutation types:
+- `add_to_collection:<ID>`: Add a new entry to the collection identified by `<ID>`.
+- `update_to_collection:<ID>`: Update an existing collection entry by `<ID>`.
+- `delete_from_collection:<ID>`: Remove the collection entry with `<ID>`.
+
 Example:
 
 ```bash
 datafold_cli mutate --schema UserProfile --mutation-type create --data '{"username": "johndoe", "email": "john@example.com"}'
+```
+
+Add to collection:
+
+```bash
+datafold_cli mutate --schema UserProfile --mutation-type add_to_collection:friends --data '{"id": "friend42"}'
+```
+
+Update in collection:
+
+```bash
+datafold_cli mutate --schema UserProfile --mutation-type update_to_collection:friends --data '{"id": "friend42", "nickname": "JD"}'
+```
+
+Delete from collection:
+
+```bash
+datafold_cli mutate --schema UserProfile --mutation-type delete_from_collection:friends --data '{"id": "friend42"}'
 ```
 
 #### Execute
