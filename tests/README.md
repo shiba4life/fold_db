@@ -38,3 +38,9 @@ To run only the network tests:
 
 ```bash
 cargo test --test network_tests
+```
+
+To run only the CLI tests:
+```bash
+cargo test --test cli
+```
