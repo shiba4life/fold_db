@@ -85,6 +85,22 @@ Run tests for a specific crate (e.g., fold_node):
 cargo test --package fold_node
 ```
 
+## Generating Coverage Reports
+
+DataFold uses [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) to produce code coverage information. Install the tool if it is not already available:
+
+```bash
+cargo install cargo-llvm-cov
+```
+
+Then run the helper script to create an HTML report for the entire workspace:
+
+```bash
+./generate_coverage.sh
+```
+
+The report will be generated at `target/llvm-cov/html/index.html`.
+
 ## Examples
 
 See **datafold_api_examples/** for Python scripts that demonstrate:
