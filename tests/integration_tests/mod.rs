@@ -5,3 +5,4 @@ pub mod cross_schema_transform_tests;
 pub mod persistence_tests;
 pub mod transform_orchestrator_tests;
 pub mod transform_enqueue_tests;
+pub mod http_server_tests;
