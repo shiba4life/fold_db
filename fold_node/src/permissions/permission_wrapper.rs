@@ -179,6 +179,16 @@ impl PermissionWrapper {
                 ))),
             },
             |field| {
+                if !field.is_writable() {
+                    return FieldPermissionResult {
+                        field_name: field_name.to_string(),
+                        allowed: false,
+                        error: Some(SchemaError::InvalidPermission(format!(
+                            "Field {field_name} is not writable"
+                        ))),
+                    };
+                }
+
                 let allowed = self.permission_manager.has_write_permission(
                     &mutation.pub_key,
                     &field.permission_policy,
