@@ -5,6 +5,7 @@ use crate::permissions::types::policy::{ExplicitCounts, PermissionsPolicy, Trust
 use crate::schema::types::fields::FieldType;
 use crate::schema::types::SchemaError;
 use crate::schema::types::Transform;
+use crate::transform::parser::TransformParser;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -127,41 +128,60 @@ impl JsonSchemaDefinition {
 
         // Validate each field
         for (field_name, field) in &self.fields {
-            // Validate payment config
-            if field.payment_config.base_multiplier <= 0.0 {
+            Self::validate_field(field_name, field)?;
+        }
+
+        Ok(())
+    }
+
+    fn validate_field(field_name: &str, field: &JsonSchemaField) -> Result<(), SchemaError> {
+        // Validate payment config
+        if field.payment_config.base_multiplier <= 0.0 {
+            return Err(SchemaError::InvalidField(format!(
+                "Field {field_name} base_multiplier must be positive"
+            )));
+        }
+
+        // Validate trust distance scaling
+        match &field.payment_config.trust_distance_scaling {
+            TrustDistanceScaling::Linear { min_factor, .. }
+            | TrustDistanceScaling::Exponential { min_factor, .. } => {
+                if *min_factor < 1.0 {
+                    return Err(SchemaError::InvalidField(format!(
+                        "Field {field_name} min_factor must be >= 1.0"
+                    )));
+                }
+            }
+            TrustDistanceScaling::None => {}
+        }
+
+        if let Some(min_payment) = field.payment_config.min_payment {
+            if min_payment == 0 {
                 return Err(SchemaError::InvalidField(format!(
-                    "Field {field_name} base_multiplier must be positive"
+                    "Field {field_name} min_payment cannot be zero"
+                )));
+            }
+        }
+
+        // Validate transform if present
+        if let Some(transform) = &field.transform {
+            // Logic cannot be empty
+            if transform.logic.is_empty() {
+                return Err(SchemaError::InvalidField(format!(
+                    "Field {field_name} transform logic cannot be empty"
                 )));
             }
 
-            // Validate trust distance scaling
-            match &field.payment_config.trust_distance_scaling {
-                TrustDistanceScaling::Linear { min_factor, .. }
-                | TrustDistanceScaling::Exponential { min_factor, .. } => {
-                    if *min_factor < 1.0 {
-                        return Err(SchemaError::InvalidField(format!(
-                            "Field {field_name} min_factor must be >= 1.0"
-                        )));
-                    }
-                }
-                TrustDistanceScaling::None => {}
-            }
-
-            // Trust distances are already non-negative due to u32 type
-            // No additional validation needed for TrustDistance::Distance
-            // as the type system ensures it's always valid
-            
-            // Validate transform if present
-            if let Some(transform) = &field.transform {
-                // For now, just check that the logic is not empty
-                if transform.logic.is_empty() {
-                    return Err(SchemaError::InvalidField(format!(
-                        "Field {field_name} transform logic cannot be empty"
-                    )));
-                }
-                
-                // TODO: Add more validation for transform logic syntax
-            }
+            // Parse transform logic using the DSL parser
+            let parser = TransformParser::new();
+            parser
+                .parse_expression(&transform.logic)
+                .map_err(|e| {
+                    SchemaError::InvalidField(format!(
+                        "Error parsing transform for field {field_name}: {}",
+                        e
+                    ))
+                })?;
         }
 
         Ok(())
