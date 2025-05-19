@@ -153,3 +153,11 @@ The CLI will display error messages if operations fail. Common errors include:
 - Schema not found
 - Invalid operation format
 - Permission denied for certain operations
+
+## Testing
+
+End-to-end CLI tests are included in `tests/cli_integration.rs`. Run them with:
+
+```bash
+cargo test --test cli_integration
+```
