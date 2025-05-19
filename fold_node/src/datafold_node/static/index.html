@@ -65,59 +65,48 @@
                     <!-- Include Schema Tab Components -->
                     <div id="schemaTabsContainer">
                         <script>
-                            fetch('/static/components/schema-tab.html')
-                                .then(response => response.text())
-                                .then(html => {
-                                    document.getElementById('schemaTabsContainer').innerHTML = html;
-                                });
+                            utils.loadHtmlIntoContainer('/static/components/schema-tab.html', 'schemaTabsContainer');
                         </script>
                     </div>
                     
                     <!-- Include Operations Tab Components -->
                     <div id="operationsTabsContainer">
                         <script>
-                            fetch('/static/components/operations-tab.html')
-                                .then(response => response.text())
-                                .then(html => {
-                                    document.getElementById('operationsTabsContainer').innerHTML = html;
-                                });
+                            utils.loadHtmlIntoContainer('/static/components/operations-tab.html', 'operationsTabsContainer');
                         </script>
                     </div>
 
                     <!-- Include Transforms Tab Component -->
                     <div id="transformsTabContainer">
                         <script>
-                            fetch('/static/components/transforms-tab.html')
-                                .then(response => response.text())
-                                .then(html => {
-                                    document.getElementById('transformsTabContainer').innerHTML = html;
+                            utils.loadHtmlIntoContainer('/static/components/transforms-tab.html', 'transformsTabContainer', () => {
+                                const refreshIcon = document.getElementById('refreshTransformsIcon');
+                                if (window.icons && refreshIcon) {
+                                    refreshIcon.innerHTML = icons.refresh();
+                                }
+                                document.getElementById('refreshTransformsBtn')?.addEventListener('click', () => {
+                                    transformsModule.loadTransforms();
                                 });
+                                transformsModule.loadTransforms();
+                            });
                         </script>
                     </div>
 
                     <!-- Include Network Tab Component -->
                     <div id="networkTabContainer">
                         <script>
-                            fetch('/static/components/network-tab.html')
-                                .then(response => response.text())
-                                .then(html => {
-                                    document.getElementById('networkTabContainer').innerHTML = html;
-                                });
+                            utils.loadHtmlIntoContainer('/static/components/network-tab.html', 'networkTabContainer');
                         </script>
                     </div>
                     
                     <!-- Include Samples Tab Component -->
                     <div id="samplesTabContainer">
                         <script>
-                            fetch('/static/components/samples-tab.html')
-                                .then(response => response.text())
-                                .then(html => {
-                                    document.getElementById('samplesTabContainer').innerHTML = html;
-                                    // Initialize samples tab after loading
-                                    if (window.samplesModule && window.samplesModule.initSamplesTab) {
-                                        window.samplesModule.initSamplesTab();
-                                    }
-                                });
+                            utils.loadHtmlIntoContainer('/static/components/samples-tab.html', 'samplesTabContainer', () => {
+                                if (window.samplesModule && window.samplesModule.initSamplesTab) {
+                                    window.samplesModule.initSamplesTab();
+                                }
+                            });
                         </script>
                     </div>
                 </div>
