@@ -100,19 +100,40 @@ impl TransformManager {
         
         // Update in-memory cache
         {
-            let mut registered_transforms = self.registered_transforms.write().unwrap();
+            let mut registered_transforms = self
+                .registered_transforms
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire registered_transforms lock".to_string(),
+                    )
+                })?;
             registered_transforms.insert(transform_id.clone(), transform);
         }
         
         // Register the output atom reference
         {
-            let mut transform_outputs = self.transform_outputs.write().unwrap();
+            let mut transform_outputs = self
+                .transform_outputs
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire transform_outputs lock".to_string(),
+                    )
+                })?;
             transform_outputs.insert(transform_id.clone(), output_aref);
         }
         
         // Register the input atom references
         {
-            let mut transform_to_arefs = self.transform_to_arefs.write().unwrap();
+            let mut transform_to_arefs = self
+                .transform_to_arefs
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire transform_to_arefs lock".to_string(),
+                    )
+                })?;
             let mut aref_set = HashSet::new();
 
             for aref_uuid in &input_arefs {
@@ -124,8 +145,22 @@ impl TransformManager {
 
         // Register the fields that trigger this transform
         {
-            let mut transform_to_fields = self.transform_to_fields.write().unwrap();
-            let mut field_to_transforms = self.field_to_transforms.write().unwrap();
+            let mut transform_to_fields = self
+                .transform_to_fields
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire transform_to_fields lock".to_string(),
+                    )
+                })?;
+            let mut field_to_transforms = self
+                .field_to_transforms
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire field_to_transforms lock".to_string(),
+                    )
+                })?;
 
             let mut field_set = HashSet::new();
             for field_key in &trigger_fields {
@@ -139,12 +174,17 @@ impl TransformManager {
         
         // Update the reverse mapping (aref -> transforms)
         {
-            let mut aref_to_transforms = self.aref_to_transforms.write().unwrap();
-            
+            let mut aref_to_transforms = self
+                .aref_to_transforms
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire aref_to_transforms lock".to_string(),
+                    )
+                })?;
+
             for aref_uuid in input_arefs {
-                let transform_set = aref_to_transforms
-                    .entry(aref_uuid)
-                    .or_default();
+                let transform_set = aref_to_transforms.entry(aref_uuid).or_default();
                 transform_set.insert(transform_id.clone());
             }
         }
@@ -171,10 +211,17 @@ impl TransformManager {
     }
 
     /// Unregisters a transform.
-    pub fn unregister_transform(&self, transform_id: &str) -> bool {
+    pub fn unregister_transform(&self, transform_id: &str) -> Result<bool, SchemaError> {
         // Remove from transforms tree and cache
         let found = if self.transforms_tree.remove(transform_id.as_bytes()).is_ok() {
-            let mut registered_transforms = self.registered_transforms.write().unwrap();
+            let mut registered_transforms = self
+                .registered_transforms
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire registered_transforms lock".to_string(),
+                    )
+                })?;
             registered_transforms.remove(transform_id).is_some()
         } else {
             false
@@ -183,14 +230,35 @@ impl TransformManager {
         if found {
             // Remove from transform outputs
             {
-                let mut transform_outputs = self.transform_outputs.write().unwrap();
+                let mut transform_outputs = self
+                    .transform_outputs
+                    .write()
+                    .map_err(|_| {
+                        SchemaError::InvalidData(
+                            "Failed to acquire transform_outputs lock".to_string(),
+                        )
+                    })?;
                 transform_outputs.remove(transform_id);
             }
 
             // Remove field mappings
             {
-                let mut transform_to_fields = self.transform_to_fields.write().unwrap();
-                let mut field_to_transforms = self.field_to_transforms.write().unwrap();
+                let mut transform_to_fields = self
+                    .transform_to_fields
+                    .write()
+                    .map_err(|_| {
+                        SchemaError::InvalidData(
+                            "Failed to acquire transform_to_fields lock".to_string(),
+                        )
+                    })?;
+                let mut field_to_transforms = self
+                    .field_to_transforms
+                    .write()
+                    .map_err(|_| {
+                        SchemaError::InvalidData(
+                            "Failed to acquire field_to_transforms lock".to_string(),
+                        )
+                    })?;
 
                 if let Some(fields) = transform_to_fields.remove(transform_id) {
                     for field in fields {
@@ -206,13 +274,27 @@ impl TransformManager {
             
             // Get the input arefs for this transform
             let input_arefs = {
-                let mut transform_to_arefs = self.transform_to_arefs.write().unwrap();
+                let mut transform_to_arefs = self
+                    .transform_to_arefs
+                    .write()
+                    .map_err(|_| {
+                        SchemaError::InvalidData(
+                            "Failed to acquire transform_to_arefs lock".to_string(),
+                        )
+                    })?;
                 transform_to_arefs.remove(transform_id).unwrap_or_default()
             };
             
             // Update the reverse mapping (aref -> transforms)
             {
-                let mut aref_to_transforms = self.aref_to_transforms.write().unwrap();
+                let mut aref_to_transforms = self
+                    .aref_to_transforms
+                    .write()
+                    .map_err(|_| {
+                        SchemaError::InvalidData(
+                            "Failed to acquire aref_to_transforms lock".to_string(),
+                        )
+                    })?;
                 
                 for aref_uuid in input_arefs {
                     if let Some(transform_set) = aref_to_transforms.get_mut(&aref_uuid) {
@@ -227,7 +309,7 @@ impl TransformManager {
             }
         }
         
-        found
+        Ok(found)
     }
 
     /// Handles an atom reference update by executing all dependent transforms.
@@ -235,12 +317,16 @@ impl TransformManager {
         let mut results = Vec::new();
         
         // Find all transforms that depend on this atom reference
-        let transform_ids = {
-            let aref_to_transforms = self.aref_to_transforms.read().unwrap();
-            
-            match aref_to_transforms.get(aref_uuid) {
-                Some(transform_set) => transform_set.clone(),
-                None => return results, // No dependent transforms
+        let transform_ids = match self.aref_to_transforms.read() {
+            Ok(map) => match map.get(aref_uuid) {
+                Some(set) => set.clone(),
+                None => return results,
+            },
+            Err(_) => {
+                results.push(Err(SchemaError::InvalidData(
+                    "Failed to acquire aref_to_transforms lock".to_string(),
+                )));
+                return results;
             }
         };
         
@@ -257,7 +343,14 @@ impl TransformManager {
     fn execute_transform(&self, transform_id: &str) -> Result<JsonValue, SchemaError> {
         // Get the transform
         let transform = {
-            let registered_transforms = self.registered_transforms.read().unwrap();
+            let registered_transforms = self
+                .registered_transforms
+                .read()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire registered_transforms lock".to_string(),
+                    )
+                })?;
             match registered_transforms.get(transform_id) {
                 Some(transform) => transform.clone(),
                 None => return Err(SchemaError::InvalidField(format!("Transform not found: {}", transform_id))),
@@ -266,7 +359,14 @@ impl TransformManager {
         
         // Create an input provider function that gets values from atom references
         let get_atom_fn = &self.get_atom_fn;
-        let transform_to_arefs = self.transform_to_arefs.read().unwrap();
+        let transform_to_arefs = self
+            .transform_to_arefs
+            .read()
+            .map_err(|_| {
+                SchemaError::InvalidData(
+                    "Failed to acquire transform_to_arefs lock".to_string(),
+                )
+            })?;
         let input_arefs = transform_to_arefs.get(transform_id).cloned().unwrap_or_default();
         
         let input_provider = move |input_name: &str| -> Result<JsonValue, Box<dyn std::error::Error>> {
@@ -283,7 +383,14 @@ impl TransformManager {
         
         // Update the output atom reference
         let output_aref = {
-            let transform_outputs = self.transform_outputs.read().unwrap();
+            let transform_outputs = self
+                .transform_outputs
+                .read()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire transform_outputs lock".to_string(),
+                    )
+                })?;
             
             match transform_outputs.get(transform_id) {
                 Some(aref_uuid) => aref_uuid.clone(),
@@ -325,46 +432,88 @@ impl TransformManager {
     }
 
     /// Returns true if a transform with the given id is registered.
-    pub fn transform_exists(&self, transform_id: &str) -> bool {
-        let registered_transforms = self.registered_transforms.read().unwrap();
-        registered_transforms.contains_key(transform_id)
+    pub fn transform_exists(&self, transform_id: &str) -> Result<bool, SchemaError> {
+        let registered_transforms = self
+            .registered_transforms
+            .read()
+            .map_err(|_| {
+                SchemaError::InvalidData(
+                    "Failed to acquire registered_transforms lock".to_string(),
+                )
+            })?;
+        Ok(registered_transforms.contains_key(transform_id))
     }
 
     /// List all registered transforms.
-    pub fn list_transforms(&self) -> HashMap<String, Transform> {
-        let registered_transforms = self.registered_transforms.read().unwrap();
-        registered_transforms.clone()
+    pub fn list_transforms(&self) -> Result<HashMap<String, Transform>, SchemaError> {
+        let registered_transforms = self
+            .registered_transforms
+            .read()
+            .map_err(|_| {
+                SchemaError::InvalidData(
+                    "Failed to acquire registered_transforms lock".to_string(),
+                )
+            })?;
+        Ok(registered_transforms.clone())
     }
 
     /// Gets all transforms that depend on the specified atom reference.
-    pub fn get_dependent_transforms(&self, aref_uuid: &str) -> HashSet<String> {
-        let aref_to_transforms = self.aref_to_transforms.read().unwrap();
-        match aref_to_transforms.get(aref_uuid) {
+    pub fn get_dependent_transforms(&self, aref_uuid: &str) -> Result<HashSet<String>, SchemaError> {
+        let aref_to_transforms = self
+            .aref_to_transforms
+            .read()
+            .map_err(|_| {
+                SchemaError::InvalidData(
+                    "Failed to acquire aref_to_transforms lock".to_string(),
+                )
+            })?;
+        Ok(match aref_to_transforms.get(aref_uuid) {
             Some(transform_set) => transform_set.clone(),
             None => HashSet::new(),
-        }
+        })
     }
 
     /// Gets all atom references that a transform depends on.
-    pub fn get_transform_inputs(&self, transform_id: &str) -> HashSet<String> {
-        let transform_to_arefs = self.transform_to_arefs.read().unwrap();
-        match transform_to_arefs.get(transform_id) {
+    pub fn get_transform_inputs(&self, transform_id: &str) -> Result<HashSet<String>, SchemaError> {
+        let transform_to_arefs = self
+            .transform_to_arefs
+            .read()
+            .map_err(|_| {
+                SchemaError::InvalidData(
+                    "Failed to acquire transform_to_arefs lock".to_string(),
+                )
+            })?;
+        Ok(match transform_to_arefs.get(transform_id) {
             Some(aref_set) => aref_set.clone(),
             None => HashSet::new(),
-        }
+        })
     }
 
     /// Gets the output atom reference for a transform.
-    pub fn get_transform_output(&self, transform_id: &str) -> Option<String> {
-        let transform_outputs = self.transform_outputs.read().unwrap();
-        transform_outputs.get(transform_id).cloned()
+    pub fn get_transform_output(&self, transform_id: &str) -> Result<Option<String>, SchemaError> {
+        let transform_outputs = self
+            .transform_outputs
+            .read()
+            .map_err(|_| {
+                SchemaError::InvalidData(
+                    "Failed to acquire transform_outputs lock".to_string(),
+                )
+            })?;
+        Ok(transform_outputs.get(transform_id).cloned())
     }
 
     /// Gets all transforms that should run when the specified field is updated.
-    pub fn get_transforms_for_field(&self, schema_name: &str, field_name: &str) -> HashSet<String> {
+    pub fn get_transforms_for_field(&self, schema_name: &str, field_name: &str) -> Result<HashSet<String>, SchemaError> {
         let key = format!("{}.{}", schema_name, field_name);
-        let field_to_transforms = self.field_to_transforms.read().unwrap();
-        field_to_transforms.get(&key).cloned().unwrap_or_default()
+        let field_to_transforms = self
+            .field_to_transforms
+            .read()
+            .map_err(|_| {
+                SchemaError::InvalidData(
+                    "Failed to acquire field_to_transforms lock".to_string(),
+                )
+            })?;
+        Ok(field_to_transforms.get(&key).cloned().unwrap_or_default())
     }
 
     /// Execute transforms for a specific schema field
@@ -376,7 +525,14 @@ pub fn execute_field_transforms(
     ) -> Result<(), SchemaError> {
         let transform_id = format!("{}.{}", schema_name, field_name);
         
-        let registered_transforms = self.registered_transforms.read().unwrap();
+        let registered_transforms = self
+            .registered_transforms
+            .read()
+            .map_err(|_| {
+                SchemaError::InvalidData(
+                    "Failed to acquire registered_transforms lock".to_string(),
+                )
+            })?;
         if let Some(transform) = registered_transforms.get(&transform_id) {
             let mut input_values = HashMap::new();
             input_values.insert("field_value".to_string(), value.clone());
@@ -396,11 +552,15 @@ impl TransformRunner for TransformManager {
         TransformManager::execute_transform_now(self, transform_id)
     }
 
-    fn transform_exists(&self, transform_id: &str) -> bool {
+    fn transform_exists(&self, transform_id: &str) -> Result<bool, SchemaError> {
         TransformManager::transform_exists(self, transform_id)
     }
 
-    fn get_transforms_for_field(&self, schema_name: &str, field_name: &str) -> HashSet<String> {
+    fn get_transforms_for_field(
+        &self,
+        schema_name: &str,
+        field_name: &str,
+    ) -> Result<HashSet<String>, SchemaError> {
         TransformManager::get_transforms_for_field(self, schema_name, field_name)
     }
 }

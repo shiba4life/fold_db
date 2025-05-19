@@ -1,5 +1,6 @@
 use crate::atom::{Atom, AtomRef, AtomRefCollection, AtomStatus};
 use crate::db_operations::DbOperations;
+use crate::schema::types::SchemaError;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -45,8 +46,14 @@ impl AtomManager {
 
     pub fn get_latest_atom(&self, aref_uuid: &str) -> Result<Atom, Box<dyn std::error::Error>> {
         // Try in-memory cache first
-        let ref_atoms = self.ref_atoms.lock().unwrap();
-        let atoms = self.atoms.lock().unwrap();
+        let ref_atoms = self
+            .ref_atoms
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
+        let atoms = self
+            .atoms
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire atoms lock".to_string()))?;
 
         if let Some(aref) = ref_atoms.get(aref_uuid) {
             if let Some(atom) = atoms.get(aref.get_atom_uuid()) {
@@ -103,9 +110,10 @@ impl AtomManager {
             content,
             status,
         )?;
-        self.atoms
+        self
+            .atoms
             .lock()
-            .unwrap()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire atoms lock".to_string()))?
             .insert(atom.uuid().to_string(), atom.clone());
         Ok(atom)
     }
@@ -119,9 +127,10 @@ impl AtomManager {
         let aref = self
             .db_ops
             .update_atom_ref(aref_uuid, atom_uuid, source_pub_key)?;
-        self.ref_atoms
+        self
+            .ref_atoms
             .lock()
-            .unwrap()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?
             .insert(aref_uuid.to_string(), aref.clone());
         
         Ok(aref)
@@ -137,9 +146,10 @@ impl AtomManager {
         let collection =
             self.db_ops
                 .update_atom_ref_collection(aref_uuid, atom_uuid, id, source_pub_key)?;
-        self.ref_collections
+        self
+            .ref_collections
             .lock()
-            .unwrap()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string()))?
             .insert(aref_uuid.to_string(), collection.clone());
         Ok(collection)
     }

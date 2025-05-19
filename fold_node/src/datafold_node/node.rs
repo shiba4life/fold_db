@@ -721,7 +721,7 @@ impl DataFoldNode {
             .db
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        Ok(db.list_transforms())
+        Ok(db.list_transforms()?)
     }
 
     /// Execute a transform by id and return the result.

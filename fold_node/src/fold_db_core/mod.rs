@@ -119,9 +119,13 @@ impl FoldDB {
             update_atom_ref_fn,
         ));
 
-        field_manager.set_transform_manager(Arc::clone(&transform_manager));
+        field_manager
+            .set_transform_manager(Arc::clone(&transform_manager))
+            .map_err(|e| sled::Error::Unsupported(e.to_string()))?;
         let orchestrator = Arc::new(TransformOrchestrator::new(transform_manager.clone()));
-        field_manager.set_orchestrator(Arc::clone(&orchestrator));
+        field_manager
+            .set_orchestrator(Arc::clone(&orchestrator))
+            .map_err(|e| sled::Error::Unsupported(e.to_string()))?;
         let _ = schema_manager.load_schemas_from_disk();
 
         Ok(Self {
@@ -372,7 +376,7 @@ impl FoldDB {
                 }
             }
 
-            self.transform_orchestrator.add_task(&schema.name, field_name);
+            let _ = self.transform_orchestrator.add_task(&schema.name, field_name);
         }
         Ok(())
     }
@@ -385,12 +389,12 @@ impl FoldDB {
     }
 
     /// Returns the number of queued transform tasks.
-    pub fn orchestrator_len(&self) -> usize {
+    pub fn orchestrator_len(&self) -> Result<usize, SchemaError> {
         self.transform_orchestrator.len()
     }
 
     /// List all registered transforms.
-    pub fn list_transforms(&self) -> HashMap<String, Transform> {
+    pub fn list_transforms(&self) -> Result<HashMap<String, Transform>, SchemaError> {
         self.transform_manager.list_transforms()
     }
 

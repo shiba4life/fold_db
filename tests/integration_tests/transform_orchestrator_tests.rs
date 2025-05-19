@@ -28,16 +28,20 @@ impl TransformRunner for MockTransformManager {
         Ok(json!(null))
     }
 
-    fn transform_exists(&self, _transform_id: &str) -> bool { true }
+    fn transform_exists(&self, _transform_id: &str) -> Result<bool, SchemaError> {
+        Ok(true)
+    }
 
-    fn get_transforms_for_field(&self, schema_name: &str, field_name: &str) -> HashSet<String> {
+    fn get_transforms_for_field(&self, schema_name: &str, field_name: &str) -> Result<HashSet<String>, SchemaError> {
         self.lookup.lock().unwrap().push((schema_name.to_string(), field_name.to_string()));
-        self.field_map
-            .get(&format!("{}.{}", schema_name, field_name))
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .collect()
+        Ok(
+            self.field_map
+                .get(&format!("{}.{}", schema_name, field_name))
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .collect(),
+        )
     }
 }
 
@@ -48,9 +52,9 @@ fn field_update_adds_to_queue() {
     let manager = Arc::new(mgr);
     let orchestrator = TransformOrchestrator::new(manager.clone());
 
-    orchestrator.add_task("SchemaA", "field1");
+    orchestrator.add_task("SchemaA", "field1").unwrap();
 
-    assert_eq!(orchestrator.len(), 1);
+    assert_eq!(orchestrator.len().unwrap(), 1);
     let calls = manager.lookup.lock().unwrap();
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0], ("SchemaA".to_string(), "field1".to_string()));
@@ -65,9 +69,9 @@ fn sequential_processing_of_tasks() {
     let manager = Arc::new(mgr);
     let orchestrator = TransformOrchestrator::new(manager.clone());
 
-    orchestrator.add_task("Schema", "a");
-    orchestrator.add_task("Schema", "b");
-    orchestrator.add_task("Schema", "c");
+    orchestrator.add_task("Schema", "a").unwrap();
+    orchestrator.add_task("Schema", "b").unwrap();
+    orchestrator.add_task("Schema", "c").unwrap();
 
     orchestrator.process_queue();
 
@@ -76,7 +80,7 @@ fn sequential_processing_of_tasks() {
     assert_eq!(exec[0], "Schema.a");
     assert_eq!(exec[1], "Schema.b");
     assert_eq!(exec[2], "Schema.c");
-    assert_eq!(orchestrator.len(), 0);
+    assert_eq!(orchestrator.len().unwrap(), 0);
 }
 
 #[test]
@@ -86,8 +90,8 @@ fn mapping_adds_specific_transform() {
     let manager = Arc::new(mgr);
     let orchestrator = TransformOrchestrator::new(manager.clone());
 
-    orchestrator.add_task("SchemaA", "field");
-    assert_eq!(orchestrator.len(), 1);
+    orchestrator.add_task("SchemaA", "field").unwrap();
+    assert_eq!(orchestrator.len().unwrap(), 1);
 
     orchestrator.process_queue();
 
