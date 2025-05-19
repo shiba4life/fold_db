@@ -230,7 +230,6 @@ impl DataFoldNode {
                 fields,
                 filter: _,
             } => {
-                let fields_clone = fields.clone();
                 let query = Query {
                     schema_name: schema,
                     fields,
@@ -238,33 +237,12 @@ impl DataFoldNode {
                     trust_distance: 0,      // Set write distance to 0 for all queries
                 };
 
-                let db = self
-                    .db
-                    .lock()
-                    .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-                let results = db.query_schema(query);
+                let results = self.query(query)?;
 
-                // Unwrap the Ok values from the results before serializing
                 let unwrapped_results: Vec<Value> = results
                     .into_iter()
-                    .enumerate()
-                    .map(|(i, result)| match result {
-                        Ok(value) => {
-                            // If the value is null, try to provide a default value based on the field name
-                            if value.is_null() {
-                                match fields_clone.get(i).map(|s| s.as_str()) {
-                                    Some("username") => Value::String("testuser".to_string()),
-                                    Some("email") => Value::String("test@example.com".to_string()),
-                                    Some("full_name") => Value::String("Test User".to_string()),
-                                    Some("bio") => Value::String("Test bio".to_string()),
-                                    Some("age") => Value::Number(serde_json::Number::from(30)),
-                                    Some("location") => Value::String("Test Location".to_string()),
-                                    _ => value,
-                                }
-                            } else {
-                                value
-                            }
-                        }
+                    .map(|result| match result {
+                        Ok(value) => value,
                         Err(e) => serde_json::json!({"error": e.to_string()}),
                     })
                     .collect();
@@ -295,11 +273,7 @@ impl DataFoldNode {
                     mutation_type,
                 };
 
-                let mut db = self
-                    .db
-                    .lock()
-                    .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-                db.write_schema(mutation)?;
+                self.mutate(mutation)?;
 
                 Ok(Value::Null)
             }
