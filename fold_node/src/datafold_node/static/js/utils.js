@@ -249,6 +249,47 @@ function toggleSchema(element) {
     }
 }
 
+/**
+ * Load an HTML snippet into a container and execute any embedded scripts.
+ * @param {string} url - The URL to fetch the HTML from
+ * @param {string} containerId - The id of the container element
+ * @param {Function} callback - Optional callback after loading
+ */
+async function loadHtmlIntoContainer(url, containerId, callback) {
+    try {
+        const response = await fetch(url);
+        const html = await response.text();
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.error(`Container ${containerId} not found`);
+            return;
+        }
+
+        container.innerHTML = html;
+
+        // Execute any inline scripts within the loaded HTML
+        container.querySelectorAll('script').forEach(script => {
+            const newScript = document.createElement('script');
+            if (script.src) {
+                newScript.src = script.src;
+            } else {
+                newScript.textContent = script.textContent;
+            }
+            document.body.appendChild(newScript);
+            document.body.removeChild(newScript);
+        });
+
+        // Dispatch DOMContentLoaded for handlers registered in the snippet
+        document.dispatchEvent(new Event('DOMContentLoaded'));
+
+        if (typeof callback === 'function') {
+            callback(container);
+        }
+    } catch (e) {
+        console.error('Failed to load HTML component', e);
+    }
+}
+
 // Export functions for use in other modules
 window.utils = {
     displayResult,
@@ -258,5 +299,6 @@ window.utils = {
     apiRequest,
     switchTab,
     toggleSchema,
-    showNotification
+    showNotification,
+    loadHtmlIntoContainer
 };
