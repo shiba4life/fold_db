@@ -54,7 +54,25 @@ fn setup_files() -> (TempDir, PathBuf, PathBuf, PathBuf) {
 }
 
 fn cli_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/debug/datafold_cli")
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let exe = manifest_dir.join("target/debug/datafold_cli");
+
+    if !exe.exists() {
+        // Build the CLI binary if it hasn't been compiled yet
+        let status = Command::new("cargo")
+            .args([
+                "build",
+                "--manifest-path",
+                "fold_node/Cargo.toml",
+                "--bin",
+                "datafold_cli",
+            ])
+            .status()
+            .expect("failed to build datafold_cli");
+        assert!(status.success());
+    }
+
+    exe
 }
 
 #[test]
@@ -129,4 +147,35 @@ fn mutate_query_execute() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("\"alice\""));
+}
+
+#[test]
+fn help_and_version() {
+    let exe = cli_path();
+
+    let output = Command::new(&exe)
+        .arg("--help")
+        .output()
+        .expect("failed to run --help");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Usage"));
+
+    let output = Command::new(&exe)
+        .arg("--version")
+        .output()
+        .expect("failed to run --version");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains(env!("CARGO_PKG_VERSION")));
+}
+
+#[test]
+fn missing_config_fails() {
+    let exe = cli_path();
+    let status = Command::new(&exe)
+        .args(["-c", "nonexistent.json", "list-schemas"])
+        .status()
+        .expect("command failed");
+    assert!(!status.success());
 }
