@@ -52,7 +52,7 @@ pub struct SampleManager {
 
 impl SampleManager {
     /// Create a new sample manager.
-    pub async fn new() -> Self {
+    pub async fn new() -> FoldDbResult<Self> {
         let mut manager = Self {
             schemas: HashMap::new(),
             queries: HashMap::new(),
@@ -60,19 +60,26 @@ impl SampleManager {
         };
 
         // Load sample data
-        manager.load_samples().await;
+        manager.load_samples().await?;
 
-        manager
+        Ok(manager)
     }
 
     /// Load sample data from files.
-    async fn load_samples(&mut self) {
+    async fn load_samples(&mut self) -> FoldDbResult<()> {
         let samples_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("src/datafold_node/samples/data");
 
         let mut entries = match fs::read_dir(&samples_dir).await {
             Ok(e) => e,
-            Err(_) => return,
+            Err(e) => {
+                eprintln!(
+                    "Failed to read samples directory {}: {}",
+                    samples_dir.display(),
+                    e
+                );
+                return Err(FoldDbError::Io(e));
+            }
         };
 
         while let Ok(Some(entry)) = entries.next_entry().await {
@@ -104,6 +111,8 @@ impl SampleManager {
                 }
             }
         }
+
+        Ok(())
     }
 
     /// Get a sample schema by name.
@@ -166,7 +175,7 @@ impl DataFoldHttpServer {
     /// * There is an error creating the sample manager
     pub async fn new(mut node: DataFoldNode, bind_address: &str) -> FoldDbResult<Self> {
         // Create sample manager
-        let sample_manager = SampleManager::new().await;
+        let sample_manager = SampleManager::new().await?;
 
         // Load sample schemas into the node
         for (_, schema_value) in sample_manager.schemas.iter() {
@@ -204,7 +213,7 @@ impl DataFoldHttpServer {
         // Create shared application state
         let app_state = web::Data::new(AppState {
             node: self.node.clone(),
-            sample_manager: SampleManager::new().await,
+            sample_manager: SampleManager::new().await?,
         });
 
         // Start the HTTP server
@@ -655,7 +664,7 @@ mod tests {
     /// Ensure the sample manager loads schema samples from disk.
     #[tokio::test]
     async fn sample_manager_loads_schemas() {
-        let manager = SampleManager::new().await;
+        let manager = SampleManager::new().await.expect("failed to load samples");
         let schemas = manager.list_schema_samples();
         assert!(schemas.contains(&"UserProfile".to_string()));
         assert!(schemas.contains(&"ProductCatalog".to_string()));
