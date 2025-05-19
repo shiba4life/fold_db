@@ -55,7 +55,7 @@ pub fn load_schema_from_file<P: AsRef<Path>>(
         }
         Err(_) => {
             let json_schema: JsonSchemaDefinition = serde_json::from_str(&schema_str)?;
-            let core = SchemaCore::default()?;
+            let core = SchemaCore::init_default()?;
             let schema = core.interpret_schema(json_schema)?;
             node.load_schema(schema)?;
         }
