@@ -18,13 +18,22 @@ fn default_network_listen_address() -> String {
     "/ip4/0.0.0.0/tcp/0".to_string()
 }
 
+impl Default for NodeConfig {
+    fn default() -> Self {
+        Self {
+            storage_path: PathBuf::from("data"),
+            default_trust_distance: 1,
+            network_listen_address: default_network_listen_address(),
+        }
+    }
+}
+
 impl NodeConfig {
     /// Create a new node configuration with the specified storage path
     pub fn new(storage_path: PathBuf) -> Self {
         Self {
             storage_path,
-            default_trust_distance: 1,
-            network_listen_address: default_network_listen_address(),
+            ..Default::default()
         }
     }
 
