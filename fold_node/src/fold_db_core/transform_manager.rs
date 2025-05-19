@@ -330,6 +330,12 @@ impl TransformManager {
         registered_transforms.contains_key(transform_id)
     }
 
+    /// List all registered transforms.
+    pub fn list_transforms(&self) -> HashMap<String, Transform> {
+        let registered_transforms = self.registered_transforms.read().unwrap();
+        registered_transforms.clone()
+    }
+
     /// Gets all transforms that depend on the specified atom reference.
     pub fn get_dependent_transforms(&self, aref_uuid: &str) -> HashSet<String> {
         let aref_to_transforms = self.aref_to_transforms.read().unwrap();

@@ -241,6 +241,9 @@ impl DataFoldHttpServer {
                         .route("/samples/schema/{name}", web::get().to(get_schema_sample))
                         .route("/samples/query/{name}", web::get().to(get_query_sample))
                         .route("/samples/mutation/{name}", web::get().to(get_mutation_sample))
+                        // Transform endpoints
+                        .route("/transforms", web::get().to(list_transforms))
+                        .route("/transform/{id}/run", web::post().to(run_transform))
                         // Network endpoints
                         .service(
                             web::scope("/network")
@@ -516,6 +519,25 @@ async fn get_mutation_sample(path: web::Path<String>, state: web::Data<AppState>
         None => HttpResponse::NotFound().json(json!({
             "error": format!("Sample mutation '{}' not found", name)
         })),
+    }
+}
+
+async fn list_transforms(state: web::Data<AppState>) -> impl Responder {
+    let node = state.node.lock().await;
+    match node.list_transforms() {
+        Ok(map) => HttpResponse::Ok().json(json!({ "data": map })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "error": format!("Failed to list transforms: {}", e) })),
+    }
+}
+
+async fn run_transform(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
+    let id = path.into_inner();
+    let mut node = state.node.lock().await;
+    match node.run_transform(&id) {
+        Ok(val) => HttpResponse::Ok().json(json!({ "data": val })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "error": format!("Failed to run transform: {}", e) })),
     }
 }
 

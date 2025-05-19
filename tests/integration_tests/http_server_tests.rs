@@ -184,3 +184,61 @@ async fn test_network_endpoints() {
     handle.abort();
 }
 
+#[tokio::test]
+async fn test_transform_endpoints() {
+    let (handle, addr, _tmp) = start_server().await;
+    let client = Client::new();
+
+    let schema_json = serde_json::json!({
+        "name": "transform_schema",
+        "fields": {
+            "computed": {
+                "permission_policy": {
+                    "read_policy": { "Distance": 0 },
+                    "write_policy": { "Distance": 0 },
+                    "explicit_read_policy": null,
+                    "explicit_write_policy": null
+                },
+                "ref_atom_uuid": "calc_uuid",
+                "payment_config": {
+                    "base_multiplier": 1.0,
+                    "trust_distance_scaling": { "None": null },
+                    "min_payment": null
+                },
+                "field_mappers": {},
+                "field_type": "Single",
+                "transform": "transform calc { logic: { 4 + 5; } }"
+            }
+        },
+        "payment_config": { "base_multiplier": 1.0, "min_payment_threshold": 0 }
+    });
+
+    let resp = client
+        .post(format!("http://{}/api/schema", addr))
+        .json(&schema_json)
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success(), "{}", resp.text().await.unwrap());
+
+    let resp = client
+        .get(format!("http://{}/api/transforms", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let body: Value = resp.json().await.unwrap();
+    assert!(body["data"].as_object().unwrap().contains_key("transform_schema.computed"));
+
+    let resp = client
+        .post(format!("http://{}/api/transform/transform_schema.computed/run", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body["data"], serde_json::json!(9.0));
+
+    handle.abort();
+}
+

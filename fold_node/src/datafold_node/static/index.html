@@ -54,6 +54,9 @@
                         <button class="tab-button" data-tab="samples">
                             <span id="samplesTabIcon"></span> Samples
                         </button>
+                        <button class="tab-button" data-tab="transforms">
+                            <span id="transformsTabIcon"></span> Transforms
+                        </button>
                         <button class="tab-button" data-tab="network">
                             <span id="networkTabIcon"></span> Network
                         </button>
@@ -80,7 +83,18 @@
                                 });
                         </script>
                     </div>
-                    
+
+                    <!-- Include Transforms Tab Component -->
+                    <div id="transformsTabContainer">
+                        <script>
+                            fetch('/static/components/transforms-tab.html')
+                                .then(response => response.text())
+                                .then(html => {
+                                    document.getElementById('transformsTabContainer').innerHTML = html;
+                                });
+                        </script>
+                    </div>
+
                     <!-- Include Network Tab Component -->
                     <div id="networkTabContainer">
                         <script>
@@ -137,6 +151,7 @@
     <script src="/static/js/operations.js"></script>
     <script src="/static/js/network.js"></script>
     <script src="/static/js/samples.js"></script>
+    <script src="/static/js/transforms.js"></script>
     <script src="/static/js/app.js"></script>
 
     <!-- Initialize icons -->
@@ -151,6 +166,7 @@
             document.getElementById('queryTabIcon').innerHTML = icons.search();
             document.getElementById('mutationTabIcon').innerHTML = icons.code();
             document.getElementById('samplesTabIcon').innerHTML = icons.library();
+            document.getElementById('transformsTabIcon').innerHTML = icons.gear();
             document.getElementById('networkTabIcon').innerHTML = icons.network();
             
             // Set status icon
