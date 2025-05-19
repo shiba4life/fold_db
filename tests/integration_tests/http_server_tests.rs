@@ -90,8 +90,9 @@ async fn test_sample_endpoints() {
         .unwrap();
     assert!(resp.status().is_success());
     let schemas: Value = resp.json().await.unwrap();
-    assert!(schemas.as_array().unwrap().contains(&Value::String("UserProfile".to_string())));
-    assert!(schemas.as_array().unwrap().contains(&Value::String("ProductCatalog".to_string())));
+    let schemas_arr = schemas["data"].as_array().unwrap();
+    assert!(schemas_arr.contains(&Value::String("UserProfile".to_string())));
+    assert!(schemas_arr.contains(&Value::String("ProductCatalog".to_string())));
     let resp = client
         .get(format!("http://{}/api/samples/schema/UserProfile", addr))
         .send()

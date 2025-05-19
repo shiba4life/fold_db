@@ -46,13 +46,14 @@ impl SchemaCore {
     }
 
     /// Creates a new `SchemaCore` using the default `data/schemas` directory.
-    pub fn default() -> Result<Self, SchemaError> {
+    #[must_use = "This returns a Result that should be handled"]
+    pub fn init_default() -> Result<Self, SchemaError> {
         let schemas_dir = PathBuf::from("data/schemas");
         Self::init_with_dir(schemas_dir)
     }
 
     /// Creates a new `SchemaCore` instance with a custom schemas directory.
-    #[must_use]
+    #[must_use = "This returns a Result containing the schema core that should be handled"]
     pub fn new(path: &str) -> Result<Self, SchemaError> {
         let schemas_dir = PathBuf::from(path).join("schemas");
         Self::init_with_dir(schemas_dir)
