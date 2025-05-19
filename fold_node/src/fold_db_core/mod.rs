@@ -6,6 +6,7 @@ pub mod transform_manager;
 pub mod transform_orchestrator;
 
 use std::sync::Arc;
+use std::collections::HashMap;
 use crate::atom::{Atom, AtomRefBehavior};
 use crate::db_operations::DbOperations;
 use crate::permissions::PermissionWrapper;
@@ -386,5 +387,15 @@ impl FoldDB {
     /// Returns the number of queued transform tasks.
     pub fn orchestrator_len(&self) -> usize {
         self.transform_orchestrator.len()
+    }
+
+    /// List all registered transforms.
+    pub fn list_transforms(&self) -> HashMap<String, Transform> {
+        self.transform_manager.list_transforms()
+    }
+
+    /// Execute a transform immediately and return the result.
+    pub fn run_transform(&self, transform_id: &str) -> Result<Value, SchemaError> {
+        self.transform_manager.execute_transform_now(transform_id)
     }
 }

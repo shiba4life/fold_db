@@ -8,7 +8,7 @@ use crate::datafold_node::config::NodeInfo;
 use crate::error::{FoldDbError, FoldDbResult, NetworkErrorKind};
 use crate::fold_db_core::FoldDB;
 use crate::network::{NetworkConfig, NetworkCore, PeerId};
-use crate::schema::types::{Mutation, Operation, Query};
+use crate::schema::types::{Mutation, Operation, Query, Transform};
 use crate::schema::{Schema, SchemaError};
 
 /// A node in the DataFold distributed database system.
@@ -713,6 +713,24 @@ impl DataFoldNode {
             initialized,
             connected_nodes_count,
         })
+    }
+
+    /// List all registered transforms.
+    pub fn list_transforms(&self) -> FoldDbResult<HashMap<String, Transform>> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        Ok(db.list_transforms())
+    }
+
+    /// Execute a transform by id and return the result.
+    pub fn run_transform(&mut self, transform_id: &str) -> FoldDbResult<Value> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        Ok(db.run_transform(transform_id)?)
     }
 
     /// Gets the unique identifier for this node.
