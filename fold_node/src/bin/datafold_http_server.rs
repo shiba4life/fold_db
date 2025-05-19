@@ -3,7 +3,6 @@ use fold_node::{
 };
 use std::env;
 use std::fs;
-use std::path::PathBuf;
 
 /// Main entry point for the DataFold HTTP server.
 ///
@@ -63,7 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         serde_json::from_str(&config_str)?
     } else {
         println!("Config file not found, using default config");
-        NodeConfig::new(PathBuf::from("data"))
+        NodeConfig::default()
     };
     println!("Config loaded successfully");
 
