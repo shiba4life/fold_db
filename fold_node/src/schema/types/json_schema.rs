@@ -45,6 +45,10 @@ pub struct JsonTransform {
     
     /// Whether payment is required for this transform
     pub payment_required: bool,
+
+    /// Explicit list of input fields in `Schema.field` format
+    #[serde(default)]
+    pub inputs: Vec<String>,
 }
 
 /// JSON representation of permission policy
@@ -97,6 +101,7 @@ impl From<JsonTransform> for Transform {
             reversible: json.reversible,
             signature: json.signature,
             payment_required: json.payment_required,
+            inputs: json.inputs,
             input_dependencies: Vec::new(),
             output_reference: None,
             parsed_expr: None,

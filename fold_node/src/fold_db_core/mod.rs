@@ -29,7 +29,7 @@ pub struct FoldDB {
     pub(crate) atom_manager: AtomManager,
     pub(crate) field_manager: FieldManager,
     pub(crate) collection_manager: CollectionManager,
-    pub(crate) schema_manager: SchemaCore,
+    pub(crate) schema_manager: Arc<SchemaCore>,
     pub(crate) transform_manager: Arc<TransformManager>,
     pub(crate) transform_orchestrator: Arc<TransformOrchestrator>,
     permission_wrapper: PermissionWrapper,
@@ -92,8 +92,10 @@ impl FoldDB {
         let atom_manager = AtomManager::new(db_ops);
         let field_manager = FieldManager::new(atom_manager.clone());
         let collection_manager = CollectionManager::new(field_manager.clone());
-        let schema_manager = SchemaCore::new(path)
-            .map_err(|e| sled::Error::Unsupported(e.to_string()))?;
+        let schema_manager = Arc::new(
+            SchemaCore::new(path)
+                .map_err(|e| sled::Error::Unsupported(e.to_string()))?,
+        );
         let atom_manager_clone = atom_manager.clone();
         let get_atom_fn = Arc::new(move |aref_uuid: &str| {
             atom_manager_clone.get_latest_atom(aref_uuid)
@@ -113,11 +115,21 @@ impl FoldDB {
             atom_manager_clone.update_atom_ref(aref_uuid, atom_uuid, source_pub_key)
         });
 
+        let field_value_manager = FieldManager::new(atom_manager.clone());
+        let schema_manager_clone = Arc::clone(&schema_manager);
+        let get_field_fn = Arc::new(move |schema_name: &str, field_name: &str| {
+            match schema_manager_clone.get_schema(schema_name)? {
+                Some(schema) => field_value_manager.get_field_value(&schema, field_name),
+                None => Err(SchemaError::InvalidField(format!("Field not found: {}.{}", schema_name, field_name))),
+            }
+        });
+
         let transform_manager = Arc::new(TransformManager::new(
             transforms_tree,
             get_atom_fn,
             create_atom_fn,
             update_atom_ref_fn,
+            get_field_fn,
         ));
 
         field_manager
@@ -170,15 +182,32 @@ impl FoldDB {
                 let mut input_arefs = Vec::new();
                 let mut trigger_fields = Vec::new();
                 let mut seen_cross = std::collections::HashSet::new();
-                for cap in cross_re.captures_iter(&transform.logic) {
-                    let schema_name = cap[1].to_string();
-                    let field_dep = cap[2].to_string();
-                    seen_cross.insert(field_dep.clone());
-                    trigger_fields.push(format!("{}.{}", schema_name, field_dep));
-                    if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
-                        if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
-                            if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
-                                input_arefs.push(dep_aref);
+
+                if !transform.inputs.is_empty() {
+                    for input in &transform.inputs {
+                        if let Some((schema_name, field_dep)) = input.split_once('.') {
+                            seen_cross.insert(field_dep.to_string());
+                            trigger_fields.push(format!("{}.{}", schema_name, field_dep));
+                            if let Some(dep_schema) = self.schema_manager.get_schema(schema_name)? {
+                                if let Some(dep_field) = dep_schema.fields.get(field_dep) {
+                                    if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
+                                        input_arefs.push(dep_aref);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    for cap in cross_re.captures_iter(&transform.logic) {
+                        let schema_name = cap[1].to_string();
+                        let field_dep = cap[2].to_string();
+                        seen_cross.insert(field_dep.clone());
+                        trigger_fields.push(format!("{}.{}", schema_name, field_dep));
+                        if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
+                            if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
+                                if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
+                                    input_arefs.push(dep_aref);
+                                }
                             }
                         }
                     }
