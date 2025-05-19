@@ -1,4 +1,5 @@
 use crate::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+use log::{info, warn, error};
 
 /// Manages and enforces access control policies in the database.
 ///
@@ -61,12 +62,12 @@ impl PermissionManager {
         // If trust distance check fails, check explicit permissions
         permissions_policy.explicit_read_policy.as_ref().map_or_else(
             || {
-                eprintln!("Trust distance failed and no explicit permissions for {pub_key}");
+                warn!("Trust distance failed and no explicit permissions for {pub_key}");
                 false
             },
             |explicit_policy| {
                 let allowed = explicit_policy.counts_by_pub_key.contains_key(pub_key);
-                eprintln!("Trust distance failed checking explicit permission for {pub_key}: {allowed}");
+                warn!("Trust distance failed checking explicit permission for {pub_key}: {allowed}");
                 allowed
             }
         )
@@ -109,7 +110,7 @@ impl PermissionManager {
             TrustDistance::Distance(required_distance) => {
                 // Calculate result and print it before returning
                 let result = trust_distance <= required_distance;
-                eprintln!("Trust distance check for {pub_key}: {trust_distance} <= {required_distance} = {result}");
+                info!("Trust distance check for {pub_key}: {trust_distance} <= {required_distance} = {result}");
                 result
             }
         };
@@ -122,12 +123,12 @@ impl PermissionManager {
         // If trust distance check fails, check explicit permissions
         permissions_policy.explicit_write_policy.as_ref().map_or_else(
             || {
-                eprintln!("Trust distance failed and no explicit permissions for {pub_key}");
+                warn!("Trust distance failed and no explicit permissions for {pub_key}");
                 false
             },
             |explicit_policy| {
                 let allowed = explicit_policy.counts_by_pub_key.contains_key(pub_key);
-                eprintln!("Trust distance failed checking explicit permission for {pub_key}: {allowed}");
+                warn!("Trust distance failed checking explicit permission for {pub_key}: {allowed}");
                 allowed
             }
         )

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
+use log::{info, warn, error};
 
 use crate::fees::lightning::LightningClient;
 use crate::fees::{
@@ -309,7 +310,7 @@ impl PaymentManager {
                 .cancel_invoice(&format!("mock_invoice_{payment_hash}"))
                 .await
             {
-                eprintln!("Failed to cancel expired invoice {payment_hash}: {e}");
+                warn!("Failed to cancel expired invoice {payment_hash}: {e}");
             }
             if let Some(state) = states.get_mut(&payment_hash) {
                 state.status = PaymentStatus::Expired;

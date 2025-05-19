@@ -5,6 +5,7 @@ use fold_node::testing::{
 };
 use serde_json::Value;
 use std::collections::HashMap;
+use env_logger;
 
 fn create_default_payment_config() -> FieldPaymentConfig {
     FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
@@ -12,6 +13,7 @@ fn create_default_payment_config() -> FieldPaymentConfig {
 
 #[test]
 fn test_permission_wrapper_query() {
+    let _ = env_logger::builder().is_test(true).try_init();
     // Setup
     let wrapper = PermissionWrapper::new();
     let schema_manager = SchemaCore::new("data").unwrap();
@@ -71,6 +73,7 @@ fn test_permission_wrapper_query() {
 
 #[test]
 fn test_permission_wrapper_no_requirement() {
+    let _ = env_logger::builder().is_test(true).try_init();
     // Setup
     let wrapper = PermissionWrapper::new();
     let schema_manager = SchemaCore::new("data").unwrap();
@@ -120,6 +123,7 @@ fn test_permission_wrapper_no_requirement() {
 
 #[test]
 fn test_permission_wrapper_mutation() {
+    let _ = env_logger::builder().is_test(true).try_init();
     // Setup
     let wrapper = PermissionWrapper::new();
     let schema_manager = SchemaCore::new("data").unwrap();

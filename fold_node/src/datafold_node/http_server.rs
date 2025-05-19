@@ -8,6 +8,7 @@ use actix_cors::Cors;
 use actix_files::Files;
 use actix_web::{web, App, HttpResponse, HttpServer as ActixHttpServer, Responder};
 use serde::Deserialize;
+use log::{info, warn, error};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
@@ -74,7 +75,7 @@ impl SampleManager {
         let mut entries = match fs::read_dir(&samples_dir).await {
             Ok(e) => e,
             Err(e) => {
-                eprintln!(
+                error!(
                     "Failed to read samples directory {}: {}",
                     samples_dir.display(),
                     e
@@ -182,7 +183,7 @@ impl DataFoldHttpServer {
         for (_, schema_value) in sample_manager.schemas.iter() {
             let schema: Schema = serde_json::from_value(schema_value.clone())
                 .map_err(|e| FoldDbError::Config(format!("Failed to deserialize sample schema: {}", e)))?;
-            println!("Loading sample schema into node: {}", schema.name);
+            info!("Loading sample schema into node: {}", schema.name);
             node.load_schema(schema)?;
         }
 
@@ -209,7 +210,7 @@ impl DataFoldHttpServer {
     /// * There is an error binding to the specified address
     /// * There is an error starting the server
     pub async fn run(&self) -> FoldDbResult<()> {
-        println!("HTTP server running on {}", self.bind_address);
+        info!("HTTP server running on {}", self.bind_address);
 
         // Create shared application state
         let app_state = web::Data::new(AppState {
@@ -281,19 +282,19 @@ impl DataFoldHttpServer {
 
 /// List all schemas.
 async fn list_schemas(state: web::Data<AppState>) -> impl Responder {
-    println!("Received request to list schemas");
+    info!("Received request to list schemas");
     let node_guard = state.node.lock().await;
 
     match node_guard.list_schemas() {
         Ok(schemas) => {
-            println!("Successfully listed schemas: {:?}", schemas);
+            info!("Successfully listed schemas: {:?}", schemas);
             // Wrap the schemas in a data field to match frontend expectations
             HttpResponse::Ok().json(json!({
                 "data": schemas
             }))
         },
         Err(e) => {
-            println!("Failed to list schemas: {}", e);
+            error!("Failed to list schemas: {}", e);
             HttpResponse::InternalServerError().json(json!({
                 "error": format!("Failed to list schemas: {}", e)
             }))

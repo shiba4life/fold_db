@@ -4,9 +4,11 @@ use serde_json::json;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::sleep;
+use env_logger;
 
 #[tokio::test]
 async fn test_request_forwarding() {
+    let _ = env_logger::builder().is_test(true).try_init();
     // Create temporary directories for the nodes
     let node1_dir = PathBuf::from("test_data/request_forwarding/node1/db");
     let node2_dir = PathBuf::from("test_data/request_forwarding/node2/db");
@@ -237,6 +239,7 @@ async fn test_request_forwarding() {
 
 #[tokio::test]
 async fn test_request_forwarding_address_resolution() {
+    let _ = env_logger::builder().is_test(true).try_init();
     let node1_dir = PathBuf::from("test_data/request_forwarding_addr/node1/db");
     let node2_dir = PathBuf::from("test_data/request_forwarding_addr/node2/db");
 

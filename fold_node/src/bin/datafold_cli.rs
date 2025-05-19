@@ -3,6 +3,8 @@ use fold_node::{load_schema_from_file, DataFoldNode, MutationType, NodeConfig, O
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
+use env_logger;
+use log::{info, warn, error};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -93,30 +95,31 @@ enum Commands {
 /// * The node cannot be initialized
 /// * There is an error executing the requested command
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
     let cli = Cli::parse();
 
     // Load node configuration
-    println!("Loading config from: {}", cli.config);
+    info!("Loading config from: {}", cli.config);
     let config_str = fs::read_to_string(&cli.config)?;
     let config: NodeConfig = serde_json::from_str(&config_str)?;
 
     // Initialize node
-    println!("Initializing DataFold Node...");
+    info!("Initializing DataFold Node...");
     let mut node = DataFoldNode::load(config)?;
-    println!("Node initialized with ID: {}", node.get_node_id());
+    info!("Node initialized with ID: {}", node.get_node_id());
 
     // Process command
     match cli.command {
         Commands::LoadSchema { path } => {
-            println!("Loading schema from: {}", path.display());
+            info!("Loading schema from: {}", path.display());
             load_schema_from_file(path, &mut node)?;
-            println!("Schema loaded successfully");
+            info!("Schema loaded successfully");
         }
         Commands::ListSchemas {} => {
             let schemas = node.list_schemas()?;
-            println!("Loaded schemas:");
+            info!("Loaded schemas:");
             for schema in schemas {
-                println!("  - {}", schema.name);
+                info!("  - {}", schema.name);
             }
         }
         Commands::Query {
@@ -125,7 +128,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             filter,
             output,
         } => {
-            println!("Executing query on schema: {}", schema);
+            info!("Executing query on schema: {}", schema);
 
             let filter_value = if let Some(filter_str) = filter {
                 Some(serde_json::from_str(&filter_str)?)
@@ -142,9 +145,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let result = node.execute_operation(operation)?;
 
             if output == "json" {
-                println!("{}", result);
+                info!("{}", result);
             } else {
-                println!("{}", serde_json::to_string_pretty(&result)?);
+                info!("{}", serde_json::to_string_pretty(&result)?);
             }
         }
         Commands::Mutate {
@@ -152,7 +155,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             mutation_type,
             data,
         } => {
-            println!("Executing mutation on schema: {}", schema);
+            info!("Executing mutation on schema: {}", schema);
 
             let data_value: Value = serde_json::from_str(&data)?;
 
@@ -163,20 +166,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             node.execute_operation(operation)?;
-            println!("Mutation executed successfully");
+            info!("Mutation executed successfully");
         }
         Commands::Execute { path } => {
-            println!("Executing operation from file: {}", path.display());
+            info!("Executing operation from file: {}", path.display());
             let operation_str = fs::read_to_string(path)?;
             let operation: Operation = serde_json::from_str(&operation_str)?;
 
             let result = node.execute_operation(operation)?;
 
             if !result.is_null() {
-                println!("Result:");
-                println!("{}", serde_json::to_string_pretty(&result)?);
+                info!("Result:");
+                info!("{}", serde_json::to_string_pretty(&result)?);
             } else {
-                println!("Operation executed successfully");
+                info!("Operation executed successfully");
             }
         }
     }

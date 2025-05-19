@@ -3,6 +3,7 @@ use std::thread;
 use std::time::Duration;
 
 use fold_node::{datafold_node::config::NodeConfig, network::NetworkConfig, DataFoldNode};
+use env_logger;
 
 // Helper function to create a test network config with random ports
 fn create_test_network_config(enable_discovery: bool) -> NetworkConfig {
@@ -33,6 +34,7 @@ fn create_test_network_config(enable_discovery: bool) -> NetworkConfig {
 
 #[tokio::test]
 async fn test_discovery_initialization() {
+    let _ = env_logger::builder().is_test(true).try_init();
     // Create a temporary directory for test data
     let temp_dir = tempfile::tempdir().unwrap();
     let storage_path = temp_dir.path().to_path_buf();
@@ -73,6 +75,7 @@ async fn test_discovery_initialization() {
 
 #[tokio::test]
 async fn test_node_discovery_enabled() {
+    let _ = env_logger::builder().is_test(true).try_init();
     // Create temporary directories for test data
     let temp_dir1 = tempfile::tempdir().unwrap();
     let temp_dir2 = tempfile::tempdir().unwrap();
@@ -183,6 +186,7 @@ async fn test_node_discovery_enabled() {
 
 #[tokio::test]
 async fn test_node_discovery_disabled() {
+    let _ = env_logger::builder().is_test(true).try_init();
     // Create temporary directories for test data
     let temp_dir1 = tempfile::tempdir().unwrap();
     let temp_dir2 = tempfile::tempdir().unwrap();
@@ -256,6 +260,7 @@ async fn test_node_discovery_disabled() {
 
 #[tokio::test]
 async fn test_manual_node_connection() {
+    let _ = env_logger::builder().is_test(true).try_init();
     // Create temporary directories for test data
     let temp_dir1 = tempfile::tempdir().unwrap();
     let temp_dir2 = tempfile::tempdir().unwrap();
@@ -331,6 +336,7 @@ async fn test_manual_node_connection() {
 
 #[tokio::test]
 async fn test_discovery_with_multiple_nodes() {
+    let _ = env_logger::builder().is_test(true).try_init();
     const NUM_NODES: usize = 3;
 
     // Create temporary directories and nodes
