@@ -558,11 +558,9 @@ impl DataFoldNode {
     /// Stop the network service
     pub async fn stop_network(&self) -> FoldDbResult<()> {
         if let Some(network) = &self.network {
-            let network_guard = network.lock().await;
-            // In a real implementation, this would stop the network service
-            // For now, just log that we're stopping
+            let mut network_guard = network.lock().await;
             println!("Stopping network service");
-            let _ = network_guard; // Acknowledge the guard to avoid unused variable warning
+            network_guard.stop();
             Ok(())
         } else {
             Err(FoldDbError::Network(NetworkErrorKind::Protocol(
