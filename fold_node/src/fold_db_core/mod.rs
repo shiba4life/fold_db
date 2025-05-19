@@ -92,7 +92,8 @@ impl FoldDB {
         let atom_manager = AtomManager::new(db_ops);
         let field_manager = FieldManager::new(atom_manager.clone());
         let collection_manager = CollectionManager::new(field_manager.clone());
-        let schema_manager = SchemaCore::new(path);
+        let schema_manager = SchemaCore::new(path)
+            .map_err(|e| sled::Error::Unsupported(e.to_string()))?;
         let atom_manager_clone = atom_manager.clone();
         let get_atom_fn = Arc::new(move |aref_uuid: &str| {
             atom_manager_clone.get_latest_atom(aref_uuid)
