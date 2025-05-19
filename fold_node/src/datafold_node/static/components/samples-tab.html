@@ -67,25 +67,25 @@
 
 <script>
     // Add icons to buttons
-    document.addEventListener('DOMContentLoaded', () => {
+    (() => {
         // Make sure sample tabs are properly set up
         const schemaSamples = document.getElementById('schemaSamples');
         const querySamples = document.getElementById('querySamples');
         const mutationSamples = document.getElementById('mutationSamples');
-        
+
         if (schemaSamples && querySamples && mutationSamples) {
             schemaSamples.classList.add('active');
             querySamples.classList.remove('active');
             mutationSamples.classList.remove('active');
         }
-        
+
         // Set up modal close buttons
         document.querySelectorAll('.close-modal').forEach(button => {
             button.addEventListener('click', () => {
                 document.getElementById('samplePreviewModal').style.display = 'none';
             });
         });
-        
+
         // Close modal when clicking outside of it
         window.addEventListener('click', (event) => {
             const modal = document.getElementById('samplePreviewModal');
@@ -93,5 +93,5 @@
                 modal.style.display = 'none';
             }
         });
-    });
+    })();
 </script>
