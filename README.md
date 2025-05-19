@@ -49,6 +49,10 @@ By default, both `datafold_cli` and `datafold_node` look for `config/node_config
 ```
 
 Override with `-c, --config <PATH>` flag.
+Additional server flags:
+
+- `--port <PORT>` – P2P network port (default `9000` for `datafold_node`, `9001` for `datafold_http_server`)
+- `--tcp-port <PORT>` – TCP server port (defaults to `9000`)
 
 ## Usage
 
@@ -60,7 +64,9 @@ See [README_CLI.md](README_CLI.md) for detailed CLI commands: loading schemas, l
 
 ```bash
 target/release/datafold_node \
-  --config config/node_config.json
+  --config config/node_config.json \
+  --port 9000 \
+  --tcp-port 9000
 ```
 
 Once running, use the CLI or HTTP/TCP clients to interact.

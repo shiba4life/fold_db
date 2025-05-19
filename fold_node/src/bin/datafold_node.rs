@@ -2,10 +2,26 @@ use fold_node::{
     datafold_node::{load_node_config, NodeConfig, DataFoldNode, TcpServer},
     network::NetworkConfig,
 };
+
 use std::env;
 use std::path::PathBuf;
+use std::fs;
+use clap::Parser;
 use env_logger;
-use log::{info, warn, error};
+use log::{info, error};
+
+/// Command line options for the datafold node binary.
+#[derive(Parser, Debug)]
+#[command(author, version, about)]
+struct Cli {
+    /// Port for the P2P network
+    #[arg(long, default_value_t = 9000)]
+    port: u16,
+
+    /// Port for the TCP server
+    #[arg(long, default_value_t = 9000)]
+    tcp_port: u16,
+}
 
 /// Main entry point for the DataFold Node server.
 ///
@@ -38,34 +54,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
     info!("Starting DataFold Node...");
 
-    // Parse command-line arguments
-    let args: Vec<String> = env::args().collect();
-    let mut port = 9000; // Default port
-    let mut tcp_port = 9000; // Default TCP port
-
-    // Simple argument parsing
-    let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--port" => {
-                if i + 1 < args.len() {
-                    if let Ok(p) = args[i + 1].parse::<u16>() {
-                        port = p;
-                    }
-                }
-                i += 2;
-            }
-            "--tcp-port" => {
-                if i + 1 < args.len() {
-                    if let Ok(p) = args[i + 1].parse::<u16>() {
-                        tcp_port = p;
-                    }
-                }
-                i += 2;
-            }
-            _ => i += 1,
-        }
-    }
+    // Parse command-line arguments using clap
+    let Cli { port, tcp_port } = Cli::parse();
 
     // Load node configuration
     let config = load_node_config(None, Some(port));
@@ -116,4 +106,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tcp_server_handle.await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Cli;
+    use clap::Parser;
+
+    #[test]
+    fn defaults() {
+        let cli = Cli::parse_from(["test"]); 
+        assert_eq!(cli.port, 9000);
+        assert_eq!(cli.tcp_port, 9000);
+    }
+
+    #[test]
+    fn custom_values() {
+        let cli = Cli::parse_from(["test", "--port", "8000", "--tcp-port", "8001"]);
+        assert_eq!(cli.port, 8000);
+        assert_eq!(cli.tcp_port, 8001);
+    }
 }

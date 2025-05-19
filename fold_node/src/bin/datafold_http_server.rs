@@ -3,8 +3,19 @@ use fold_node::{
 };
 use std::env;
 use std::path::PathBuf;
+use std::fs;
+use clap::Parser;
 use env_logger;
-use log::{info, warn, error};
+use log::{info, error};
+
+/// Command line options for the HTTP server binary.
+#[derive(Parser, Debug)]
+#[command(author, version, about)]
+struct Cli {
+    /// Port for the HTTP server
+    #[arg(long, default_value_t = 9001)]
+    port: u16,
+}
 
 /// Main entry point for the DataFold HTTP server.
 ///
@@ -35,25 +46,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
     info!("Starting DataFold HTTP Server...");
 
-    // Parse command-line arguments
-    let args: Vec<String> = env::args().collect();
-    let mut http_port = 9001; // Default HTTP port
-
-    // Simple argument parsing
-    let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--port" => {
-                if i + 1 < args.len() {
-                    if let Ok(p) = args[i + 1].parse::<u16>() {
-                        http_port = p;
-                    }
-                }
-                i += 2;
-            }
-            _ => i += 1,
-        }
-    }
+    // Parse command-line arguments using clap
+    let Cli { port: http_port } = Cli::parse();
 
     // Load node configuration
     let config = load_node_config(None, None);
@@ -76,4 +70,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     http_server.run().await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Cli;
+    use clap::Parser;
+
+    #[test]
+    fn defaults() {
+        let cli = Cli::parse_from(["test"]);
+        assert_eq!(cli.port, 9001);
+    }
+
+    #[test]
+    fn custom_port() {
+        let cli = Cli::parse_from(["test", "--port", "8000"]);
+        assert_eq!(cli.port, 8000);
+    }
 }

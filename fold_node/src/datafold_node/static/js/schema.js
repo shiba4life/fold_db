@@ -132,6 +132,9 @@ async function removeSchema(schemaName, event) {
         utils.displayResult('Schema removed successfully');
         // Refresh schema list
         loadSchemaList();
+        if (window.transformsModule?.loadTransforms) {
+            window.transformsModule.loadTransforms();
+        }
     } catch (error) {
         utils.displayResult(error.message, true);
     }
@@ -160,6 +163,9 @@ async function loadSchema() {
         utils.displayResult('Schema loaded successfully');
         // Refresh schema list
         loadSchemaList();
+        if (window.transformsModule?.loadTransforms) {
+            window.transformsModule.loadTransforms();
+        }
     } catch (error) {
         utils.displayResult(error.message, true);
     }
