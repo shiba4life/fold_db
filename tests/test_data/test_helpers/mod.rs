@@ -3,6 +3,8 @@ pub mod schema_builder;
 
 // Re-export testing utilities for all tests
 use fold_node::FoldDB;
+use fold_node::{DataFoldNode, NodeConfig};
+use tempfile::tempdir;
 use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
@@ -137,4 +139,34 @@ pub fn setup_and_allow_schema(
     schema_name: &str,
 ) -> Result<(), fold_node::testing::SchemaError> {
     db.allow_schema(schema_name)
+}
+
+#[allow(dead_code)]
+pub fn create_test_node() -> DataFoldNode {
+    let dir = tempdir().expect("temp dir");
+    let config = NodeConfig {
+        storage_path: dir.path().to_path_buf(),
+        default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
+    };
+    DataFoldNode::new(config).expect("Failed to create test node")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fold_node::testing::Schema;
+
+    #[test]
+    fn test_create_test_node() {
+        let mut node1 = create_test_node();
+        let id1 = node1.get_node_id().to_string();
+        let node2 = create_test_node();
+        let id2 = node2.get_node_id().to_string();
+        assert_ne!(id1, id2, "nodes should have unique ids");
+
+        let schema = Schema::new("helper_test".to_string());
+        assert!(node1.load_schema(schema).is_ok());
+        assert!(node1.get_schema("helper_test").unwrap().is_some());
+    }
 }

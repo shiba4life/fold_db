@@ -1,50 +1,12 @@
-use fold_node::testing::{
-    FieldPaymentConfig, FieldType, Mutation, MutationType, PermissionsPolicy, Query, Schema,
-    SchemaField, TrustDistance, TrustDistanceScaling,
-};
-use fold_node::{DataFoldNode, NodeConfig};
+use fold_node::testing::{Mutation, MutationType, Query};
 use serde_json::json;
-use std::collections::HashMap;
-use tempfile::tempdir;
-
-fn create_test_node() -> DataFoldNode {
-    let dir = tempdir().unwrap();
-    let config = NodeConfig {
-        storage_path: dir.path().to_path_buf(),
-        default_trust_distance: 1,
-        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-    };
-    DataFoldNode::new(config).unwrap()
-}
-
-fn create_test_schema() -> Schema {
-    let mut schema = Schema::new("user_profile".to_string());
-
-    // Add name field
-    let name_field = SchemaField::new(
-        PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
-        FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
-        HashMap::new(),
-        Some(FieldType::Single),
-    );
-    schema.add_field("name".to_string(), name_field);
-
-    // Add email field
-    let email_field = SchemaField::new(
-        PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
-        FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
-        HashMap::new(),
-        Some(FieldType::Single),
-    );
-    schema.add_field("email".to_string(), email_field);
-
-    schema
-}
+use crate::test_data::test_helpers::create_test_node;
+use crate::test_data::schema_test_data::create_basic_user_profile_schema;
 
 #[test]
 fn test_node_schema_operations() {
     let mut node = create_test_node();
-    let schema = create_test_schema();
+    let schema = create_basic_user_profile_schema();
 
     // Test schema loading
     assert!(node.load_schema(schema.clone()).is_ok());
@@ -58,7 +20,7 @@ fn test_node_schema_operations() {
 #[test]
 fn test_node_data_operations() {
     let mut node = create_test_node();
-    let schema = create_test_schema();
+    let schema = create_basic_user_profile_schema();
 
     // Load schema
     node.load_schema(schema).unwrap();
@@ -107,7 +69,7 @@ fn test_trust_distance_handling() {
     assert!(node.add_trusted_node("test_node").is_ok());
 
     // Verify default trust distance is applied to queries
-    let schema = create_test_schema();
+    let schema = create_basic_user_profile_schema();
     node.load_schema(schema).unwrap();
     node.allow_schema("user_profile").unwrap();
 
@@ -125,7 +87,7 @@ fn test_trust_distance_handling() {
 #[test]
 fn test_version_history() {
     let mut node = create_test_node();
-    let schema = create_test_schema();
+    let schema = create_basic_user_profile_schema();
 
     // Load schema
     node.load_schema(schema).unwrap();

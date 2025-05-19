@@ -2,20 +2,10 @@ use fold_node::testing::{
     FieldPaymentConfig, FieldType, Mutation, MutationType, PermissionsPolicy, Query, Schema, SchemaField, TrustDistance, TrustDistanceScaling,
 };
 use fold_node::transform::{Transform, TransformExecutor, TransformParser};
-use fold_node::{DataFoldNode, NodeConfig};
+use crate::test_data::test_helpers::create_test_node;
 use serde_json::json;
 use std::collections::HashMap;
-use tempfile::tempdir;
 
-fn create_test_node() -> DataFoldNode {
-    let dir = tempdir().unwrap();
-    let config = NodeConfig {
-        storage_path: dir.path().to_path_buf(),
-        default_trust_distance: 1,
-        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-    };
-    DataFoldNode::new(config).unwrap()
-}
 
 fn create_schema_a() -> Schema {
     let mut schema = Schema::new("SchemaA".to_string());

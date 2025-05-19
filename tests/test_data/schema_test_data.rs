@@ -27,6 +27,29 @@ pub fn create_test_schema(name: &str) -> Schema {
 }
 
 #[allow(dead_code)]
+pub fn create_basic_user_profile_schema() -> Schema {
+    let mut schema = Schema::new("user_profile".to_string());
+
+    let name_field = SchemaField::new(
+        PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
+        create_default_payment_config(),
+        HashMap::new(),
+        Some(FieldType::Single),
+    );
+    schema.add_field("name".to_string(), name_field);
+
+    let email_field = SchemaField::new(
+        PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
+        create_default_payment_config(),
+        HashMap::new(),
+        Some(FieldType::Single),
+    );
+    schema.add_field("email".to_string(), email_field);
+
+    schema
+}
+
+#[allow(dead_code)]
 pub fn create_user_profile_schema() -> Schema {
     let mut schema = Schema::new("user_profile".to_string());
 
