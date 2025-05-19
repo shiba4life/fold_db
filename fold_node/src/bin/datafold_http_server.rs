@@ -65,8 +65,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config: NodeConfig = if let Ok(config_str) = fs::read_to_string(&config_path) {
         serde_json::from_str(&config_str)?
     } else {
-        warn!("Config file not found, using default config");
-        NodeConfig::new(PathBuf::from("data"))
+        println!("Config file not found, using default config");
+        NodeConfig::default()
     };
     info!("Config loaded successfully");
 

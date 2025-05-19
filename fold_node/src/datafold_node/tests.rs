@@ -28,3 +28,11 @@ fn test_add_trusted_node() {
     assert!(node.remove_trusted_node("test_node").is_ok());
     assert!(!node.get_trusted_nodes().contains_key("test_node"));
 }
+
+#[test]
+fn test_node_config_default() {
+    let config = NodeConfig::default();
+    assert_eq!(config.storage_path, std::path::PathBuf::from("data"));
+    assert_eq!(config.default_trust_distance, 1);
+    assert_eq!(config.network_listen_address, "/ip4/0.0.0.0/tcp/0".to_string());
+}

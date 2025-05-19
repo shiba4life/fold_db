@@ -16,7 +16,7 @@ fn test_permission_wrapper_query() {
     let _ = env_logger::builder().is_test(true).try_init();
     // Setup
     let wrapper = PermissionWrapper::new();
-    let schema_manager = SchemaCore::new("data");
+    let schema_manager = SchemaCore::new("data").unwrap();
 
     // Create a test schema
     let mut fields = HashMap::new();
@@ -76,7 +76,7 @@ fn test_permission_wrapper_no_requirement() {
     let _ = env_logger::builder().is_test(true).try_init();
     // Setup
     let wrapper = PermissionWrapper::new();
-    let schema_manager = SchemaCore::new("data");
+    let schema_manager = SchemaCore::new("data").unwrap();
 
     // Create a test schema with no distance requirement
     let mut fields = HashMap::new();
@@ -126,7 +126,7 @@ fn test_permission_wrapper_mutation() {
     let _ = env_logger::builder().is_test(true).try_init();
     // Setup
     let wrapper = PermissionWrapper::new();
-    let schema_manager = SchemaCore::new("data");
+    let schema_manager = SchemaCore::new("data").unwrap();
 
     // Create a test schema with both explicit write permissions and trust distance
     let mut fields = HashMap::new();

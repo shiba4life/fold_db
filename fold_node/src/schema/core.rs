@@ -27,39 +27,35 @@ pub struct SchemaCore {
     schemas_dir: PathBuf,
 }
 
-impl Default for SchemaCore {
-    fn default() -> Self {
-        let schemas_dir = PathBuf::from("data/schemas");
-        if let Err(e) = fs::create_dir_all(&schemas_dir) {
-            // Ignore AlreadyExists error, but panic on other errors
-            if e.kind() != std::io::ErrorKind::AlreadyExists {
-                panic!("Failed to create schemas directory: {}", e);
-            }
-        }
-
-        Self {
-            schemas: Mutex::new(HashMap::new()),
-            schemas_dir,
-        }
-    }
-}
-
 impl SchemaCore {
-    /// Creates a new SchemaCore instance with a custom schemas directory.
-    #[must_use]
-    pub fn new(path: &str) -> Self {
-        let schemas_dir = PathBuf::from(path).join("schemas");
+    /// Internal helper to create the schema directory and construct the struct.
+    fn init_with_dir(schemas_dir: PathBuf) -> Result<Self, SchemaError> {
         if let Err(e) = fs::create_dir_all(&schemas_dir) {
-            // Ignore AlreadyExists error, but panic on other errors
             if e.kind() != std::io::ErrorKind::AlreadyExists {
-                panic!("Failed to create schemas directory: {}", e);
+                return Err(SchemaError::InvalidData(format!(
+                    "Failed to create schemas directory: {}",
+                    e
+                )));
             }
         }
 
-        Self {
+        Ok(Self {
             schemas: Mutex::new(HashMap::new()),
             schemas_dir,
-        }
+        })
+    }
+
+    /// Creates a new `SchemaCore` using the default `data/schemas` directory.
+    pub fn default() -> Result<Self, SchemaError> {
+        let schemas_dir = PathBuf::from("data/schemas");
+        Self::init_with_dir(schemas_dir)
+    }
+
+    /// Creates a new `SchemaCore` instance with a custom schemas directory.
+    #[must_use]
+    pub fn new(path: &str) -> Result<Self, SchemaError> {
+        let schemas_dir = PathBuf::from(path).join("schemas");
+        Self::init_with_dir(schemas_dir)
     }
 
     /// Gets the path for a schema file.
@@ -384,7 +380,7 @@ mod tests {
         let test_schema_name = "test_persistence_schema";
         cleanup_test_schema(test_schema_name); // Cleanup any leftover test files
 
-        let core = SchemaCore::new("data");
+        let core = SchemaCore::new("data").unwrap();
 
         // Create a test schema
         let mut fields = HashMap::new();
@@ -423,7 +419,7 @@ mod tests {
 
     #[test]
     fn test_map_fields_success() {
-        let core = SchemaCore::new("data");
+        let core = SchemaCore::new("data").unwrap();
 
         // Create source schema with a field that has a ref_atom_uuid
         let mut source_fields = HashMap::new();

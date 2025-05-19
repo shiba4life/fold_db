@@ -35,7 +35,7 @@ fn setup_files() -> (TempDir, PathBuf, PathBuf, PathBuf) {
 
     let config_path = dir.path().join("config.json");
     let config_content = format!(
-        "{{\n  \"storage_path\": \"{}\",\n  \"default_trust_distance\": 1,\n  \"network_listen_address\": \"/ip4/127.0.0.1/tcp/0\"\n}}",
+        "{{\n  \"storage_path\": \"{}\",\n  \"default_trust_distance\": 0,\n  \"network_listen_address\": \"/ip4/127.0.0.1/tcp/0\"\n}}",
         db_dir.display()
     );
     fs::write(&config_path, config_content).unwrap();

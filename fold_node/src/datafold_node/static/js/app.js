@@ -2,121 +2,162 @@
  * Main application file for the DataFold Node UI
  */
 
-// Initialize the application when the DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    initApp();
-});
+class App {
+    constructor() {
+        this.componentsLoaded = false;
+        this.initialized = false;
+    }
 
-/**
- * Initialize the application
- */
-function initApp() {
-    // Set up event listeners immediately
-    setupEventListeners();
-    
-    // Use a more reliable method to ensure DOM is fully loaded
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', onDOMLoaded);
-    } else {
-        onDOMLoaded();
-    }
-}
-
-function onDOMLoaded() {
-    // Load initial data
-    loadInitialData();
-    
-    console.log('DataFold Node UI initialized');
-}
-
-/**
- * Set up event listeners for UI elements
- */
-function setupEventListeners() {
-    // Schema tab
-    const loadSchemaBtn = document.getElementById('loadSchemaBtn');
-    if (loadSchemaBtn) {
-        loadSchemaBtn.addEventListener('click', schemaModule.loadSchema);
-    }
-    
-    const loadExampleSchemaBtn = document.getElementById('loadExampleSchemaBtn');
-    if (loadExampleSchemaBtn) {
-        loadExampleSchemaBtn.addEventListener('click', schemaModule.loadExampleSchema);
-    }
-    
-    // Query tab
-    const runQueryBtn = document.getElementById('runQueryBtn');
-    if (runQueryBtn) {
-        runQueryBtn.addEventListener('click', () => operationsModule.executeOperation('query'));
-    }
-    
-    const loadExampleQueryBtn = document.getElementById('loadExampleQueryBtn');
-    if (loadExampleQueryBtn) {
-        loadExampleQueryBtn.addEventListener('click', operationsModule.loadExampleQuery);
-    }
-    
-    // Mutation tab
-    const runMutationBtn = document.getElementById('runMutationBtn');
-    if (runMutationBtn) {
-        runMutationBtn.addEventListener('click', () => operationsModule.executeOperation('mutation'));
-    }
-    
-    const loadExampleMutationBtn = document.getElementById('loadExampleMutationBtn');
-    if (loadExampleMutationBtn) {
-        loadExampleMutationBtn.addEventListener('click', operationsModule.loadExampleMutation);
-    }
-    
-    // Network tab (if exists)
-    const startNetworkBtn = document.getElementById('startNetworkBtn');
-    if (startNetworkBtn) {
-        startNetworkBtn.addEventListener('click', networkModule.startNetwork);
-    }
-    
-    const stopNetworkBtn = document.getElementById('stopNetworkBtn');
-    if (stopNetworkBtn) {
-        stopNetworkBtn.addEventListener('click', networkModule.stopNetwork);
-    }
-    
-    const discoverNodesBtn = document.getElementById('discoverNodesBtn');
-    if (discoverNodesBtn) {
-        discoverNodesBtn.addEventListener('click', networkModule.discoverNodes);
-    }
-    
-    const listNodesBtn = document.getElementById('listNodesBtn');
-    if (listNodesBtn) {
-        listNodesBtn.addEventListener('click', networkModule.listNodes);
-    }
-    
-    // Tab switching
-    document.querySelectorAll('.tab-button').forEach(button => {
-        const tabName = button.getAttribute('data-tab');
-        if (tabName) {
-            button.addEventListener('click', () => utils.switchTab(tabName));
+    async init() {
+        if (this.initialized) return;
+        
+        try {
+            // Initialize icons first
+            this.initIcons();
+            
+            // Load all components
+            await this.loadComponents();
+            
+            // Set up event listeners
+            this.setupEventListeners();
+            
+            // Load initial data
+            await this.loadInitialData();
+            
+            this.initialized = true;
+            console.log('DataFold Node UI initialized');
+        } catch (error) {
+            console.error('Failed to initialize app:', error);
         }
+    }
+
+    initIcons() {
+        if (!window.icons) {
+            console.error('Icons module not loaded');
+            return;
+        }
+
+        const iconMappings = {
+            'logoIcon': icons.database,
+            'schemasTabIcon': icons.folder,
+            'schemaTabIcon': icons.schema,
+            'queryTabIcon': icons.search,
+            'mutationTabIcon': icons.code,
+            'samplesTabIcon': icons.library,
+            'transformsTabIcon': icons.gear,
+            'networkTabIcon': icons.network,
+            'statusIcon': icons.check
+        };
+
+        Object.entries(iconMappings).forEach(([id, iconFn]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.innerHTML = iconFn();
+            }
+        });
+    }
+
+    async loadComponents() {
+        if (this.componentsLoaded) return;
+
+        const components = [
+            { url: 'components/schema-tab.html', id: 'schemaTabsContainer' },
+            { url: 'components/operations-tab.html', id: 'operationsTabsContainer' },
+            { url: 'components/transforms-tab.html', id: 'transformsTabContainer' },
+            { url: 'components/network-tab.html', id: 'networkTabContainer' },
+            { url: 'components/samples-tab.html', id: 'samplesTabContainer' }
+        ];
+
+        try {
+            await Promise.all(components.map(comp =>
+                utils.loadHtmlIntoContainer(comp.url, comp.id)
+            ));
+            this.componentsLoaded = true;
+        } catch (error) {
+            console.error('Failed to load components:', error);
+            throw error;
+        }
+    }
+
+    setupEventListeners() {
+        // Tab switching
+        document.querySelectorAll('.tab-button').forEach(button => {
+            const tabName = button.getAttribute('data-tab');
+            if (tabName) {
+                button.addEventListener('click', () => utils.switchTab(tabName));
+            }
+        });
+
+        // Schema tab
+        const loadSchemaBtn = document.getElementById('loadSchemaBtn');
+        if (loadSchemaBtn) {
+            loadSchemaBtn.addEventListener('click', () => schemaModule.loadSchema());
+        }
+
+        const loadExampleSchemaBtn = document.getElementById('loadExampleSchemaBtn');
+        if (loadExampleSchemaBtn) {
+            loadExampleSchemaBtn.addEventListener('click', () => schemaModule.loadExampleSchema());
+        }
+
+        // Operations
+        const runQueryBtn = document.getElementById('runQueryBtn');
+        if (runQueryBtn) {
+            runQueryBtn.addEventListener('click', () => operationsModule.executeOperation('query'));
+        }
+
+        const runMutationBtn = document.getElementById('runMutationBtn');
+        if (runMutationBtn) {
+            runMutationBtn.addEventListener('click', () => operationsModule.executeOperation('mutation'));
+        }
+
+        // Network
+        ['startNetwork', 'stopNetwork', 'discoverNodes', 'listNodes'].forEach(action => {
+            const btn = document.getElementById(`${action}Btn`);
+            if (btn && networkModule[action]) {
+                btn.addEventListener('click', () => networkModule[action]());
+            }
+        });
+    }
+
+    async loadInitialData() {
+        try {
+            // Initialize transforms
+            if (window.transformsModule) {
+                const refreshIcon = document.getElementById('refreshTransformsIcon');
+                if (window.icons && refreshIcon) {
+                    refreshIcon.innerHTML = icons.refresh();
+                }
+                const refreshBtn = document.getElementById('refreshTransformsBtn');
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', () => transformsModule.loadTransforms());
+                }
+                await transformsModule.loadTransforms();
+            }
+
+            // Initialize samples
+            if (window.samplesModule?.initSamplesTab) {
+                await samplesModule.initSamplesTab();
+            }
+
+            // Load schema list
+            await schemaModule.loadSchemaList();
+
+            // Load network status
+            if (document.getElementById('networkStatus')) {
+                await networkModule.getNetworkStatus();
+            }
+        } catch (error) {
+            console.error('Failed to load initial data:', error);
+        }
+    }
+}
+
+// Create and export app instance
+window.app = new App();
+
+// Initialize when everything is loaded
+window.addEventListener('load', () => {
+    window.app.init().catch(error => {
+        console.error('Failed to initialize app:', error);
     });
-}
-
-/**
- * Load initial data for the UI
- */
-function loadInitialData() {
-    // Load schema list
-    schemaModule.loadSchemaList();
-    
-    // Load sample data if the samples module exists
-    if (window.samplesModule && window.samplesModule.initSamplesTab) {
-        samplesModule.initSamplesTab();
-    }
-    
-    // Load network status if the element exists
-    if (document.getElementById('networkStatus')) {
-        networkModule.getNetworkStatus();
-    }
-}
-
-// Make functions available globally
-window.app = {
-    initApp,
-    setupEventListeners,
-    loadInitialData
-};
+});

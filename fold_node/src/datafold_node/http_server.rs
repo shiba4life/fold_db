@@ -42,6 +42,7 @@ pub struct DataFoldHttpServer {
 ///
 /// SampleManager provides access to sample schemas, queries, and mutations
 /// for one-click loading in the UI.
+#[derive(Clone)]
 pub struct SampleManager {
     /// Sample schemas
     schemas: HashMap<String, Value>,
@@ -214,7 +215,7 @@ impl DataFoldHttpServer {
         // Create shared application state
         let app_state = web::Data::new(AppState {
             node: self.node.clone(),
-            sample_manager: SampleManager::new().await?,
+            sample_manager: self.sample_manager.clone(),
         });
 
         // Start the HTTP server
@@ -229,9 +230,6 @@ impl DataFoldHttpServer {
             App::new()
                 .wrap(cors)
                 .app_data(app_state.clone())
-                .route("/", web::get().to(|| async {
-                    HttpResponse::Ok().body(include_str!("static/index.html"))
-                }))
                 .service(
                     web::scope("/api")
                         // Schema endpoints
@@ -266,8 +264,8 @@ impl DataFoldHttpServer {
                                 .route("/nodes", web::get().to(list_nodes))
                         ),
                 )
-                // Static files
-                .service(Files::new("/static", "src/datafold_node/static").index_file("index.html"))
+                // Static files - serve from root
+                .service(Files::new("/", "src/datafold_node/static").index_file("index.html"))
        })
         .bind(&self.bind_address)
         .map_err(|e| FoldDbError::Config(format!("Failed to bind HTTP server: {}", e)))?
@@ -661,6 +659,11 @@ async fn list_nodes(state: web::Data<AppState>) -> impl Responder {
 #[cfg(test)]
 mod tests {
     use super::SampleManager;
+    use super::DataFoldHttpServer;
+    use crate::datafold_node::{DataFoldNode, NodeConfig};
+    use serde_json::json;
+    use std::net::TcpListener;
+    use tempfile::tempdir;
 
     /// Ensure the sample manager loads schema samples from disk.
     #[tokio::test]
@@ -669,5 +672,47 @@ mod tests {
         let schemas = manager.list_schema_samples();
         assert!(schemas.contains(&"UserProfile".to_string()));
         assert!(schemas.contains(&"ProductCatalog".to_string()));
+    }
+
+    /// Verify that server startup does not reload samples.
+    #[tokio::test]
+    async fn server_uses_existing_samples() {
+        let temp_dir = tempdir().unwrap();
+        let config = NodeConfig::new(temp_dir.path().to_path_buf());
+        let node = DataFoldNode::new(config).unwrap();
+
+        // pick an available port
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+        let bind_addr = format!("127.0.0.1:{}", addr.port());
+
+        let mut server = DataFoldHttpServer::new(node, &bind_addr)
+            .await
+            .expect("server init");
+
+        // Replace loaded samples with a single custom entry
+        server.sample_manager.schemas.clear();
+        server
+            .sample_manager
+            .schemas
+            .insert("Custom".to_string(), json!({"type": "schema"}));
+
+        let handle = tokio::spawn(async move { server.run().await.unwrap() });
+
+        // Wait briefly for server to start
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        let resp: Vec<String> =
+            reqwest::get(format!("http://{}/samples/schemas", bind_addr))
+                .await
+                .expect("request")
+                .json()
+                .await
+                .expect("json");
+        assert_eq!(resp, vec!["Custom".to_string()]);
+
+        handle.abort();
+        let _ = handle.await;
     }
 }
