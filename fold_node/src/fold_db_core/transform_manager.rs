@@ -24,6 +24,10 @@ pub struct TransformManager {
     aref_to_transforms: RwLock<HashMap<String, HashSet<String>>>,
     /// Maps transform IDs to their dependent atom reference UUIDs
     transform_to_arefs: RwLock<HashMap<String, HashSet<String>>>,
+    /// Maps schema.field keys to transforms triggered by them
+    field_to_transforms: RwLock<HashMap<String, HashSet<String>>>,
+    /// Maps transform IDs to the fields that trigger them
+    transform_to_fields: RwLock<HashMap<String, HashSet<String>>>,
     /// Maps transform IDs to their output atom reference UUIDs
     transform_outputs: RwLock<HashMap<String, String>>,
     /// Callback for getting an atom by its reference UUID
@@ -58,6 +62,8 @@ impl TransformManager {
             registered_transforms: RwLock::new(registered_transforms),
             aref_to_transforms: RwLock::new(HashMap::new()),
             transform_to_arefs: RwLock::new(HashMap::new()),
+            field_to_transforms: RwLock::new(HashMap::new()),
+            transform_to_fields: RwLock::new(HashMap::new()),
             transform_outputs: RwLock::new(HashMap::new()),
             get_atom_fn,
             create_atom_fn,
@@ -71,6 +77,7 @@ impl TransformManager {
         transform_id: String,
         mut transform: Transform,
         input_arefs: Vec<String>,
+        trigger_fields: Vec<String>,
         output_aref: String,
     ) -> Result<(), SchemaError> {
         // Validate the transform
@@ -107,12 +114,27 @@ impl TransformManager {
         {
             let mut transform_to_arefs = self.transform_to_arefs.write().unwrap();
             let mut aref_set = HashSet::new();
-            
+
             for aref_uuid in &input_arefs {
                 aref_set.insert(aref_uuid.clone());
             }
-            
+
             transform_to_arefs.insert(transform_id.clone(), aref_set);
+        }
+
+        // Register the fields that trigger this transform
+        {
+            let mut transform_to_fields = self.transform_to_fields.write().unwrap();
+            let mut field_to_transforms = self.field_to_transforms.write().unwrap();
+
+            let mut field_set = HashSet::new();
+            for field_key in &trigger_fields {
+                field_set.insert(field_key.clone());
+                let set = field_to_transforms.entry(field_key.clone()).or_default();
+                set.insert(transform_id.clone());
+            }
+
+            transform_to_fields.insert(transform_id.clone(), field_set);
         }
         
         // Update the reverse mapping (aref -> transforms)
@@ -138,10 +160,12 @@ impl TransformManager {
         output_aref: String,
     ) -> Result<(), SchemaError> {
         let dependencies = transform.analyze_dependencies().into_iter().collect::<Vec<String>>();
+        let trigger_fields = Vec::new();
         self.register_transform(
             transform_id,
             transform,
             dependencies,
+            trigger_fields,
             output_aref,
         )
     }
@@ -161,6 +185,23 @@ impl TransformManager {
             {
                 let mut transform_outputs = self.transform_outputs.write().unwrap();
                 transform_outputs.remove(transform_id);
+            }
+
+            // Remove field mappings
+            {
+                let mut transform_to_fields = self.transform_to_fields.write().unwrap();
+                let mut field_to_transforms = self.field_to_transforms.write().unwrap();
+
+                if let Some(fields) = transform_to_fields.remove(transform_id) {
+                    for field in fields {
+                        if let Some(set) = field_to_transforms.get_mut(&field) {
+                            set.remove(transform_id);
+                            if set.is_empty() {
+                                field_to_transforms.remove(&field);
+                            }
+                        }
+                    }
+                }
             }
             
             // Get the input arefs for this transform
@@ -313,6 +354,13 @@ impl TransformManager {
         transform_outputs.get(transform_id).cloned()
     }
 
+    /// Gets all transforms that should run when the specified field is updated.
+    pub fn get_transforms_for_field(&self, schema_name: &str, field_name: &str) -> HashSet<String> {
+        let key = format!("{}.{}", schema_name, field_name);
+        let field_to_transforms = self.field_to_transforms.read().unwrap();
+        field_to_transforms.get(&key).cloned().unwrap_or_default()
+    }
+
     /// Execute transforms for a specific schema field
 pub fn execute_field_transforms(
         &self,
@@ -344,5 +392,9 @@ impl TransformRunner for TransformManager {
 
     fn transform_exists(&self, transform_id: &str) -> bool {
         TransformManager::transform_exists(self, transform_id)
+    }
+
+    fn get_transforms_for_field(&self, schema_name: &str, field_name: &str) -> HashSet<String> {
+        TransformManager::get_transforms_for_field(self, schema_name, field_name)
     }
 }

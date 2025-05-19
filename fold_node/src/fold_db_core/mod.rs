@@ -142,9 +142,10 @@ impl FoldDB {
         transform_id: String,
         transform: Transform,
         input_arefs: Vec<String>,
+        trigger_fields: Vec<String>,
         output_aref: String,
     ) -> Result<(), SchemaError> {
-        self.transform_manager.register_transform(transform_id, transform, input_arefs, output_aref)
+        self.transform_manager.register_transform(transform_id, transform, input_arefs, trigger_fields, output_aref)
     }
 
     fn register_transforms_for_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
@@ -158,6 +159,7 @@ impl FoldDB {
                 })?;
 
                 let mut input_arefs = Vec::new();
+                let mut trigger_fields = Vec::new();
 
                 let cross_re = Regex::new(r"([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)").unwrap();
                 let mut seen_cross = std::collections::HashSet::new();
@@ -165,6 +167,7 @@ impl FoldDB {
                     let schema_name = cap[1].to_string();
                     let field_dep = cap[2].to_string();
                     seen_cross.insert(field_dep.clone());
+                    trigger_fields.push(format!("{}.{}", schema_name, field_dep));
                     if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
                         if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
                             if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
@@ -181,6 +184,8 @@ impl FoldDB {
                     let schema_name = schema.name.clone();
                     let field_dep = dep;
 
+                    trigger_fields.push(format!("{}.{}", schema_name, field_dep));
+
                     if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
                         if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
                             if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
@@ -191,10 +196,12 @@ impl FoldDB {
                 }
 
                 let transform_id = format!("{}.{}", schema.name, field_name);
+                trigger_fields.push(transform_id.clone());
                 self.transform_manager.register_transform(
                     transform_id.clone(),
                     transform.clone(),
                     input_arefs,
+                    trigger_fields,
                     output_aref,
                 )?;
                 let _ = self.transform_manager.execute_transform_now(&transform_id);

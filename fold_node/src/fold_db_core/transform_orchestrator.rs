@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashSet};
 use std::sync::{Arc, Mutex};
 
 use serde_json::Value as JsonValue;
@@ -9,6 +9,7 @@ use crate::schema::SchemaError;
 pub trait TransformRunner: Send + Sync {
     fn execute_transform_now(&self, transform_id: &str) -> Result<JsonValue, SchemaError>;
     fn transform_exists(&self, transform_id: &str) -> bool;
+    fn get_transforms_for_field(&self, schema_name: &str, field_name: &str) -> HashSet<String>;
 }
 
 /// Orchestrates execution of transforms sequentially.
@@ -27,10 +28,14 @@ impl TransformOrchestrator {
 
     /// Add a task for the given schema and field.
     pub fn add_task(&self, schema_name: &str, field_name: &str) {
-        let transform_id = format!("{}.{}", schema_name, field_name);
-        if self.manager.transform_exists(&transform_id) {
-            let mut q = self.queue.lock().unwrap();
-            q.push_back(transform_id);
+        let ids = self.manager.get_transforms_for_field(schema_name, field_name);
+        if ids.is_empty() {
+            return;
+        }
+
+        let mut q = self.queue.lock().unwrap();
+        for id in ids {
+            q.push_back(id);
         }
     }
 
