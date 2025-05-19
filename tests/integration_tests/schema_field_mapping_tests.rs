@@ -1,20 +1,11 @@
 use fold_node::schema::Schema;
-use fold_node::{DataFoldNode, NodeConfig};
+use crate::test_data::test_helpers::create_test_node;
 use serde_json::json;
-use tempfile::tempdir;
 
 #[test]
 fn test_field_mappers_share_aref_uuid() {
-    // Create a temporary directory for the test
-    let dir = tempdir().unwrap();
-    let config = NodeConfig {
-        storage_path: dir.path().to_path_buf(),
-        default_trust_distance: 1,
-        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-    };
-
     // Create a new DataFoldNode
-    let mut node = DataFoldNode::new(config).unwrap();
+    let mut node = create_test_node();
 
     // Create source schema (UserProfile)
     let source_schema_json = r#"{

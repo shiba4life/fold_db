@@ -1,33 +1,27 @@
-use fold_node::{datafold_node::{DataFoldHttpServer, NodeConfig, DataFoldNode}, schema::types::Operation};
+use fold_node::{datafold_node::DataFoldHttpServer, schema::types::Operation};
+use crate::test_data::test_helpers::create_test_node;
 use reqwest::Client;
 use serde_json::Value;
-use tempfile::TempDir;
 use std::net::TcpListener;
 use tokio::{task::JoinHandle, time::Duration};
 
-async fn start_server() -> (JoinHandle<()>, String, TempDir) {
+async fn start_server() -> (JoinHandle<()>, String) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     drop(listener);
-    let temp_dir = tempfile::tempdir().unwrap();
-    let config = NodeConfig {
-        storage_path: temp_dir.path().to_path_buf(),
-        default_trust_distance: 1,
-        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-    };
-    let node = DataFoldNode::new(config).unwrap();
+    let node = create_test_node();
     let bind_address = format!("127.0.0.1:{}", port);
     let server = DataFoldHttpServer::new(node, &bind_address).await.unwrap();
     let handle = tokio::spawn(async move {
         let _ = server.run().await;
     });
     tokio::time::sleep(Duration::from_millis(100)).await;
-    (handle, bind_address, temp_dir)
+    (handle, bind_address)
 }
 
 #[tokio::test]
 async fn test_list_schemas_route() {
-    let (handle, addr, _tmp) = start_server().await;
+    let (handle, addr) = start_server().await;
     let client = Client::new();
     let resp = client
         .get(format!("http://{}/api/schemas", addr))
@@ -42,7 +36,7 @@ async fn test_list_schemas_route() {
 
 #[tokio::test]
 async fn test_get_schema_route() {
-    let (handle, addr, _tmp) = start_server().await;
+    let (handle, addr) = start_server().await;
     let client = Client::new();
     let resp = client
         .get(format!("http://{}/api/schema/UserProfile", addr))
@@ -57,7 +51,7 @@ async fn test_get_schema_route() {
 
 #[tokio::test]
 async fn test_execute_route() {
-    let (handle, addr, _tmp) = start_server().await;
+    let (handle, addr) = start_server().await;
     let client = Client::new();
     let operation = Operation::Query {
         schema: "UserProfile".to_string(),
@@ -81,7 +75,7 @@ async fn test_execute_route() {
 
 #[tokio::test]
 async fn test_sample_endpoints() {
-    let (handle, addr, _tmp) = start_server().await;
+    let (handle, addr) = start_server().await;
     let client = Client::new();
     let resp = client
         .get(format!("http://{}/api/samples/schemas", addr))
@@ -116,7 +110,7 @@ async fn test_sample_endpoints() {
 
 #[tokio::test]
 async fn test_network_endpoints() {
-    let (handle, addr, _tmp) = start_server().await;
+    let (handle, addr) = start_server().await;
     let client = Client::new();
 
     let config = serde_json::json!({
@@ -187,7 +181,7 @@ async fn test_network_endpoints() {
 
 #[tokio::test]
 async fn test_transform_endpoints() {
-    let (handle, addr, _tmp) = start_server().await;
+    let (handle, addr) = start_server().await;
     let client = Client::new();
 
     let schema_json = serde_json::json!({

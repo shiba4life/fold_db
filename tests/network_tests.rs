@@ -1,7 +1,8 @@
-use fold_node::datafold_node::{config::NodeConfig, DataFoldNode};
+#[path = "test_data/test_helpers/mod.rs"]
+mod test_helpers;
+use test_helpers::create_test_node;
 use fold_node::network::{NetworkConfig, NetworkCore, SchemaService};
 use fold_node::schema::Schema;
-use tempfile::tempdir;
 
 #[tokio::test]
 async fn test_schema_service() {
@@ -44,26 +45,9 @@ async fn test_network_core_creation() {
 
 #[tokio::test]
 async fn test_datafold_node_network_integration() {
-    // Create temporary directories for the nodes
-    let node1_dir = tempdir().unwrap();
-    let node2_dir = tempdir().unwrap();
-
-    // Create node configs
-    let node1_config = NodeConfig {
-        storage_path: node1_dir.path().to_path_buf(),
-        default_trust_distance: 1,
-        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-    };
-
-    let node2_config = NodeConfig {
-        storage_path: node2_dir.path().to_path_buf(),
-        default_trust_distance: 1,
-        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-    };
-
     // Create the nodes
-    let mut node1 = DataFoldNode::new(node1_config).unwrap();
-    let mut node2 = DataFoldNode::new(node2_config).unwrap();
+    let mut node1 = create_test_node();
+    let mut node2 = create_test_node();
 
     // Create network configs
     let network1_config = NetworkConfig::new("/ip4/127.0.0.1/tcp/0").with_mdns(false); // Disable mDNS for testing
