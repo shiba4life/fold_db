@@ -1,38 +1,27 @@
 # DataFold Node
 
 ## Overview
-DataFold Node is a module that provides a complete interface to FoldDB's functionality, allowing users to:
-- Load and manage FoldDB instances
-- Access schema management capabilities
-- Execute mutations and queries
-- Handle permissions and trust distance
-- Manage atomic operations
+DataFold Node provides an interface to FoldDB's functionality. It lets you load schemas, run queries and mutations, and manage trusted nodes.
 
 ## Core Features
 
 ### Database Management
 - Initialize and load FoldDB instances
 - Configure storage locations
-- Handle database connections
-- Manage database lifecycle
+- Handle database lifecycle
 
 ### Schema Operations
 - Load schema definitions
-- Validate schema structures
-- Access schema information
-- Update schemas when needed
+- List and retrieve schemas
+- Allow or remove schemas
 
 ### Data Operations
 - Execute mutations with atomic guarantees
-- Perform queries with field-level permissions
-- Handle versioning and history tracking
-- Manage AtomRefs and version chains
+- Perform queries with trust distance control
+- Access version history for atom references
 
-### Permission Management
-- Configure trust distances
-- Set explicit permissions
-- Validate access rights
-- Handle public key authentication
+### Trusted Nodes
+- Manage trusted node identifiers and trust distance
 
 ## API Structure
 
@@ -41,6 +30,8 @@ DataFold Node is a module that provides a complete interface to FoldDB's functio
 pub struct DataFoldNode {
     db: FoldDB,
     config: NodeConfig,
+    trusted_nodes: HashMap<String, NodeInfo>,
+    node_id: String,
 }
 
 pub struct NodeConfig {
@@ -53,22 +44,31 @@ pub struct NodeConfig {
 ```rust
 impl DataFoldNode {
     // Initialize a new node
-    pub fn new(config: NodeConfig) -> Result<Self>;
-    
+    pub fn new(config: NodeConfig) -> FoldDbResult<Self>;
+
     // Load an existing database
-    pub fn load(config: NodeConfig) -> Result<Self>;
-    
+    pub fn load(config: NodeConfig) -> FoldDbResult<Self>;
+
     // Schema operations
-    pub fn load_schema(&self, schema: Schema) -> Result<()>;
-    pub fn get_schema(&self, schema_id: &str) -> Result<Schema>;
-    
+    pub fn load_schema(&mut self, schema: Schema) -> FoldDbResult<()>;
+    pub fn get_schema(&self, schema_id: &str) -> FoldDbResult<Option<Schema>>;
+    pub fn list_schemas(&self) -> FoldDbResult<Vec<Schema>>;
+    pub fn allow_schema(&mut self, schema_name: &str) -> FoldDbResult<()>;
+    pub fn remove_schema(&mut self, schema_name: &str) -> FoldDbResult<()>;
+
     // Data operations
-    pub fn query(&self, query: Query) -> Result<QueryResult>;
-    pub fn mutate(&self, mutation: Mutation) -> Result<MutationResult>;
-    
-    // Permission operations
-    pub fn set_trust_distance(&self, distance: u32) -> Result<()>;
-    pub fn set_permissions(&self, permissions: Permissions) -> Result<()>;
+    pub fn query(&self, query: Query) -> FoldDbResult<Vec<Result<Value, SchemaError>>>;
+    pub fn mutate(&mut self, mutation: Mutation) -> FoldDbResult<()>;
+    pub fn execute_operation(&mut self, op: Operation) -> FoldDbResult<Value>;
+    pub fn get_history(&self, aref_uuid: &str) -> FoldDbResult<Vec<Value>>;
+
+    // Trusted node management
+    pub fn add_trusted_node(&mut self, node_id: &str) -> FoldDbResult<()>;
+    pub fn remove_trusted_node(&mut self, node_id: &str) -> FoldDbResult<()>;
+    pub fn get_trusted_nodes(&self) -> &HashMap<String, NodeInfo>;
+
+    // Node information
+    pub fn get_node_id(&self) -> &str;
 }
 ```
 
@@ -80,29 +80,40 @@ let config = NodeConfig {
     storage_path: PathBuf::from("./data"),
     default_trust_distance: 1,
 };
-let node = DataFoldNode::new(config)?;
+let mut node = DataFoldNode::new(config)?;
 ```
 
 ### Load Schema
 ```rust
-let schema = Schema::from_json(schema_json)?;
+let schema: Schema = serde_json::from_str(schema_json)?;
 node.load_schema(schema)?;
+node.allow_schema("user_profile")?;
 ```
 
 ### Execute Query
 ```rust
-let query = Query::new("user_profile")
-    .select(&["name", "email"])
-    .filter("id", "=", "123");
-let result = node.query(query)?;
+let query = Query::new(
+    "user_profile".to_string(),
+    vec!["name".to_string(), "email".to_string()],
+    String::new(), // pub_key
+    0,             // use default trust distance
+);
+let results = node.query(query)?;
 ```
 
 ### Execute Mutation
 ```rust
-let mutation = Mutation::new("user_profile")
-    .set("name", "John Doe")
-    .set("email", "john@example.com");
-let result = node.mutate(mutation)?;
+let mut fields = HashMap::new();
+fields.insert("name".to_string(), json!("John Doe"));
+fields.insert("email".to_string(), json!("john@example.com"));
+let mutation = Mutation::new(
+    "user_profile".to_string(),
+    fields,
+    String::new(), // pub_key
+    0,             // use default trust distance
+    MutationType::Create,
+);
+node.mutate(mutation)?;
 ```
 
 ## Technical Requirements
