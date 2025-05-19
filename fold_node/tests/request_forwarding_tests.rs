@@ -86,6 +86,7 @@ async fn test_request_forwarding() {
         network1.add_known_peer(node2_peer_id);
         // Register the node ID to peer ID mapping
         network1.register_node_id(&node2_id, node2_peer_id);
+        network1.register_node_address(&node2_id, "127.0.0.1:8002".to_string());
     }
 
     {
@@ -93,6 +94,7 @@ async fn test_request_forwarding() {
         network2.add_known_peer(node1_peer_id);
         // Register the node ID to peer ID mapping
         network2.register_node_id(&node1_id, node1_peer_id);
+        network2.register_node_address(&node1_id, "127.0.0.1:8001".to_string());
     }
 
     // Wait a moment to ensure both nodes are fully registered
@@ -229,6 +231,128 @@ async fn test_request_forwarding() {
     node2.stop_network().await.unwrap();
 
     // Cancel the TCP server tasks
+    tcp_server1_handle.abort();
+    tcp_server2_handle.abort();
+}
+
+#[tokio::test]
+async fn test_request_forwarding_address_resolution() {
+    let node1_dir = PathBuf::from("test_data/request_forwarding_addr/node1/db");
+    let node2_dir = PathBuf::from("test_data/request_forwarding_addr/node2/db");
+
+    std::fs::create_dir_all(&node1_dir).unwrap();
+    std::fs::create_dir_all(&node2_dir).unwrap();
+
+    let node1_config = NodeConfig {
+        storage_path: node1_dir,
+        default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/9101".to_string(),
+    };
+    let node2_config = NodeConfig {
+        storage_path: node2_dir,
+        default_trust_distance: 1,
+        network_listen_address: "/ip4/127.0.0.1/tcp/9102".to_string(),
+    };
+
+    let mut node1 = DataFoldNode::new(node1_config).unwrap();
+    let mut node2 = DataFoldNode::new(node2_config).unwrap();
+
+    let network1_config = NetworkConfig::new("/ip4/127.0.0.1/tcp/9101");
+    let network2_config = NetworkConfig::new("/ip4/127.0.0.1/tcp/9102");
+
+    node1.init_network(network1_config).await.unwrap();
+    node2.init_network(network2_config).await.unwrap();
+
+    node1
+        .start_network_with_address("/ip4/127.0.0.1/tcp/9101")
+        .await
+        .unwrap();
+    node2
+        .start_network_with_address("/ip4/127.0.0.1/tcp/9102")
+        .await
+        .unwrap();
+
+    sleep(Duration::from_secs(1)).await;
+
+    let node1_id = node1.get_node_id().to_string();
+    let node2_id = node2.get_node_id().to_string();
+
+    node1.add_trusted_node(&node2_id).unwrap();
+    node2.add_trusted_node(&node1_id).unwrap();
+
+    let node1_peer_id;
+    let node2_peer_id;
+    {
+        let network1 = node1.get_network_mut().await.unwrap();
+        node1_peer_id = network1.local_peer_id();
+    }
+    {
+        let network2 = node2.get_network_mut().await.unwrap();
+        node2_peer_id = network2.local_peer_id();
+    }
+
+    {
+        let mut network1 = node1.get_network_mut().await.unwrap();
+        network1.add_known_peer(node2_peer_id);
+        network1.register_node_id(&node2_id, node2_peer_id);
+        network1.register_node_address(&node2_id, "127.0.0.1:8202".to_string());
+    }
+    {
+        let mut network2 = node2.get_network_mut().await.unwrap();
+        network2.add_known_peer(node1_peer_id);
+        network2.register_node_id(&node1_id, node1_peer_id);
+        network2.register_node_address(&node1_id, "127.0.0.1:8201".to_string());
+    }
+
+    sleep(Duration::from_millis(500)).await;
+
+    let test_schema = json!({
+        "name": "test_schema",
+        "payment_config": { "base_multiplier": 1.0, "min_payment_threshold": 0 },
+        "fields": {}
+    });
+    let schema: fold_node::schema::Schema = serde_json::from_value(test_schema).unwrap();
+    node2.load_schema(schema).unwrap();
+
+    let tcp_server1 = TcpServer::new(node1.clone(), 8201).await.unwrap();
+    let tcp_server1_handle = tokio::spawn(async move {
+        if let Err(e) = tcp_server1.run().await {
+            eprintln!("Node 1 TCP server error: {}", e);
+        }
+    });
+    let tcp_server2 = TcpServer::new(node2.clone(), 8202).await.unwrap();
+    let tcp_server2_handle = tokio::spawn(async move {
+        if let Err(e) = tcp_server2.run().await {
+            eprintln!("Node 2 TCP server error: {}", e);
+        }
+    });
+
+    sleep(Duration::from_secs(1)).await;
+
+    let mut stream = tokio::net::TcpStream::connect("127.0.0.1:8201")
+        .await
+        .unwrap();
+
+    let request = json!({
+        "operation": "query",
+        "params": { "schema": "test_schema", "fields": [] },
+        "target_node_id": node2_id
+    });
+
+    let request_bytes = serde_json::to_vec(&request).unwrap();
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    stream.write_u32(request_bytes.len() as u32).await.unwrap();
+    stream.write_all(&request_bytes).await.unwrap();
+
+    let response_len = stream.read_u32().await.unwrap();
+    let mut response_bytes = vec![0u8; response_len as usize];
+    stream.read_exact(&mut response_bytes).await.unwrap();
+    let response: serde_json::Value = serde_json::from_slice(&response_bytes).unwrap();
+    assert!(response.is_object());
+
+    node1.stop_network().await.unwrap();
+    node2.stop_network().await.unwrap();
+
     tcp_server1_handle.abort();
     tcp_server2_handle.abort();
 }
