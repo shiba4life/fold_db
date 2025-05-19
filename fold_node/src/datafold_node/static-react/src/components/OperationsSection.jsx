@@ -6,8 +6,8 @@ import {
   CodeIcon, 
   LibraryIcon, 
   CogIcon, 
-  ServerIcon 
-} from '@heroicons/react/solid'
+  ServerIcon
+} from '@heroicons/react/24/solid'
 
 import SchemasTab from './tabs/SchemasTab'
 import SchemaTab from './tabs/SchemaTab'

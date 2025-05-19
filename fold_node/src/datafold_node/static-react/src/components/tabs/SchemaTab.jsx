@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/solid'
+import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/solid'
 
 function SchemaTab({ schemas, onResult }) {
   const [expandedSchemas, setExpandedSchemas] = useState({})

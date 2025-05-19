@@ -73,16 +73,32 @@ Once running, use the CLI or HTTP/TCP clients to interact.
 
 ### Running the HTTP Server and Web UI
 
-Build the HTTP server binary and start it on your machine:
+To run DataFold with the web interface, you'll need to start both the Rust backend server and the React frontend development server:
 
+1. Start the Rust HTTP server:
 ```bash
-cargo build --release --bin datafold_http_server
-NODE_CONFIG=config/node_config.json \
-  target/release/datafold_http_server --port 9001
+# Kill any existing server process first
+ps aux | grep datafold_http_server | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null
+rm -f data/db.lock  # Remove any stale lock files
+
+# Build and start the server
+cd fold_node
+cargo run --bin datafold_http_server -- --port 9001
 ```
 
-The server hosts a web UI at `http://localhost:9001`. Open this URL in your browser to
-interact with DataFold without using the CLI.
+2. Start the React development server:
+```bash
+# Navigate to the React project directory
+cd fold_node/src/datafold_node/static-react
+
+# Install dependencies (only needed first time)
+npm install
+
+# Start the development server
+npm run dev
+```
+
+The React UI will be available at `http://localhost:5173` and will automatically connect to the Rust backend at `http://localhost:9001`. Any changes to the React code will be hot-reloaded in your browser.
 
 ### Loading Sample Data
 

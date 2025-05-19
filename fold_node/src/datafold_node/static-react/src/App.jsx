@@ -6,6 +6,7 @@ import ResultsSection from './components/ResultsSection'
 import SchemaTab from './components/tabs/SchemaTab'
 import QueryTab from './components/tabs/QueryTab'
 import MutationTab from './components/tabs/MutationTab'
+import TransformsTab from './components/tabs/TransformsTab'
 
 function App() {
   const [activeTab, setActiveTab] = useState('schemas')
@@ -43,6 +44,8 @@ function App() {
         return <QueryTab schemas={schemas} onResult={handleOperationResult} />
       case 'mutation':
         return <MutationTab schemas={schemas} onResult={handleOperationResult} />
+      case 'transforms':
+        return <TransformsTab schemas={schemas} onResult={handleOperationResult} />
       default:
         return null
     }
@@ -85,6 +88,16 @@ function App() {
               onClick={() => handleTabChange('mutation')}
             >
               Mutation
+            </button>
+            <button
+              className={`px-4 py-2 text-sm font-medium ${
+                activeTab === 'transforms'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+              onClick={() => handleTabChange('transforms')}
+            >
+              Transforms
             </button>
           </div>
           
