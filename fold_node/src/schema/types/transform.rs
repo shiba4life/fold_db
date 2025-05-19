@@ -46,6 +46,10 @@ pub struct Transform {
     
     /// Whether payment is required for this transform
     pub payment_required: bool,
+
+    /// Explicit input fields in `Schema.field` format
+    #[serde(default)]
+    pub inputs: Vec<String>,
     
     /// Input dependencies for this transform
     #[serde(default)]
@@ -57,7 +61,7 @@ pub struct Transform {
     
     /// The parsed expression (not serialized)
     #[serde(skip)]
-    pub parsed_expr: Option<crate::transform::ast::Expression>,
+        pub parsed_expr: Option<crate::transform::ast::Expression>,
     
     /// The parsed transform declaration (not serialized)
     #[serde(skip)]
@@ -90,6 +94,7 @@ impl Transform {
             reversible,
             signature,
             payment_required,
+            inputs: Vec::new(),
             input_dependencies: Vec::new(),
             output_reference: None,
             parsed_expr: None,
@@ -124,6 +129,7 @@ impl Transform {
             reversible,
             signature,
             payment_required,
+            inputs: Vec::new(),
             input_dependencies: Vec::new(),
             output_reference: None,
             parsed_expr: Some(parsed_expr),
@@ -160,6 +166,7 @@ impl Transform {
             reversible,
             signature,
             payment_required,
+            inputs: Vec::new(),
             input_dependencies,
             output_reference,
             parsed_expr: None,
@@ -183,6 +190,16 @@ impl Transform {
     /// * `output_reference` - The output reference for this transform
     pub fn set_output_reference(&mut self, output_reference: String) {
         self.output_reference = Some(output_reference);
+    }
+
+    /// Sets the explicit input fields for this transform.
+    pub fn set_inputs(&mut self, inputs: Vec<String>) {
+        self.inputs = inputs;
+    }
+
+    /// Gets the explicit input fields for this transform.
+    pub fn get_inputs(&self) -> &[String] {
+        &self.inputs
     }
     
     /// Gets the input dependencies for this transform.
@@ -267,6 +284,7 @@ impl Transform {
             reversible: declaration.reversible,
             signature: declaration.signature.clone(),
             payment_required,
+            inputs: Vec::new(),
             input_dependencies: Vec::new(), // Will be populated later
             output_reference: None,
             parsed_expr: None, // Will be populated later

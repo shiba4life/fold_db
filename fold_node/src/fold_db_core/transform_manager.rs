@@ -16,6 +16,9 @@ pub type CreateAtomFn = Arc<dyn Fn(&str, String, Option<String>, JsonValue, Opti
 /// Callback function type for updating an atom reference
 pub type UpdateAtomRefFn = Arc<dyn Fn(&str, String, String) -> Result<AtomRef, Box<dyn std::error::Error>> + Send + Sync>;
 
+/// Callback function type for getting a field value by schema and field name
+pub type GetFieldFn = Arc<dyn Fn(&str, &str) -> Result<JsonValue, SchemaError> + Send + Sync>;
+
 pub struct TransformManager {
     /// Tree for storing transforms
     transforms_tree: sled::Tree,
@@ -37,6 +40,8 @@ pub struct TransformManager {
     create_atom_fn: CreateAtomFn,
     /// Callback for updating an atom reference
     update_atom_ref_fn: UpdateAtomRefFn,
+    /// Callback for retrieving field values
+    get_field_fn: GetFieldFn,
 }
 
 impl TransformManager {
@@ -46,6 +51,7 @@ impl TransformManager {
         get_atom_fn: GetAtomFn,
         create_atom_fn: CreateAtomFn,
         update_atom_ref_fn: UpdateAtomRefFn,
+        get_field_fn: GetFieldFn,
     ) -> Self {
         // Load any persisted transforms
         let mut registered_transforms = HashMap::new();
@@ -69,6 +75,7 @@ impl TransformManager {
             get_atom_fn,
             create_atom_fn,
             update_atom_ref_fn,
+            get_field_fn,
         }
     }
 
@@ -369,18 +376,28 @@ impl TransformManager {
                 )
             })?;
         let input_arefs = transform_to_arefs.get(transform_id).cloned().unwrap_or_default();
-        
-        let input_provider = move |input_name: &str| -> Result<JsonValue, Box<dyn std::error::Error>> {
-            if input_arefs.contains(input_name) {
-                let atom = (get_atom_fn)(input_name)?;
-                Ok(atom.content().clone())
-            } else {
-                Err(format!("Input not found: {}", input_name).into())
+
+        let mut input_values = HashMap::new();
+
+        // Fetch explicit inputs if provided
+        if !transform.inputs.is_empty() {
+            for input in &transform.inputs {
+                if let Some((schema, field)) = input.split_once('.') {
+                    let val = (self.get_field_fn)(schema, field)?;
+                    input_values.insert(input.clone(), val);
+                }
             }
-        };
-        
-        // Execute the transform with the input provider
-        let result = TransformExecutor::execute_transform_with_provider(&transform, input_provider)?;
+        }
+
+        // Fallback to atom references for other dependencies
+        for aref in &input_arefs {
+            let atom = (get_atom_fn)(aref).map_err(|e| {
+                SchemaError::InvalidField(format!("Failed to get input '{}': {}", aref, e))
+            })?;
+            input_values.insert(aref.clone(), atom.content().clone());
+        }
+
+        let result = TransformExecutor::execute_transform(&transform, input_values)?;
         
         // Update the output atom reference
         let output_aref = {
