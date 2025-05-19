@@ -155,6 +155,9 @@ impl FoldDB {
     }
 
     fn register_transforms_for_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
+        // Create regex pattern once, outside the loop
+        let cross_re = Regex::new(r"([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)").unwrap();
+        
         for (field_name, field) in &schema.fields {
             if let Some(transform) = field.get_transform() {
                 let output_aref = field.get_ref_atom_uuid().ok_or_else(|| {
@@ -166,8 +169,6 @@ impl FoldDB {
 
                 let mut input_arefs = Vec::new();
                 let mut trigger_fields = Vec::new();
-
-                let cross_re = Regex::new(r"([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)").unwrap();
                 let mut seen_cross = std::collections::HashSet::new();
                 for cap in cross_re.captures_iter(&transform.logic) {
                     let schema_name = cap[1].to_string();

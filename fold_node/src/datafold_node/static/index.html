@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DataFold Node</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
-    <link rel="stylesheet" href="/static/css/modern-styles.css">
-    <link rel="stylesheet" href="/static/css/samples.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/modern-styles.css">
+    <link rel="stylesheet" href="css/samples.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap">
 </head>
 <body>
@@ -62,52 +62,12 @@
                         </button>
                     </div>
                     
-                    <!-- Include Schema Tab Components -->
-                    <div id="schemaTabsContainer">
-                        <script>
-                            utils.loadHtmlIntoContainer('/static/components/schema-tab.html', 'schemaTabsContainer');
-                        </script>
-                    </div>
-                    
-                    <!-- Include Operations Tab Components -->
-                    <div id="operationsTabsContainer">
-                        <script>
-                            utils.loadHtmlIntoContainer('/static/components/operations-tab.html', 'operationsTabsContainer');
-                        </script>
-                    </div>
-
-                    <!-- Include Transforms Tab Component -->
-                    <div id="transformsTabContainer">
-                        <script>
-                            utils.loadHtmlIntoContainer('/static/components/transforms-tab.html', 'transformsTabContainer', () => {
-                                const refreshIcon = document.getElementById('refreshTransformsIcon');
-                                if (window.icons && refreshIcon) {
-                                    refreshIcon.innerHTML = icons.refresh();
-                                }
-                                document.getElementById('refreshTransformsBtn')?.addEventListener('click', () => {
-                                    transformsModule.loadTransforms();
-                                });
-                                transformsModule.loadTransforms();
-                            });
-                        </script>
-                    </div>
-
-                    <!-- Include Network Tab Component -->
-                    <div id="networkTabContainer">
-                        <script>
-                            utils.loadHtmlIntoContainer('/static/components/network-tab.html', 'networkTabContainer');
-                        </script>
-                    </div>
-                    
-                    <!-- Include Samples Tab Component -->
-                    <div id="samplesTabContainer">
-                        <script>
-                            utils.loadHtmlIntoContainer('/static/components/samples-tab.html', 'samplesTabContainer', () => {
-                                if (window.samplesModule && window.samplesModule.initSamplesTab) {
-                                    window.samplesModule.initSamplesTab();
-                                }
-                            });
-                        </script>
+                    <div class="tab-contents">
+                        <div id="schemaTabsContainer" class="tab-content-container active"></div>
+                        <div id="operationsTabsContainer" class="tab-content-container"></div>
+                        <div id="transformsTabContainer" class="tab-content-container"></div>
+                        <div id="networkTabContainer" class="tab-content-container"></div>
+                        <div id="samplesTabContainer" class="tab-content-container"></div>
                     </div>
                 </div>
             </div>
@@ -133,34 +93,18 @@
         </div>
     </footer>
 
-    <!-- Load JavaScript modules -->
-    <script src="/static/js/icons.js"></script>
-    <script src="/static/js/utils.js"></script>
-    <script src="/static/js/schema.js"></script>
-    <script src="/static/js/operations.js"></script>
-    <script src="/static/js/network.js"></script>
-    <script src="/static/js/samples.js"></script>
-    <script src="/static/js/transforms.js"></script>
-    <script src="/static/js/app.js"></script>
+    <!-- Core modules that must load first -->
+    <script src="js/utils.js" defer></script>
+    <script src="js/icons.js" defer></script>
 
-    <!-- Initialize icons -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Set logo icon
-            document.getElementById('logoIcon').innerHTML = icons.database();
-            
-            // Set tab icons
-            document.getElementById('schemasTabIcon').innerHTML = icons.folder();
-            document.getElementById('schemaTabIcon').innerHTML = icons.schema();
-            document.getElementById('queryTabIcon').innerHTML = icons.search();
-            document.getElementById('mutationTabIcon').innerHTML = icons.code();
-            document.getElementById('samplesTabIcon').innerHTML = icons.library();
-            document.getElementById('transformsTabIcon').innerHTML = icons.gear();
-            document.getElementById('networkTabIcon').innerHTML = icons.network();
-            
-            // Set status icon
-            document.getElementById('statusIcon').innerHTML = icons.check();
-        });
-    </script>
+    <!-- Feature modules -->
+    <script src="js/schema.js" defer></script>
+    <script src="js/operations.js" defer></script>
+    <script src="js/network.js" defer></script>
+    <script src="js/samples.js" defer></script>
+    <script src="js/transforms.js" defer></script>
+
+    <!-- App initialization -->
+    <script src="js/app.js" defer></script>
 </body>
 </html>

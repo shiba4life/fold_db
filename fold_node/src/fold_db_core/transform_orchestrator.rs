@@ -73,4 +73,15 @@ impl TransformOrchestrator {
                 .len(),
         )
     }
+
+    /// Returns true if the queue is empty.
+    pub fn is_empty(&self) -> Result<bool, SchemaError> {
+        Ok(
+            self
+                .queue
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire queue lock".to_string()))?
+                .is_empty()
+        )
+    }
 }

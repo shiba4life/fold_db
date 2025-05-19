@@ -121,6 +121,23 @@ Run tests for a specific crate (e.g., fold_node):
 cargo test --package fold_node
 ```
 
+### UI Tests
+
+The web UI components are tested using Jest. To run the UI tests:
+
+1. Install Node.js dependencies:
+```bash
+cd fold_node/src/datafold_node/static
+npm install
+```
+
+2. Run the tests:
+```bash
+npm test
+```
+
+This will run all Jest tests for UI components, including network tab functionality, form handling, and status display tests.
+
 ## Generating Coverage Reports
 
 DataFold uses [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) to produce code coverage information. Install the tool if it is not already available:

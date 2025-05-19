@@ -29,6 +29,7 @@ Thumbs.db
 fold_node/data/
 src/datafold_node/data/db/
 src/datafold_node/data
+data/db*
 /config/
 *.log
 *.env
@@ -90,3 +91,8 @@ target/llvm-cov/
 *.profraw
 *.profdata
 vendor/
+
+# Jest and Node.js for static UI
+fold_node/src/datafold_node/static/node_modules/
+fold_node/src/datafold_node/static/coverage/
+fold_node/src/datafold_node/static/.jest-cache/

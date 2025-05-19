@@ -229,9 +229,6 @@ impl DataFoldHttpServer {
             App::new()
                 .wrap(cors)
                 .app_data(app_state.clone())
-                .route("/", web::get().to(|| async {
-                    HttpResponse::Ok().body(include_str!("static/index.html"))
-                }))
                 .service(
                     web::scope("/api")
                         // Schema endpoints
@@ -266,8 +263,8 @@ impl DataFoldHttpServer {
                                 .route("/nodes", web::get().to(list_nodes))
                         ),
                 )
-                // Static files
-                .service(Files::new("/static", "src/datafold_node/static").index_file("index.html"))
+                // Static files - serve from root
+                .service(Files::new("/", "src/datafold_node/static").index_file("index.html"))
        })
         .bind(&self.bind_address)
         .map_err(|e| FoldDbError::Config(format!("Failed to bind HTTP server: {}", e)))?
