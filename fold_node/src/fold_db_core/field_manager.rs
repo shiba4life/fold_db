@@ -25,22 +25,38 @@ impl FieldManager {
         }
     }
 
-    pub fn set_transform_manager(&self, manager: Arc<TransformManager>) {
-        let mut guard = self.transform_manager.write().unwrap();
+    pub fn set_transform_manager(&self, manager: Arc<TransformManager>) -> Result<(), SchemaError> {
+        let mut guard = self
+            .transform_manager
+            .write()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire transform_manager lock".to_string()))?;
         *guard = Some(manager);
+        Ok(())
     }
 
-    pub fn get_transform_manager(&self) -> Option<Arc<TransformManager>> {
-        self.transform_manager.read().unwrap().clone()
+    pub fn get_transform_manager(&self) -> Result<Option<Arc<TransformManager>>, SchemaError> {
+        let guard = self
+            .transform_manager
+            .read()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire transform_manager lock".to_string()))?;
+        Ok(guard.clone())
     }
 
-    pub fn set_orchestrator(&self, orchestrator: Arc<TransformOrchestrator>) {
-        let mut guard = self.orchestrator.write().unwrap();
+    pub fn set_orchestrator(&self, orchestrator: Arc<TransformOrchestrator>) -> Result<(), SchemaError> {
+        let mut guard = self
+            .orchestrator
+            .write()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire orchestrator lock".to_string()))?;
         *guard = Some(orchestrator);
+        Ok(())
     }
 
-    pub fn get_orchestrator(&self) -> Option<Arc<TransformOrchestrator>> {
-        self.orchestrator.read().unwrap().clone()
+    pub fn get_orchestrator(&self) -> Result<Option<Arc<TransformOrchestrator>>, SchemaError> {
+        let guard = self
+            .orchestrator
+            .read()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire orchestrator lock".to_string()))?;
+        Ok(guard.clone())
     }
 
     pub fn get_or_create_atom_ref(
@@ -73,7 +89,9 @@ impl FieldManager {
         let atoms = self.atom_manager.get_atoms();
 
         let atom_uuid = {
-            let guard = ref_atoms.lock().unwrap();
+            let guard = ref_atoms
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
             guard
                 .get(&ref_atom_uuid)
                 .map(|aref| aref.get_atom_uuid().clone())
@@ -81,7 +99,9 @@ impl FieldManager {
 
         // If we have an atom UUID, try to get the atom
         if let Some(atom_uuid) = atom_uuid {
-            let guard = atoms.lock().unwrap();
+            let guard = atoms
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire atoms lock".to_string()))?;
             if let Some(atom) = guard.get(&atom_uuid) {
                 return Ok(atom.content().clone());
             }
@@ -125,7 +145,9 @@ impl FieldManager {
         let aref_uuid = ctx.get_or_create_atom_ref()?;
         let prev_atom_uuid = {
             let ref_atoms = ctx.atom_manager.get_ref_atoms();
-            let guard = ref_atoms.lock().unwrap();
+            let guard = ref_atoms
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
             guard
                 .get(&aref_uuid)
                 .map(|aref| aref.get_atom_uuid().to_string())

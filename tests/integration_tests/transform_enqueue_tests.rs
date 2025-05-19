@@ -39,7 +39,7 @@ fn mutation_enqueues_transform() {
     db.write_schema(mutation).unwrap();
 
     // Verify that a transform task was queued
-    assert_eq!(db.orchestrator_len(), 1);
+    assert_eq!(db.orchestrator_len().unwrap(), 1);
 
     cleanup_test_db(&path);
 }

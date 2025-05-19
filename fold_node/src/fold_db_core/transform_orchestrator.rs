@@ -8,8 +8,12 @@ use crate::schema::SchemaError;
 /// Trait abstraction over transform execution for easier testing.
 pub trait TransformRunner: Send + Sync {
     fn execute_transform_now(&self, transform_id: &str) -> Result<JsonValue, SchemaError>;
-    fn transform_exists(&self, transform_id: &str) -> bool;
-    fn get_transforms_for_field(&self, schema_name: &str, field_name: &str) -> HashSet<String>;
+    fn transform_exists(&self, transform_id: &str) -> Result<bool, SchemaError>;
+    fn get_transforms_for_field(
+        &self,
+        schema_name: &str,
+        field_name: &str,
+    ) -> Result<HashSet<String>, SchemaError>;
 }
 
 /// Orchestrates execution of transforms sequentially.
@@ -27,22 +31,28 @@ impl TransformOrchestrator {
     }
 
     /// Add a task for the given schema and field.
-    pub fn add_task(&self, schema_name: &str, field_name: &str) {
-        let ids = self.manager.get_transforms_for_field(schema_name, field_name);
+    pub fn add_task(&self, schema_name: &str, field_name: &str) -> Result<(), SchemaError> {
+        let ids = self.manager.get_transforms_for_field(schema_name, field_name)?;
         if ids.is_empty() {
-            return;
+            return Ok(());
         }
-
-        let mut q = self.queue.lock().unwrap();
+        let mut q = self
+            .queue
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire queue lock".to_string()))?;
         for id in ids {
             q.push_back(id);
         }
+        Ok(())
     }
 
     /// Process a single task from the queue.
     pub fn process_one(&self) -> Option<Result<JsonValue, SchemaError>> {
         let transform_id = {
-            let mut q = self.queue.lock().unwrap();
+            let mut q = self
+                .queue
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire queue lock".to_string())).ok()?;
             q.pop_front()
         }?;
         Some(self.manager.execute_transform_now(&transform_id))
@@ -54,7 +64,13 @@ impl TransformOrchestrator {
     }
 
     /// Queue length, useful for tests.
-    pub fn len(&self) -> usize {
-        self.queue.lock().unwrap().len()
+    pub fn len(&self) -> Result<usize, SchemaError> {
+        Ok(
+            self
+                .queue
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire queue lock".to_string()))?
+                .len(),
+        )
     }
 }

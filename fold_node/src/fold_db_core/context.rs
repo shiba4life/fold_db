@@ -40,31 +40,39 @@ impl<'a> AtomContext<'a> {
     pub fn get_or_create_atom_ref(&mut self) -> Result<String, SchemaError> {
         let field_def = self.get_field_def()?;
 
-        let aref_uuid = field_def.get_ref_atom_uuid().unwrap_or_else(|| {
+        let aref_uuid = if let Some(uuid) = field_def.get_ref_atom_uuid() {
+            uuid
+        } else {
             let aref_uuid = Uuid::new_v4().to_string();
             match field_def.field_type() {
                 FieldType::Single => {
                     let aref = AtomRef::new(aref_uuid.clone(), self.source_pub_key.clone());
                     let ref_atoms = self.atom_manager.get_ref_atoms();
-                    let mut guard = ref_atoms.lock().unwrap();
+                    let mut guard = ref_atoms
+                        .lock()
+                        .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
                     guard.insert(aref_uuid.clone(), aref);
                 }
                 FieldType::Collection => {
                     let collection = AtomRefCollection::new(self.source_pub_key.clone());
                     let ref_collections = self.atom_manager.get_ref_collections();
-                    let mut guard = ref_collections.lock().unwrap();
+                    let mut guard = ref_collections
+                        .lock()
+                        .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string()))?;
                     guard.insert(aref_uuid.clone(), collection);
                 }
             }
             aref_uuid
-        });
+        };
 
         Ok(aref_uuid)
     }
 
     pub fn get_prev_atom_uuid(&self, aref_uuid: &str) -> Result<String, SchemaError> {
         let ref_atoms = self.atom_manager.get_ref_atoms();
-        let guard = ref_atoms.lock().unwrap();
+        let guard = ref_atoms
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
         let aref = guard
             .get(aref_uuid)
             .ok_or_else(|| SchemaError::InvalidData("AtomRef not found".to_string()))?;
@@ -77,7 +85,9 @@ impl<'a> AtomContext<'a> {
         id: &str,
     ) -> Result<String, SchemaError> {
         let ref_collections = self.atom_manager.get_ref_collections();
-        let guard = ref_collections.lock().unwrap();
+        let guard = ref_collections
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string()))?;
         let aref = guard
             .get(aref_uuid)
             .ok_or_else(|| SchemaError::InvalidData("AtomRefCollection not found".to_string()))?;
