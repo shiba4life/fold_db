@@ -1,5 +1,8 @@
 use clap::{Parser, Subcommand};
-use fold_node::{load_schema_from_file, DataFoldNode, MutationType, NodeConfig, Operation};
+use fold_node::{
+    load_schema_from_file, DataFoldNode, MutationType, NodeConfig, Operation,
+    load_node_config,
+};
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
@@ -100,8 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load node configuration
     info!("Loading config from: {}", cli.config);
-    let config_str = fs::read_to_string(&cli.config)?;
-    let config: NodeConfig = serde_json::from_str(&config_str)?;
+    let config = load_node_config(Some(&cli.config), None);
 
     // Initialize node
     info!("Initializing DataFold Node...");

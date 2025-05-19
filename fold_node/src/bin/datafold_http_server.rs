@@ -1,6 +1,8 @@
 use fold_node::{
-    datafold_node::{config::NodeConfig, DataFoldNode, DataFoldHttpServer},
+    datafold_node::{load_node_config, NodeConfig, DataFoldNode, DataFoldHttpServer},
 };
+use std::env;
+use std::path::PathBuf;
 use std::fs;
 use clap::Parser;
 use env_logger;
@@ -47,18 +49,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command-line arguments using clap
     let Cli { port: http_port } = Cli::parse();
 
-    // Read node config from environment variable or default path
-    let config_path =
-        std::env::var("NODE_CONFIG").unwrap_or_else(|_| "config/node_config.json".to_string());
-    info!("Loading config from: {}", config_path);
-
-    // Create a default config if the file doesn't exist
-    let config: NodeConfig = if let Ok(config_str) = fs::read_to_string(&config_path) {
-        serde_json::from_str(&config_str)?
-    } else {
-        println!("Config file not found, using default config");
-        NodeConfig::default()
-    };
+    // Load node configuration
+    let config = load_node_config(None, None);
     info!("Config loaded successfully");
 
     // Load or initialize node
