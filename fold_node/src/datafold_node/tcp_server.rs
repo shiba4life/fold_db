@@ -102,6 +102,11 @@ impl TcpServer {
         let listener = TcpListener::bind(&addr).await?;
         println!("TCP server listening on {}", addr);
 
+        // Register this node's address with the network if available
+        if let Ok(mut net) = node.get_network_mut().await {
+            net.register_node_address(node.get_node_id(), addr.clone());
+        }
+
         Ok(Self {
             node: Arc::new(Mutex::new(node)),
             listener,

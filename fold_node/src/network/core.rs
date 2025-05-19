@@ -58,6 +58,8 @@ pub struct NetworkCore {
     node_to_peer_map: HashMap<String, PeerId>,
     /// Mapping from peer IDs to node IDs (UUIDs)
     peer_to_node_map: HashMap<PeerId, String>,
+    /// Mapping from node IDs to their listening addresses
+    node_to_address_map: HashMap<String, String>,
     /// Mock for testing - maps peer IDs to schema services
     #[cfg(test)]
     mock_peers: HashMap<PeerId, SchemaService>,
@@ -77,6 +79,7 @@ impl NetworkCore {
             config,
             node_to_peer_map: HashMap::new(),
             peer_to_node_map: HashMap::new(),
+            node_to_address_map: HashMap::new(),
             #[cfg(test)]
             mock_peers: HashMap::new(),
         })
@@ -86,6 +89,16 @@ impl NetworkCore {
     pub fn register_node_id(&mut self, node_id: &str, peer_id: PeerId) {
         self.node_to_peer_map.insert(node_id.to_string(), peer_id);
         self.peer_to_node_map.insert(peer_id, node_id.to_string());
+    }
+
+    /// Register the listening address for a node ID
+    pub fn register_node_address(&mut self, node_id: &str, address: String) {
+        self.node_to_address_map.insert(node_id.to_string(), address);
+    }
+
+    /// Get the listening address for a node ID
+    pub fn get_address_for_node(&self, node_id: &str) -> Option<String> {
+        self.node_to_address_map.get(node_id).cloned()
     }
 
     /// Get the peer ID for a node ID
@@ -343,10 +356,16 @@ impl NetworkCore {
         // For now, we'll use a direct TCP connection to the target node
         // In a real implementation, this would use the libp2p request-response protocol
 
-        // For simplicity, we'll always connect to Node 2 (port 8002)
-        // In a real implementation, we would use a more sophisticated approach
-        // to determine the correct port for each node
-        let target_address = "127.0.0.1:8002".to_string();
+        // Determine the target node's listening address
+        let target_address = match self.get_address_for_node(&node_id) {
+            Some(addr) => addr,
+            None => {
+                return Err(NetworkError::ConnectionError(format!(
+                    "Address for node {} not found",
+                    node_id
+                )));
+            }
+        };
 
         println!("Connecting to target node at {}", target_address);
 
