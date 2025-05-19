@@ -1,5 +1,5 @@
 use crate::permissions::types::policy::{PermissionsPolicy, TrustDistance};
-use log::{info, warn, error};
+use log::{info, warn};
 
 /// Manages and enforces access control policies in the database.
 ///

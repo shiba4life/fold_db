@@ -1,9 +1,9 @@
-use fold_node::testing::SchemaCore;
+use fold_node::schema::SchemaCore;
 use tempfile::NamedTempFile;
 
 #[test]
 fn test_default_initialization() {
-    SchemaCore::default().expect("default initialization failed");
+    SchemaCore::init_default().expect("default initialization failed");
 }
 
 #[test]

@@ -2,7 +2,7 @@ use serde_json::Value;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use log::{info, warn, error};
+use log::info;
 
 use crate::datafold_node::config::NodeConfig;
 use crate::datafold_node::config::NodeInfo;

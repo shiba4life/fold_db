@@ -3,12 +3,56 @@ use fold_node::testing::{
     PermissionsPolicy, Query, Schema, SchemaCore, SchemaField, SchemaPaymentConfig, TrustDistance,
     TrustDistanceScaling,
 };
+use fold_node::schema::types::Transform;
 use serde_json::Value;
 use std::collections::HashMap;
 use env_logger;
 
 fn create_default_payment_config() -> FieldPaymentConfig {
     FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
+}
+
+#[test]
+fn test_non_reversible_transform_not_writable() {
+    let _ = env_logger::builder().is_test(true).try_init();
+    let wrapper = PermissionWrapper::new();
+    let schema_manager = SchemaCore::new("data").unwrap();
+
+    let transform = Transform::new("1 + 1".to_string(), false, None, false);
+    let field = SchemaField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+        HashMap::new(),
+        Some(FieldType::Single),
+    )
+    .with_ref_atom_uuid("calc_uuid".to_string())
+    .with_transform(transform);
+
+    let mut fields = HashMap::new();
+    fields.insert("calc".to_string(), field);
+
+    let schema = Schema {
+        name: "test_schema".to_string(),
+        fields,
+        payment_config: SchemaPaymentConfig::default(),
+    };
+
+    schema_manager.load_schema(schema).unwrap();
+
+    let mutation = Mutation {
+        mutation_type: MutationType::Create,
+        schema_name: "test_schema".to_string(),
+        fields_and_values: {
+            let mut map = HashMap::new();
+            map.insert("calc".to_string(), Value::Null);
+            map
+        },
+        pub_key: "any".to_string(),
+        trust_distance: 1,
+    };
+
+    let result = wrapper.check_mutation_field_permission(&mutation, "calc", &schema_manager);
+    assert!(!result.allowed);
 }
 
 #[test]

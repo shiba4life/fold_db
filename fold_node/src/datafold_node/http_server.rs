@@ -8,7 +8,7 @@ use actix_cors::Cors;
 use actix_files::Files;
 use actix_web::{web, App, HttpResponse, HttpServer as ActixHttpServer, Responder};
 use serde::Deserialize;
-use log::{info, warn, error};
+use log::{info, error};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
@@ -481,17 +481,23 @@ async fn execute_mutation(mutation: web::Json<Value>, state: web::Data<AppState>
 
 /// List all sample schemas.
 async fn list_schema_samples(state: web::Data<AppState>) -> impl Responder {
-    HttpResponse::Ok().json(state.sample_manager.list_schema_samples())
+    HttpResponse::Ok().json(json!({
+        "data": state.sample_manager.list_schema_samples()
+    }))
 }
 
 /// List all sample queries.
 async fn list_query_samples(state: web::Data<AppState>) -> impl Responder {
-    HttpResponse::Ok().json(state.sample_manager.list_query_samples())
+    HttpResponse::Ok().json(json!({
+        "data": state.sample_manager.list_query_samples()
+    }))
 }
 
 /// List all sample mutations.
 async fn list_mutation_samples(state: web::Data<AppState>) -> impl Responder {
-    HttpResponse::Ok().json(state.sample_manager.list_mutation_samples())
+    HttpResponse::Ok().json(json!({
+        "data": state.sample_manager.list_mutation_samples()
+    }))
 }
 
 /// Get a sample schema by name.
@@ -700,17 +706,32 @@ mod tests {
 
         let handle = tokio::spawn(async move { server.run().await.unwrap() });
 
-        // Wait briefly for server to start
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        // Wait for server to start
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-        let resp: Vec<String> =
-            reqwest::get(format!("http://{}/samples/schemas", bind_addr))
-                .await
-                .expect("request")
-                .json()
-                .await
-                .expect("json");
-        assert_eq!(resp, vec!["Custom".to_string()]);
+        // Make request to server
+        let client = reqwest::Client::new();
+        let url = format!("http://{}/api/samples/schemas", bind_addr);
+        
+        let json_value = client.get(&url)
+            .timeout(std::time::Duration::from_secs(5))
+            .send()
+            .await
+            .expect("Failed to connect to server")
+            .error_for_status()
+            .expect("Server returned error status")
+            .json::<serde_json::Value>()
+            .await
+            .expect("Failed to parse JSON response");
+        
+        // Verify response
+        let schemas = json_value.get("data")
+            .expect("missing data field")
+            .as_array()
+            .expect("data field is not an array");
+        assert_eq!(schemas.len(), 1, "expected exactly one schema");
+        assert_eq!(schemas[0].as_str().expect("schema name is not a string"), "Custom");
+
 
         handle.abort();
         let _ = handle.await;

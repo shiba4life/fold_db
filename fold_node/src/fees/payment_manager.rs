@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-use log::{info, warn, error};
+use log::warn;
 
 use crate::fees::lightning::LightningClient;
 use crate::fees::{

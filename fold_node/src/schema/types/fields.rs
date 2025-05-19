@@ -59,6 +59,9 @@ pub struct SchemaField {
     /// Optional transform for this field
     /// Defines how data from source fields is processed to produce a derived value
     pub transform: Option<Transform>,
+
+    /// Whether this field can be written to directly
+    pub writable: bool,
 }
 
 // Manual implementation of Deserialize for SchemaField to parse the transform string
@@ -75,6 +78,7 @@ impl<'de> Deserialize<'de> for SchemaField {
             field_type: Option<FieldType>, // Make field_type optional for deserialization
             field_mappers: HashMap<String, String>,
             transform: Option<String>, // Deserialize transform as a string
+            writable: Option<bool>,
         }
 
         let helper = SchemaFieldHelper::deserialize(deserializer)?;
@@ -83,19 +87,27 @@ impl<'de> Deserialize<'de> for SchemaField {
             let parser = TransformParser::new();
             match parser.parse_transform(&transform_logic) {
                 Ok(declaration) => Ok(Transform::from_declaration(declaration)),
-                Err(e) => Err(serde::de::Error::custom(format!("Error parsing transform: {}", e))), // Include SchemaError details
+                Err(e) => Err(serde::de::Error::custom(format!("Error parsing transform: {}", e))),
             }
-        }).transpose()?; // Use transpose to convert Option<Result<T, E>> to Result<Option<T>, E>
+        }).transpose()?;
 
-
-        Ok(SchemaField {
+        let mut field = SchemaField {
             permission_policy: helper.permission_policy,
             payment_config: helper.payment_config,
             ref_atom_uuid: helper.ref_atom_uuid,
-            field_type: helper.field_type.unwrap_or(FieldType::Single), // Provide default if missing
+            field_type: helper.field_type.unwrap_or(FieldType::Single),
             field_mappers: helper.field_mappers,
             transform: parsed_transform,
-        })
+            writable: helper.writable.unwrap_or(true),
+        };
+
+        if let Some(t) = &field.transform {
+            if !t.reversible {
+                field.writable = false;
+            }
+        }
+
+        Ok(field)
     }
 }
 
@@ -131,6 +143,7 @@ impl SchemaField {
             field_mappers,
             field_type: field_type.unwrap_or(FieldType::Single),
             transform: None,
+            writable: true,
         }
     }
 
@@ -210,6 +223,7 @@ impl SchemaField {
     ///
     /// The field instance with the transform set
     pub fn with_transform(mut self, transform: Transform) -> Self {
+        self.writable = transform.reversible;
         self.transform = Some(transform);
         self
     }
@@ -223,12 +237,19 @@ impl SchemaField {
         self.transform.as_ref()
     }
 
+    /// Returns whether this field is writable
+    #[must_use]
+    pub fn is_writable(&self) -> bool {
+        self.writable
+    }
+
     /// Sets the transform for this field.
     ///
     /// # Arguments
     ///
     /// * `transform` - The transform to apply to this field
     pub fn set_transform(&mut self, transform: Transform) {
+        self.writable = transform.reversible;
         self.transform = Some(transform);
     }
 }
