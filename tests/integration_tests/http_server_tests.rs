@@ -93,6 +93,8 @@ async fn test_sample_endpoints() {
     let schemas_arr = schemas["data"].as_array().unwrap();
     assert!(schemas_arr.contains(&Value::String("UserProfile".to_string())));
     assert!(schemas_arr.contains(&Value::String("ProductCatalog".to_string())));
+    assert!(schemas_arr.contains(&Value::String("TransformBase".to_string())));
+    assert!(schemas_arr.contains(&Value::String("TransformSchema".to_string())));
     let resp = client
         .get(format!("http://{}/api/samples/schema/UserProfile", addr))
         .send()
@@ -111,6 +113,25 @@ async fn test_sample_endpoints() {
     assert!(resp.status().is_success());
     let schema: Value = resp.json().await.unwrap();
     assert_eq!(schema["name"], "ProductCatalog");
+
+    // Verify transform sample schemas
+    let resp = client
+        .get(format!("http://{}/api/samples/schema/TransformBase", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let schema: Value = resp.json().await.unwrap();
+    assert_eq!(schema["name"], "TransformBase");
+
+    let resp = client
+        .get(format!("http://{}/api/samples/schema/TransformSchema", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let schema: Value = resp.json().await.unwrap();
+    assert_eq!(schema["name"], "TransformSchema");
     handle.abort();
 }
 

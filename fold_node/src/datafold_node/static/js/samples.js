@@ -10,6 +10,8 @@ const sampleDescriptions = {
     'BlogPost': 'A blog post schema demonstrating collection fields for tags and comments.',
     'SocialMediaPost': 'A social media post schema with permissions on likes and comments.',
     'FinancialTransaction': 'A financial transaction schema with strict payment policies.',
+    'TransformBase': 'Base schema providing values for cross-schema transforms.',
+    'TransformSchema': 'Schema demonstrating a transform that reads data from TransformBase.',
     
     // Query descriptions
     'BasicUserQuery': 'A simple query to retrieve basic user information without any filtering.',
