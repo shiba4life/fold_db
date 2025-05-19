@@ -1,5 +1,8 @@
 mod client;
-mod types;
+
+pub use crate::fees::types::lightning::{
+    Channel, NodeConfig, NodeInfo, Network, RoutingFees,
+};
 
 #[cfg(test)]
 mod mock;
