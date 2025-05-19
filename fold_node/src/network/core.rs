@@ -63,6 +63,8 @@ pub struct NetworkCore {
     /// Mock for testing - maps peer IDs to schema services
     #[cfg(test)]
     mock_peers: HashMap<PeerId, SchemaService>,
+    /// Handle for the background networking task
+    mdns_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl NetworkCore {
@@ -82,6 +84,7 @@ impl NetworkCore {
             node_to_address_map: HashMap::new(),
             #[cfg(test)]
             mock_peers: HashMap::new(),
+            mdns_handle: None,
         })
     }
 
@@ -154,7 +157,7 @@ impl NetworkCore {
             // This is a placeholder for the actual implementation
             // In a real implementation, this would start a background task
             // that periodically announces this node via mDNS
-            tokio::spawn(async move {
+            let handle = tokio::spawn(async move {
                 println!(
                     "Starting mDNS announcements on port {} every {:?}",
                     discovery_port, announcement_interval
@@ -168,6 +171,8 @@ impl NetworkCore {
                     tokio::time::sleep(announcement_interval).await;
                 }
             });
+
+            self.mdns_handle = Some(handle);
 
             // For now, we'll simulate peer discovery
             if cfg!(feature = "simulate-peers") {
@@ -183,6 +188,13 @@ impl NetworkCore {
         }
 
         Ok(())
+    }
+
+    /// Stop the network service by aborting any background tasks
+    pub fn stop(&mut self) {
+        if let Some(handle) = self.mdns_handle.take() {
+            handle.abort();
+        }
     }
 
     /// Check which schemas are available on a remote peer.
