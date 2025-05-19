@@ -39,6 +39,7 @@ pub mod testing;
 
 // Re-export main types for convenience
 pub use datafold_node::config::NodeConfig;
+pub use datafold_node::config::load_node_config;
 pub use datafold_node::loader::load_schema_from_file;
 pub use datafold_node::DataFoldNode;
 pub use error::{FoldDbError, FoldDbResult};

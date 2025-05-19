@@ -30,6 +30,7 @@ fn build_schema(transform_logic: &str) -> JsonSchemaDefinition {
             reversible: false,
             signature: None,
             payment_required: false,
+            inputs: Vec::new(),
         }),
     };
 

@@ -19,6 +19,7 @@ pub mod tests;
 
 // Re-export the DataFoldNode struct for easier imports
 pub use config::NodeConfig;
+pub use config::load_node_config;
 pub use http_server::DataFoldHttpServer;
 pub use loader::load_schema_from_file;
 pub use node::DataFoldNode;

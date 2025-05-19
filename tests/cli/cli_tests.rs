@@ -171,11 +171,11 @@ fn help_and_version() {
 }
 
 #[test]
-fn missing_config_fails() {
+fn missing_config_uses_default() {
     let exe = cli_path();
     let status = Command::new(&exe)
         .args(["-c", "nonexistent.json", "list-schemas"])
         .status()
         .expect("command failed");
-    assert!(!status.success());
+    assert!(status.success());
 }
