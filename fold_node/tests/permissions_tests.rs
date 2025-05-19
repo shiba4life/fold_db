@@ -14,7 +14,7 @@ fn create_default_payment_config() -> FieldPaymentConfig {
 fn test_permission_wrapper_query() {
     // Setup
     let wrapper = PermissionWrapper::new();
-    let schema_manager = SchemaCore::new("data");
+    let schema_manager = SchemaCore::new("data").unwrap();
 
     // Create a test schema
     let mut fields = HashMap::new();
@@ -73,7 +73,7 @@ fn test_permission_wrapper_query() {
 fn test_permission_wrapper_no_requirement() {
     // Setup
     let wrapper = PermissionWrapper::new();
-    let schema_manager = SchemaCore::new("data");
+    let schema_manager = SchemaCore::new("data").unwrap();
 
     // Create a test schema with no distance requirement
     let mut fields = HashMap::new();
@@ -122,7 +122,7 @@ fn test_permission_wrapper_no_requirement() {
 fn test_permission_wrapper_mutation() {
     // Setup
     let wrapper = PermissionWrapper::new();
-    let schema_manager = SchemaCore::new("data");
+    let schema_manager = SchemaCore::new("data").unwrap();
 
     // Create a test schema with both explicit write permissions and trust distance
     let mut fields = HashMap::new();

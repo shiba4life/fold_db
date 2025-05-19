@@ -33,7 +33,7 @@ fn test_invalid_schema_validation() {
         }
     }"#;
 
-    let core = SchemaCore::new("data");
+    let core = SchemaCore::new("data").unwrap();
     let result = core.load_schema_from_json(invalid_json_str);
     assert!(result.is_err());
 }
