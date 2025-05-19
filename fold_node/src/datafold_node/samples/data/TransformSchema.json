@@ -17,20 +17,8 @@
           "None": null
         }
       },
-      "field_mappers": {}
-    }
-  },
-  "transforms": {
-    "sum_values": {
-      "name": "sum_values",
-      "logic": "return TransformBase.value1 + TransformBase.value2;",
-      "reversible": false,
-      "signature": null,
-      "payment_required": false,
-      "input_dependencies": [
-        "TransformBase.value1",
-        "TransformBase.value2"
-      ]
+      "field_mappers": {},
+      "transform": "transform sum_values { logic: { TransformBase.value1 + TransformBase.value2; } }"
     }
   },
   "payment_config": {

@@ -258,3 +258,20 @@ async fn test_transform_endpoints() {
     handle.abort();
 }
 
+#[tokio::test]
+async fn test_sample_transform_visible() {
+    let (handle, addr) = start_server().await;
+    let client = Client::new();
+
+    let resp = client
+        .get(format!("http://{}/api/transforms", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let body: Value = resp.json().await.unwrap();
+    assert!(body["data"].as_object().unwrap().contains_key("TransformSchema.result"));
+
+    handle.abort();
+}
+
