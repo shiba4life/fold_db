@@ -8,6 +8,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
+use log::{info, warn, error};
 
 /// TCP server for the DataFold node.
 ///
@@ -100,7 +101,7 @@ impl TcpServer {
     pub async fn new(node: DataFoldNode, port: u16) -> FoldDbResult<Self> {
         let addr = format!("127.0.0.1:{}", port);
         let listener = TcpListener::bind(&addr).await?;
-        println!("TCP server listening on {}", addr);
+        info!("TCP server listening on {}", addr);
 
         // Register this node's address with the network if available
         if let Ok(mut net) = node.get_network_mut().await {
@@ -151,11 +152,11 @@ impl TcpServer {
     /// }
     /// ```
     pub async fn run(&self) -> FoldDbResult<()> {
-        println!("TCP server running...");
+        info!("TCP server running...");
 
         loop {
             let (socket, _) = self.listener.accept().await?;
-            println!("New client connected");
+            info!("New client connected");
 
             // Clone the node reference for the new connection
             let node_clone = self.node.clone();
@@ -163,7 +164,7 @@ impl TcpServer {
             // Spawn a new task to handle the connection
             tokio::spawn(async move {
                 if let Err(e) = Self::handle_connection(socket, node_clone).await {
-                    eprintln!("Error handling connection: {}", e);
+                    error!("Error handling connection: {}", e);
                 }
             });
         }
@@ -213,10 +214,10 @@ impl TcpServer {
                 Err(e) => {
                     if e.kind() == std::io::ErrorKind::UnexpectedEof {
                         // Client disconnected
-                        println!("Client disconnected");
+                        info!("Client disconnected");
                         return Ok(());
                     }
-                    println!("Error reading request length: {}", e);
+                    error!("Error reading request length: {}", e);
                     return Err(e.into());
                 }
             };
@@ -224,7 +225,7 @@ impl TcpServer {
             // Sanity check the request length to prevent OOM
             if request_len > 10_000_000 {
                 // 10MB limit
-                println!("Request too large: {} bytes", request_len);
+                warn!("Request too large: {} bytes", request_len);
                 let error_response = json!({
                     "error": "Request too large",
                     "max_size": 10_000_000
@@ -240,9 +241,9 @@ impl TcpServer {
             match socket.read_exact(&mut request_bytes).await {
                 Ok(_) => {}
                 Err(e) => {
-                    println!("Error reading request: {}", e);
+                    error!("Error reading request: {}", e);
                     if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                        println!("Client disconnected while reading request");
+                        info!("Client disconnected while reading request");
                         return Ok(());
                     }
 
@@ -264,7 +265,7 @@ impl TcpServer {
             let request: Value = match serde_json::from_slice(&request_bytes) {
                 Ok(req) => req,
                 Err(e) => {
-                    println!("Error deserializing request: {}", e);
+                    error!("Error deserializing request: {}", e);
 
                     // Try to send an error response
                     let error_response = json!({
@@ -284,7 +285,7 @@ impl TcpServer {
             let response = match Self::process_request(&request, node.clone()).await {
                 Ok(resp) => resp,
                 Err(e) => {
-                    println!("Error processing request: {}", e);
+                    error!("Error processing request: {}", e);
 
                     // Create an error response
                     json!({
@@ -297,7 +298,7 @@ impl TcpServer {
             let response_bytes = match serde_json::to_vec(&response) {
                 Ok(bytes) => bytes,
                 Err(e) => {
-                    println!("Error serializing response: {}", e);
+                    error!("Error serializing response: {}", e);
 
                     // Try to send an error response
                     let error_response = json!({
@@ -315,9 +316,9 @@ impl TcpServer {
 
             // Send the response length
             if let Err(e) = socket.write_u32(response_bytes.len() as u32).await {
-                println!("Error sending response length: {}", e);
+                error!("Error sending response length: {}", e);
                 if e.kind() == std::io::ErrorKind::BrokenPipe {
-                    println!("Client disconnected while sending response length");
+                    info!("Client disconnected while sending response length");
                     return Ok(());
                 }
                 return Err(e.into());
@@ -325,9 +326,9 @@ impl TcpServer {
 
             // Send the response
             if let Err(e) = socket.write_all(&response_bytes).await {
-                println!("Error sending response: {}", e);
+                error!("Error sending response: {}", e);
                 if e.kind() == std::io::ErrorKind::BrokenPipe {
-                    println!("Client disconnected while sending response");
+                    info!("Client disconnected while sending response");
                     return Ok(());
                 }
                 return Err(e.into());
@@ -335,9 +336,9 @@ impl TcpServer {
 
             // Flush the socket to ensure all data is sent
             if let Err(e) = socket.flush().await {
-                println!("Error flushing socket: {}", e);
+                error!("Error flushing socket: {}", e);
                 if e.kind() == std::io::ErrorKind::BrokenPipe {
-                    println!("Client disconnected while flushing socket");
+                    info!("Client disconnected while flushing socket");
                     return Ok(());
                 }
                 return Err(e.into());
@@ -383,7 +384,7 @@ impl TcpServer {
         request: &Value,
         node: Arc<Mutex<DataFoldNode>>,
     ) -> FoldDbResult<Value> {
-        println!(
+        info!(
             "Processing request: {}",
             serde_json::to_string_pretty(request).unwrap_or_else(|_| request.to_string())
         );
@@ -404,7 +405,7 @@ impl TcpServer {
 
             // If the target node ID doesn't match the local node ID, forward the request
             if target_node_id != local_node_id {
-                println!(
+                info!(
                     "Request targeted for node {}, forwarding...",
                     target_node_id
                 );
@@ -629,7 +630,7 @@ impl TcpServer {
         // Look up the PeerId for the target node ID
         let peer_id = match network.get_peer_id_for_node(target_node_id) {
             Some(id) => {
-                println!("Found PeerId {} for node ID {}", id, target_node_id);
+                info!("Found PeerId {} for node ID {}", id, target_node_id);
                 id
             }
             None => {
@@ -637,7 +638,7 @@ impl TcpServer {
                 // This is a fallback for backward compatibility
                 match target_node_id.parse::<PeerId>() {
                     Ok(id) => {
-                        println!("Parsed node ID {} as PeerId {}", target_node_id, id);
+                        info!("Parsed node ID {} as PeerId {}", target_node_id, id);
                         // Register this mapping for future use
                         network.register_node_id(target_node_id, id);
                         id
@@ -646,7 +647,7 @@ impl TcpServer {
                         // If we can't parse it, generate a random PeerId and register it
                         // This is just for testing purposes
                         let id = PeerId::random();
-                        println!(
+                        info!(
                             "Using placeholder PeerId {} for node ID {}",
                             id, target_node_id
                         );
@@ -695,7 +696,7 @@ impl TcpServer {
         let available_schemas = match node_guard.check_remote_schemas(&peer_id.to_string(), vec![schema_name.clone()]).await {
             Ok(schemas) => schemas,
             Err(e) => {
-                println!("Error checking schemas: {}", e);
+                error!("Error checking schemas: {}", e);
                 return Err(FoldDbError::Network(NetworkErrorKind::Protocol(
                     format!("Error checking schemas: {}", e)
                 )));
@@ -710,13 +711,13 @@ impl TcpServer {
         */
 
         // For testing purposes, we'll assume the schema is available
-        println!(
+        info!(
             "Assuming schema {} is available on target node",
             schema_name
         );
 
         // Forward the request to the target node using the network layer
-        println!(
+        info!(
             "Forwarding request to node {} (peer {})",
             target_node_id, peer_id
         );
@@ -727,7 +728,7 @@ impl TcpServer {
             .await?;
 
         // Return the response from the target node
-        println!(
+        info!(
             "Received response from node {} (peer {})",
             target_node_id, peer_id
         );

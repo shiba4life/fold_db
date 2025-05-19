@@ -4,6 +4,8 @@ use fold_node::{
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use env_logger;
+use log::{info, warn, error};
 
 /// Main entry point for the DataFold HTTP server.
 ///
@@ -31,7 +33,8 @@ use std::path::PathBuf;
 /// * The HTTP server cannot be started
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Starting DataFold HTTP Server...");
+    env_logger::init();
+    info!("Starting DataFold HTTP Server...");
 
     // Parse command-line arguments
     let args: Vec<String> = env::args().collect();
@@ -56,27 +59,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Read node config from environment variable or default path
     let config_path =
         std::env::var("NODE_CONFIG").unwrap_or_else(|_| "config/node_config.json".to_string());
-    println!("Loading config from: {}", config_path);
+    info!("Loading config from: {}", config_path);
 
     // Create a default config if the file doesn't exist
     let config: NodeConfig = if let Ok(config_str) = fs::read_to_string(&config_path) {
         serde_json::from_str(&config_str)?
     } else {
-        println!("Config file not found, using default config");
+        warn!("Config file not found, using default config");
         NodeConfig::new(PathBuf::from("data"))
     };
-    println!("Config loaded successfully");
+    info!("Config loaded successfully");
 
     // Load or initialize node
-    println!("Loading DataFold Node...");
+    info!("Loading DataFold Node...");
     let node = DataFoldNode::load(config)?;
-    println!("Node loaded successfully");
+    info!("Node loaded successfully");
 
     // Print node ID for connecting
-    println!("Node ID: {}", node.get_node_id());
+    info!("Node ID: {}", node.get_node_id());
 
     // Start the HTTP server
-    println!("Starting HTTP server on port {}...", http_port);
+    info!("Starting HTTP server on port {}...", http_port);
     let bind_address = format!("127.0.0.1:{}", http_port);
     let http_server = DataFoldHttpServer::new(node, &bind_address).await?;
 

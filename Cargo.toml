@@ -32,6 +32,8 @@ futures = "0.3"
 rand = "0.8"
 tempfile = "3.8"
 clap = { version = "4.4", features = ["derive"] }
+log = "0.4"
+env_logger = "0.10"
 # P2P Networking
 libp2p = { version = "0.53", features = [
     "mdns",
@@ -66,3 +68,6 @@ reqwest = { version = "0.11", features = ["json"] }
 [lib]
 name = "fold_db"
 path = "src/lib.rs"
+
+[patch.crates-io]
+env_logger = { path = "vendor/env_logger" }

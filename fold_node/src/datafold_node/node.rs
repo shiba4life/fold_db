@@ -2,6 +2,7 @@ use serde_json::Value;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use log::{info, warn, error};
 
 use crate::datafold_node::config::NodeConfig;
 use crate::datafold_node::config::NodeInfo;
@@ -223,7 +224,7 @@ impl DataFoldNode {
     /// }
     /// ```
     pub fn execute_operation(&mut self, operation: Operation) -> FoldDbResult<Value> {
-        println!("Executing operation: {:?}", operation);
+        info!("Executing operation: {:?}", operation);
         match operation {
             Operation::Query {
                 schema,
@@ -285,7 +286,7 @@ impl DataFoldNode {
                     }
                 };
 
-                println!("Mutation type: {:?}", mutation_type);
+                info!("Mutation type: {:?}", mutation_type);
 
                 let mutation = Mutation {
                     schema_name: schema,
@@ -322,7 +323,7 @@ impl DataFoldNode {
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
         let schema_names = db.schema_manager.list_schemas()?;
-        println!("Schema names from schema_manager: {:?}", schema_names);
+        info!("Schema names from schema_manager: {:?}", schema_names);
         let mut schemas = Vec::new();
         for name in schema_names {
             if let Some(schema) = db.schema_manager.get_schema(&name)? {
@@ -508,7 +509,7 @@ impl DataFoldNode {
         // Register the node ID with the network core
         let local_peer_id = network_core.local_peer_id();
         network_core.register_node_id(&self.node_id, local_peer_id);
-        println!(
+        info!(
             "Registered node ID {} with peer ID {}",
             self.node_id, local_peer_id
         );
@@ -559,7 +560,7 @@ impl DataFoldNode {
     pub async fn stop_network(&self) -> FoldDbResult<()> {
         if let Some(network) = &self.network {
             let mut network_guard = network.lock().await;
-            println!("Stopping network service");
+            info!("Stopping network service");
             network_guard.stop();
             Ok(())
         } else {
@@ -587,7 +588,7 @@ impl DataFoldNode {
 
             // Trigger mDNS discovery
             // This will update the known_peers list in the NetworkCore
-            println!("Triggering mDNS discovery...");
+            info!("Triggering mDNS discovery...");
 
             // In a real implementation, this would actively scan for peers
             // For now, we'll just return the current known peers
@@ -674,7 +675,7 @@ impl DataFoldNode {
                 .get_node_id_for_peer(&peer_id)
                 .unwrap_or_else(|| peer_id.to_string());
 
-            println!("Forwarding request to node {} (peer {})", node_id, peer_id);
+            info!("Forwarding request to node {} (peer {})", node_id, peer_id);
 
             // Use the network layer to forward the request
             let response = network
@@ -682,7 +683,7 @@ impl DataFoldNode {
                 .await
                 .map_err(|e| FoldDbError::Network(e.into()))?;
 
-            println!("Received response from node {} (peer {})", node_id, peer_id);
+            info!("Received response from node {} (peer {})", node_id, peer_id);
 
             Ok(response)
         } else {

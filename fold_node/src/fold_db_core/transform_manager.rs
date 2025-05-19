@@ -5,6 +5,7 @@ use super::transform_orchestrator::TransformRunner;
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
+use log::{info, warn, error};
 
 /// Callback function type for getting an atom by its reference UUID
 pub type GetAtomFn = Arc<dyn Fn(&str) -> Result<Atom, Box<dyn std::error::Error>> + Send + Sync>;
@@ -539,7 +540,7 @@ pub fn execute_field_transforms(
             input_values.insert("field_key".to_string(), serde_json::Value::String(transform_id.clone()));
 
             if let Err(e) = TransformExecutor::execute_transform(transform, input_values) {
-                eprintln!("Failed to execute transform for field {}: {}", transform_id, e);
+                error!("Failed to execute transform for field {}: {}", transform_id, e);
             }
         }
 

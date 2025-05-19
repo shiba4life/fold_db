@@ -6,6 +6,7 @@ use libp2p::PeerId;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
+use log::{info, warn, error};
 
 /// Core network component for P2P communication between DataFold nodes.
 ///
@@ -131,14 +132,14 @@ impl NetworkCore {
 
     /// Start the network service
     pub async fn run(&mut self, listen_address: &str) -> NetworkResult<()> {
-        println!("Network service started on {}", listen_address);
-        println!("Using protocol: {}", SCHEMA_PROTOCOL_NAME);
+        info!("Network service started on {}", listen_address);
+        info!("Using protocol: {}", SCHEMA_PROTOCOL_NAME);
 
         // Set up mDNS discovery if enabled
         if self.config.enable_mdns {
-            println!("mDNS discovery enabled");
-            println!("Discovery port: {}", self.config.discovery_port);
-            println!(
+            info!("mDNS discovery enabled");
+            info!("Discovery port: {}", self.config.discovery_port);
+            info!(
                 "Announcement interval: {:?}",
                 self.config.announcement_interval
             );
@@ -158,14 +159,14 @@ impl NetworkCore {
             // In a real implementation, this would start a background task
             // that periodically announces this node via mDNS
             let handle = tokio::spawn(async move {
-                println!(
+                info!(
                     "Starting mDNS announcements on port {} every {:?}",
                     discovery_port, announcement_interval
                 );
 
                 loop {
                     // Simulate mDNS announcement
-                    println!("SIMULATION: Announcing peer {} via mDNS", local_peer_id);
+                    info!("SIMULATION: Announcing peer {} via mDNS", local_peer_id);
 
                     // Wait for the next announcement
                     tokio::time::sleep(announcement_interval).await;
@@ -176,15 +177,15 @@ impl NetworkCore {
 
             // For now, we'll simulate peer discovery
             if cfg!(feature = "simulate-peers") {
-                println!("SIMULATION: Generating random peers for demonstration");
+                info!("SIMULATION: Generating random peers for demonstration");
                 for _ in 0..3 {
                     let peer_id = PeerId::random();
                     self.known_peers.insert(peer_id);
-                    println!("SIMULATION: Discovered peer: {}", peer_id);
+                    info!("SIMULATION: Discovered peer: {}", peer_id);
                 }
             }
         } else {
-            println!("mDNS discovery disabled");
+            info!("mDNS discovery disabled");
         }
 
         Ok(())
@@ -360,7 +361,7 @@ impl NetworkCore {
             .get_node_id_for_peer(&peer_id)
             .unwrap_or_else(|| peer_id.to_string());
 
-        println!(
+        info!(
             "Forwarding {} request to node {} (peer {})",
             operation, node_id, peer_id
         );
@@ -379,7 +380,7 @@ impl NetworkCore {
             }
         };
 
-        println!("Connecting to target node at {}", target_address);
+        info!("Connecting to target node at {}", target_address);
 
         // Connect to the target node
         let stream = match tokio::net::TcpStream::connect(&target_address).await {
@@ -397,14 +398,14 @@ impl NetworkCore {
 
         match result {
             Ok(response) => {
-                println!("Received response from target node");
+                info!("Received response from target node");
                 Ok(response)
             }
             Err(e) => {
-                println!("Error forwarding request to target node: {}", e);
+                error!("Error forwarding request to target node: {}", e);
 
                 // If we can't connect to the target node, fall back to simulated responses
-                println!("Falling back to simulated response");
+                warn!("Falling back to simulated response");
 
                 match operation {
                     "query" => {
@@ -537,11 +538,11 @@ impl NetworkCore {
     /// Actively scan for peers using mDNS
     pub async fn discover_nodes(&mut self) -> NetworkResult<Vec<PeerId>> {
         if !self.config.enable_mdns {
-            println!("mDNS discovery is disabled, no peers will be discovered");
+            info!("mDNS discovery is disabled, no peers will be discovered");
             return Ok(Vec::new());
         }
 
-        println!(
+        info!(
             "Scanning for peers using mDNS on port {}",
             self.config.discovery_port
         );
@@ -554,14 +555,14 @@ impl NetworkCore {
 
         // For now, we'll simulate peer discovery
         if cfg!(feature = "simulate-peers") {
-            println!("SIMULATION: Generating random peers for demonstration");
+            info!("SIMULATION: Generating random peers for demonstration");
 
             // Generate 0-3 random peers
             let num_peers = rand::random::<u8>() % 4;
             for _ in 0..num_peers {
                 let peer_id = PeerId::random();
                 self.known_peers.insert(peer_id);
-                println!("SIMULATION: Discovered peer: {}", peer_id);
+                info!("SIMULATION: Discovered peer: {}", peer_id);
             }
         }
 
