@@ -123,3 +123,77 @@ fn test_cross_schema_transform_with_inputs() {
     assert_eq!(result, json!(9.0));
 }
 
+#[test]
+fn test_transform_persists_to_output_field() {
+    let mut node = create_test_node();
+
+    // Create Schema B with an output field
+    let mut schema_b = Schema::new("SchemaB".to_string());
+    let output_field = SchemaField::new(
+        PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
+        FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
+        HashMap::new(),
+        Some(FieldType::Single),
+    );
+    schema_b.add_field("b_out".to_string(), output_field);
+    node.load_schema(schema_b).unwrap();
+    node.allow_schema("SchemaB").unwrap();
+
+    // Create Schema A with input field and transform writing to SchemaB.b_out
+    let mut schema_a = Schema::new("SchemaA".to_string());
+    let input_field = SchemaField::new(
+        PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
+        FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
+        HashMap::new(),
+        Some(FieldType::Single),
+    );
+    schema_a.add_field("a_in".to_string(), input_field);
+
+    let parser = TransformParser::new();
+    let expr = parser.parse_expression("a_in + 2").unwrap();
+    let mut transform = Transform::new_with_expr(
+        "a_in + 2".to_string(),
+        expr,
+        false,
+        None,
+        false,
+        "SchemaB.b_out".to_string(),
+    );
+    transform.set_inputs(vec!["SchemaA.a_in".to_string()]);
+    let t_field = SchemaField::new(
+        PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
+        FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
+        HashMap::new(),
+        Some(FieldType::Single),
+    )
+    .with_transform(transform);
+    schema_a.add_field("calc".to_string(), t_field);
+
+    node.load_schema(schema_a).unwrap();
+    node.allow_schema("SchemaA").unwrap();
+
+    // Set input value
+    let mutation = Mutation {
+        mutation_type: MutationType::Create,
+        schema_name: "SchemaA".to_string(),
+        pub_key: "test_key".to_string(),
+        trust_distance: 1,
+        fields_and_values: vec![("a_in".to_string(), json!(3))]
+            .into_iter()
+            .collect(),
+    };
+    node.mutate(mutation).unwrap();
+
+    // Execute the transform which should persist to SchemaB.b_out
+    node.run_transform("SchemaA.calc").unwrap();
+
+    let query = Query {
+        schema_name: "SchemaB".to_string(),
+        pub_key: "test_key".to_string(),
+        fields: vec!["b_out".to_string()],
+        trust_distance: 1,
+    };
+    let results = node.query(query).unwrap();
+    assert_eq!(results[0].as_ref().unwrap(), &json!(5.0));
+}
+
