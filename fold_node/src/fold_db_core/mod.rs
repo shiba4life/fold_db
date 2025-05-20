@@ -159,118 +159,144 @@ impl FoldDB {
         self.transform_manager.register_transform(registration)
     }
 
-    fn register_transforms_for_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
-        // Create regex pattern once, outside the loop
-        let cross_re = Regex::new(r"([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)").unwrap();
-        
-        for (field_name, field) in &schema.fields {
-            if let Some(transform) = field.get_transform() {
-                // Determine the actual output field for this transform
-                let (out_schema_name, out_field_name) = match transform
-                    .get_output()
-                    .split_once('.')
-                {
-                    Some((s, f)) => (s.to_string(), f.to_string()),
-                    None => (schema.name.clone(), field_name.clone()),
-                };
+    fn parse_output_field(
+        &self,
+        schema: &Schema,
+        field_name: &str,
+        field: &crate::schema::types::SchemaField,
+        transform: &Transform,
+    ) -> Result<String, SchemaError> {
+        let (out_schema_name, out_field_name) = match transform.get_output().split_once('.') {
+            Some((s, f)) => (s.to_string(), f.to_string()),
+            None => (schema.name.clone(), field_name.to_string()),
+        };
 
-                // Get the atom reference for the output field
-                let output_aref = if out_schema_name == schema.name
-                    && out_field_name == *field_name
-                {
-                    field.get_ref_atom_uuid().ok_or_else(|| {
-                        SchemaError::InvalidData(format!(
-                            "Field {} missing atom reference",
-                            field_name
-                        ))
-                    })?
-                } else {
-                    match self
-                        .schema_manager
-                        .get_schema(&out_schema_name)?
-                        .and_then(|s| s.fields.get(&out_field_name).cloned())
-                    {
-                        Some(of) => of.get_ref_atom_uuid().ok_or_else(|| {
-                            SchemaError::InvalidData(format!(
-                                "Field {}.{} missing atom reference",
-                                out_schema_name, out_field_name
-                            ))
-                        })?,
-                        None => field.get_ref_atom_uuid().ok_or_else(|| {
-                            SchemaError::InvalidData(format!(
-                                "Field {} missing atom reference",
-                                field_name
-                            ))
-                        })?,
-                    }
-                };
+        if out_schema_name == schema.name && out_field_name == field_name {
+            field.get_ref_atom_uuid().ok_or_else(|| {
+                SchemaError::InvalidData(format!("Field {} missing atom reference", field_name))
+            })
+        } else {
+            match self
+                .schema_manager
+                .get_schema(&out_schema_name)?
+                .and_then(|s| s.fields.get(&out_field_name).cloned())
+            {
+                Some(of) => of.get_ref_atom_uuid().ok_or_else(|| {
+                    SchemaError::InvalidData(format!(
+                        "Field {}.{} missing atom reference",
+                        out_schema_name, out_field_name
+                    ))
+                }),
+                None => field.get_ref_atom_uuid().ok_or_else(|| {
+                    SchemaError::InvalidData(format!("Field {} missing atom reference", field_name))
+                }),
+            }
+        }
+    }
 
-                let mut input_arefs = Vec::new();
-                let mut trigger_fields = Vec::new();
-                let mut seen_cross = std::collections::HashSet::new();
+    fn collect_input_arefs(
+        &self,
+        schema: &Schema,
+        transform: &Transform,
+        cross_re: &Regex,
+    ) -> Result<(Vec<String>, Vec<String>), SchemaError> {
+        let mut input_arefs = Vec::new();
+        let mut trigger_fields = Vec::new();
+        let mut seen_cross = std::collections::HashSet::new();
 
-                let inputs = transform.get_inputs();
-                if !inputs.is_empty() {
-                    for input in inputs {
-                        if let Some((schema_name, field_dep)) = input.split_once('.') {
-                            seen_cross.insert(field_dep.to_string());
-                            trigger_fields.push(format!("{}.{}", schema_name, field_dep));
-                            if let Some(dep_schema) = self.schema_manager.get_schema(schema_name)? {
-                                if let Some(dep_field) = dep_schema.fields.get(field_dep) {
-                                    if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
-                                        input_arefs.push(dep_aref);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    for cap in cross_re.captures_iter(&transform.logic) {
-                        let schema_name = cap[1].to_string();
-                        let field_dep = cap[2].to_string();
-                        seen_cross.insert(field_dep.clone());
-                        trigger_fields.push(format!("{}.{}", schema_name, field_dep));
-                        if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
-                            if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
-                                if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
-                                    input_arefs.push(dep_aref);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                for dep in transform.analyze_dependencies() {
-                    if seen_cross.contains(&dep) {
-                        continue;
-                    }
-                    let schema_name = schema.name.clone();
-                    let field_dep = dep;
-
+        let inputs = transform.get_inputs();
+        if !inputs.is_empty() {
+            for input in inputs {
+                if let Some((schema_name, field_dep)) = input.split_once('.') {
+                    seen_cross.insert(field_dep.to_string());
                     trigger_fields.push(format!("{}.{}", schema_name, field_dep));
-
-                    if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
-                        if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
+                    if let Some(dep_schema) = self.schema_manager.get_schema(schema_name)? {
+                        if let Some(dep_field) = dep_schema.fields.get(field_dep) {
                             if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
                                 input_arefs.push(dep_aref);
                             }
                         }
                     }
                 }
+            }
+        } else {
+            for cap in cross_re.captures_iter(&transform.logic) {
+                let schema_name = cap[1].to_string();
+                let field_dep = cap[2].to_string();
+                seen_cross.insert(field_dep.clone());
+                trigger_fields.push(format!("{}.{}", schema_name, field_dep));
+                if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
+                    if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
+                        if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
+                            input_arefs.push(dep_aref);
+                        }
+                    }
+                }
+            }
+        }
 
-                let transform_id = format!("{}.{}", schema.name, field_name);
-                trigger_fields.push(transform_id.clone());
-                let registration = TransformRegistration {
-                    transform_id: transform_id.clone(),
-                    transform: transform.clone(),
+        for dep in transform.analyze_dependencies() {
+            if seen_cross.contains(&dep) {
+                continue;
+            }
+            let schema_name = schema.name.clone();
+            let field_dep = dep;
+
+            trigger_fields.push(format!("{}.{}", schema_name, field_dep));
+
+            if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
+                if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
+                    if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
+                        input_arefs.push(dep_aref);
+                    }
+                }
+            }
+        }
+
+        Ok((input_arefs, trigger_fields))
+    }
+
+    fn register_transform_internal(
+        &self,
+        schema: &Schema,
+        field_name: &str,
+        transform: &Transform,
+        input_arefs: Vec<String>,
+        mut trigger_fields: Vec<String>,
+        output_aref: String,
+    ) -> Result<(), SchemaError> {
+        let transform_id = format!("{}.{}", schema.name, field_name);
+        trigger_fields.push(transform_id.clone());
+        let registration = TransformRegistration {
+            transform_id: transform_id.clone(),
+            transform: transform.clone(),
+            input_arefs,
+            trigger_fields,
+            output_aref,
+            schema_name: schema.name.clone(),
+            field_name: field_name.to_string(),
+        };
+        self.transform_manager.register_transform(registration)?;
+        let _ = self.transform_manager.execute_transform_now(&transform_id);
+        Ok(())
+    }
+
+    fn register_transforms_for_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
+        let cross_re = Regex::new(r"([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)").unwrap();
+
+        for (field_name, field) in &schema.fields {
+            if let Some(transform) = field.get_transform() {
+                let output_aref = self.parse_output_field(schema, field_name, field, transform)?;
+                let (input_arefs, trigger_fields) =
+                    self.collect_input_arefs(schema, transform, &cross_re)?;
+                self.register_transform_internal(
+                    schema,
+                    field_name,
+                    transform,
                     input_arefs,
                     trigger_fields,
                     output_aref,
-                    schema_name: schema.name.clone(),
-                    field_name: field_name.clone(),
-                };
-                self.transform_manager.register_transform(registration)?;
-                let _ = self.transform_manager.execute_transform_now(&transform_id);
+                )?;
             }
         }
 
