@@ -14,7 +14,9 @@ pub async fn stream_logs() -> impl Responder {
     };
     let stream = BroadcastStream::new(rx).filter_map(|msg| async move {
         match msg {
-            Ok(line) => Some(Ok(web::Bytes::from(format!("data: {}\n\n", line)))),
+            Ok(line) => Some(Ok::<web::Bytes, actix_web::Error>(
+                web::Bytes::from(format!("data: {}\n\n", line)),
+            )),
             Err(_) => None,
         }
     });

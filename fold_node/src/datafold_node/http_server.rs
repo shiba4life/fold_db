@@ -64,6 +64,9 @@ impl DataFoldHttpServer {
     /// Returns a `FoldDbError` if:
     /// * There is an error creating the sample manager
     pub async fn new(mut node: DataFoldNode, bind_address: &str) -> FoldDbResult<Self> {
+        // Ensure the web logger is initialized so log routes have data
+        crate::web_logger::init().ok();
+
         // Create sample manager
         let sample_manager = SampleManager::new().await?;
 
