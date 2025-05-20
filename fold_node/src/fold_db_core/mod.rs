@@ -209,8 +209,9 @@ impl FoldDB {
                 let mut trigger_fields = Vec::new();
                 let mut seen_cross = std::collections::HashSet::new();
 
-                if !transform.inputs.is_empty() {
-                    for input in &transform.inputs {
+                let inputs = transform.get_inputs();
+                if !inputs.is_empty() {
+                    for input in inputs {
                         if let Some((schema_name, field_dep)) = input.split_once('.') {
                             seen_cross.insert(field_dep.to_string());
                             trigger_fields.push(format!("{}.{}", schema_name, field_dep));
