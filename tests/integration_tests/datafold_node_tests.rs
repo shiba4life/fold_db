@@ -1,6 +1,9 @@
 use fold_node::testing::{Mutation, MutationType, Query};
 use serde_json::json;
 use crate::test_data::test_helpers::create_test_node;
+use crate::test_data::test_helpers::node_operations::{
+    load_and_allow, insert_value, query_value,
+};
 use crate::test_data::schema_test_data::create_basic_user_profile_schema;
 
 #[test]
@@ -8,8 +11,7 @@ fn test_node_schema_operations() {
     let mut node = create_test_node();
     let schema = create_basic_user_profile_schema();
 
-    // Test schema loading
-    assert!(node.load_schema(schema.clone()).is_ok());
+    assert!(load_and_allow(&mut node, schema.clone()).is_ok());
 
     // Test schema retrieval
     let retrieved_schema = node.get_schema("user_profile").unwrap();
@@ -21,42 +23,21 @@ fn test_node_schema_operations() {
 fn test_node_data_operations() {
     let mut node = create_test_node();
     let schema = create_basic_user_profile_schema();
-
-    // Load schema
-    node.load_schema(schema).unwrap();
-    node.allow_schema("user_profile").unwrap();
+    load_and_allow(&mut node, schema).unwrap();
 
     // Test mutation
-    let mutation = Mutation {
-        mutation_type: MutationType::Create,
-        schema_name: "user_profile".to_string(),
-        pub_key: "test_key".to_string(),
-        trust_distance: 1,
-        fields_and_values: vec![
-            ("name".to_string(), json!("John Doe")),
-            ("email".to_string(), json!("john@example.com")),
-        ]
-        .into_iter()
-        .collect(),
-    };
-
-    assert!(node.mutate(mutation).is_ok());
+    insert_value(&mut node, "user_profile", "name", json!("John Doe")).unwrap();
+    insert_value(&mut node, "user_profile", "email", json!("john@example.com"))
+        .unwrap();
 
     // Test query
-    let query = Query {
-        schema_name: "user_profile".to_string(),
-        pub_key: "test_key".to_string(),
-        fields: vec!["name".to_string(), "email".to_string()],
-        trust_distance: 1,
-    };
-
-    let results = node.query(query).unwrap();
+    let results = vec![
+        query_value(&mut node, "user_profile", "name").unwrap(),
+        query_value(&mut node, "user_profile", "email").unwrap(),
+    ];
     assert_eq!(results.len(), 2);
 
-    // Verify results
-    for result in results {
-        assert!(result.is_ok());
-        let value = result.unwrap();
+    for value in results {
         assert!(value == json!("John Doe") || value == json!("john@example.com"));
     }
 }
@@ -70,8 +51,7 @@ fn test_trust_distance_handling() {
 
     // Verify default trust distance is applied to queries
     let schema = create_basic_user_profile_schema();
-    node.load_schema(schema).unwrap();
-    node.allow_schema("user_profile").unwrap();
+    load_and_allow(&mut node, schema).unwrap();
 
     let query = Query {
         schema_name: "user_profile".to_string(),
@@ -88,10 +68,7 @@ fn test_trust_distance_handling() {
 fn test_version_history() {
     let mut node = create_test_node();
     let schema = create_basic_user_profile_schema();
-
-    // Load schema
-    node.load_schema(schema).unwrap();
-    node.allow_schema("user_profile").unwrap();
+    load_and_allow(&mut node, schema).unwrap();
 
     // Get initial schema to see the field's ref_atom_uuid
     let initial_schema = node.get_schema("user_profile").unwrap().unwrap();
@@ -102,16 +79,7 @@ fn test_version_history() {
     );
 
     // Create initial data
-    let mutation1 = Mutation {
-        mutation_type: MutationType::Create,
-        schema_name: "user_profile".to_string(),
-        pub_key: "test_key".to_string(),
-        trust_distance: 1,
-        fields_and_values: vec![("name".to_string(), json!("John Doe"))]
-            .into_iter()
-            .collect(),
-    };
-    node.mutate(mutation1).unwrap();
+    insert_value(&mut node, "user_profile", "name", json!("John Doe")).unwrap();
 
     // Get schema after first mutation to check ref_atom_uuid
     let schema_after_create = node.get_schema("user_profile").unwrap().unwrap();
@@ -122,14 +90,8 @@ fn test_version_history() {
     );
 
     // Query current value
-    let query1 = Query {
-        schema_name: "user_profile".to_string(),
-        fields: vec!["name".to_string()],
-        pub_key: "test_key".to_string(),
-        trust_distance: 1,
-    };
-    let results1 = node.query(query1).unwrap();
-    println!("Value after create: {:?}", results1[0]);
+    let result1 = query_value(&mut node, "user_profile", "name").unwrap();
+    println!("Value after create: {:?}", result1);
 
     // Update data
     let mutation2 = Mutation {
@@ -144,14 +106,8 @@ fn test_version_history() {
     node.mutate(mutation2).unwrap();
 
     // Query updated value
-    let query2 = Query {
-        schema_name: "user_profile".to_string(),
-        fields: vec!["name".to_string()],
-        pub_key: "test_key".to_string(),
-        trust_distance: 1,
-    };
-    let results2 = node.query(query2).unwrap();
-    println!("Value after update: {:?}", results2[0]);
+    let result2 = query_value(&mut node, "user_profile", "name").unwrap();
+    println!("Value after update: {:?}", result2);
 
     // Get schema after update to check ref_atom_uuid
     let schema_after_update = node.get_schema("user_profile").unwrap().unwrap();
