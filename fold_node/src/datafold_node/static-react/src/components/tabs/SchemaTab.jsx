@@ -1,8 +1,27 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/solid'
 
 function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
   const [expandedSchemas, setExpandedSchemas] = useState({})
+  const [sampleSchemas, setSampleSchemas] = useState([])
+  const [selectedSample, setSelectedSample] = useState('')
+  const [loadingSample, setLoadingSample] = useState(false)
+  const [samplesError, setSamplesError] = useState(null)
+
+  useEffect(() => {
+    fetchSampleSchemas()
+  }, [])
+
+  const fetchSampleSchemas = async () => {
+    try {
+      const resp = await fetch('/api/samples/schemas')
+      const data = await resp.json()
+      setSampleSchemas(data.data || [])
+    } catch (err) {
+      console.error('Failed to fetch sample schemas:', err)
+      setSamplesError('Failed to load sample schemas')
+    }
+  }
 
   const toggleSchema = (schemaName) => {
     setExpandedSchemas(prev => ({
@@ -22,6 +41,49 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
       }
     } catch (err) {
       console.error('Failed to remove schema:', err)
+    }
+  }
+
+  const loadSampleSchema = async () => {
+    if (!selectedSample) return
+    setLoadingSample(true)
+    setSamplesError(null)
+
+    try {
+      const resp = await fetch(`/api/samples/schema/${selectedSample}`)
+      if (!resp.ok) {
+        throw new Error(`Failed to fetch sample: ${resp.status}`)
+      }
+      const schema = await resp.json()
+      const createResp = await fetch('/api/schema', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(schema)
+      })
+
+      const data = await createResp.json()
+
+      if (!createResp.ok) {
+        throw new Error(data.error || 'Failed to load schema')
+      }
+
+      if (onResult) {
+        onResult(data)
+      }
+      if (onSchemaUpdated) {
+        onSchemaUpdated()
+      }
+      setSelectedSample('')
+    } catch (err) {
+      console.error('Failed to load sample schema:', err)
+      setSamplesError('Failed to load sample schema')
+      if (onResult) {
+        onResult({ error: 'Failed to load sample schema' })
+      }
+    } finally {
+      setLoadingSample(false)
     }
   }
 
@@ -106,8 +168,40 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
   }
 
   return (
-    <div className="p-6 space-y-4">
-      {schemas.map(renderSchema)}
+    <div className="p-6 space-y-6">
+      <div>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Load Sample Schema</h3>
+        <div className="flex items-center space-x-2">
+          <select
+            className="border-gray-300 rounded-md px-3 py-2"
+            value={selectedSample}
+            onChange={(e) => setSelectedSample(e.target.value)}
+          >
+            <option value="">Select a sample...</option>
+            {sampleSchemas.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+          <button
+            onClick={loadSampleSchema}
+            disabled={!selectedSample || loadingSample}
+            className={`px-4 py-2 text-sm font-medium rounded-md text-white ${
+              !selectedSample || loadingSample
+                ? 'bg-gray-300 cursor-not-allowed'
+                : 'bg-primary hover:bg-primary/90'
+            }`}
+          >
+            {loadingSample ? 'Loading...' : 'Load'}
+          </button>
+        </div>
+        {samplesError && (
+          <p className="mt-2 text-sm text-red-600">{samplesError}</p>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        {schemas.map(renderSchema)}
+      </div>
     </div>
   )
 }
