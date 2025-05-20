@@ -92,7 +92,3 @@ target/llvm-cov/
 *.profdata
 vendor/
 
-# Jest and Node.js for static UI
-fold_node/src/datafold_node/static/node_modules/
-fold_node/src/datafold_node/static/coverage/
-fold_node/src/datafold_node/static/.jest-cache/

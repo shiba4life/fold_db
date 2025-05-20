@@ -145,20 +145,21 @@ cargo test --package fold_node
 
 ### UI Tests
 
-The web UI components are tested using Jest. To run the UI tests:
+The React UI can include its own test suite. If a `test` script exists in the
+package configuration, run the tests with:
 
 1. Install Node.js dependencies:
 ```bash
-cd fold_node/src/datafold_node/static
+cd fold_node/src/datafold_node/static-react
 npm install
 ```
 
-2. Run the tests:
+2. Execute the tests:
 ```bash
 npm test
 ```
 
-This will run all Jest tests for UI components, including network tab functionality, form handling, and status display tests.
+Any available tests will verify the React components and UI logic.
 
 ## Generating Coverage Reports
 
