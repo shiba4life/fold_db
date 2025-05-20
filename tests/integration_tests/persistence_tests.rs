@@ -3,6 +3,7 @@ use fold_node::testing::{
     TrustDistance, TrustDistanceScaling, Mutation, MutationType, Query,
 };
 use fold_node::{DataFoldNode, NodeConfig};
+use crate::test_data::test_helpers::node_operations::{load_and_allow, insert_value, query_value};
 use fold_node::transform::{Transform, TransformParser};
 use serde_json::json;
 use std::collections::HashMap;
@@ -52,27 +53,12 @@ fn test_db_and_transform_persistence() {
 
     // Load schema and insert a value
     let schema = create_persistence_schema();
-    node.load_schema(schema).unwrap();
+    load_and_allow(&mut node, schema).unwrap();
 
-    let mutation = Mutation {
-        mutation_type: MutationType::Create,
-        schema_name: "PersistSchema".to_string(),
-        pub_key: "test_key".to_string(),
-        trust_distance: 1,
-        fields_and_values: vec![("input_field".to_string(), json!(42))]
-            .into_iter()
-            .collect(),
-    };
-    node.mutate(mutation).unwrap();
+    insert_value(&mut node, "PersistSchema", "input_field", json!(42)).unwrap();
 
-    let query = Query {
-        schema_name: "PersistSchema".to_string(),
-        pub_key: "test_key".to_string(),
-        fields: vec!["input_field".to_string()],
-        trust_distance: 1,
-    };
-    let results = node.query(query).unwrap();
-    assert_eq!(results[0].as_ref().unwrap(), &json!(42));
+    let result = query_value(&mut node, "PersistSchema", "input_field").unwrap();
+    assert_eq!(result, json!(42));
 
     // Drop the first node to flush data to disk
     drop(node);

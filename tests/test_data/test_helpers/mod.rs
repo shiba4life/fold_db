@@ -1,5 +1,6 @@
 pub mod operation_builder;
 pub mod schema_builder;
+pub mod node_operations;
 
 // Re-export testing utilities for all tests
 use fold_node::FoldDB;

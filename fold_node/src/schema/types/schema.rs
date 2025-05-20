@@ -107,6 +107,36 @@ mod tests {
     use crate::schema::types::fields::FieldType;
     use uuid::Uuid;
 
+    fn create_field(policy: PermissionsPolicy) -> SchemaField {
+        SchemaField::new(
+            policy,
+            create_default_payment_config(),
+            HashMap::new(),
+            Some(FieldType::Single),
+        )
+        .with_ref_atom_uuid(Uuid::new_v4().to_string())
+    }
+
+    fn multi_field_schema() -> Schema {
+        let mut schema = Schema::new("test_schema".to_string());
+        let fields = vec![
+            ("public_field", PermissionsPolicy::default()),
+            (
+                "protected_field",
+                PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(2)),
+            ),
+            (
+                "private_field",
+                PermissionsPolicy::new(TrustDistance::Distance(3), TrustDistance::Distance(3)),
+            ),
+        ];
+
+        for (name, policy) in fields {
+            schema.add_field(name.to_string(), create_field(policy));
+        }
+        schema
+    }
+
     fn create_default_payment_config() -> FieldPaymentConfig {
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
     }
@@ -124,13 +154,8 @@ mod tests {
     fn test_schema_field_management() {
         let mut schema = Schema::new("test_schema".to_string());
         let field_name = "test_field".to_string();
-        let field = SchemaField::new(
-            PermissionsPolicy::default(),
-            create_default_payment_config(),
-            HashMap::new(),
-            Some(FieldType::Single),
-        )
-        .with_ref_atom_uuid("test-uuid".to_string());
+        let field = create_field(PermissionsPolicy::default())
+            .with_ref_atom_uuid("test-uuid".to_string());
 
         // Add field
         schema.add_field(field_name.clone(), field.clone());
@@ -150,14 +175,10 @@ mod tests {
         let mut schema = Schema::new("test_schema".to_string());
         let field_name = "protected_field".to_string();
 
-        // Create field with custom permissions
-        let field = SchemaField::new(
-            PermissionsPolicy::new(TrustDistance::Distance(2), TrustDistance::Distance(3)),
-            create_default_payment_config(),
-            HashMap::new(),
-            Some(FieldType::Single),
-        )
-        .with_ref_atom_uuid(Uuid::new_v4().to_string());
+        let field = create_field(PermissionsPolicy::new(
+            TrustDistance::Distance(2),
+            TrustDistance::Distance(3),
+        ));
 
         schema.add_field(field_name.clone(), field.clone());
 
@@ -197,37 +218,15 @@ mod tests {
     }
 
     #[test]
-    fn test_schema_with_multiple_fields() {
-        let mut schema = Schema::new("test_schema".to_string());
-
-        // Add multiple fields with different permissions
-        let fields = vec![
-            ("public_field", PermissionsPolicy::default()),
-            (
-                "protected_field",
-                PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(2)),
-            ),
-            (
-                "private_field",
-                PermissionsPolicy::new(TrustDistance::Distance(3), TrustDistance::Distance(3)),
-            ),
-        ];
-
-        for (name, policy) in fields {
-            schema.add_field(
-                name.to_string(),
-                SchemaField::new(
-                    policy,
-                    create_default_payment_config(),
-                    HashMap::new(),
-                    Some(FieldType::Single),
-                )
-                .with_ref_atom_uuid(Uuid::new_v4().to_string()),
-            );
-        }
-
-        // Verify all fields were added with correct permissions
+    fn test_multi_field_count() {
+        let schema = multi_field_schema();
         assert_eq!(schema.fields.len(), 3);
+    }
+
+    #[test]
+    fn test_multi_field_permissions() {
+        let schema = multi_field_schema();
+
         match &schema
             .fields
             .get("public_field")
@@ -259,7 +258,8 @@ mod tests {
             _ => panic!("Expected Distance variant"),
         }
     }
-#[test]
+
+    #[test]
     fn test_schema_deserialization_with_field_transforms() {
         let json_input = "{
             \"name\": \"test_schema_with_transforms\",
