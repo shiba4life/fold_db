@@ -147,3 +147,60 @@ fn test_schema_disk_loading() {
         assert_eq!(schema.name, schema_name);
     }
 }
+
+#[test]
+fn test_transform_placeholder_output_on_disk_load() {
+    use std::fs::{self, File};
+    use std::io::Write;
+
+    // Create a temporary directory for test
+    let test_dir = tempdir().unwrap();
+    let schema_dir = test_dir.path().join("schemas");
+    fs::create_dir_all(&schema_dir).unwrap();
+
+    // Manually create a schema JSON with a placeholder transform output
+    let schema_path = schema_dir.join("placeholder_schema.json");
+    let schema_json = r#"{
+        "name": "placeholder_schema",
+        "fields": {
+            "calc": {
+                "permission_policy": {
+                    "read_policy": { "Distance": 0 },
+                    "write_policy": { "Distance": 0 },
+                    "explicit_read_policy": null,
+                    "explicit_write_policy": null
+                },
+                "ref_atom_uuid": "calc_uuid",
+                "payment_config": {
+                    "base_multiplier": 1.0,
+                    "trust_distance_scaling": { "None": null },
+                    "min_payment": null
+                },
+                "field_mappers": {},
+                "field_type": "Single",
+                "transform": {
+                    "logic": "1 + 2",
+                    "inputs": [],
+                    "output": "test.calc"
+                }
+            }
+        },
+        "payment_config": { "base_multiplier": 1.0, "min_payment_threshold": 0 }
+    }"#;
+
+    let mut file = File::create(&schema_path).unwrap();
+    file.write_all(schema_json.as_bytes()).unwrap();
+
+    // Load the schema from disk
+    let manager = SchemaCore::new(test_dir.path().to_str().unwrap()).unwrap();
+    manager.load_schemas_from_disk().unwrap();
+
+    // Verify the transform output was updated
+    let schema = manager
+        .get_schema("placeholder_schema")
+        .unwrap()
+        .unwrap();
+    let field = schema.fields.get("calc").unwrap();
+    let transform = field.get_transform().unwrap();
+    assert_eq!(transform.get_output(), "placeholder_schema.calc");
+}
