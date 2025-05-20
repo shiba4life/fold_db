@@ -466,4 +466,30 @@ impl FoldDB {
     pub fn run_transform(&self, transform_id: &str) -> Result<Value, SchemaError> {
         self.transform_manager.execute_transform_now(transform_id)
     }
+
+    /// Unload a schema and remove its associated transforms.
+    pub fn remove_schema(&self, schema_name: &str) -> Result<(), SchemaError> {
+        let schema = match self.schema_manager.get_schema(schema_name)? {
+            Some(s) => s,
+            None => {
+                return Err(SchemaError::NotFound(format!(
+                    "Schema {} not found",
+                    schema_name
+                )))
+            }
+        };
+
+        for field_name in schema.fields.keys() {
+            let transform_id = format!("{}.{}", schema.name, field_name);
+            let _ = self.transform_manager.unregister_transform(&transform_id)?;
+        }
+
+        match self.schema_manager.unload_schema(schema_name)? {
+            true => Ok(()),
+            false => Err(SchemaError::NotFound(format!(
+                "Schema {} not found",
+                schema_name
+            ))),
+        }
+    }
 }

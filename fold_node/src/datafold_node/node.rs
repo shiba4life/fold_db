@@ -441,14 +441,7 @@ impl DataFoldNode {
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
 
-        match db.schema_manager.unload_schema(schema_name) {
-            Ok(true) => Ok(()),
-            Ok(false) => Err(FoldDbError::Config(format!(
-                "Schema {} not found",
-                schema_name
-            ))),
-            Err(e) => Err(e.into()),
-        }
+        db.remove_schema(schema_name).map_err(|e| e.into())
     }
 
     /// Initialize the network layer
