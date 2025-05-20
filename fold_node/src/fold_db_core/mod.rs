@@ -172,12 +172,45 @@ impl FoldDB {
         
         for (field_name, field) in &schema.fields {
             if let Some(transform) = field.get_transform() {
-                let output_aref = field.get_ref_atom_uuid().ok_or_else(|| {
-                    SchemaError::InvalidData(format!(
-                        "Field {} missing atom reference",
-                        field_name
-                    ))
-                })?;
+                // Determine the actual output field for this transform
+                let (out_schema_name, out_field_name) = match transform
+                    .get_output_schema()
+                    .split_once('.')
+                {
+                    Some((s, f)) => (s.to_string(), f.to_string()),
+                    None => (schema.name.clone(), field_name.clone()),
+                };
+
+                // Get the atom reference for the output field
+                let output_aref = if out_schema_name == schema.name
+                    && out_field_name == *field_name
+                {
+                    field.get_ref_atom_uuid().ok_or_else(|| {
+                        SchemaError::InvalidData(format!(
+                            "Field {} missing atom reference",
+                            field_name
+                        ))
+                    })?
+                } else {
+                    match self
+                        .schema_manager
+                        .get_schema(&out_schema_name)?
+                        .and_then(|s| s.fields.get(&out_field_name).cloned())
+                    {
+                        Some(of) => of.get_ref_atom_uuid().ok_or_else(|| {
+                            SchemaError::InvalidData(format!(
+                                "Field {}.{} missing atom reference",
+                                out_schema_name, out_field_name
+                            ))
+                        })?,
+                        None => field.get_ref_atom_uuid().ok_or_else(|| {
+                            SchemaError::InvalidData(format!(
+                                "Field {} missing atom reference",
+                                field_name
+                            ))
+                        })?,
+                    }
+                };
 
                 let mut input_arefs = Vec::new();
                 let mut trigger_fields = Vec::new();

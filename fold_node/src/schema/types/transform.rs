@@ -288,8 +288,10 @@ impl Transform {
         // Set payment requirement to false since it's been removed
         let payment_required = false;
 
-        // Derive output schema from declaration name
-        let output_schema = "test.test_transform".to_string();
+        // Derive output schema from the transform name using a placeholder
+        // schema name. When registered, this may be replaced with the actual
+        // schema field depending on where the transform is attached.
+        let output_schema = format!("test.{}", declaration.name);
         
         Self {
             name: declaration.name.clone(),
