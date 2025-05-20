@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
-use fold_node::fold_db_core::transform_orchestrator::{TransformOrchestrator, TransformRunner};
+use fold_node::fold_db_core::transform_manager::types::TransformRunner;
+use fold_node::fold_db_core::transform_orchestrator::TransformOrchestrator;
 use fold_node::schema::SchemaError;
 use serde_json::json;
 

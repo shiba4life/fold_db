@@ -1,23 +1,10 @@
-use crate::atom::{Atom, AtomRef};
 use crate::schema::types::{Transform, SchemaError, TransformRegistration};
 use crate::transform::TransformExecutor;
-use super::transform_orchestrator::TransformRunner;
+use super::types::{CreateAtomFn, GetAtomFn, GetFieldFn, UpdateAtomRefFn, TransformRunner};
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 use log::error;
-
-/// Callback function type for getting an atom by its reference UUID
-pub type GetAtomFn = Arc<dyn Fn(&str) -> Result<Atom, Box<dyn std::error::Error>> + Send + Sync>;
-
-/// Callback function type for creating a new atom
-pub type CreateAtomFn = Arc<dyn Fn(&str, String, Option<String>, JsonValue, Option<crate::atom::AtomStatus>) -> Result<Atom, Box<dyn std::error::Error>> + Send + Sync>;
-
-/// Callback function type for updating an atom reference
-pub type UpdateAtomRefFn = Arc<dyn Fn(&str, String, String) -> Result<AtomRef, Box<dyn std::error::Error>> + Send + Sync>;
-
-/// Callback function type for getting a field value by schema and field name
-pub type GetFieldFn = Arc<dyn Fn(&str, &str) -> Result<JsonValue, SchemaError> + Send + Sync>;
 
 pub struct TransformManager {
     /// Tree for storing transforms

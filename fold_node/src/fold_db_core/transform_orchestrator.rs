@@ -1,21 +1,11 @@
-use std::collections::{VecDeque, HashSet};
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use serde_json::Value as JsonValue;
 use log::{info, error};
 
 use crate::schema::SchemaError;
-
-/// Trait abstraction over transform execution for easier testing.
-pub trait TransformRunner: Send + Sync {
-    fn execute_transform_now(&self, transform_id: &str) -> Result<JsonValue, SchemaError>;
-    fn transform_exists(&self, transform_id: &str) -> Result<bool, SchemaError>;
-    fn get_transforms_for_field(
-        &self,
-        schema_name: &str,
-        field_name: &str,
-    ) -> Result<HashSet<String>, SchemaError>;
-}
+use super::transform_manager::types::TransformRunner;
 
 /// Orchestrates execution of transforms sequentially.
 pub struct TransformOrchestrator {
