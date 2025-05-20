@@ -87,7 +87,7 @@
       "reversible": false,
       "signature": null,
       "payment_required": false,
-      "input_dependencies": ["sender", "amount", "recipient"]
+      "inputs": ["sender", "amount", "recipient"]
     },
     "time_since_transaction": {
       "name": "time_since_transaction",
@@ -95,7 +95,7 @@
       "reversible": false,
       "signature": null,
       "payment_required": false,
-      "input_dependencies": ["timestamp"]
+      "inputs": ["timestamp"]
     },
     "transaction_category": {
       "name": "transaction_category",
@@ -103,7 +103,7 @@
       "reversible": false,
       "signature": null,
       "payment_required": false,
-      "input_dependencies": ["amount"]
+      "inputs": ["amount"]
     }
   },
   "payment_config": {

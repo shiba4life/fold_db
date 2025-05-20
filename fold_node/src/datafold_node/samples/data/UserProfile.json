@@ -81,7 +81,7 @@
       "reversible": false,
       "signature": null,
       "payment_required": false,
-      "input_dependencies": ["username", "full_name"]
+      "inputs": ["username", "full_name"]
     },
     "age_group": {
       "name": "age_group",
@@ -89,7 +89,7 @@
       "reversible": false,
       "signature": null,
       "payment_required": false,
-      "input_dependencies": ["age"]
+      "inputs": ["age"]
     }
   },
   "payment_config": {
