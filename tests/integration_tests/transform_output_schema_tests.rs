@@ -13,9 +13,6 @@ fn create_schema_with_transform() -> Schema {
     let transform = Transform::new_with_expr(
         "1 + 2".to_string(),
         expr,
-        false,
-        None,
-        false,
         "test.calc".to_string(),
     );
     let field = SchemaField::new(
@@ -30,7 +27,7 @@ fn create_schema_with_transform() -> Schema {
 }
 
 #[test]
-fn transform_output_schema_updated_on_load() {
+fn transform_output_updated_on_load() {
     let mut node = create_test_node();
     let schema = create_schema_with_transform();
     node.load_schema(schema).unwrap();
@@ -38,5 +35,5 @@ fn transform_output_schema_updated_on_load() {
     let loaded_schema = node.get_schema("OutputSchemaTest").unwrap().unwrap();
     let field = loaded_schema.fields.get("calc").unwrap();
     let transform = field.get_transform().unwrap();
-    assert_eq!(transform.get_output_schema(), "OutputSchemaTest.calc");
+    assert_eq!(transform.get_output(), "OutputSchemaTest.calc");
 }

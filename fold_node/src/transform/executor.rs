@@ -54,7 +54,7 @@ impl TransformExecutor {
         let mut input_values = HashMap::new();
         
         // Use the transform's declared dependencies
-        for input_name in &transform.input_dependencies {
+        for input_name in &transform.inputs {
             match input_provider(input_name) {
                 Ok(value) => {
                     input_values.insert(input_name.clone(), value);
@@ -66,7 +66,7 @@ impl TransformExecutor {
         }
         
         // If no dependencies are declared, try to analyze the transform logic
-        if transform.input_dependencies.is_empty() {
+        if transform.inputs.is_empty() {
             let dependencies = transform.analyze_dependencies();
             for input_name in dependencies {
                 // Skip if we already have this input
@@ -105,7 +105,7 @@ impl TransformExecutor {
         input_values: HashMap<String, JsonValue>,
     ) -> Result<JsonValue, SchemaError> {
         // Use the pre-parsed expression if available, otherwise parse the transform logic
-        let ast = match &transform.parsed_expr {
+        let ast = match &transform.parsed_expression {
             Some(expr) => expr.clone(),
             None => {
                 // Parse the transform logic
@@ -175,20 +175,7 @@ impl TransformExecutor {
         
         ast.map_err(|e| SchemaError::InvalidField(format!("Invalid transform syntax: {}", e)))?;
         
-        // Check if the transform is reversible but doesn't have a reverse transform
-        if transform.reversible {
-            // In a real implementation, we would check if the transform has a reverse transform
-            // or if it can be automatically reversed
-        }
-        
-        // Validate signature if present
-        if let Some(signature) = &transform.signature {
-            // In a real implementation, we would verify the signature
-            // For now, just check that it's not empty
-            if signature.is_empty() {
-                return Err(SchemaError::InvalidField("Transform signature cannot be empty".to_string()));
-            }
-        }
+
         
         Ok(())
     }
@@ -219,10 +206,7 @@ mod tests {
         let transform = Transform::new_with_expr(
             "let bmi = weight / (height ^ 2); bmi".to_string(),
             expr,
-            false,
-            None,
-            false,
-            "test.bmi".to_string()
+            "test.bmi".to_string(),
         );
         
         // Create input values
@@ -265,10 +249,7 @@ mod tests {
         let transform = Transform::new_with_expr(
             "patient.weight / (patient.height ^ 2)".to_string(),
             expr,
-            false,
-            None,
-            false,
-            "test.bmi".to_string()
+            "test.bmi".to_string(),
         );
         
         // Create input values with nested objects
@@ -298,10 +279,7 @@ mod tests {
         // Valid transform
         let transform = Transform::new(
             "input + 10".to_string(),
-            false,
-            Some("valid-signature".to_string()),
-            false,
-            "test.output".to_string()
+            "test.output".to_string(),
         );
         
         assert!(TransformExecutor::validate_transform(&transform).is_ok());
@@ -309,23 +287,11 @@ mod tests {
         // Invalid transform (syntax error)
         let invalid_transform = Transform::new(
             "input +".to_string(), // Missing right operand
-            false,
-            None,
-            false,
-            "test.output".to_string()
+            "test.output".to_string(),
         );
         
         assert!(TransformExecutor::validate_transform(&invalid_transform).is_err());
         
-        // Invalid transform (empty signature)
-        let invalid_signature_transform = Transform::new(
-            "input + 10".to_string(),
-            false,
-            Some("".to_string()),
-            false,
-            "test.output".to_string()
-        );
-        
-        assert!(TransformExecutor::validate_transform(&invalid_signature_transform).is_err());
+        // No signature validation errors expected anymore
     }
 }

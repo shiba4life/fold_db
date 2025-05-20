@@ -124,10 +124,8 @@ mod tests {
                     "field_type": "Single",
                     "transform": {
                         "logic": "4 + 5",
-                        "reversible": false,
-                        "signature": null,
-                        "payment_required": false,
-                        "output_schema": "transform_schema.computed"
+                        "inputs": [],
+                        "output": "transform_schema.computed"
                     }
                 }
             },

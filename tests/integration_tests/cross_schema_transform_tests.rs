@@ -68,9 +68,6 @@ fn test_cross_schema_transform_manual_execution() {
     let transform = Transform::new_with_expr(
         "SchemaA.a_test_field + 5".to_string(),
         expr,
-        false,
-        None,
-        false,
         "SchemaB.b_test_field".to_string()
     );
     let schema_b = create_schema_b(transform.clone());
@@ -109,9 +106,6 @@ fn test_cross_schema_transform_with_inputs() {
     let mut transform = Transform::new_with_expr(
         "SchemaA.a_test_field + 5".to_string(),
         expr,
-        false,
-        None,
-        false,
         "SchemaB.b_test_field".to_string()
     );
     transform.set_inputs(vec!["SchemaA.a_test_field".to_string()]);
@@ -154,9 +148,6 @@ fn test_transform_persists_to_output_field() {
     let mut transform = Transform::new_with_expr(
         "a_in + 2".to_string(),
         expr,
-        false,
-        None,
-        false,
         "SchemaB.b_out".to_string(),
     );
     transform.set_inputs(vec!["SchemaA.a_in".to_string()]);

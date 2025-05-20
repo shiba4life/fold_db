@@ -167,7 +167,7 @@ impl FoldDB {
             if let Some(transform) = field.get_transform() {
                 // Determine the actual output field for this transform
                 let (out_schema_name, out_field_name) = match transform
-                    .get_output_schema()
+                    .get_output()
                     .split_once('.')
                 {
                     Some((s, f)) => (s.to_string(), f.to_string()),
