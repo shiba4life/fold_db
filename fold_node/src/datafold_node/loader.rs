@@ -154,7 +154,10 @@ mod tests {
             .get("computed")
             .expect("field not found");
         assert!(field.transform.is_some());
-        assert_eq!(field.transform.as_ref().unwrap().logic, "4 + 5");
+        let t = field.transform.as_ref().unwrap();
+        assert_eq!(t.logic, "4 + 5");
+        assert_eq!(t.inputs.len(), 0);
+        assert_eq!(t.output, "transform_schema.computed");
 
         Ok(())
     }

@@ -76,28 +76,19 @@
   },
   "transforms": {
     "stock_status": {
-      "name": "stock_status",
       "logic": "if inventory_count == 0 { return \"Out of Stock\"; } else if inventory_count < 10 { return \"Low Stock\"; } else { return \"In Stock\"; }",
-      "reversible": false,
-      "signature": null,
-      "payment_required": false,
-      "input_dependencies": ["inventory_count"]
+      "inputs": ["ProductCatalog.inventory_count"],
+      "output": "ProductCatalog.stock_status"
     },
     "price_range": {
-      "name": "price_range",
       "logic": "if price < 50 { return \"Budget\"; } else if price < 200 { return \"Mid-Range\"; } else { return \"Premium\"; }",
-      "reversible": false,
-      "signature": null,
-      "payment_required": false,
-      "input_dependencies": ["price"]
+      "inputs": ["ProductCatalog.price"],
+      "output": "ProductCatalog.price_range"
     },
     "product_preview": {
-      "name": "product_preview",
       "logic": "return name + \" - \" + category + \" ($\" + price + \")\";",
-      "reversible": false,
-      "signature": null,
-      "payment_required": false,
-      "input_dependencies": ["name", "category", "price"]
+      "inputs": ["ProductCatalog.name", "ProductCatalog.category", "ProductCatalog.price"],
+      "output": "ProductCatalog.product_preview"
     }
   },
   "payment_config": {

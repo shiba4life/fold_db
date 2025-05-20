@@ -76,20 +76,14 @@
   },
   "transforms": {
     "display_name": {
-      "name": "display_name",
       "logic": "if full_name != \"\" { return full_name; } else { return username; }",
-      "reversible": false,
-      "signature": null,
-      "payment_required": false,
-      "input_dependencies": ["username", "full_name"]
+      "inputs": ["UserProfile.username", "UserProfile.full_name"],
+      "output": "UserProfile.display_name"
     },
     "age_group": {
-      "name": "age_group",
       "logic": "if age < 18 { return \"under 18\"; } else if age < 30 { return \"18-29\"; } else if age < 50 { return \"30-49\"; } else { return \"50+\"; }",
-      "reversible": false,
-      "signature": null,
-      "payment_required": false,
-      "input_dependencies": ["age"]
+      "inputs": ["UserProfile.age"],
+      "output": "UserProfile.age_group"
     }
   },
   "payment_config": {
