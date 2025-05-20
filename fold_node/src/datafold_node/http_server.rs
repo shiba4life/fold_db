@@ -3,6 +3,7 @@ use crate::error::{FoldDbError, FoldDbResult};
 use crate::schema::Schema;
 use super::sample_manager::SampleManager;
 use super::{schema_routes, query_routes, network_routes};
+use super::log_routes;
 
 use actix_cors::Cors;
 use actix_files::Files;
@@ -141,6 +142,9 @@ impl DataFoldHttpServer {
                         .route("/transform/{id}/run", web::post().to(query_routes::run_transform))
                         .route("/transforms/queue", web::get().to(query_routes::get_transform_queue))
                         .route("/transforms/queue/{id}", web::post().to(query_routes::add_to_transform_queue))
+                        // Log endpoints
+                        .route("/logs", web::get().to(log_routes::list_logs))
+                        .route("/logs/stream", web::get().to(log_routes::stream_logs))
                         // Network endpoints
                         .service(
                             web::scope("/network")
@@ -229,6 +233,45 @@ mod tests {
         assert_eq!(schemas.len(), 1, "expected exactly one schema");
         assert_eq!(schemas[0].as_str().expect("schema name is not a string"), "Custom");
 
+
+        handle.abort();
+        let _ = handle.await;
+    }
+
+    /// Verify that logs endpoint returns data
+    #[tokio::test]
+    async fn logs_endpoint_returns_lines() {
+        let temp_dir = tempdir().unwrap();
+        let config = NodeConfig::new(temp_dir.path().to_path_buf());
+        let node = DataFoldNode::new(config).unwrap();
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+        let bind_addr = format!("127.0.0.1:{}", addr.port());
+
+        let server = DataFoldHttpServer::new(node, &bind_addr)
+            .await
+            .expect("server init");
+
+        let handle = tokio::spawn(async move { server.run().await.unwrap() });
+
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+        let client = reqwest::Client::new();
+        let url = format!("http://{}/api/logs", bind_addr);
+
+        let logs: serde_json::Value = client
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(5))
+            .send()
+            .await
+            .expect("request failed")
+            .json()
+            .await
+            .expect("invalid json");
+
+        assert!(logs.as_array().map(|v| !v.is_empty()).unwrap_or(false));
 
         handle.abort();
         let _ = handle.await;

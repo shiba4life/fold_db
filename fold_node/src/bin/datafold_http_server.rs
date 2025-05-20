@@ -43,7 +43,7 @@ struct Cli {
 /// * The HTTP server cannot be started
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::init();
+    fold_node::web_logger::init().ok();
     info!("Starting DataFold HTTP Server...");
 
     // Parse command-line arguments using clap
