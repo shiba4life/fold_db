@@ -365,56 +365,9 @@ impl TransformManager {
     /// Executes a transform and updates its output atom reference.
     fn execute_transform(&self, transform_id: &str) -> Result<JsonValue, SchemaError> {
         info!("Executing transform {}", transform_id);
-        // Get the transform
-        let transform = {
-            let registered_transforms = self
-                .registered_transforms
-                .read()
-                .map_err(|_| {
-                    SchemaError::InvalidData(
-                        "Failed to acquire registered_transforms lock".to_string(),
-                    )
-                })?;
-            match registered_transforms.get(transform_id) {
-                Some(transform) => transform.clone(),
-                None => return Err(SchemaError::InvalidField(format!("Transform not found: {}", transform_id))),
-            }
-        };
-        
-        // Create an input provider function that gets values from atom references
-        let get_atom_fn = &self.get_atom_fn;
-        let transform_to_arefs = self
-            .transform_to_arefs
-            .read()
-            .map_err(|_| {
-                SchemaError::InvalidData(
-                    "Failed to acquire transform_to_arefs lock".to_string(),
-                )
-            })?;
-        let input_arefs = transform_to_arefs.get(transform_id).cloned().unwrap_or_default();
 
-        let mut input_values = HashMap::new();
-
-        // Fetch explicit inputs if provided
-        let inputs = transform.get_inputs();
-        if !inputs.is_empty() {
-            for input in inputs {
-                if let Some((schema, field)) = input.split_once('.') {
-                    let val = (self.get_field_fn)(schema, field)?;
-                    input_values.insert(input.clone(), val);
-                }
-            }
-        }
-
-        // Fallback to atom references for other dependencies
-        for aref in &input_arefs {
-            let atom = (get_atom_fn)(aref).map_err(|e| {
-                SchemaError::InvalidField(format!("Failed to get input '{}': {}", aref, e))
-            })?;
-            input_values.insert(aref.clone(), atom.content().clone());
-        }
-
-        info!("Input values for {}: {:?}", transform_id, input_values);
+        let transform = self.fetch_registered_transform(transform_id)?;
+        let input_values = self.gather_input_values(transform_id, &transform)?;
 
         let result = match TransformExecutor::execute_transform(&transform, input_values) {
             Ok(val) => {
@@ -426,8 +379,79 @@ impl TransformManager {
                 return Err(e);
             }
         };
-        
-        // Update the output atom reference
+
+        self.persist_transform_result(transform_id, result.clone())?;
+        Ok(result)
+    }
+
+    /// Fetch a registered transform by id.
+    fn fetch_registered_transform(&self, transform_id: &str) -> Result<Transform, SchemaError> {
+        let registered_transforms = self
+            .registered_transforms
+            .read()
+            .map_err(|_| {
+                SchemaError::InvalidData(
+                    "Failed to acquire registered_transforms lock".to_string(),
+                )
+            })?;
+        match registered_transforms.get(transform_id) {
+            Some(transform) => Ok(transform.clone()),
+            None => Err(SchemaError::InvalidField(format!(
+                "Transform not found: {}",
+                transform_id
+            ))),
+        }
+    }
+
+    /// Gather input values for a transform.
+    fn gather_input_values(
+        &self,
+        transform_id: &str,
+        transform: &Transform,
+    ) -> Result<HashMap<String, JsonValue>, SchemaError> {
+        let get_atom_fn = &self.get_atom_fn;
+        let transform_to_arefs = self
+            .transform_to_arefs
+            .read()
+            .map_err(|_| {
+                SchemaError::InvalidData(
+                    "Failed to acquire transform_to_arefs lock".to_string(),
+                )
+            })?;
+        let input_arefs = transform_to_arefs
+            .get(transform_id)
+            .cloned()
+            .unwrap_or_default();
+
+        let mut input_values = HashMap::new();
+
+        let inputs = transform.get_inputs();
+        if !inputs.is_empty() {
+            for input in inputs {
+                if let Some((schema, field)) = input.split_once('.') {
+                    let val = (self.get_field_fn)(schema, field)?;
+                    input_values.insert(input.clone(), val);
+                }
+            }
+        }
+
+        for aref in &input_arefs {
+            let atom = (get_atom_fn)(aref).map_err(|e| {
+                SchemaError::InvalidField(format!("Failed to get input '{}': {}", aref, e))
+            })?;
+            input_values.insert(aref.clone(), atom.content().clone());
+        }
+
+        info!("Input values for {}: {:?}", transform_id, input_values);
+        Ok(input_values)
+    }
+
+    /// Persist the result of a transform to its output atom reference.
+    fn persist_transform_result(
+        &self,
+        transform_id: &str,
+        result: JsonValue,
+    ) -> Result<(), SchemaError> {
         let output_aref = {
             let transform_outputs = self
                 .transform_outputs
@@ -437,14 +461,18 @@ impl TransformManager {
                         "Failed to acquire transform_outputs lock".to_string(),
                     )
                 })?;
-            
+
             match transform_outputs.get(transform_id) {
                 Some(aref_uuid) => aref_uuid.clone(),
-                None => return Err(SchemaError::InvalidField(format!("Transform output not found: {}", transform_id))),
+                None => {
+                    return Err(SchemaError::InvalidField(format!(
+                        "Transform output not found: {}",
+                        transform_id
+                    )))
+                }
             }
         };
-        
-        // Create a new atom with the transform result
+
         let atom = match (self.create_atom_fn)(
             "transform_result",
             "transform_system".to_string(),
@@ -453,20 +481,26 @@ impl TransformManager {
             None,
         ) {
             Ok(atom) => atom,
-            Err(e) => return Err(SchemaError::InvalidField(format!("Failed to create atom: {}", e))),
+            Err(e) => {
+                return Err(SchemaError::InvalidField(format!("Failed to create atom: {}", e)))
+            }
         };
-        
-        // Update the output atom reference
+
         match (self.update_atom_ref_fn)(
             &output_aref,
             atom.uuid().to_string(),
             "transform_system".to_string(),
         ) {
-            Ok(_) => {},
-            Err(e) => return Err(SchemaError::InvalidField(format!("Failed to update atom reference: {}", e))),
+            Ok(_) => {}
+            Err(e) => {
+                return Err(SchemaError::InvalidField(format!(
+                    "Failed to update atom reference: {}",
+                    e
+                )))
+            }
         }
-        
-        Ok(result)
+
+        Ok(())
     }
 
     /// Executes a registered transform immediately and updates its output.
