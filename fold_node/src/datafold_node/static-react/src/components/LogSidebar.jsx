@@ -22,7 +22,7 @@ function LogSidebar() {
   }, [logs])
 
   return (
-    <aside className="w-80 bg-gray-900 text-white p-4 overflow-y-auto">
+    <aside className="w-80 h-screen bg-gray-900 text-white p-4 overflow-y-auto">
       <h2 className="text-lg font-semibold mb-2">Logs</h2>
       <div className="space-y-1 text-xs font-mono">
         {logs.map((line, idx) => (
