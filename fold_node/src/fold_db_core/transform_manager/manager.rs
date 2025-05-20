@@ -4,7 +4,7 @@ use super::types::{CreateAtomFn, GetAtomFn, GetFieldFn, UpdateAtomRefFn, Transfo
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
-use log::error;
+use log::{error, info};
 
 pub struct TransformManager {
     /// Tree for storing transforms
@@ -83,7 +83,9 @@ impl TransformManager {
         TransformExecutor::validate_transform(&transform)?;
 
         // Set transform output field
-        transform.set_output(format!("{}.{}", schema_name, field_name));
+        let output_field = format!("{}.{}", schema_name, field_name);
+        let inputs_len = input_arefs.len();
+        transform.set_output(output_field.clone());
         
         // Store the transform
         let transform_json = serde_json::to_vec(&transform)
@@ -186,7 +188,14 @@ impl TransformManager {
                 transform_set.insert(transform_id.clone());
             }
         }
-        
+
+        info!(
+            "Registered transform {} output {} with {} input references",
+            transform_id,
+            output_field,
+            inputs_len
+        );
+
         Ok(())
     }
 
@@ -201,6 +210,9 @@ impl TransformManager {
     ) -> Result<(), SchemaError> {
         let dependencies = transform.analyze_dependencies().into_iter().collect::<Vec<String>>();
         let trigger_fields = Vec::new();
+        let inputs_len = dependencies.len();
+        let output_field = format!("{}.{}", schema_name, field_name);
+        let tid = transform_id.clone();
         self.register_transform(
             TransformRegistration {
                 transform_id,
@@ -211,7 +223,14 @@ impl TransformManager {
                 schema_name,
                 field_name,
             }
-        )
+        )?;
+        info!(
+            "Registered transform {} output {} with {} input references",
+            tid,
+            output_field,
+            inputs_len
+        );
+        Ok(())
     }
 
     /// Unregisters a transform.
