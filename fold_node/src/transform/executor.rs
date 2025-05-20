@@ -9,6 +9,7 @@ use super::parser::TransformParser;
 use crate::schema::types::{SchemaError, Transform};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
+use log::info;
 
 /// Executor for transforms.
 pub struct TransformExecutor;
@@ -28,7 +29,16 @@ impl TransformExecutor {
         transform: &Transform,
         input_values: HashMap<String, JsonValue>,
     ) -> Result<JsonValue, SchemaError> {
-        Self::execute_transform_with_expr(transform, input_values)
+        info!(
+            "execute_transform logic: {} with inputs: {:?}",
+            transform.logic,
+            input_values
+        );
+        let result = Self::execute_transform_with_expr(transform, input_values);
+        if let Ok(ref value) = result {
+            info!("execute_transform result: {:?}", value);
+        }
+        result
     }
     
     /// Executes a transform with the given input provider function.
@@ -87,7 +97,16 @@ impl TransformExecutor {
         }
         
         // Execute the transform with the collected inputs
-        Self::execute_transform(transform, input_values)
+        info!(
+            "execute_transform_with_provider logic: {} with inputs: {:?}",
+            transform.logic,
+            input_values
+        );
+        let result = Self::execute_transform(transform, input_values);
+        if let Ok(ref value) = result {
+            info!("execute_transform_with_provider result: {:?}", value);
+        }
+        result
     }
     
     /// Executes a transform with a pre-parsed expression.
@@ -116,6 +135,12 @@ impl TransformExecutor {
             }
         };
         
+        info!(
+            "execute_transform_with_expr expression: {:?} inputs: {:?}",
+            ast,
+            input_values
+        );
+
         // Convert input values to interpreter values
         let variables = Self::convert_input_values(input_values);
         
@@ -123,11 +148,12 @@ impl TransformExecutor {
         let mut interpreter = Interpreter::with_variables(variables);
         
         // Evaluate the AST
-        let result = interpreter.evaluate(&ast)
+        let evaluated = interpreter.evaluate(&ast)
             .map_err(|e| SchemaError::InvalidField(format!("Failed to execute transform: {}", e)))?;
-        
-        // Convert result back to JsonValue
-        Self::convert_result_value(result)
+
+        let json_result = Self::convert_result_value(evaluated)?;
+        info!("execute_transform_with_expr result: {:?}", json_result);
+        Ok(json_result)
     }
     
     /// Converts input values from JsonValue to interpreter Value.
