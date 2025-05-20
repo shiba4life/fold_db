@@ -50,10 +50,16 @@ fi
 
 # Check if there are any JavaScript or TypeScript files being committed
 if git diff --cached --name-only | grep -Eq '\.(js|jsx|ts|tsx)$'; then
-    echo "JavaScript/TypeScript files detected in commit, running npm tests..."
-    pushd fold_node/src/datafold_node/static > /dev/null
-    npm test || { echo "npm tests failed!"; popd > /dev/null; exit 1; }
-    popd > /dev/null
+    echo "JavaScript/TypeScript files detected in commit."
+    if [ -f fold_node/src/datafold_node/static-react/package.json ] && \
+       grep -q '"test"' fold_node/src/datafold_node/static-react/package.json; then
+        echo "Running React UI npm tests..."
+        pushd fold_node/src/datafold_node/static-react > /dev/null
+        npm test || { echo "npm tests failed!"; popd > /dev/null; exit 1; }
+        popd > /dev/null
+    else
+        echo "No npm test script found for React UI, skipping."
+    fi
 else
     echo "No JavaScript/TypeScript files in commit, skipping npm tests."
 fi

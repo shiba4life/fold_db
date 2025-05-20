@@ -19,7 +19,8 @@ use tokio::fs;
 /// HTTP server for the DataFold node.
 ///
 /// DataFoldHttpServer provides a web-based interface for external clients to interact
-/// with a DataFold node. It handles HTTP requests, serves static files for the UI,
+/// with a DataFold node. It handles HTTP requests and can serve the built React
+/// UI,
 /// and provides REST API endpoints for schemas, queries, and mutations.
 ///
 /// # Features
@@ -197,7 +198,7 @@ impl DataFoldHttpServer {
     /// Run the HTTP server.
     ///
     /// This method starts the HTTP server and begins accepting client connections.
-    /// It serves static files for the UI and provides REST API endpoints for
+    /// It can serve the compiled React UI and provides REST API endpoints for
     /// schemas, queries, and mutations.
     ///
     /// # Returns
@@ -266,8 +267,8 @@ impl DataFoldHttpServer {
                                 .route("/nodes", web::get().to(list_nodes))
                         ),
                 )
-                // Static files - serve from root
-                .service(Files::new("/", "src/datafold_node/static").index_file("index.html"))
+                // Serve the built React UI if it exists
+                .service(Files::new("/", "src/datafold_node/static-react/dist").index_file("index.html"))
        })
         .bind(&self.bind_address)
         .map_err(|e| FoldDbError::Config(format!("Failed to bind HTTP server: {}", e)))?

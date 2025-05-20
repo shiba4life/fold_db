@@ -16,7 +16,8 @@ The pre-commit hook runs before each commit and performs the following checks:
 6. Runs SDK integration tests
 7. Runs real integration tests
 8. Runs all tests across the entire workspace with `cargo test --workspace`
-9. Runs `npm test` for UI components when JavaScript or TypeScript files are committed
+9. Runs `npm test` for the React UI when JavaScript or TypeScript files are
+   committed and a test script is defined
 
 If any of these checks fail, the commit will be aborted.
 
