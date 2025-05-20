@@ -47,7 +47,7 @@ pub struct TransformRegistration {
     pub field_name: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Transform {
     /// Explicit input fields in `Schema.field` format
     #[serde(default)]
@@ -62,6 +62,40 @@ pub struct Transform {
     /// The parsed expression (not serialized)
     #[serde(skip)]
     pub parsed_expression: Option<crate::transform::ast::Expression>,
+}
+
+// Custom deserialization to allow either a transform DSL string or a struct
+impl<'de> serde::Deserialize<'de> for Transform {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        #[serde(untagged)]
+        enum Helper {
+            Str(String),
+            Struct { inputs: Option<Vec<String>>, logic: String, output: String },
+        }
+
+        match Helper::deserialize(deserializer)? {
+            Helper::Str(s) => {
+                let parser = crate::transform::parser::TransformParser::new();
+                let decl = parser
+                    .parse_transform(&s)
+                    .map_err(|e| serde::de::Error::custom(format!(
+                        "Failed to parse transform DSL: {}",
+                        e
+                    )))?;
+                Ok(Self::from_declaration(decl))
+            }
+            Helper::Struct { inputs, logic, output } => Ok(Self {
+                inputs: inputs.unwrap_or_default(),
+                logic,
+                output,
+                parsed_expression: None,
+            }),
+        }
+    }
 }
 
 impl Transform {
