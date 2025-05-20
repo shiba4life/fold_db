@@ -31,7 +31,13 @@ pub struct JsonSchemaField {
 }
 
 /// JSON representation of a transform
+///
+/// Only the required pieces of information are kept. Any unknown
+/// fields in the incoming JSON will cause a deserialization error so
+/// that stale attributes such as `reversible` or `signature` do not
+/// silently pass through the system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct JsonTransform {
     /// The transform logic expressed in the DSL
     pub logic: String,
@@ -88,12 +94,9 @@ impl From<JsonFieldPaymentConfig> for FieldPaymentConfig {
 
 impl From<JsonTransform> for Transform {
     fn from(json: JsonTransform) -> Self {
-        Self {
-            inputs: json.inputs,
-            logic: json.logic,
-            output: json.output,
-            parsed_expression: None,
-        }
+        let mut transform = Transform::new(json.logic, json.output);
+        transform.set_inputs(json.inputs);
+        transform
     }
 }
 
