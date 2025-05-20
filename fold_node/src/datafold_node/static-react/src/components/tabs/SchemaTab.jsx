@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/solid'
 
-function SchemaTab({ schemas, onResult }) {
+function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
   const [expandedSchemas, setExpandedSchemas] = useState({})
 
   const toggleSchema = (schemaName) => {
@@ -9,6 +9,20 @@ function SchemaTab({ schemas, onResult }) {
       ...prev,
       [schemaName]: !prev[schemaName]
     }))
+  }
+
+  const removeSchema = async (schemaName) => {
+    try {
+      const resp = await fetch(`/api/schema/${schemaName}`, { method: 'DELETE' })
+      if (!resp.ok) {
+        throw new Error(`Failed to remove schema: ${resp.status}`)
+      }
+      if (onSchemaUpdated) {
+        onSchemaUpdated()
+      }
+    } catch (err) {
+      console.error('Failed to remove schema:', err)
+    }
   }
 
   const renderField = (field, fieldName) => {
@@ -66,6 +80,15 @@ function SchemaTab({ schemas, onResult }) {
                 ({Object.keys(schema.fields).length} fields)
               </span>
             </div>
+            <button
+              className="group inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              onClick={(e) => {
+                e.stopPropagation()
+                removeSchema(schema.name)
+              }}
+            >
+              Remove
+            </button>
           </div>
         </div>
         
