@@ -44,6 +44,17 @@ async fn test_network_core_creation() {
 }
 
 #[tokio::test]
+async fn test_discover_nodes_disabled() {
+    // Create a network core with discovery disabled
+    let config = NetworkConfig::default().with_mdns(false);
+    let mut node = NetworkCore::new(config).await.unwrap();
+
+    // Discovery should return an empty list when disabled
+    let peers = node.discover_nodes().await.unwrap();
+    assert!(peers.is_empty());
+}
+
+#[tokio::test]
 async fn test_datafold_node_network_integration() {
     // Create the nodes
     let mut node1 = create_test_node();
