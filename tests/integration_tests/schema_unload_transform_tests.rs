@@ -16,9 +16,6 @@ fn unload_schema_removes_transforms() {
     let transform = Transform::new_with_expr(
         "1 + 2".to_string(),
         expr,
-        false,
-        None,
-        false,
         "UnloadSchema.calc".to_string(),
     );
     let field = SchemaField::new(

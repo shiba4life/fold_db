@@ -27,11 +27,8 @@ fn build_schema(transform_logic: &str) -> JsonSchemaDefinition {
         field_type: FieldType::Single,
         transform: Some(JsonTransform {
             logic: transform_logic.to_string(),
-            reversible: false,
-            signature: None,
-            payment_required: false,
             inputs: Vec::new(),
-            output_schema: "test.calc".to_string(),
+            output: "test.calc".to_string(),
         }),
     };
 

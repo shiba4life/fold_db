@@ -17,9 +17,6 @@ fn mutation_enqueues_transform() {
     let transform = Transform::new_with_expr(
         "1 + 1".to_string(),
         expr,
-        false,
-        None,
-        false,
         "EnqueueSchema.calc".to_string()
     );
     let field = SchemaField::new(

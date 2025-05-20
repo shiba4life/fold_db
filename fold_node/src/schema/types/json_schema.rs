@@ -35,23 +35,13 @@ pub struct JsonSchemaField {
 pub struct JsonTransform {
     /// The transform logic expressed in the DSL
     pub logic: String,
-    
-    /// Whether this transform is reversible
-    pub reversible: bool,
-    
-    /// Optional signature for verification
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub signature: Option<String>,
-    
-    /// Whether payment is required for this transform
-    pub payment_required: bool,
 
     /// Explicit list of input fields in `Schema.field` format
     #[serde(default)]
     pub inputs: Vec<String>,
 
-    /// Output schema for this transform in `Schema.field` format
-    pub output_schema: String,
+    /// Output field for this transform in `Schema.field` format
+    pub output: String,
 }
 
 /// JSON representation of permission policy
@@ -99,17 +89,10 @@ impl From<JsonFieldPaymentConfig> for FieldPaymentConfig {
 impl From<JsonTransform> for Transform {
     fn from(json: JsonTransform) -> Self {
         Self {
-            name: String::new(),
-            logic: json.logic,
-            reversible: json.reversible,
-            signature: json.signature,
-            payment_required: json.payment_required,
             inputs: json.inputs,
-            input_dependencies: Vec::new(),
-            output_reference: None,
-            output_schema: json.output_schema,
-            parsed_expr: None,
-            parsed_declaration: None,
+            logic: json.logic,
+            output: json.output,
+            parsed_expression: None,
         }
     }
 }

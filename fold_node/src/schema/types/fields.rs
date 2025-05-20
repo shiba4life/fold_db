@@ -92,7 +92,7 @@ impl<'de> Deserialize<'de> for SchemaField {
                     let transform = Transform::from_declaration(declaration);
                     let transform = if let (Some(schema_name), Some(field_name)) = (&helper.schema_name, &helper.field_name) {
                         Transform {
-                            output_schema: format!("{}.{}", schema_name, field_name),
+                            output: format!("{}.{}", schema_name, field_name),
                             ..transform
                         }
                     } else {
@@ -114,11 +114,7 @@ impl<'de> Deserialize<'de> for SchemaField {
             writable: helper.writable.unwrap_or(true),
         };
 
-        if let Some(t) = &field.transform {
-            if !t.reversible {
-                field.writable = false;
-            }
-        }
+
 
         Ok(field)
     }
@@ -236,7 +232,6 @@ impl SchemaField {
     ///
     /// The field instance with the transform set
     pub fn with_transform(mut self, transform: Transform) -> Self {
-        self.writable = transform.reversible;
         self.transform = Some(transform);
         self
     }
@@ -262,7 +257,6 @@ impl SchemaField {
     ///
     /// * `transform` - The transform to apply to this field
     pub fn set_transform(&mut self, transform: Transform) {
-        self.writable = transform.reversible;
         self.transform = Some(transform);
     }
 }
@@ -343,10 +337,7 @@ mod tests {
     fn test_field_with_transform() {
         let transform = Transform::new(
             "return field1 + field2;".to_string(),
-            false,
-            None,
-            false,
-            "test.calc".to_string()
+            "test.calc".to_string(),
         );
         let field = SchemaField::new(
             PermissionsPolicy::default(),
@@ -381,7 +372,7 @@ mod tests {
         assert!(field.transform.is_some());
         let transform = field.transform.unwrap();
         assert_eq!(transform.logic, "return (field1 * 2)".to_string());
-        assert_eq!(transform.output_schema, "test.temp");  // Default output_schema from Transform::from_declaration
+        assert_eq!(transform.output, "test.temp");  // Default output from Transform::from_declaration
     }
 
     #[test]

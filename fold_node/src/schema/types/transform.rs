@@ -24,9 +24,6 @@ use crate::transform::ast::TransformDeclaration;
 ///
 /// let transform = Transform::new(
 ///     "let bmi = weight / (height ^ 2); return 0.5 * blood_pressure + 1.2 * bmi;".to_string(),
-///     false,
-///     Some("sha256sum(\"v1.0.3\")".to_string()),
-///     true,
 ///     "health.risk_score".to_string(),
 /// );
 /// ```
@@ -52,186 +49,47 @@ pub struct TransformRegistration {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transform {
-    /// The name of the transform
-    #[serde(default)]
-    pub name: String,
-    
-    /// The transform logic expressed in the DSL
-    pub logic: String,
-    
-    /// Whether this transform is reversible
-    pub reversible: bool,
-    
-    /// Optional signature for verification
-    pub signature: Option<String>,
-    
-    /// Whether payment is required for this transform
-    pub payment_required: bool,
-
     /// Explicit input fields in `Schema.field` format
     #[serde(default)]
     pub inputs: Vec<String>,
-    
-    /// Input dependencies for this transform
-    #[serde(default)]
-    pub input_dependencies: Vec<String>,
-    
-    /// Output reference for this transform
-    #[serde(skip)]
-    pub output_reference: Option<String>,
 
-    /// Output schema for this transform in `Schema.field` format
-    pub output_schema: String,
-    
+    /// The transform logic expressed in the DSL
+    pub logic: String,
+
+    /// Output field for this transform in `Schema.field` format
+    pub output: String,
+
     /// The parsed expression (not serialized)
     #[serde(skip)]
-    pub parsed_expr: Option<crate::transform::ast::Expression>,
-    
-    /// The parsed transform declaration (not serialized)
-    #[serde(skip)]
-    pub parsed_declaration: Option<TransformDeclaration>,
+    pub parsed_expression: Option<crate::transform::ast::Expression>,
 }
 
 impl Transform {
-    /// Creates a new Transform with the specified parameters.
-    ///
-    /// # Arguments
-    ///
-    /// * `logic` - The transform logic expressed in the DSL
-    /// * `reversible` - Whether this transform is reversible
-    /// * `signature` - Optional signature for verification
-    /// * `payment_required` - Whether payment is required for this transform
-    ///
-    /// # Returns
-    ///
-    /// A new Transform instance
+    /// Creates a new `Transform` from raw logic and output field.
     #[must_use]
-    pub fn new(
-        logic: String,
-        reversible: bool,
-        signature: Option<String>,
-        payment_required: bool,
-        output_schema: String,
-    ) -> Self {
+    pub fn new(logic: String, output: String) -> Self {
         Self {
-            name: String::new(),
-            logic,
-            reversible,
-            signature,
-            payment_required,
             inputs: Vec::new(),
-            input_dependencies: Vec::new(),
-            output_reference: None,
-            output_schema,
-            parsed_expr: None,
-            parsed_declaration: None,
+            logic,
+            output,
+            parsed_expression: None,
         }
     }
-    
-    /// Creates a new Transform with a pre-parsed expression.
-    ///
-    /// # Arguments
-    ///
-    /// * `logic` - The transform logic expressed in the DSL
-    /// * `parsed_expr` - The pre-parsed expression
-    /// * `reversible` - Whether this transform is reversible
-    /// * `signature` - Optional signature for verification
-    /// * `payment_required` - Whether payment is required for this transform
-    ///
-    /// # Returns
-    ///
-    /// A new Transform instance
+
+    /// Creates a new `Transform` with a pre-parsed expression.
     #[must_use]
     pub fn new_with_expr(
         logic: String,
-        parsed_expr: crate::transform::ast::Expression,
-        reversible: bool,
-        signature: Option<String>,
-        payment_required: bool,
-        output_schema: String,
+        parsed_expression: crate::transform::ast::Expression,
+        output: String,
     ) -> Self {
         Self {
-            name: String::new(),
-            logic,
-            reversible,
-            signature,
-            payment_required,
             inputs: Vec::new(),
-            input_dependencies: Vec::new(),
-            output_reference: None,
-            output_schema,
-            parsed_expr: Some(parsed_expr),
-            parsed_declaration: None,
+            logic,
+            output,
+            parsed_expression: Some(parsed_expression),
         }
     }
-    
-    /// Creates a new Transform with input dependencies and output reference.
-    ///
-    /// # Arguments
-    ///
-    /// * `logic` - The transform logic expressed in the DSL
-    /// * `reversible` - Whether this transform is reversible
-    /// * `signature` - Optional signature for verification
-    /// * `payment_required` - Whether payment is required for this transform
-    /// * `input_dependencies` - The input dependencies for this transform
-    /// * `output_reference` - The output reference for this transform
-    ///
-    /// # Returns
-    ///
-    /// A new Transform instance
-    #[must_use]
-    pub fn with_dependencies(
-        logic: String,
-        reversible: bool,
-        signature: Option<String>,
-        payment_required: bool,
-        input_dependencies: Vec<String>,
-        output_reference: Option<String>,
-        output_schema: String,
-    ) -> Self {
-        Self {
-            name: String::new(),
-            logic,
-            reversible,
-            signature,
-            payment_required,
-            inputs: Vec::new(),
-            input_dependencies,
-            output_reference,
-            output_schema,
-            parsed_expr: None,
-            parsed_declaration: None,
-        }
-    }
-    
-    /// Sets the input dependencies for this transform.
-    ///
-    /// # Arguments
-    ///
-    /// * `dependencies` - The input dependencies for this transform
-    pub fn set_input_dependencies(&mut self, dependencies: Vec<String>) {
-        self.input_dependencies = dependencies;
-    }
-    
-    /// Sets the output reference for this transform.
-    ///
-    /// # Arguments
-    ///
-    /// * `output_reference` - The output reference for this transform
-    pub fn set_output_reference(&mut self, output_reference: String) {
-        self.output_reference = Some(output_reference);
-    }
-
-    /// Sets the output schema for this transform.
-    ///
-    /// # Arguments
-    ///
-    /// * `schema_name` - The name of the schema
-    /// * `field_name` - The name of the field
-    pub fn set_output_schema(&mut self, schema_name: String, field_name: String) {
-        self.output_schema = format!("{}.{}", schema_name, field_name);
-    }
-    
 
     /// Sets the explicit input fields for this transform.
     pub fn set_inputs(&mut self, inputs: Vec<String>) {
@@ -242,23 +100,15 @@ impl Transform {
     pub fn get_inputs(&self) -> &[String] {
         &self.inputs
     }
-    
-    /// Gets the input dependencies for this transform.
-    ///
-    /// # Returns
-    ///
-    /// The input dependencies for this transform
-    pub fn get_input_dependencies(&self) -> &[String] {
-        &self.input_dependencies
+
+    /// Sets the output field for this transform.
+    pub fn set_output(&mut self, output: String) {
+        self.output = output;
     }
-    
-    /// Gets the output reference for this transform.
-    ///
-    /// # Returns
-    ///
-    /// The output reference for this transform, if any
-    pub fn get_output_reference(&self) -> Option<&String> {
-        self.output_reference.as_ref()
+
+    /// Gets the output field for this transform.
+    pub fn get_output(&self) -> &str {
+        &self.output
     }
     
     /// Analyzes the transform logic to extract variable names that might be input dependencies.
@@ -311,51 +161,24 @@ impl Transform {
     #[must_use]
     pub fn from_declaration(declaration: TransformDeclaration) -> Self {
         // Extract logic from the declaration
-        let logic = declaration.logic.iter()
+        let logic = declaration
+            .logic
+            .iter()
             .map(|expr| format!("{}", expr))
             .collect::<Vec<_>>()
             .join("\n");
-        
-        // Set payment requirement to false since it's been removed
-        let payment_required = false;
 
-        // Derive output schema from the transform name using a placeholder
-        // schema name. When registered, this may be replaced with the actual
-        // schema field depending on where the transform is attached.
-        let output_schema = format!("test.{}", declaration.name);
-        
+        // Placeholder output until attached to a field
+        let output = format!("test.{}", declaration.name);
+
         Self {
-            name: declaration.name.clone(),
-            logic,
-            reversible: declaration.reversible,
-            signature: declaration.signature.clone(),
-            payment_required,
             inputs: Vec::new(),
-            input_dependencies: Vec::new(), // Will be populated later
-            output_reference: None,
-            output_schema,
-            parsed_expr: None, // Will be populated later
-            parsed_declaration: Some(declaration),
+            logic,
+            output,
+            parsed_expression: None,
         }
     }
-    
-    /// Gets the name of the transform.
-    ///
-    /// # Returns
-    ///
-    /// The name of the transform
-    pub fn get_name(&self) -> &str {
-        &self.name
-    }
 
-    /// Gets the output schema for this transform.
-    ///
-    /// # Returns
-    ///
-    /// The output schema for this transform in `Schema.field` format
-    pub fn get_output_schema(&self) -> &str {
-        &self.output_schema
-    }
     
 }
 #[cfg(test)]
@@ -380,28 +203,18 @@ mod tests {
 
         let transform = Transform::from_declaration(declaration);
 
-        assert_eq!(transform.name, "test_transform");
         assert_eq!(transform.logic, "return (field1 + field2)"); // Removed trailing semicolon
-        assert_eq!(transform.reversible, false);
-        assert!(transform.signature.is_none());
-        assert_eq!(transform.payment_required, false); // payment_required is hardcoded to false in from_declaration
-        assert!(transform.input_dependencies.is_empty()); // input_dependencies is not populated in from_declaration
-        assert!(transform.output_reference.is_none());
-        assert_eq!(transform.output_schema, "test.test_transform"); // Output schema derived from declaration name
-        assert!(transform.parsed_expr.is_none()); // parsed_expr is not populated in from_declaration
-        assert!(transform.parsed_declaration.is_some());
+        assert_eq!(transform.output, "test.test_transform"); // Output derived from declaration name
+        assert!(transform.parsed_expression.is_none());
     }
 
     #[test]
-    fn test_output_schema() {
+    fn test_output_field() {
         let transform = Transform::new(
             "return x + 1".to_string(),
-            false,
-            None,
-            false,
             "test.number".to_string(),
         );
 
-        assert_eq!(transform.get_output_schema(), "test.number");
+        assert_eq!(transform.get_output(), "test.number");
     }
 }

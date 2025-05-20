@@ -94,9 +94,9 @@ impl SchemaCore {
         // Ensure any transforms on fields have the correct output schema
         for (field_name, field) in schema.fields.iter_mut() {
             if let Some(transform) = field.transform.as_mut() {
-                let out_schema = transform.get_output_schema();
+                let out_schema = transform.get_output();
                 if out_schema.starts_with("test.") {
-                    transform.set_output_schema(schema.name.clone(), field_name.clone());
+                    transform.set_output(format!("{}.{}", schema.name, field_name));
                 }
             }
         }

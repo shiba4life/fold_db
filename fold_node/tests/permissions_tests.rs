@@ -20,10 +20,7 @@ fn test_non_reversible_transform_not_writable() {
 
     let transform = Transform::new(
         "1 + 1".to_string(),
-        false,
-        None,
-        false,
-        "test_schema.calc".to_string()
+        "test_schema.calc".to_string(),
     );
     let field = SchemaField::new(
         PermissionsPolicy::default(),
