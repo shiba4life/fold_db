@@ -90,8 +90,18 @@ impl SchemaCore {
     }
 
     /// Loads a schema into the manager and persists it to disk.
-    pub fn load_schema(&self, schema: Schema) -> Result<(), SchemaError> {
-        // First persist the schema
+    pub fn load_schema(&self, mut schema: Schema) -> Result<(), SchemaError> {
+        // Ensure any transforms on fields have the correct output schema
+        for (field_name, field) in schema.fields.iter_mut() {
+            if let Some(transform) = field.transform.as_mut() {
+                let out_schema = transform.get_output_schema();
+                if out_schema.starts_with("test.") {
+                    transform.set_output_schema(schema.name.clone(), field_name.clone());
+                }
+            }
+        }
+
+        // Persist the updated schema
         self.persist_schema(&schema)?;
 
         // Then add it to memory
