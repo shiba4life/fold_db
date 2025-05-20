@@ -18,7 +18,11 @@
         }
       },
       "field_mappers": {},
-      "transform": "transform sum_values { logic: { TransformBase.value1 + TransformBase.value2; } }"
+      "transform": {
+        "logic": "TransformBase.value1 + TransformBase.value2",
+        "inputs": [],
+        "output": "TransformSchema.result"
+      }
     }
   },
   "payment_config": {
