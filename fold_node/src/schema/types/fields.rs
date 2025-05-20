@@ -6,7 +6,6 @@ use uuid::Uuid;
 use crate::fees::types::config::FieldPaymentConfig;
 use crate::permissions::types::policy::PermissionsPolicy;
 use crate::schema::types::Transform;
-use crate::transform::parser::TransformParser; // Import TransformParser
 
 #[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq)] // Explicitly use serde::Deserialize
 #[serde(rename_all = "PascalCase")]
@@ -77,7 +76,7 @@ impl<'de> Deserialize<'de> for SchemaField {
             ref_atom_uuid: Option<String>,
             field_type: Option<FieldType>, // Make field_type optional for deserialization
             field_mappers: HashMap<String, String>,
-            transform: Option<String>, // Deserialize transform as a string
+            transform: Option<Transform>,
             writable: Option<bool>,
             schema_name: Option<String>, // Add schema_name for output_schema population
             field_name: Option<String>, // Add field_name for output_schema population
@@ -85,26 +84,14 @@ impl<'de> Deserialize<'de> for SchemaField {
 
         let helper = SchemaFieldHelper::deserialize(deserializer)?;
 
-        let parsed_transform = helper.transform.map(|transform_logic| {
-            let parser = TransformParser::new();
-            match parser.parse_transform(&transform_logic) {
-                Ok(declaration) => {
-                    let transform = Transform::from_declaration(declaration);
-                    let transform = if let (Some(schema_name), Some(field_name)) = (&helper.schema_name, &helper.field_name) {
-                        Transform {
-                            output: format!("{}.{}", schema_name, field_name),
-                            ..transform
-                        }
-                    } else {
-                        transform
-                    };
-                    Ok(transform)
-                },
-                Err(e) => Err(serde::de::Error::custom(format!("Error parsing transform: {}", e))),
+        let parsed_transform = helper.transform.map(|mut t| {
+            if let (Some(schema_name), Some(field_name)) = (&helper.schema_name, &helper.field_name) {
+                t.output = format!("{}.{}", schema_name, field_name);
             }
-        }).transpose()?;
+            t
+        });
 
-        let mut field = SchemaField {
+        let field = SchemaField {
             permission_policy: helper.permission_policy,
             payment_config: helper.payment_config,
             ref_atom_uuid: helper.ref_atom_uuid,
@@ -113,9 +100,6 @@ impl<'de> Deserialize<'de> for SchemaField {
             transform: parsed_transform,
             writable: helper.writable.unwrap_or(true),
         };
-
-
-
         Ok(field)
     }
 }
@@ -365,14 +349,18 @@ mod tests {
             "ref_atom_uuid": "some-uuid",
             "field_type": "Single",
             "field_mappers": {},
-            "transform": "transform temp { logic: { return field1 * 2; } }"
+            "transform": {
+                "logic": "return field1 * 2;",
+                "inputs": [],
+                "output": "test.temp"
+            }
         }"#;
 
         let field: SchemaField = serde_json::from_str(json_input).unwrap();
         assert!(field.transform.is_some());
         let transform = field.transform.unwrap();
-        assert_eq!(transform.logic, "return (field1 * 2)".to_string());
-        assert_eq!(transform.output, "test.temp");  // Default output from Transform::from_declaration
+        assert_eq!(transform.logic, "return field1 * 2;".to_string());
+        assert_eq!(transform.output, "test.temp");
     }
 
     #[test]

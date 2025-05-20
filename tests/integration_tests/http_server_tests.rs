@@ -223,7 +223,11 @@ async fn test_transform_endpoints() {
                 },
                 "field_mappers": {},
                 "field_type": "Single",
-                "transform": "transform calc { logic: { 4 + 5; } }"
+                "transform": {
+                    "logic": "4 + 5",
+                    "inputs": [],
+                    "output": "transform_schema.computed"
+                }
             }
         },
         "payment_config": { "base_multiplier": 1.0, "min_payment_threshold": 0 }
@@ -298,7 +302,11 @@ async fn test_delete_schema_removes_transforms() {
                 },
                 "field_mappers": {},
                 "field_type": "Single",
-                "transform": "transform calc { logic: { 1 + 1; } }"
+                "transform": {
+                    "logic": "1 + 1",
+                    "inputs": [],
+                    "output": "delete_schema.calc"
+                }
             }
         },
         "payment_config": { "base_multiplier": 1.0, "min_payment_threshold": 0 }
