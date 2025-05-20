@@ -5,6 +5,7 @@ use crate::schema::types::fields::FieldType;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
 use serde_json::Value;
+use log::info;
 
 pub struct CollectionManager {
     pub(super) field_manager: FieldManager,
@@ -32,6 +33,13 @@ impl CollectionManager {
         ctx.validate_field_type(FieldType::Collection)?;
         ctx.create_and_update_collection_atom(None, content.clone(), None, id.clone())?;
 
+        info!(
+            "add_collection_field_value - schema: {}, field: {}, id: {}, result: success",
+            schema.name,
+            field,
+            id
+        );
+
         Ok(())
     }
 
@@ -55,6 +63,13 @@ impl CollectionManager {
         let prev_atom_uuid = ctx.get_prev_collection_atom_uuid(&aref_uuid, &id)?;
 
         ctx.create_and_update_collection_atom(Some(prev_atom_uuid), content.clone(), None, id.clone())?;
+
+        info!(
+            "update_collection_field_value - schema: {}, field: {}, id: {}, result: success",
+            schema.name,
+            field,
+            id
+        );
 
         Ok(())
     }
@@ -83,6 +98,13 @@ impl CollectionManager {
             Some(AtomStatus::Deleted),
             id.clone(),
         )?;
+
+        info!(
+            "delete_collection_field_value - schema: {}, field: {}, id: {}, result: success",
+            schema.name,
+            field,
+            id
+        );
 
         Ok(())
     }

@@ -6,6 +6,7 @@ use crate::schema::types::fields::FieldType;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
 use serde_json::Value;
+use log::info;
 
 use std::sync::{Arc, RwLock};
 use super::transform_orchestrator::TransformOrchestrator;
@@ -80,50 +81,51 @@ impl FieldManager {
             .get(field)
             .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
 
-        let Some(ref_atom_uuid) = field_def.get_ref_atom_uuid() else {
-            return Ok(Value::Null);
-        };
+        let result = if let Some(ref_atom_uuid) = field_def.get_ref_atom_uuid() {
+            // Try to get the atom reference
+            let ref_atoms = self.atom_manager.get_ref_atoms();
+            let atoms = self.atom_manager.get_atoms();
 
-        // Try to get the atom reference
-        let ref_atoms = self.atom_manager.get_ref_atoms();
-        let atoms = self.atom_manager.get_atoms();
+            let atom_uuid = {
+                let guard = ref_atoms
+                    .lock()
+                    .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
+                guard
+                    .get(&ref_atom_uuid)
+                    .map(|aref| aref.get_atom_uuid().clone())
+            };
 
-        let atom_uuid = {
-            let guard = ref_atoms
-                .lock()
-                .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
-            guard
-                .get(&ref_atom_uuid)
-                .map(|aref| aref.get_atom_uuid().clone())
-        };
-
-        // If we have an atom UUID, try to get the atom
-        if let Some(atom_uuid) = atom_uuid {
-            let guard = atoms
-                .lock()
-                .map_err(|_| SchemaError::InvalidData("Failed to acquire atoms lock".to_string()))?;
-            if let Some(atom) = guard.get(&atom_uuid) {
-                return Ok(atom.content().clone());
-            }
-        }
-
-        // If we couldn't find the atom in memory, try from disk
-        match self.atom_manager.get_latest_atom(&ref_atom_uuid) {
-            Ok(atom) => Ok(atom.content().clone()),
-            Err(_) => {
-                // If we couldn't find the atom, return a default value based on the field name
-                // This is a temporary solution until we implement proper default values
-                match field {
-                    "username" => Ok(Value::String("".to_string())),
-                    "email" => Ok(Value::String("".to_string())),
-                    "full_name" => Ok(Value::String("".to_string())),
-                    "bio" => Ok(Value::String("".to_string())),
-                    "age" => Ok(Value::Number(serde_json::Number::from(0))),
-                    "location" => Ok(Value::String("".to_string())),
-                    _ => Ok(Value::Null),
+            // If we have an atom UUID, try to get the atom
+            if let Some(atom_uuid) = atom_uuid {
+                let guard = atoms
+                    .lock()
+                    .map_err(|_| SchemaError::InvalidData("Failed to acquire atoms lock".to_string()))?;
+                if let Some(atom) = guard.get(&atom_uuid) {
+                    atom.content().clone()
+                } else {
+                    self.atom_manager
+                        .get_latest_atom(&ref_atom_uuid)
+                        .map(|a| a.content().clone())
+                        .unwrap_or_else(|_| Self::default_value(field))
                 }
+            } else {
+                self.atom_manager
+                    .get_latest_atom(&ref_atom_uuid)
+                    .map(|a| a.content().clone())
+                    .unwrap_or_else(|_| Self::default_value(field))
             }
-        }
+        } else {
+            Value::Null
+        };
+
+        info!(
+            "get_field_value - schema: {}, field: {}, result: {:?}",
+            schema.name,
+            field,
+            result
+        );
+
+        Ok(result)
     }
 
     pub fn set_field_value(
@@ -155,6 +157,12 @@ impl FieldManager {
 
         ctx.create_and_update_atom(prev_atom_uuid, content.clone(), None)?;
 
+        info!(
+            "set_field_value - schema: {}, field: {}, result: success",
+            schema.name,
+            field
+        );
+
         Ok(())
     }
 
@@ -179,6 +187,12 @@ impl FieldManager {
 
         ctx.create_and_update_atom(Some(prev_atom_uuid), content.clone(), None)?;
 
+        info!(
+            "update_field - schema: {}, field: {}, result: success",
+            schema.name,
+            field
+        );
+
         Ok(())
     }
 
@@ -202,7 +216,23 @@ impl FieldManager {
 
         ctx.create_and_update_atom(Some(prev_atom_uuid), Value::Null, Some(AtomStatus::Deleted))?;
 
+        info!(
+            "delete_field - schema: {}, field: {}, result: success",
+            schema.name,
+            field
+        );
+
         Ok(())
+    }
+
+    fn default_value(field: &str) -> Value {
+        match field {
+            "username" | "email" | "full_name" | "bio" | "location" => {
+                Value::String("".to_string())
+            }
+            "age" => Value::Number(serde_json::Number::from(0)),
+            _ => Value::Null,
+        }
     }
 }
 
