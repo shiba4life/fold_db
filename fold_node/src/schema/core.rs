@@ -169,8 +169,12 @@ impl SchemaCore {
                 if let Some(ext) = entry.path().extension() {
                     if ext == "json" {
                         if let Ok(contents) = std::fs::read_to_string(entry.path()) {
-                            if let Ok(schema) = serde_json::from_str(&contents) {
+                            if let Ok(schema) = serde_json::from_str::<Schema>(&contents) {
                                 let _ = self.load_schema(schema);
+                            } else if let Ok(json_schema) = serde_json::from_str::<JsonSchemaDefinition>(&contents) {
+                                if let Ok(schema) = self.interpret_schema(json_schema) {
+                                    let _ = self.load_schema(schema);
+                                }
                             }
                         }
                     }
