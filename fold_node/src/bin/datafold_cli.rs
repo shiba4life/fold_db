@@ -1,13 +1,13 @@
 use clap::{Parser, Subcommand};
 use fold_node::{
-    load_schema_from_file, DataFoldNode, MutationType, NodeConfig, Operation,
-    load_node_config,
+    load_schema_from_file, load_node_config, DataFoldNode, MutationType, NodeConfig,
+    Operation,
 };
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
 use env_logger;
-use log::{info, warn, error};
+use log::{error, info, warn};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -71,6 +71,93 @@ enum Commands {
     },
 }
 
+fn handle_load_schema(path: PathBuf, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Loading schema from: {}", path.display());
+    load_schema_from_file(path, node)?;
+    info!("Schema loaded successfully");
+    Ok(())
+}
+
+fn handle_list_schemas(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    let schemas = node.list_schemas()?;
+    info!("Loaded schemas:");
+    for schema in schemas {
+        info!("  - {}", schema.name);
+    }
+    Ok(())
+}
+
+fn handle_query(
+    node: &mut DataFoldNode,
+    schema: String,
+    fields: Vec<String>,
+    filter: Option<String>,
+    output: String,
+) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Executing query on schema: {}", schema);
+
+    let filter_value = if let Some(filter_str) = filter {
+        Some(serde_json::from_str(&filter_str)?)
+    } else {
+        None
+    };
+
+    let operation = Operation::Query {
+        schema,
+        fields,
+        filter: filter_value,
+    };
+
+    let result = node.execute_operation(operation)?;
+
+    if output == "json" {
+        info!("{}", result);
+    } else {
+        info!("{}", serde_json::to_string_pretty(&result)?);
+    }
+
+    Ok(())
+}
+
+fn handle_mutate(
+    node: &mut DataFoldNode,
+    schema: String,
+    mutation_type: MutationType,
+    data: String,
+) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Executing mutation on schema: {}", schema);
+
+    let data_value: Value = serde_json::from_str(&data)?;
+
+    let operation = Operation::Mutation {
+        schema,
+        data: data_value,
+        mutation_type,
+    };
+
+    node.execute_operation(operation)?;
+    info!("Mutation executed successfully");
+
+    Ok(())
+}
+
+fn handle_execute(path: PathBuf, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Executing operation from file: {}", path.display());
+    let operation_str = fs::read_to_string(path)?;
+    let operation: Operation = serde_json::from_str(&operation_str)?;
+
+    let result = node.execute_operation(operation)?;
+
+    if !result.is_null() {
+        info!("Result:");
+        info!("{}", serde_json::to_string_pretty(&result)?);
+    } else {
+        info!("Operation executed successfully");
+    }
+
+    Ok(())
+}
+
 /// Main entry point for the DataFold CLI.
 ///
 /// This function parses command-line arguments, initializes a DataFold node,
@@ -112,78 +199,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Process command
     match cli.command {
-        Commands::LoadSchema { path } => {
-            info!("Loading schema from: {}", path.display());
-            load_schema_from_file(path, &mut node)?;
-            info!("Schema loaded successfully");
-        }
-        Commands::ListSchemas {} => {
-            let schemas = node.list_schemas()?;
-            info!("Loaded schemas:");
-            for schema in schemas {
-                info!("  - {}", schema.name);
-            }
-        }
+        Commands::LoadSchema { path } => handle_load_schema(path, &mut node)?,
+        Commands::ListSchemas {} => handle_list_schemas(&mut node)?,
         Commands::Query {
             schema,
             fields,
             filter,
             output,
-        } => {
-            info!("Executing query on schema: {}", schema);
-
-            let filter_value = if let Some(filter_str) = filter {
-                Some(serde_json::from_str(&filter_str)?)
-            } else {
-                None
-            };
-
-            let operation = Operation::Query {
-                schema,
-                fields,
-                filter: filter_value,
-            };
-
-            let result = node.execute_operation(operation)?;
-
-            if output == "json" {
-                info!("{}", result);
-            } else {
-                info!("{}", serde_json::to_string_pretty(&result)?);
-            }
-        }
+        } => handle_query(&mut node, schema, fields, filter, output)?,
         Commands::Mutate {
             schema,
             mutation_type,
             data,
-        } => {
-            info!("Executing mutation on schema: {}", schema);
-
-            let data_value: Value = serde_json::from_str(&data)?;
-
-            let operation = Operation::Mutation {
-                schema,
-                data: data_value,
-                mutation_type,
-            };
-
-            node.execute_operation(operation)?;
-            info!("Mutation executed successfully");
-        }
-        Commands::Execute { path } => {
-            info!("Executing operation from file: {}", path.display());
-            let operation_str = fs::read_to_string(path)?;
-            let operation: Operation = serde_json::from_str(&operation_str)?;
-
-            let result = node.execute_operation(operation)?;
-
-            if !result.is_null() {
-                info!("Result:");
-                info!("{}", serde_json::to_string_pretty(&result)?);
-            } else {
-                info!("Operation executed successfully");
-            }
-        }
+        } => handle_mutate(&mut node, schema, mutation_type, data)?,
+        Commands::Execute { path } => handle_execute(path, &mut node)?,
     }
 
     Ok(())
