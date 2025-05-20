@@ -24,6 +24,10 @@ impl TransformOrchestrator {
     /// Add a task for the given schema and field.
     pub fn add_task(&self, schema_name: &str, field_name: &str) -> Result<(), SchemaError> {
         let ids = self.manager.get_transforms_for_field(schema_name, field_name)?;
+        info!(
+            "Transforms queued for {}.{}: {:?}",
+            schema_name, field_name, ids
+        );
         if ids.is_empty() {
             return Ok(());
         }
@@ -82,7 +86,10 @@ impl TransformOrchestrator {
                 .map_err(|_| SchemaError::InvalidData("Failed to acquire queue lock".to_string())).ok()?;
             q.pop_front()
         }?;
-        Some(self.manager.execute_transform_now(&transform_id))
+        info!("Executing transform: {}", transform_id);
+        let result = self.manager.execute_transform_now(&transform_id);
+        info!("Result for transform {}: {:?}", transform_id, result);
+        Some(result)
     }
 
     /// Process all queued tasks sequentially.
