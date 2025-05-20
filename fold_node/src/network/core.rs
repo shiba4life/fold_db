@@ -2,6 +2,7 @@ use crate::network::config::NetworkConfig;
 use crate::network::error::{NetworkError, NetworkResult};
 use crate::network::schema_protocol::SCHEMA_PROTOCOL_NAME;
 use crate::network::schema_service::SchemaService;
+use crate::network::{connections, discovery};
 use libp2p::PeerId;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -394,7 +395,7 @@ impl NetworkCore {
         };
 
         // Send the request to the target node
-        let result = Self::send_request_to_node(stream, request.clone()).await;
+        let result = connections::send_request_to_node(stream, request.clone()).await;
 
         match result {
             Ok(response) => {
@@ -490,87 +491,10 @@ impl NetworkCore {
         }
     }
 
-    /// Send a request to a node over a TCP connection
-    async fn send_request_to_node(
-        mut stream: tokio::net::TcpStream,
-        request: Value,
-    ) -> NetworkResult<Value> {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-        // Serialize the request
-        let request_bytes = serde_json::to_vec(&request).map_err(|e| {
-            NetworkError::ProtocolError(format!("Failed to serialize request: {}", e))
-        })?;
-
-        // Send the request length
-        stream
-            .write_u32(request_bytes.len() as u32)
-            .await
-            .map_err(|e| {
-                NetworkError::ConnectionError(format!("Failed to send request length: {}", e))
-            })?;
-
-        // Send the request
-        stream
-            .write_all(&request_bytes)
-            .await
-            .map_err(|e| NetworkError::ConnectionError(format!("Failed to send request: {}", e)))?;
-
-        // Read the response length
-        let response_len = stream.read_u32().await.map_err(|e| {
-            NetworkError::ConnectionError(format!("Failed to read response length: {}", e))
-        })? as usize;
-
-        // Read the response
-        let mut response_bytes = vec![0u8; response_len];
-        stream.read_exact(&mut response_bytes).await.map_err(|e| {
-            NetworkError::ConnectionError(format!("Failed to read response: {}", e))
-        })?;
-
-        // Deserialize the response
-        let response = serde_json::from_slice(&response_bytes).map_err(|e| {
-            NetworkError::ProtocolError(format!("Failed to deserialize response: {}", e))
-        })?;
-
-        Ok(response)
-    }
 
     /// Actively scan for peers using mDNS
     pub async fn discover_nodes(&mut self) -> NetworkResult<Vec<PeerId>> {
-        if !self.config.enable_mdns {
-            info!("mDNS discovery is disabled, no peers will be discovered");
-            return Ok(Vec::new());
-        }
-
-        info!(
-            "Scanning for peers using mDNS on port {}",
-            self.config.discovery_port
-        );
-
-        // In a real implementation, this would:
-        // 1. Send out mDNS queries
-        // 2. Wait for responses
-        // 3. Add discovered peers to known_peers
-        // 4. Return the list of discovered peers
-
-        // For now, we'll simulate peer discovery
-        if cfg!(feature = "simulate-peers") {
-            info!("SIMULATION: Generating random peers for demonstration");
-
-            // Generate 0-3 random peers
-            let num_peers = rand::random::<u8>() % 4;
-            for _ in 0..num_peers {
-                let peer_id = PeerId::random();
-                self.known_peers.insert(peer_id);
-                info!("SIMULATION: Discovered peer: {}", peer_id);
-            }
-        }
-
-        // Simulate network delay
-        tokio::time::sleep(Duration::from_millis(200)).await;
-
-        // Return the current set of known peers
-        Ok(self.known_peers.iter().cloned().collect())
+        discovery::discover_peers(&self.config, &mut self.known_peers).await
     }
 
     /// Add a mock peer for testing
