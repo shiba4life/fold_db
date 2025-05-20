@@ -273,6 +273,42 @@ mod tests {
             _ => panic!("Expected number"),
         }
     }
+
+    #[test]
+    fn test_execute_transform_with_provider_inputs_handling() {
+        let parser = TransformParser::new();
+        let expr = parser.parse_expression("a + b").unwrap();
+        let base_transform = Transform::new_with_expr(
+            "a + b".to_string(),
+            expr,
+            "test.out".to_string(),
+        );
+
+        // Case 1: explicit inputs provided, dependency analysis should not run
+        let mut transform = base_transform.clone();
+        transform.set_inputs(vec!["a".to_string()]);
+
+        let provider = |name: &str| -> Result<JsonValue, Box<dyn std::error::Error>> {
+            match name {
+                "a" => Ok(JsonValue::from(2)),
+                other => panic!("unexpected input request: {}", other),
+            }
+        };
+        // Evaluation should fail because 'b' is missing but provider should not panic
+        assert!(TransformExecutor::execute_transform_with_provider(&transform, provider).is_err());
+
+        // Case 2: no explicit inputs, analysis should request both 'a' and 'b'
+        let provider = |name: &str| -> Result<JsonValue, Box<dyn std::error::Error>> {
+            match name {
+                "a" => Ok(JsonValue::from(2)),
+                "b" => Ok(JsonValue::from(3)),
+                other => panic!("unexpected input request: {}", other),
+            }
+        };
+
+        let result = TransformExecutor::execute_transform_with_provider(&base_transform, provider).unwrap();
+        assert_eq!(result, JsonValue::from(5.0));
+    }
     
     #[test]
     fn test_validate_transform() {
