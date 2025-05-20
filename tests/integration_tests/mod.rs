@@ -7,3 +7,4 @@ pub mod transform_orchestrator_tests;
 pub mod transform_enqueue_tests;
 pub mod http_server_tests;
 pub mod schema_unload_transform_tests;
+pub mod transform_output_schema_tests;
