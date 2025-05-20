@@ -94,7 +94,7 @@ impl TransformManager {
         TransformExecutor::validate_transform(&transform)?;
 
         // Set transform output schema
-        transform.output_schema = format!("{}.{}", schema_name, field_name);
+        transform.set_output_schema(schema_name, field_name);
         
         // Set the transform's input dependencies and output reference
         transform.set_input_dependencies(input_arefs.clone());

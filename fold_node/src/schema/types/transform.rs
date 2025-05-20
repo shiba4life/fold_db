@@ -222,6 +222,17 @@ impl Transform {
         self.output_reference = Some(output_reference);
     }
 
+    /// Sets the output schema for this transform.
+    ///
+    /// # Arguments
+    ///
+    /// * `schema_name` - The name of the schema
+    /// * `field_name` - The name of the field
+    pub fn set_output_schema(&mut self, schema_name: String, field_name: String) {
+        self.output_schema = format!("{}.{}", schema_name, field_name);
+    }
+    
+
     /// Sets the explicit input fields for this transform.
     pub fn set_inputs(&mut self, inputs: Vec<String>) {
         self.inputs = inputs;
