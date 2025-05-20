@@ -11,10 +11,29 @@ const TransformsTab = ({ schemas, onResult }) => {
   })
 
   useEffect(() => {
-    // Filter schemas to find those with transform fields
+    // Filter and process schemas with transform fields
     const transformSchemas = schemas.filter(schema =>
-      Object.values(schema.fields).some(field => field.transform)
-    )
+      Object.values(schema.fields).some(field => field.transform || typeof field.transform === 'string')
+    ).map(schema => {
+      // Deep clone the schema to avoid modifying the original
+      const processedSchema = JSON.parse(JSON.stringify(schema))
+      
+      // Process each field's transform
+      Object.entries(processedSchema.fields).forEach(([fieldName, field]) => {
+        if (typeof field.transform === 'string') {
+          // Parse the transform string
+          const match = field.transform.match(/transform\s+(\w+)\s*{\s*logic:\s*{\s*([^}]+);\s*}\s*}/)
+          if (match) {
+            field.transform = {
+              name: match[1],
+              logic: match[2].trim(),
+              reversible: false // Default value
+            }
+          }
+        }
+      })
+      return processedSchema
+    })
     setTransforms(transformSchemas)
 
     // Fetch queue information
@@ -102,8 +121,14 @@ const TransformsTab = ({ schemas, onResult }) => {
                       <h4 className="font-medium text-gray-700">{fieldName}</h4>
                       <div className="mt-2 space-y-2">
                         <div className="text-sm">
-                          <span className="font-medium">Transform Name:</span>{' '}
-                          <span className="text-gray-600">{field.transform.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">Transform Name:</span>
+                            <span className="text-gray-600">{field.transform.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="font-medium">Output Schema:</span>
+                            <span className="text-blue-600">{field.transform.output_schema}</span>
+                          </div>
                           <div className="flex items-center">
                             <button
                               onClick={() => handleAddToQueue(schema.name, fieldName, field.transform)}
@@ -131,6 +156,14 @@ const TransformsTab = ({ schemas, onResult }) => {
                             {field.transform.reversible ? 'Yes' : 'No'}
                           </span>
                         </div>
+                        {field.transform.output && (
+                          <div className="text-sm mt-2 bg-blue-50 p-3 rounded-md border-l-4 border-blue-500">
+                            <span className="font-medium text-blue-700">Output:</span>{' '}
+                            <pre className="mt-1 whitespace-pre-wrap text-gray-800 font-mono text-xs bg-white p-2 rounded">
+                              {JSON.stringify(field.transform.output, null, 2)}
+                            </pre>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )

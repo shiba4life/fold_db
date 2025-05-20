@@ -13,14 +13,41 @@ async function loadTransforms() {
         Object.entries(map).forEach(([id, t]) => {
             const div = document.createElement('div');
             div.className = 'transform-item';
-            const pre = document.createElement('pre');
-            pre.textContent = JSON.stringify(t, null, 2);
+            
+            // Transform ID and Run button
+            const header = document.createElement('div');
+            header.className = 'transform-header';
+            header.appendChild(document.createTextNode(id));
             const btn = document.createElement('button');
-            btn.className = 'btn btn-sm btn-primary mt-2';
+            btn.className = 'btn btn-sm btn-primary';
             btn.innerHTML = `${window.icons ? icons.play() + ' ' : ''}Run`;
             btn.addEventListener('click', () => runTransform(id));
-            div.appendChild(document.createTextNode(id));
-            div.appendChild(btn);
+            header.appendChild(btn);
+            div.appendChild(header);
+
+            // Output field display
+            if (t.output) {
+                const outputSection = document.createElement('div');
+                outputSection.className = 'transform-output';
+                const outputLabel = document.createElement('div');
+                outputLabel.className = 'transform-label';
+                outputLabel.textContent = 'Output:';
+                const outputValue = document.createElement('pre');
+                outputValue.className = 'output-value';
+                outputValue.textContent = JSON.stringify(t.output, null, 2);
+                outputSection.appendChild(outputLabel);
+                outputSection.appendChild(outputValue);
+                div.appendChild(outputSection);
+            }
+
+            // Full transform details
+            const detailsLabel = document.createElement('div');
+            detailsLabel.className = 'transform-label';
+            detailsLabel.textContent = 'Transform Details:';
+            const pre = document.createElement('pre');
+            pre.className = 'transform-details';
+            pre.textContent = JSON.stringify(t, null, 2);
+            div.appendChild(detailsLabel);
             div.appendChild(pre);
             container.appendChild(div);
         });

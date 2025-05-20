@@ -344,3 +344,51 @@ button:disabled:hover::after {
         padding: 15px;
     }
 }
+
+/* Transform styles */
+.transform-item {
+    background: #f8f9fa;
+    padding: 20px;
+    margin: 15px 0;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.transform-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    font-weight: bold;
+    color: #333;
+}
+
+.transform-output {
+    background: #e6f3ff;
+    padding: 15px;
+    border-radius: 6px;
+    margin: 15px 0;
+    border-left: 4px solid #4895ef;
+}
+
+.transform-label {
+    font-weight: 600;
+    color: #4361ee;
+    margin-bottom: 8px;
+}
+
+.output-value {
+    background: #fff;
+    padding: 12px;
+    border-radius: 4px;
+    margin: 0;
+    border: 1px solid #cce5ff;
+}
+
+.transform-details {
+    background: #fff;
+    padding: 12px;
+    border-radius: 4px;
+    margin: 8px 0 0 0;
+    border: 1px solid #dee2e6;
+}
