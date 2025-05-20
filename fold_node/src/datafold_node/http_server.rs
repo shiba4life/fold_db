@@ -1,20 +1,15 @@
 use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
-use crate::schema::types::Operation;
 use crate::schema::Schema;
-use crate::network::NetworkConfig;
+use super::sample_manager::SampleManager;
+use super::{schema_routes, query_routes, network_routes};
 
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_web::{web, App, HttpResponse, HttpServer as ActixHttpServer, Responder};
-use serde::Deserialize;
-use log::{info, error};
-use serde_json::{json, Value};
-use std::collections::HashMap;
-use std::path::Path;
+use actix_web::{web, App, HttpServer as ActixHttpServer};
+use log::info;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio::fs;
 
 /// HTTP server for the DataFold node.
 ///
@@ -39,122 +34,13 @@ pub struct DataFoldHttpServer {
     sample_manager: SampleManager,
 }
 
-/// Sample data manager for the HTTP server.
-///
-/// SampleManager provides access to sample schemas, queries, and mutations
-/// for one-click loading in the UI.
-#[derive(Clone)]
-pub struct SampleManager {
-    /// Sample schemas
-    schemas: HashMap<String, Value>,
-    /// Sample queries
-    queries: HashMap<String, Value>,
-    /// Sample mutations
-    mutations: HashMap<String, Value>,
-}
-
-impl SampleManager {
-    /// Create a new sample manager.
-    pub async fn new() -> FoldDbResult<Self> {
-        let mut manager = Self {
-            schemas: HashMap::new(),
-            queries: HashMap::new(),
-            mutations: HashMap::new(),
-        };
-
-        // Load sample data
-        manager.load_samples().await?;
-
-        Ok(manager)
-    }
-
-    /// Load sample data from files.
-    async fn load_samples(&mut self) -> FoldDbResult<()> {
-        let samples_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("src/datafold_node/samples/data");
-
-        let mut entries = match fs::read_dir(&samples_dir).await {
-            Ok(e) => e,
-            Err(e) => {
-                error!(
-                    "Failed to read samples directory {}: {}",
-                    samples_dir.display(),
-                    e
-                );
-                return Err(FoldDbError::Io(e));
-            }
-        };
-
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            if let Ok(ft) = entry.file_type().await {
-                if !ft.is_file() {
-                    continue;
-                }
-            }
-
-            if let Ok(content) = fs::read_to_string(entry.path()).await {
-                if let Ok(value) = serde_json::from_str::<Value>(&content) {
-                    let name = entry
-                        .file_name()
-                        .to_string_lossy()
-                        .trim_end_matches(".json")
-                        .to_string();
-
-                    match value.get("type").and_then(|v| v.as_str()) {
-                        Some("query") => {
-                            self.queries.insert(name, value);
-                        }
-                        Some("mutation") => {
-                            self.mutations.insert(name, value);
-                        }
-                        _ => {
-                            self.schemas.insert(name, value);
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Get a sample schema by name.
-    pub fn get_schema_sample(&self, name: &str) -> Option<&Value> {
-        self.schemas.get(name)
-    }
-
-    /// Get a sample query by name.
-    pub fn get_query_sample(&self, name: &str) -> Option<&Value> {
-        self.queries.get(name)
-    }
-
-    /// Get a sample mutation by name.
-    pub fn get_mutation_sample(&self, name: &str) -> Option<&Value> {
-        self.mutations.get(name)
-    }
-
-    /// List all sample schemas.
-    pub fn list_schema_samples(&self) -> Vec<String> {
-        self.schemas.keys().cloned().collect()
-    }
-
-    /// List all sample queries.
-    pub fn list_query_samples(&self) -> Vec<String> {
-        self.queries.keys().cloned().collect()
-    }
-
-    /// List all sample mutations.
-    pub fn list_mutation_samples(&self) -> Vec<String> {
-        self.mutations.keys().cloned().collect()
-    }
-}
 
 /// Shared application state for the HTTP server.
-struct AppState {
+pub(crate) struct AppState {
     /// The DataFold node
-    node: Arc<tokio::sync::Mutex<DataFoldNode>>,
+    pub(crate) node: Arc<tokio::sync::Mutex<DataFoldNode>>,
     /// The sample data manager
-    sample_manager: SampleManager,
+    pub(crate) sample_manager: SampleManager,
 }
 
 impl DataFoldHttpServer {
@@ -234,37 +120,37 @@ impl DataFoldHttpServer {
                 .service(
                     web::scope("/api")
                         // Schema endpoints
-                        .route("/schemas", web::get().to(list_schemas))
-                        .route("/schema/{name}", web::get().to(get_schema))
-                        .route("/schema", web::post().to(create_schema))
-                        .route("/schema/{name}", web::put().to(update_schema))
-                        .route("/schema/{name}", web::delete().to(delete_schema))
+                        .route("/schemas", web::get().to(schema_routes::list_schemas))
+                        .route("/schema/{name}", web::get().to(schema_routes::get_schema))
+                        .route("/schema", web::post().to(schema_routes::create_schema))
+                        .route("/schema/{name}", web::put().to(schema_routes::update_schema))
+                        .route("/schema/{name}", web::delete().to(schema_routes::delete_schema))
                         // Operation endpoints
-                        .route("/execute", web::post().to(execute_operation))
-                        .route("/query", web::post().to(execute_query))
-                        .route("/mutation", web::post().to(execute_mutation))
+                        .route("/execute", web::post().to(query_routes::execute_operation))
+                        .route("/query", web::post().to(query_routes::execute_query))
+                        .route("/mutation", web::post().to(query_routes::execute_mutation))
                         // Sample endpoints
-                        .route("/samples/schemas", web::get().to(list_schema_samples))
-                        .route("/samples/queries", web::get().to(list_query_samples))
-                        .route("/samples/mutations", web::get().to(list_mutation_samples))
-                        .route("/samples/schema/{name}", web::get().to(get_schema_sample))
-                        .route("/samples/query/{name}", web::get().to(get_query_sample))
-                        .route("/samples/mutation/{name}", web::get().to(get_mutation_sample))
+                        .route("/samples/schemas", web::get().to(query_routes::list_schema_samples))
+                        .route("/samples/queries", web::get().to(query_routes::list_query_samples))
+                        .route("/samples/mutations", web::get().to(query_routes::list_mutation_samples))
+                        .route("/samples/schema/{name}", web::get().to(query_routes::get_schema_sample))
+                        .route("/samples/query/{name}", web::get().to(query_routes::get_query_sample))
+                        .route("/samples/mutation/{name}", web::get().to(query_routes::get_mutation_sample))
                         // Transform endpoints
-                        .route("/transforms", web::get().to(list_transforms))
-                        .route("/transform/{id}/run", web::post().to(run_transform))
-                        .route("/transforms/queue", web::get().to(get_transform_queue))
-                        .route("/transforms/queue/{id}", web::post().to(add_to_transform_queue))
+                        .route("/transforms", web::get().to(query_routes::list_transforms))
+                        .route("/transform/{id}/run", web::post().to(query_routes::run_transform))
+                        .route("/transforms/queue", web::get().to(query_routes::get_transform_queue))
+                        .route("/transforms/queue/{id}", web::post().to(query_routes::add_to_transform_queue))
                         // Network endpoints
                         .service(
                             web::scope("/network")
-                                .route("/init", web::post().to(init_network))
-                                .route("/start", web::post().to(start_network))
-                                .route("/stop", web::post().to(stop_network))
-                                .route("/status", web::get().to(get_network_status))
-                                .route("/connect", web::post().to(connect_to_node))
-                                .route("/discover", web::post().to(discover_nodes))
-                                .route("/nodes", web::get().to(list_nodes))
+                                .route("/init", web::post().to(network_routes::init_network))
+                                .route("/start", web::post().to(network_routes::start_network))
+                                .route("/stop", web::post().to(network_routes::stop_network))
+                                .route("/status", web::get().to(network_routes::get_network_status))
+                                .route("/connect", web::post().to(network_routes::connect_to_node))
+                                .route("/discover", web::post().to(network_routes::discover_nodes))
+                                .route("/nodes", web::get().to(network_routes::list_nodes))
                         ),
                 )
                 // Serve the built React UI if it exists
@@ -283,405 +169,13 @@ impl DataFoldHttpServer {
     }
 }
 
-/// List all schemas.
-async fn list_schemas(state: web::Data<AppState>) -> impl Responder {
-    info!("Received request to list schemas");
-    let node_guard = state.node.lock().await;
-
-    match node_guard.list_schemas() {
-        Ok(schemas) => {
-            // info!("Successfully listed schemas: {:?}", schemas);
-            // Wrap the schemas in a data field to match frontend expectations
-            HttpResponse::Ok().json(json!({
-                "data": schemas
-            }))
-        },
-        Err(e) => {
-            error!("Failed to list schemas: {}", e);
-            HttpResponse::InternalServerError().json(json!({
-                "error": format!("Failed to list schemas: {}", e)
-            }))
-        },
-    }
-}
-
-/// Get a schema by name.
-async fn get_schema(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
-    let name = path.into_inner();
-    let node_guard = state.node.lock().await;
-
-    match node_guard.get_schema(&name) {
-        Ok(Some(schema)) => HttpResponse::Ok().json(schema),
-        Ok(None) => HttpResponse::NotFound().json(json!({
-            "error": format!("Schema '{}' not found", name)
-        })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({
-            "error": format!("Failed to get schema: {}", e)
-        })),
-    }
-}
-
-/// Create a new schema.
-async fn create_schema(schema: web::Json<Schema>, state: web::Data<AppState>) -> impl Responder {
-    let mut node_guard = state.node.lock().await;
-
-    match node_guard.load_schema(schema.into_inner()) {
-        Ok(_) => HttpResponse::Created().json(json!({
-            "success": true
-        })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({
-            "error": format!("Failed to create schema: {}", e)
-        })),
-    }
-}
-
-/// Update an existing schema.
-async fn update_schema(
-    path: web::Path<String>,
-    schema: web::Json<Schema>,
-    state: web::Data<AppState>,
-) -> impl Responder {
-    let name = path.into_inner();
-    let schema_data = schema.into_inner();
-
-    // Check if the schema name matches the path
-    if schema_data.name != name {
-        return HttpResponse::BadRequest().json(json!({
-            "error": format!("Schema name '{}' does not match path '{}'", schema_data.name, name)
-        }));
-    }
-
-    let mut node_guard = state.node.lock().await;
-
-    // First remove the existing schema
-    let _ = node_guard.remove_schema(&name);
-
-    // Then load the updated schema
-    match node_guard.load_schema(schema_data) {
-        Ok(_) => HttpResponse::Ok().json(json!({
-            "success": true
-        })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({
-            "error": format!("Failed to update schema: {}", e)
-        })),
-    }
-}
-
-/// Delete a schema.
-async fn delete_schema(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
-    let name = path.into_inner();
-    let mut node_guard = state.node.lock().await;
-
-    match node_guard.remove_schema(&name) {
-        Ok(_) => HttpResponse::Ok().json(json!({
-            "success": true
-        })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({
-            "error": format!("Failed to delete schema: {}", e)
-        })),
-    }
-}
-
-/// Execute an operation (query or mutation).
-#[derive(Deserialize)]
-struct OperationRequest {
-    operation: String,
-}
-
-async fn execute_operation(
-    request: web::Json<OperationRequest>,
-    state: web::Data<AppState>,
-) -> impl Responder {
-    let operation_str = &request.operation;
-    
-    // Parse the operation
-    let operation: Operation = match serde_json::from_str(operation_str) {
-        Ok(op) => op,
-        Err(e) => {
-            return HttpResponse::BadRequest().json(json!({
-                "error": format!("Failed to parse operation: {}", e)
-            }));
-        }
-    };
-
-    let mut node_guard = state.node.lock().await;
-
-    match node_guard.execute_operation(operation) {
-        Ok(result) => HttpResponse::Ok().json(json!({
-            "data": result
-        })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({
-            "error": format!("Failed to execute operation: {}", e)
-        })),
-    }
-}
-
-/// Execute a query.
-async fn execute_query(query: web::Json<Value>, state: web::Data<AppState>) -> impl Responder {
-    // Parse the query as an Operation
-    let operation = match serde_json::from_value::<Operation>(query.into_inner()) {
-        Ok(op) => {
-            match op {
-                Operation::Query { .. } => op,
-                _ => {
-                    return HttpResponse::BadRequest().json(json!({
-                        "error": "Expected a query operation"
-                    }));
-                }
-            }
-        }
-        Err(e) => {
-            return HttpResponse::BadRequest().json(json!({
-                "error": format!("Failed to parse query: {}", e)
-            }));
-        }
-    };
-
-    let mut node_guard = state.node.lock().await;
-
-    match node_guard.execute_operation(operation) {
-        Ok(result) => HttpResponse::Ok().json(json!({
-            "data": result
-        })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({
-            "error": format!("Failed to execute query: {}", e)
-        })),
-    }
-}
-
-/// Execute a mutation.
-async fn execute_mutation(mutation: web::Json<Value>, state: web::Data<AppState>) -> impl Responder {
-    // Parse the mutation as an Operation
-    let operation = match serde_json::from_value::<Operation>(mutation.into_inner()) {
-        Ok(op) => {
-            match op {
-                Operation::Mutation { .. } => op,
-                _ => {
-                    return HttpResponse::BadRequest().json(json!({
-                        "error": "Expected a mutation operation"
-                    }));
-                }
-            }
-        }
-        Err(e) => {
-            return HttpResponse::BadRequest().json(json!({
-                "error": format!("Failed to parse mutation: {}", e)
-            }));
-        }
-    };
-
-    let mut node_guard = state.node.lock().await;
-
-    match node_guard.execute_operation(operation) {
-        Ok(_) => HttpResponse::Ok().json(json!({
-            "success": true
-        })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({
-            "error": format!("Failed to execute mutation: {}", e)
-        })),
-    }
-}
-
-/// List all sample schemas.
-async fn list_schema_samples(state: web::Data<AppState>) -> impl Responder {
-    HttpResponse::Ok().json(json!({
-        "data": state.sample_manager.list_schema_samples()
-    }))
-}
-
-/// List all sample queries.
-async fn list_query_samples(state: web::Data<AppState>) -> impl Responder {
-    HttpResponse::Ok().json(json!({
-        "data": state.sample_manager.list_query_samples()
-    }))
-}
-
-/// List all sample mutations.
-async fn list_mutation_samples(state: web::Data<AppState>) -> impl Responder {
-    HttpResponse::Ok().json(json!({
-        "data": state.sample_manager.list_mutation_samples()
-    }))
-}
-
-/// Get a sample schema by name.
-async fn get_schema_sample(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
-    let name = path.into_inner();
-    
-    match state.sample_manager.get_schema_sample(&name) {
-        Some(schema) => HttpResponse::Ok().json(schema),
-        None => HttpResponse::NotFound().json(json!({
-            "error": format!("Sample schema '{}' not found", name)
-        })),
-    }
-}
-
-/// Get a sample query by name.
-async fn get_query_sample(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
-    let name = path.into_inner();
-    
-    match state.sample_manager.get_query_sample(&name) {
-        Some(query) => HttpResponse::Ok().json(query),
-        None => HttpResponse::NotFound().json(json!({
-            "error": format!("Sample query '{}' not found", name)
-        })),
-    }
-}
-
-/// Get a sample mutation by name.
-async fn get_mutation_sample(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
-    let name = path.into_inner();
-    
-    match state.sample_manager.get_mutation_sample(&name) {
-        Some(mutation) => HttpResponse::Ok().json(mutation),
-        None => HttpResponse::NotFound().json(json!({
-            "error": format!("Sample mutation '{}' not found", name)
-        })),
-    }
-}
-
-async fn list_transforms(state: web::Data<AppState>) -> impl Responder {
-    let node = state.node.lock().await;
-    match node.list_transforms() {
-        Ok(map) => HttpResponse::Ok().json(json!({ "data": map })),
-        Err(e) => HttpResponse::InternalServerError()
-            .json(json!({ "error": format!("Failed to list transforms: {}", e) })),
-    }
-}
-
-async fn run_transform(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
-    let id = path.into_inner();
-    let mut node = state.node.lock().await;
-    match node.run_transform(&id) {
-        Ok(val) => HttpResponse::Ok().json(json!({ "data": val })),
-        Err(e) => HttpResponse::InternalServerError()
-            .json(json!({ "error": format!("Failed to run transform: {}", e) })),
-    }
-}
-
-#[derive(Deserialize)]
-struct NetworkConfigPayload {
-    listen_address: String,
-    discovery_port: Option<u16>,
-    max_connections: Option<usize>,
-    connection_timeout_secs: Option<u64>,
-    announcement_interval_secs: Option<u64>,
-    enable_discovery: Option<bool>,
-}
-
-#[derive(Deserialize)]
-struct ConnectRequest {
-    node_id: String,
-}
-
-async fn init_network(
-    config: web::Json<NetworkConfigPayload>,
-    state: web::Data<AppState>,
-) -> impl Responder {
-    let mut node = state.node.lock().await;
-
-    let mut network_config = NetworkConfig::new(&config.listen_address);
-    if let Some(port) = config.discovery_port {
-        network_config = network_config.with_discovery_port(port);
-    }
-    if let Some(max) = config.max_connections {
-        network_config = network_config.with_max_connections(max);
-    }
-    if let Some(timeout) = config.connection_timeout_secs {
-        network_config =
-            network_config.with_connection_timeout(std::time::Duration::from_secs(timeout));
-    }
-    if let Some(interval) = config.announcement_interval_secs {
-        network_config =
-            network_config.with_announcement_interval(std::time::Duration::from_secs(interval));
-    }
-    if let Some(enable) = config.enable_discovery {
-        network_config = network_config.with_mdns(enable);
-    }
-
-    match node.init_network(network_config).await {
-        Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
-        Err(e) => HttpResponse::InternalServerError()
-            .json(json!({ "error": format!("Failed to init network: {}", e) })),
-    }
-}
-
-async fn start_network(state: web::Data<AppState>) -> impl Responder {
-    let node = state.node.lock().await;
-    match node.start_network().await {
-        Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
-        Err(e) => HttpResponse::InternalServerError()
-            .json(json!({ "error": format!("Failed to start network: {}", e) })),
-    }
-}
-
-async fn stop_network(state: web::Data<AppState>) -> impl Responder {
-    let node = state.node.lock().await;
-    match node.stop_network().await {
-        Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
-        Err(e) => HttpResponse::InternalServerError()
-            .json(json!({ "error": format!("Failed to stop network: {}", e) })),
-    }
-}
-
-async fn get_network_status(state: web::Data<AppState>) -> impl Responder {
-    let node = state.node.lock().await;
-    match node.get_network_status().await {
-        Ok(status) => HttpResponse::Ok().json(json!({ "data": status })),
-        Err(e) => HttpResponse::InternalServerError()
-            .json(json!({ "error": format!("Failed to get network status: {}", e) })),
-    }
-}
-
-async fn connect_to_node(
-    req: web::Json<ConnectRequest>,
-    state: web::Data<AppState>,
-) -> impl Responder {
-    let mut node = state.node.lock().await;
-    match node.connect_to_node(&req.node_id).await {
-        Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
-        Err(e) => HttpResponse::InternalServerError()
-            .json(json!({ "error": format!("Failed to connect to node: {}", e) })),
-    }
-}
-
-async fn discover_nodes(state: web::Data<AppState>) -> impl Responder {
-    let node = state.node.lock().await;
-    match node.discover_nodes().await {
-        Ok(peers) => {
-            let peers: Vec<String> = peers.into_iter().map(|p| p.to_string()).collect();
-            HttpResponse::Ok().json(json!({ "data": peers }))
-        }
-        Err(e) => HttpResponse::InternalServerError()
-            .json(json!({ "error": format!("Failed to discover nodes: {}", e) })),
-    }
-}
-
-async fn list_nodes(state: web::Data<AppState>) -> impl Responder {
-    let node = state.node.lock().await;
-    match node.get_known_nodes().await {
-        Ok(nodes) => HttpResponse::Ok().json(json!({ "data": nodes })),
-        Err(e) => HttpResponse::InternalServerError()
-            .json(json!({ "error": format!("Failed to list nodes: {}", e) })),
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::SampleManager;
     use super::DataFoldHttpServer;
     use crate::datafold_node::{DataFoldNode, NodeConfig};
     use serde_json::json;
     use std::net::TcpListener;
     use tempfile::tempdir;
-
-    /// Ensure the sample manager loads schema samples from disk.
-    #[tokio::test]
-    async fn sample_manager_loads_schemas() {
-        let manager = SampleManager::new().await.expect("failed to load samples");
-        let schemas = manager.list_schema_samples();
-        assert!(schemas.contains(&"UserProfile".to_string()));
-        assert!(schemas.contains(&"ProductCatalog".to_string()));
-    }
 
     /// Verify that server startup does not reload samples.
     #[tokio::test]
@@ -741,61 +235,4 @@ mod tests {
     }
 }
 
-/// Add a transform to the queue
-async fn add_to_transform_queue(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
-    let transform_id = path.into_inner();
-    info!("Attempting to add transform to queue: {}", transform_id);
-    
-    let node = state.node.lock().await;
-    
-    // First list all transforms to help debug
-    match node.list_transforms() {
-        Ok(transforms) => {
-            info!("Available transforms: {:?}", transforms.keys().collect::<Vec<_>>());
-            if !transforms.contains_key(&transform_id) {
-                error!("Transform not found: {}", transform_id);
-                info!("Transform details for each transform:");
-                for (id, transform) in &transforms {
-                    info!("ID: {}, Output: {}, Logic: {}", id, transform.get_output(), transform.logic);
-                }
-                return HttpResponse::NotFound().json(json!({
-                    "error": format!("Transform '{}' not found. Available transforms: {:?}",
-                        transform_id, &transforms.keys().collect::<Vec<_>>())
-                }));
-            }
-        }
-        Err(e) => {
-            error!("Failed to list transforms: {}", e);
-            return HttpResponse::InternalServerError().json(json!({
-                "error": format!("Failed to verify transform: {}", e)
-            }));
-        }
-    }
 
-    match node.add_transform_to_queue(&transform_id) {
-        Ok(_) => {
-            info!("Successfully added transform to queue: {}", transform_id);
-            HttpResponse::Ok().json(json!({
-                "success": true,
-                "message": format!("Transform '{}' added to queue", transform_id)
-            }))
-        },
-        Err(e) => {
-            error!("Failed to add transform to queue: {}", e);
-            HttpResponse::InternalServerError().json(json!({
-                "error": format!("Failed to add transform to queue: {}", e)
-            }))
-        },
-    }
-}
-
-/// Get information about the transform queue
-async fn get_transform_queue(state: web::Data<AppState>) -> impl Responder {
-    let node = state.node.lock().await;
-    match node.get_transform_queue_info() {
-        Ok(info) => HttpResponse::Ok().json(info),
-        Err(e) => HttpResponse::InternalServerError().json(json!({
-            "error": format!("Failed to get transform queue info: {}", e)
-        })),
-    }
-}
