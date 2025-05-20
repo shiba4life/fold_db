@@ -12,6 +12,10 @@
 pub mod config;
 pub mod error;
 pub mod http_server;
+pub mod sample_manager;
+pub mod schema_routes;
+pub mod query_routes;
+pub mod network_routes;
 pub mod loader;
 mod db;
 mod permissions;
@@ -26,6 +30,7 @@ pub mod tests;
 pub use config::NodeConfig;
 pub use config::load_node_config;
 pub use http_server::DataFoldHttpServer;
+pub use sample_manager::SampleManager;
 pub use loader::load_schema_from_file;
 pub use node::DataFoldNode;
 pub use tcp_server::TcpServer;
