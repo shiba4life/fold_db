@@ -7,8 +7,9 @@ use super::ast::{Expression, Operator, UnaryOperator, Value};
 use crate::schema::types::SchemaError;
 use std::collections::HashMap;
 
-/// Type for function implementations in the interpreter
-pub type TransformFunction = Box<dyn Fn(Vec<Value>) -> Result<Value, String>>;
+pub mod builtins;
+pub use builtins::{builtin_functions, TransformFunction};
+
 
 /// Interpreter for the transform DSL.
 pub struct Interpreter {
@@ -21,15 +22,10 @@ pub struct Interpreter {
 
 impl Default for Interpreter {
     fn default() -> Self {
-        let mut interpreter = Self {
+        Self {
             variables: HashMap::new(),
-            functions: HashMap::new(),
-        };
-        
-        // Register built-in functions
-        interpreter.register_builtin_functions();
-        
-        interpreter
+            functions: builtin_functions(),
+        }
     }
 }
 
@@ -47,132 +43,9 @@ impl Interpreter {
     }
     
     /// Registers built-in functions.
+    #[allow(dead_code)]
     fn register_builtin_functions(&mut self) {
-        // Math functions
-        self.functions.insert("min".to_string(), Box::new(|args| {
-            if args.len() != 2 {
-                return Err("min() requires exactly 2 arguments".to_string());
-            }
-            
-            let a = match &args[0] {
-                Value::Number(n) => *n,
-                _ => return Err("min() requires numeric arguments".to_string()),
-            };
-            
-            let b = match &args[1] {
-                Value::Number(n) => *n,
-                _ => return Err("min() requires numeric arguments".to_string()),
-            };
-            
-            Ok(Value::Number(a.min(b)))
-        }));
-        
-        self.functions.insert("max".to_string(), Box::new(|args| {
-            if args.len() != 2 {
-                return Err("max() requires exactly 2 arguments".to_string());
-            }
-            
-            let a = match &args[0] {
-                Value::Number(n) => *n,
-                _ => return Err("max() requires numeric arguments".to_string()),
-            };
-            
-            let b = match &args[1] {
-                Value::Number(n) => *n,
-                _ => return Err("max() requires numeric arguments".to_string()),
-            };
-            
-            Ok(Value::Number(a.max(b)))
-        }));
-        
-        self.functions.insert("clamp".to_string(), Box::new(|args| {
-            if args.len() != 3 {
-                return Err("clamp() requires exactly 3 arguments".to_string());
-            }
-            
-            let value = match &args[0] {
-                Value::Number(n) => *n,
-                _ => return Err("clamp() requires numeric arguments".to_string()),
-            };
-            
-            let min = match &args[1] {
-                Value::Number(n) => *n,
-                _ => return Err("clamp() requires numeric arguments".to_string()),
-            };
-            
-            let max = match &args[2] {
-                Value::Number(n) => *n,
-                _ => return Err("clamp() requires numeric arguments".to_string()),
-            };
-            
-            Ok(Value::Number(value.max(min).min(max)))
-        }));
-        
-        // String functions
-        self.functions.insert("concat".to_string(), Box::new(|args| {
-            let mut result = String::new();
-            
-            for arg in args {
-                match arg {
-                    Value::String(s) => result.push_str(&s),
-                    _ => return Err("concat() requires string arguments".to_string()),
-                }
-            }
-            
-            Ok(Value::String(result))
-        }));
-        
-        // Type conversion functions
-        self.functions.insert("to_string".to_string(), Box::new(|args| {
-            if args.len() != 1 {
-                return Err("to_string() requires exactly 1 argument".to_string());
-            }
-            
-            let result = match &args[0] {
-                Value::Number(n) => n.to_string(),
-                Value::Boolean(b) => b.to_string(),
-                Value::String(s) => s.clone(),
-                Value::Null => "null".to_string(),
-                Value::Object(_) => "<object>".to_string(),
-                Value::Array(_) => "<array>".to_string(),
-            };
-            
-            Ok(Value::String(result))
-        }));
-        
-        self.functions.insert("to_number".to_string(), Box::new(|args| {
-            if args.len() != 1 {
-                return Err("to_number() requires exactly 1 argument".to_string());
-            }
-            
-            let result = match &args[0] {
-                Value::Number(n) => *n,
-                Value::Boolean(b) => if *b { 1.0 } else { 0.0 },
-                Value::String(s) => s.parse::<f64>().unwrap_or(0.0),
-                Value::Null => 0.0,
-                Value::Object(_) => 0.0,
-                Value::Array(_) => 0.0,
-            };
-            
-            Ok(Value::Number(result))
-        }));
-        
-        self.functions.insert("to_boolean".to_string(), Box::new(|args| {
-            if args.len() != 1 {
-                return Err("to_boolean() requires exactly 1 argument".to_string());
-            }
-            
-            let result = match &args[0] {
-                Value::Number(n) => *n != 0.0,
-                Value::Boolean(b) => *b,
-                Value::String(s) => !s.is_empty(),
-                Value::Null => false,
-                Value::Object(_) => true,
-                Value::Array(_) => true,
-            };
-            
-            Ok(Value::Boolean(result))
-        }));
+        self.functions.extend(builtin_functions());
     }
     
     /// Evaluates an expression.
