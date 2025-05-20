@@ -88,7 +88,9 @@ mod tests {
             node: std::sync::Arc::new(tokio::sync::Mutex::new(node)),
             sample_manager: SampleManager { schemas: Default::default(), queries: Default::default(), mutations: Default::default() }
         });
-        let resp = list_schemas(state).await.respond_to(&actix_web::HttpRequest::default());
+        use actix_web::test;
+        let req = test::TestRequest::default().to_http_request();
+        let resp = list_schemas(state).await.respond_to(&req);
         assert_eq!(resp.status(), 200);
     }
 }
