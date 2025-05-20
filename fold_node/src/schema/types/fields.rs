@@ -79,6 +79,8 @@ impl<'de> Deserialize<'de> for SchemaField {
             field_mappers: HashMap<String, String>,
             transform: Option<String>, // Deserialize transform as a string
             writable: Option<bool>,
+            schema_name: Option<String>, // Add schema_name for output_schema population
+            field_name: Option<String>, // Add field_name for output_schema population
         }
 
         let helper = SchemaFieldHelper::deserialize(deserializer)?;
@@ -86,7 +88,18 @@ impl<'de> Deserialize<'de> for SchemaField {
         let parsed_transform = helper.transform.map(|transform_logic| {
             let parser = TransformParser::new();
             match parser.parse_transform(&transform_logic) {
-                Ok(declaration) => Ok(Transform::from_declaration(declaration)),
+                Ok(declaration) => {
+                    let transform = Transform::from_declaration(declaration);
+                    let transform = if let (Some(schema_name), Some(field_name)) = (&helper.schema_name, &helper.field_name) {
+                        Transform {
+                            output_schema: format!("{}.{}", schema_name, field_name),
+                            ..transform
+                        }
+                    } else {
+                        transform
+                    };
+                    Ok(transform)
+                },
                 Err(e) => Err(serde::de::Error::custom(format!("Error parsing transform: {}", e))),
             }
         }).transpose()?;
@@ -368,7 +381,7 @@ mod tests {
         assert!(field.transform.is_some());
         let transform = field.transform.unwrap();
         assert_eq!(transform.logic, "return (field1 * 2)".to_string());
-        // Further assertions can be added to check the parsed AST if needed
+        assert_eq!(transform.output_schema, "test.temp");  // Default output_schema from Transform::from_declaration
     }
 
     #[test]

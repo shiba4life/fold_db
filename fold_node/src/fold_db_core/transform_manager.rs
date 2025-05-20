@@ -1,5 +1,5 @@
 use crate::atom::{Atom, AtomRef};
-use crate::schema::types::{Transform, SchemaError};
+use crate::schema::types::{Transform, SchemaError, TransformRegistration};
 use crate::transform::TransformExecutor;
 use super::transform_orchestrator::TransformRunner;
 use serde_json::Value as JsonValue;
@@ -80,16 +80,21 @@ impl TransformManager {
     }
 
     /// Registers a transform with its input and output atom references.
-    pub fn register_transform(
-        &self,
-        transform_id: String,
-        mut transform: Transform,
-        input_arefs: Vec<String>,
-        trigger_fields: Vec<String>,
-        output_aref: String,
-    ) -> Result<(), SchemaError> {
+    pub fn register_transform(&self, registration: TransformRegistration) -> Result<(), SchemaError> {
+        let TransformRegistration {
+            transform_id,
+            mut transform,
+            input_arefs,
+            trigger_fields,
+            output_aref,
+            schema_name,
+            field_name,
+        } = registration;
         // Validate the transform
         TransformExecutor::validate_transform(&transform)?;
+
+        // Set transform output schema
+        transform.output_schema = format!("{}.{}", schema_name, field_name);
         
         // Set the transform's input dependencies and output reference
         transform.set_input_dependencies(input_arefs.clone());
@@ -206,15 +211,21 @@ impl TransformManager {
         transform_id: String,
         transform: Transform,
         output_aref: String,
+        schema_name: String,
+        field_name: String,
     ) -> Result<(), SchemaError> {
         let dependencies = transform.analyze_dependencies().into_iter().collect::<Vec<String>>();
         let trigger_fields = Vec::new();
         self.register_transform(
-            transform_id,
-            transform,
-            dependencies,
-            trigger_fields,
-            output_aref,
+            TransformRegistration {
+                transform_id,
+                transform,
+                input_arefs: dependencies,
+                trigger_fields,
+                output_aref,
+                schema_name,
+                field_name,
+            }
         )
     }
 

@@ -30,6 +30,26 @@ use crate::transform::ast::TransformDeclaration;
 ///     "health.risk_score".to_string(),
 /// );
 /// ```
+/// Parameters for registering a transform
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct TransformRegistration {
+    /// The ID of the transform
+    pub transform_id: String,
+    /// The transform itself
+    pub transform: Transform,
+    /// Input atom reference UUIDs
+    pub input_arefs: Vec<String>,
+    /// Fields that trigger the transform
+    pub trigger_fields: Vec<String>,
+    /// Output atom reference UUID
+    pub output_aref: String,
+    /// Schema name
+    pub schema_name: String,
+    /// Field name
+    pub field_name: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transform {
     /// The name of the transform

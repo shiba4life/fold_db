@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use crate::atom::{Atom, AtomRefBehavior};
 use crate::db_operations::DbOperations;
 use crate::permissions::PermissionWrapper;
-use crate::schema::types::{Mutation, MutationType, Query, Transform};
+use crate::schema::types::{Mutation, MutationType, Query, Transform, TransformRegistration};
 use crate::schema::SchemaCore;
 use crate::schema::{Schema, SchemaError};
 use serde_json;
@@ -155,15 +155,8 @@ impl FoldDB {
     }
 
     /// Registers a transform with its input and output atom references
-    pub fn register_transform(
-        &mut self,
-        transform_id: String,
-        transform: Transform,
-        input_arefs: Vec<String>,
-        trigger_fields: Vec<String>,
-        output_aref: String,
-    ) -> Result<(), SchemaError> {
-        self.transform_manager.register_transform(transform_id, transform, input_arefs, trigger_fields, output_aref)
+    pub fn register_transform(&mut self, registration: TransformRegistration) -> Result<(), SchemaError> {
+        self.transform_manager.register_transform(registration)
     }
 
     fn register_transforms_for_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
@@ -266,13 +259,16 @@ impl FoldDB {
 
                 let transform_id = format!("{}.{}", schema.name, field_name);
                 trigger_fields.push(transform_id.clone());
-                self.transform_manager.register_transform(
-                    transform_id.clone(),
-                    transform.clone(),
+                let registration = TransformRegistration {
+                    transform_id: transform_id.clone(),
+                    transform: transform.clone(),
                     input_arefs,
                     trigger_fields,
                     output_aref,
-                )?;
+                    schema_name: schema.name.clone(),
+                    field_name: field_name.clone(),
+                };
+                self.transform_manager.register_transform(registration)?;
                 let _ = self.transform_manager.execute_transform_now(&transform_id);
             }
         }

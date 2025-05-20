@@ -12,4 +12,4 @@ pub use json_schema::{JsonSchemaDefinition, JsonSchemaField};
 pub use operation::Operation;
 pub use operations::{Mutation, MutationType, Query};
 pub use schema::Schema;
-pub use transform::Transform;
+pub use transform::{Transform, TransformRegistration};
