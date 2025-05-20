@@ -387,8 +387,9 @@ impl TransformManager {
         let mut input_values = HashMap::new();
 
         // Fetch explicit inputs if provided
-        if !transform.inputs.is_empty() {
-            for input in &transform.inputs {
+        let inputs = transform.get_inputs();
+        if !inputs.is_empty() {
+            for input in inputs {
                 if let Some((schema, field)) = input.split_once('.') {
                     let val = (self.get_field_fn)(schema, field)?;
                     input_values.insert(input.clone(), val);

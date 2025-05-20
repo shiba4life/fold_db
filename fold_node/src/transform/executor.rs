@@ -54,7 +54,7 @@ impl TransformExecutor {
         let mut input_values = HashMap::new();
         
         // Use the transform's declared dependencies
-        for input_name in &transform.inputs {
+        for input_name in transform.get_inputs() {
             match input_provider(input_name) {
                 Ok(value) => {
                     input_values.insert(input_name.clone(), value);
@@ -64,9 +64,9 @@ impl TransformExecutor {
                 }
             }
         }
-        
+
         // If no dependencies are declared, try to analyze the transform logic
-        if transform.inputs.is_empty() {
+        if transform.get_inputs().is_empty() {
             let dependencies = transform.analyze_dependencies();
             for input_name in dependencies {
                 // Skip if we already have this input
