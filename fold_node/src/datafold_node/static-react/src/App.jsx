@@ -7,6 +7,7 @@ import SchemaTab from './components/tabs/SchemaTab'
 import QueryTab from './components/tabs/QueryTab'
 import MutationTab from './components/tabs/MutationTab'
 import TransformsTab from './components/tabs/TransformsTab'
+import LogSidebar from './components/LogSidebar'
 
 function App() {
   const [activeTab, setActiveTab] = useState('schemas')
@@ -62,14 +63,15 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      <main className="container mx-auto px-4 py-6">
-        <StatusSection />
-        
-        <div className="mt-6">
-          <div className="flex border-b border-gray-200">
-            <button
+    <div className="min-h-screen flex bg-gray-50">
+      <div className="flex flex-col flex-1">
+        <Header />
+        <main className="container mx-auto px-4 py-6 flex-1">
+          <StatusSection />
+
+          <div className="mt-6">
+            <div className="flex border-b border-gray-200">
+              <button
               className={`px-4 py-2 text-sm font-medium ${
                 activeTab === 'schemas'
                   ? 'text-primary border-b-2 border-primary'
@@ -109,16 +111,18 @@ function App() {
             >
               Transforms
             </button>
-          </div>
-          
-          <div className="mt-4">
-            {renderActiveTab()}
-          </div>
-        </div>
+            </div>
 
-        {results && <ResultsSection results={results} />}
-      </main>
-      <Footer />
+            <div className="mt-4">
+              {renderActiveTab()}
+            </div>
+          </div>
+
+          {results && <ResultsSection results={results} />}
+        </main>
+        <Footer />
+      </div>
+      <LogSidebar />
     </div>
   )
 }

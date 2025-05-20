@@ -98,7 +98,7 @@ enum Commands {
 /// * The node cannot be initialized
 /// * There is an error executing the requested command
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::init();
+    fold_node::web_logger::init().ok();
     let cli = Cli::parse();
 
     // Load node configuration

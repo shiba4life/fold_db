@@ -36,6 +36,7 @@ pub mod permissions;
 pub mod schema;
 pub mod transform;
 pub mod testing;
+pub mod web_logger;
 
 // Re-export main types for convenience
 pub use datafold_node::config::NodeConfig;
