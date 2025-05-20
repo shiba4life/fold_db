@@ -27,6 +27,7 @@ use crate::transform::ast::TransformDeclaration;
 ///     false,
 ///     Some("sha256sum(\"v1.0.3\")".to_string()),
 ///     true,
+///     "health.risk_score".to_string(),
 /// );
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,10 +59,13 @@ pub struct Transform {
     /// Output reference for this transform
     #[serde(skip)]
     pub output_reference: Option<String>,
+
+    /// Output schema for this transform in `Schema.field` format
+    pub output_schema: String,
     
     /// The parsed expression (not serialized)
     #[serde(skip)]
-        pub parsed_expr: Option<crate::transform::ast::Expression>,
+    pub parsed_expr: Option<crate::transform::ast::Expression>,
     
     /// The parsed transform declaration (not serialized)
     #[serde(skip)]
@@ -87,6 +91,7 @@ impl Transform {
         reversible: bool,
         signature: Option<String>,
         payment_required: bool,
+        output_schema: String,
     ) -> Self {
         Self {
             name: String::new(),
@@ -97,6 +102,7 @@ impl Transform {
             inputs: Vec::new(),
             input_dependencies: Vec::new(),
             output_reference: None,
+            output_schema,
             parsed_expr: None,
             parsed_declaration: None,
         }
@@ -122,6 +128,7 @@ impl Transform {
         reversible: bool,
         signature: Option<String>,
         payment_required: bool,
+        output_schema: String,
     ) -> Self {
         Self {
             name: String::new(),
@@ -132,6 +139,7 @@ impl Transform {
             inputs: Vec::new(),
             input_dependencies: Vec::new(),
             output_reference: None,
+            output_schema,
             parsed_expr: Some(parsed_expr),
             parsed_declaration: None,
         }
@@ -159,6 +167,7 @@ impl Transform {
         payment_required: bool,
         input_dependencies: Vec<String>,
         output_reference: Option<String>,
+        output_schema: String,
     ) -> Self {
         Self {
             name: String::new(),
@@ -169,6 +178,7 @@ impl Transform {
             inputs: Vec::new(),
             input_dependencies,
             output_reference,
+            output_schema,
             parsed_expr: None,
             parsed_declaration: None,
         }
@@ -277,6 +287,9 @@ impl Transform {
         
         // Set payment requirement to false since it's been removed
         let payment_required = false;
+
+        // Derive output schema from declaration name
+        let output_schema = "test.test_transform".to_string();
         
         Self {
             name: declaration.name.clone(),
@@ -287,6 +300,7 @@ impl Transform {
             inputs: Vec::new(),
             input_dependencies: Vec::new(), // Will be populated later
             output_reference: None,
+            output_schema,
             parsed_expr: None, // Will be populated later
             parsed_declaration: Some(declaration),
         }
@@ -299,6 +313,15 @@ impl Transform {
     /// The name of the transform
     pub fn get_name(&self) -> &str {
         &self.name
+    }
+
+    /// Gets the output schema for this transform.
+    ///
+    /// # Returns
+    ///
+    /// The output schema for this transform in `Schema.field` format
+    pub fn get_output_schema(&self) -> &str {
+        &self.output_schema
     }
     
 }
@@ -331,7 +354,21 @@ mod tests {
         assert_eq!(transform.payment_required, false); // payment_required is hardcoded to false in from_declaration
         assert!(transform.input_dependencies.is_empty()); // input_dependencies is not populated in from_declaration
         assert!(transform.output_reference.is_none());
+        assert_eq!(transform.output_schema, "test.test_transform"); // Output schema derived from declaration name
         assert!(transform.parsed_expr.is_none()); // parsed_expr is not populated in from_declaration
         assert!(transform.parsed_declaration.is_some());
+    }
+
+    #[test]
+    fn test_output_schema() {
+        let transform = Transform::new(
+            "return x + 1".to_string(),
+            false,
+            None,
+            false,
+            "test.number".to_string(),
+        );
+
+        assert_eq!(transform.get_output_schema(), "test.number");
     }
 }

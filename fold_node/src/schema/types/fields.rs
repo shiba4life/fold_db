@@ -328,7 +328,13 @@ mod tests {
 
     #[test]
     fn test_field_with_transform() {
-        let transform = Transform::new("return field1 + field2;".to_string(), false, None, false);
+        let transform = Transform::new(
+            "return field1 + field2;".to_string(),
+            false,
+            None,
+            false,
+            "test.calc".to_string()
+        );
         let field = SchemaField::new(
             PermissionsPolicy::default(),
             create_default_payment_config(),

@@ -71,6 +71,7 @@ fn test_cross_schema_transform_manual_execution() {
         false,
         None,
         false,
+        "SchemaB.b_test_field".to_string()
     );
     let schema_b = create_schema_b(transform.clone());
     node.load_schema(schema_b).unwrap();
@@ -111,6 +112,7 @@ fn test_cross_schema_transform_with_inputs() {
         false,
         None,
         false,
+        "SchemaB.b_test_field".to_string()
     );
     transform.set_inputs(vec!["SchemaA.a_test_field".to_string()]);
     let schema_b = create_schema_b(transform);

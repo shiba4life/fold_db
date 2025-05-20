@@ -222,6 +222,7 @@ mod tests {
             false,
             None,
             false,
+            "test.bmi".to_string()
         );
         
         // Create input values
@@ -267,6 +268,7 @@ mod tests {
             false,
             None,
             false,
+            "test.bmi".to_string()
         );
         
         // Create input values with nested objects
@@ -299,6 +301,7 @@ mod tests {
             false,
             Some("valid-signature".to_string()),
             false,
+            "test.output".to_string()
         );
         
         assert!(TransformExecutor::validate_transform(&transform).is_ok());
@@ -309,6 +312,7 @@ mod tests {
             false,
             None,
             false,
+            "test.output".to_string()
         );
         
         assert!(TransformExecutor::validate_transform(&invalid_transform).is_err());
@@ -319,6 +323,7 @@ mod tests {
             false,
             Some("".to_string()),
             false,
+            "test.output".to_string()
         );
         
         assert!(TransformExecutor::validate_transform(&invalid_signature_transform).is_err());

@@ -736,10 +736,8 @@ impl DataFoldNode {
         let mut queue = Vec::new();
         let mut current_length = queue_length;
         while current_length > 0 {
-            if let Some(result) = db.transform_orchestrator.process_one() {
-                if let Ok(transform_id) = result {
-                    queue.push(transform_id.to_string());
-                }
+            if let Some(Ok(transform_id)) = db.transform_orchestrator.process_one() {
+                queue.push(transform_id.to_string());
             }
             current_length -= 1;
         }

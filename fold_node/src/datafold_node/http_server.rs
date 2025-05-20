@@ -754,12 +754,12 @@ async fn add_to_transform_queue(path: web::Path<String>, state: web::Data<AppSta
             if !transforms.contains_key(&transform_id) {
                 error!("Transform not found: {}", transform_id);
                 info!("Transform details for each transform:");
-                for (id, transform) in transforms {
+                for (id, transform) in &transforms {
                     info!("ID: {}, Name: {}, Logic: {}", id, transform.name, transform.logic);
                 }
                 return HttpResponse::NotFound().json(json!({
                     "error": format!("Transform '{}' not found. Available transforms: {:?}",
-                        transform_id, transforms.keys().collect::<Vec<_>>())
+                        transform_id, &transforms.keys().collect::<Vec<_>>())
                 }));
             }
         }

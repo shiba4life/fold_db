@@ -18,7 +18,13 @@ fn test_non_reversible_transform_not_writable() {
     let wrapper = PermissionWrapper::new();
     let schema_manager = SchemaCore::new("data").unwrap();
 
-    let transform = Transform::new("1 + 1".to_string(), false, None, false);
+    let transform = Transform::new(
+        "1 + 1".to_string(),
+        false,
+        None,
+        false,
+        "test_schema.calc".to_string()
+    );
     let field = SchemaField::new(
         PermissionsPolicy::default(),
         create_default_payment_config(),

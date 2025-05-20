@@ -31,6 +31,7 @@ fn build_schema(transform_logic: &str) -> JsonSchemaDefinition {
             signature: None,
             payment_required: false,
             inputs: Vec::new(),
+            output_schema: "test.calc".to_string(),
         }),
     };
 

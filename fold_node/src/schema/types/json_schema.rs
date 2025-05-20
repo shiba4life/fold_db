@@ -49,6 +49,9 @@ pub struct JsonTransform {
     /// Explicit list of input fields in `Schema.field` format
     #[serde(default)]
     pub inputs: Vec<String>,
+
+    /// Output schema for this transform in `Schema.field` format
+    pub output_schema: String,
 }
 
 /// JSON representation of permission policy
@@ -104,6 +107,7 @@ impl From<JsonTransform> for Transform {
             inputs: json.inputs,
             input_dependencies: Vec::new(),
             output_reference: None,
+            output_schema: json.output_schema,
             parsed_expr: None,
             parsed_declaration: None,
         }

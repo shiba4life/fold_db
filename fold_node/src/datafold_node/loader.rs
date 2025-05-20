@@ -126,7 +126,8 @@ mod tests {
                         "logic": "4 + 5",
                         "reversible": false,
                         "signature": null,
-                        "payment_required": false
+                        "payment_required": false,
+                        "output_schema": "transform_schema.computed"
                     }
                 }
             },

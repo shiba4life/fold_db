@@ -28,6 +28,7 @@ fn create_persistence_schema() -> Schema {
         false,
         None,
         false,
+        "PersistSchema.transform_field".to_string()
     );
     let transform_field = SchemaField::new(
         PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
