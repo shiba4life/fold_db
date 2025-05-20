@@ -4,7 +4,7 @@ use super::types::{CreateAtomFn, GetAtomFn, GetFieldFn, UpdateAtomRefFn, Transfo
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
-use log::error;
+use log::{error, info};
 
 pub struct TransformManager {
     /// Tree for storing transforms
@@ -345,6 +345,7 @@ impl TransformManager {
 
     /// Executes a transform and updates its output atom reference.
     fn execute_transform(&self, transform_id: &str) -> Result<JsonValue, SchemaError> {
+        info!("Executing transform {}", transform_id);
         // Get the transform
         let transform = {
             let registered_transforms = self
@@ -394,7 +395,18 @@ impl TransformManager {
             input_values.insert(aref.clone(), atom.content().clone());
         }
 
-        let result = TransformExecutor::execute_transform(&transform, input_values)?;
+        info!("Input values for {}: {:?}", transform_id, input_values);
+
+        let result = match TransformExecutor::execute_transform(&transform, input_values) {
+            Ok(val) => {
+                info!("Transform {} produced result: {:?}", transform_id, val);
+                val
+            }
+            Err(e) => {
+                error!("Transform {} failed: {}", transform_id, e);
+                return Err(e);
+            }
+        };
         
         // Update the output atom reference
         let output_aref = {
@@ -443,7 +455,13 @@ impl TransformManager {
         &self,
         transform_id: &str,
     ) -> Result<JsonValue, SchemaError> {
-        self.execute_transform(transform_id)
+        info!("execute_transform_now called for {}", transform_id);
+        let result = self.execute_transform(transform_id);
+        match &result {
+            Ok(val) => info!("Transform {} finished with result: {:?}", transform_id, val),
+            Err(e) => error!("Transform {} failed: {}", transform_id, e),
+        }
+        result
     }
 
     /// Returns true if a transform with the given id is registered.
