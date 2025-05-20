@@ -297,7 +297,7 @@ impl DataFoldNode {
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
         let schema_names = db.schema_manager.list_schemas()?;
-        info!("Schema names from schema_manager: {:?}", schema_names);
+        // info!("Schema names from schema_manager: {:?}", schema_names);
         let mut schemas = Vec::new();
         for name in schema_names {
             if let Some(schema) = db.schema_manager.get_schema(&name)? {
@@ -709,5 +709,45 @@ impl DataFoldNode {
     /// Gets the unique identifier for this node.
     pub fn get_node_id(&self) -> &str {
         &self.node_id
+    }
+
+    /// Add a transform to the queue
+    pub fn add_transform_to_queue(&self, transform_id: &str) -> FoldDbResult<()> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        
+        db.transform_orchestrator.add_transform(transform_id)?;
+        Ok(())
+    }
+
+    /// Get information about the transform queue
+    pub fn get_transform_queue_info(&self) -> FoldDbResult<serde_json::Value> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        
+        let queue_length = db.transform_orchestrator.len()?;
+        let is_empty = db.transform_orchestrator.is_empty()?;
+        
+        // Get the queued transform IDs
+        let mut queue = Vec::new();
+        let mut current_length = queue_length;
+        while current_length > 0 {
+            if let Some(result) = db.transform_orchestrator.process_one() {
+                if let Ok(transform_id) = result {
+                    queue.push(transform_id.to_string());
+                }
+            }
+            current_length -= 1;
+        }
+
+        Ok(serde_json::json!({
+            "queue": queue,
+            "length": queue_length,
+            "isEmpty": is_empty
+        }))
     }
 }

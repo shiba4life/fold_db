@@ -252,6 +252,8 @@ impl DataFoldHttpServer {
                         // Transform endpoints
                         .route("/transforms", web::get().to(list_transforms))
                         .route("/transform/{id}/run", web::post().to(run_transform))
+                        .route("/transforms/queue", web::get().to(get_transform_queue))
+                        .route("/transforms/queue/{id}", web::post().to(add_to_transform_queue))
                         // Network endpoints
                         .service(
                             web::scope("/network")
@@ -287,7 +289,7 @@ async fn list_schemas(state: web::Data<AppState>) -> impl Responder {
 
     match node_guard.list_schemas() {
         Ok(schemas) => {
-            info!("Successfully listed schemas: {:?}", schemas);
+            // info!("Successfully listed schemas: {:?}", schemas);
             // Wrap the schemas in a data field to match frontend expectations
             HttpResponse::Ok().json(json!({
                 "data": schemas
@@ -735,5 +737,64 @@ mod tests {
 
         handle.abort();
         let _ = handle.await;
+    }
+}
+
+/// Add a transform to the queue
+async fn add_to_transform_queue(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
+    let transform_id = path.into_inner();
+    info!("Attempting to add transform to queue: {}", transform_id);
+    
+    let node = state.node.lock().await;
+    
+    // First list all transforms to help debug
+    match node.list_transforms() {
+        Ok(transforms) => {
+            info!("Available transforms: {:?}", transforms.keys().collect::<Vec<_>>());
+            if !transforms.contains_key(&transform_id) {
+                error!("Transform not found: {}", transform_id);
+                info!("Transform details for each transform:");
+                for (id, transform) in transforms {
+                    info!("ID: {}, Name: {}, Logic: {}", id, transform.name, transform.logic);
+                }
+                return HttpResponse::NotFound().json(json!({
+                    "error": format!("Transform '{}' not found. Available transforms: {:?}",
+                        transform_id, transforms.keys().collect::<Vec<_>>())
+                }));
+            }
+        }
+        Err(e) => {
+            error!("Failed to list transforms: {}", e);
+            return HttpResponse::InternalServerError().json(json!({
+                "error": format!("Failed to verify transform: {}", e)
+            }));
+        }
+    }
+
+    match node.add_transform_to_queue(&transform_id) {
+        Ok(_) => {
+            info!("Successfully added transform to queue: {}", transform_id);
+            HttpResponse::Ok().json(json!({
+                "success": true,
+                "message": format!("Transform '{}' added to queue", transform_id)
+            }))
+        },
+        Err(e) => {
+            error!("Failed to add transform to queue: {}", e);
+            HttpResponse::InternalServerError().json(json!({
+                "error": format!("Failed to add transform to queue: {}", e)
+            }))
+        },
+    }
+}
+
+/// Get information about the transform queue
+async fn get_transform_queue(state: web::Data<AppState>) -> impl Responder {
+    let node = state.node.lock().await;
+    match node.get_transform_queue_info() {
+        Ok(info) => HttpResponse::Ok().json(info),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to get transform queue info: {}", e)
+        })),
     }
 }

@@ -2,6 +2,7 @@ use std::collections::{VecDeque, HashSet};
 use std::sync::{Arc, Mutex};
 
 use serde_json::Value as JsonValue;
+use log::{info, error};
 
 use crate::schema::SchemaError;
 
@@ -46,6 +47,42 @@ impl TransformOrchestrator {
         Ok(())
     }
 
+    /// Add a transform directly to the queue by ID.
+    pub fn add_transform(&self, transform_id: &str) -> Result<(), SchemaError> {
+        info!("Attempting to add transform to queue: {}", transform_id);
+        
+        // Verify the transform exists
+        match self.manager.transform_exists(transform_id) {
+            Ok(exists) => {
+                if !exists {
+                    error!("Transform not found: {}", transform_id);
+                    return Err(SchemaError::InvalidData(format!("Transform '{}' not found", transform_id)));
+                }
+            }
+            Err(e) => {
+                error!("Error checking transform existence: {}", e);
+                return Err(e);
+            }
+        }
+
+        let mut q = self
+            .queue
+            .lock()
+            .map_err(|e| {
+                error!("Failed to acquire queue lock: {}", e);
+                SchemaError::InvalidData("Failed to acquire queue lock".to_string())
+            })?;
+        
+        info!("Adding transform {} to queue", transform_id);
+        q.push_back(transform_id.to_string());
+        
+        // Log queue state
+        info!("Current queue length: {}", q.len());
+        info!("Queue contents: {:?}", q);
+        
+        Ok(())
+    }
+
     /// Process a single task from the queue.
     pub fn process_one(&self) -> Option<Result<JsonValue, SchemaError>> {
         let transform_id = {
@@ -65,23 +102,29 @@ impl TransformOrchestrator {
 
     /// Queue length, useful for tests.
     pub fn len(&self) -> Result<usize, SchemaError> {
-        Ok(
-            self
-                .queue
-                .lock()
-                .map_err(|_| SchemaError::InvalidData("Failed to acquire queue lock".to_string()))?
-                .len(),
-        )
+        let q = self
+            .queue
+            .lock()
+            .map_err(|e| {
+                error!("Failed to acquire queue lock: {}", e);
+                SchemaError::InvalidData("Failed to acquire queue lock".to_string())
+            })?;
+        let length = q.len();
+        info!("Queue length: {}", length);
+        Ok(length)
     }
 
     /// Returns true if the queue is empty.
     pub fn is_empty(&self) -> Result<bool, SchemaError> {
-        Ok(
-            self
-                .queue
-                .lock()
-                .map_err(|_| SchemaError::InvalidData("Failed to acquire queue lock".to_string()))?
-                .is_empty()
-        )
+        let q = self
+            .queue
+            .lock()
+            .map_err(|e| {
+                error!("Failed to acquire queue lock: {}", e);
+                SchemaError::InvalidData("Failed to acquire queue lock".to_string())
+            })?;
+        let empty = q.is_empty();
+        info!("Queue is empty: {}", empty);
+        Ok(empty)
     }
 }
