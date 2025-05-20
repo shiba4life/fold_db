@@ -79,7 +79,9 @@ impl TransformManager {
         }
     }
 
-    /// Registers a transform with its input and output atom references.
+    /// Registers a transform and tracks its input and output atom references
+    /// internally.  The provided `input_arefs` are used only for dependency
+    /// tracking and are not persisted on the [`Transform`] itself.
     pub fn register_transform(&self, registration: TransformRegistration) -> Result<(), SchemaError> {
         let TransformRegistration {
             transform_id,

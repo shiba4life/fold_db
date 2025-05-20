@@ -81,7 +81,7 @@
       "reversible": false,
       "signature": null,
       "payment_required": false,
-      "input_dependencies": ["inventory_count"]
+      "inputs": ["inventory_count"]
     },
     "price_range": {
       "name": "price_range",
@@ -89,7 +89,7 @@
       "reversible": false,
       "signature": null,
       "payment_required": false,
-      "input_dependencies": ["price"]
+      "inputs": ["price"]
     },
     "product_preview": {
       "name": "product_preview",
@@ -97,7 +97,7 @@
       "reversible": false,
       "signature": null,
       "payment_required": false,
-      "input_dependencies": ["name", "category", "price"]
+      "inputs": ["name", "category", "price"]
     }
   },
   "payment_config": {

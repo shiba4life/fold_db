@@ -81,7 +81,7 @@
       "reversible": false,
       "signature": null,
       "payment_required": false,
-      "input_dependencies": ["content"]
+      "inputs": ["content"]
     },
     "tag_count": {
       "name": "tag_count",
@@ -89,7 +89,7 @@
       "reversible": false,
       "signature": null,
       "payment_required": false,
-      "input_dependencies": ["tags"]
+      "inputs": ["tags"]
     },
     "reading_time": {
       "name": "reading_time",
@@ -97,7 +97,7 @@
       "reversible": false,
       "signature": null,
       "payment_required": false,
-      "input_dependencies": ["content"]
+      "inputs": ["content"]
     }
   },
   "payment_config": {
