@@ -3,12 +3,11 @@ use crate::error::{FoldDbError, FoldDbResult};
 use crate::schema::types::operations::MutationType;
 use crate::schema::Schema;
 use libp2p::PeerId;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
 use tokio::sync::Mutex;
-use log::{info, warn, error};
+use log::{info, error};
 
 /// TCP server for the DataFold node.
 ///
@@ -170,181 +169,6 @@ impl TcpServer {
         }
     }
 
-    /// Handle a client connection.
-    ///
-    /// This method handles a single client connection to the TCP server.
-    /// It runs in a loop, reading requests from the client, processing them,
-    /// and sending responses back. The loop continues until the client
-    /// disconnects or an error occurs.
-    ///
-    /// The communication protocol is:
-    /// 1. Read a 32-bit unsigned integer representing the request length
-    /// 2. Read the request data (JSON)
-    /// 3. Process the request
-    /// 4. Write a 32-bit unsigned integer representing the response length
-    /// 5. Write the response data (JSON)
-    ///
-    /// # Arguments
-    ///
-    /// * `socket` - The TCP socket for the client connection
-    /// * `node` - The DataFoldNode to use for processing requests
-    ///
-    /// # Returns
-    ///
-    /// A `FoldDbResult` indicating success or failure.
-    ///
-    /// # Errors
-    ///
-    /// Returns a `FoldDbError` if:
-    /// * There is an error reading from the socket
-    /// * There is an error writing to the socket
-    /// * There is an error processing a request
-    /// * The request is too large (exceeds 10MB)
-    async fn handle_connection(
-        mut socket: TcpStream,
-        node: Arc<Mutex<DataFoldNode>>,
-    ) -> FoldDbResult<()> {
-        // We can't set keepalive directly on tokio's TcpStream, so we'll skip it
-        // In a real implementation, we would use socket2 crate to set keepalive
-
-        loop {
-            // Read the request length
-            let request_len = match socket.read_u32().await {
-                Ok(len) => len as usize,
-                Err(e) => {
-                    if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                        // Client disconnected
-                        info!("Client disconnected");
-                        return Ok(());
-                    }
-                    error!("Error reading request length: {}", e);
-                    return Err(e.into());
-                }
-            };
-
-            // Sanity check the request length to prevent OOM
-            if request_len > 10_000_000 {
-                // 10MB limit
-                warn!("Request too large: {} bytes", request_len);
-                let error_response = json!({
-                    "error": "Request too large",
-                    "max_size": 10_000_000
-                });
-                let error_bytes = serde_json::to_vec(&error_response)?;
-                socket.write_u32(error_bytes.len() as u32).await?;
-                socket.write_all(&error_bytes).await?;
-                continue;
-            }
-
-            // Read the request
-            let mut request_bytes = vec![0u8; request_len];
-            match socket.read_exact(&mut request_bytes).await {
-                Ok(_) => {}
-                Err(e) => {
-                    error!("Error reading request: {}", e);
-                    if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                        info!("Client disconnected while reading request");
-                        return Ok(());
-                    }
-
-                    // Try to send an error response
-                    let error_response = json!({
-                        "error": format!("Error reading request: {}", e)
-                    });
-                    let error_bytes = serde_json::to_vec(&error_response)?;
-
-                    // Ignore errors when sending the error response
-                    let _ = socket.write_u32(error_bytes.len() as u32).await;
-                    let _ = socket.write_all(&error_bytes).await;
-
-                    return Err(e.into());
-                }
-            };
-
-            // Deserialize the request
-            let request: Value = match serde_json::from_slice(&request_bytes) {
-                Ok(req) => req,
-                Err(e) => {
-                    error!("Error deserializing request: {}", e);
-
-                    // Try to send an error response
-                    let error_response = json!({
-                        "error": format!("Error deserializing request: {}", e)
-                    });
-                    let error_bytes = serde_json::to_vec(&error_response)?;
-
-                    // Ignore errors when sending the error response
-                    let _ = socket.write_u32(error_bytes.len() as u32).await;
-                    let _ = socket.write_all(&error_bytes).await;
-
-                    continue;
-                }
-            };
-
-            // Process the request
-            let response = match Self::process_request(&request, node.clone()).await {
-                Ok(resp) => resp,
-                Err(e) => {
-                    error!("Error processing request: {}", e);
-
-                    // Create an error response
-                    json!({
-                        "error": format!("Error processing request: {}", e)
-                    })
-                }
-            };
-
-            // Serialize the response
-            let response_bytes = match serde_json::to_vec(&response) {
-                Ok(bytes) => bytes,
-                Err(e) => {
-                    error!("Error serializing response: {}", e);
-
-                    // Try to send an error response
-                    let error_response = json!({
-                        "error": format!("Error serializing response: {}", e)
-                    });
-                    let error_bytes = serde_json::to_vec(&error_response)?;
-
-                    // Ignore errors when sending the error response
-                    let _ = socket.write_u32(error_bytes.len() as u32).await;
-                    let _ = socket.write_all(&error_bytes).await;
-
-                    continue;
-                }
-            };
-
-            // Send the response length
-            if let Err(e) = socket.write_u32(response_bytes.len() as u32).await {
-                error!("Error sending response length: {}", e);
-                if e.kind() == std::io::ErrorKind::BrokenPipe {
-                    info!("Client disconnected while sending response length");
-                    return Ok(());
-                }
-                return Err(e.into());
-            }
-
-            // Send the response
-            if let Err(e) = socket.write_all(&response_bytes).await {
-                error!("Error sending response: {}", e);
-                if e.kind() == std::io::ErrorKind::BrokenPipe {
-                    info!("Client disconnected while sending response");
-                    return Ok(());
-                }
-                return Err(e.into());
-            }
-
-            // Flush the socket to ensure all data is sent
-            if let Err(e) = socket.flush().await {
-                error!("Error flushing socket: {}", e);
-                if e.kind() == std::io::ErrorKind::BrokenPipe {
-                    info!("Client disconnected while flushing socket");
-                    return Ok(());
-                }
-                return Err(e.into());
-            }
-        }
-    }
 
     /// Process a request from a client.
     ///
@@ -380,7 +204,7 @@ impl TcpServer {
     /// * `query` - Execute a query against a schema
     /// * `mutation` - Execute a mutation against a schema
     /// * `discover_nodes` - Discover other nodes in the network
-    async fn process_request(
+    pub(crate) async fn process_request(
         request: &Value,
         node: Arc<Mutex<DataFoldNode>>,
     ) -> FoldDbResult<Value> {
