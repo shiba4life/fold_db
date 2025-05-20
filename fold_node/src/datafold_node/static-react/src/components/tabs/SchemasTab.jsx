@@ -18,6 +18,12 @@ const UploadIcon = ({ className }) => (
   </svg>
 )
 
+const TrashIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+    <path d="M3 6h18M8 6V4h8v2m1 0v12a2 2 0 01-2 2H9a2 2 0 01-2-2V6h10z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
 function SchemasTab() {
   const [schemas, setSchemas] = useState([])
   const [expandedSchema, setExpandedSchema] = useState(null)
@@ -49,6 +55,21 @@ function SchemasTab() {
 
   const toggleSchema = (schemaId) => {
     setExpandedSchema(expandedSchema === schemaId ? null : schemaId)
+  }
+
+  const removeSchema = async (schemaName) => {
+    try {
+      const resp = await fetch(`/api/schema/${schemaName}`, {
+        method: 'DELETE'
+      })
+      if (!resp.ok) {
+        throw new Error(`Failed to remove schema: ${resp.status}`)
+      }
+      await loadSchemas()
+    } catch (err) {
+      console.error('Failed to remove schema:', err)
+      setError('Failed to remove schema. Please try again.')
+    }
   }
 
   if (loading) {
@@ -108,6 +129,16 @@ function SchemasTab() {
                 <button className="group inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
                   <UploadIcon className="icon icon-xs mr-1.5 text-white" />
                   Load
+                </button>
+                <button
+                  className="group inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeSchema(schema.name)
+                  }}
+                >
+                  <TrashIcon className="icon icon-xs mr-1.5 text-white" />
+                  Remove
                 </button>
               </div>
             </div>

@@ -36,10 +36,20 @@ function App() {
     setResults(result)
   }
 
+  const handleSchemaUpdated = () => {
+    fetchSchemas()
+  }
+
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'schemas':
-        return <SchemaTab schemas={schemas} onResult={handleOperationResult} />
+        return (
+          <SchemaTab
+            schemas={schemas}
+            onResult={handleOperationResult}
+            onSchemaUpdated={handleSchemaUpdated}
+          />
+        )
       case 'query':
         return <QueryTab schemas={schemas} onResult={handleOperationResult} />
       case 'mutation':
