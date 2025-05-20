@@ -15,6 +15,8 @@ pub mod http_server;
 pub mod loader;
 pub mod node;
 pub mod tcp_server;
+pub mod tcp_protocol;
+pub mod tcp_connections;
 pub mod tests;
 
 // Re-export the DataFoldNode struct for easier imports
