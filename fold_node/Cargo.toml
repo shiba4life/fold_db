@@ -89,5 +89,3 @@ path = "examples/transform_logic_test.rs"
 name = "complex_transform_dsl"
 path = "examples/complex_transform_dsl.rs"
 
-[patch.crates-io]
-env_logger = { path = "../vendor/env_logger" }
