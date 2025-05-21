@@ -100,3 +100,19 @@ fn mapping_adds_specific_transform() {
     assert_eq!(exec.len(), 1);
     assert_eq!(exec[0], "SchemaB.other");
 }
+
+#[test]
+fn duplicate_ids_are_deduped() {
+    let mgr = MockTransformManager::new();
+    let manager = Arc::new(mgr);
+    let orchestrator = TransformOrchestrator::new(manager.clone());
+
+    orchestrator.add_transform("T1").unwrap();
+    orchestrator.add_transform("T1").unwrap();
+    assert_eq!(orchestrator.len().unwrap(), 1);
+
+    orchestrator.process_queue();
+    let exec = manager.executed.lock().unwrap();
+    assert_eq!(exec.len(), 1);
+    assert_eq!(exec[0], "T1");
+}

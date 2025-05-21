@@ -20,17 +20,25 @@ impl AtomManager {
 
         for result in db_ops.db().iter().flatten() {
             let key_str = String::from_utf8_lossy(result.0.as_ref());
+            let bytes = result.1.as_ref();
 
-            if key_str.starts_with("atom:") {
-                if let Ok(atom) = serde_json::from_slice(result.1.as_ref()) {
-                    atoms.insert(key_str.into_owned(), atom);
+            if let Some(stripped) = key_str.strip_prefix("atom:") {
+                if let Ok(atom) = serde_json::from_slice(bytes) {
+                    atoms.insert(stripped.to_string(), atom);
                 }
-            } else if key_str.starts_with("ref:") {
-                if let Ok(atom_ref) = serde_json::from_slice::<AtomRef>(result.1.as_ref()) {
+            } else if let Some(stripped) = key_str.strip_prefix("ref:") {
+                if let Ok(atom_ref) = serde_json::from_slice::<AtomRef>(bytes) {
+                    ref_atoms.insert(stripped.to_string(), atom_ref);
+                } else if let Ok(collection) = serde_json::from_slice::<AtomRefCollection>(bytes) {
+                    ref_collections.insert(stripped.to_string(), collection);
+                }
+            } else {
+                // Backwards compatibility: entries without prefixes
+                if let Ok(atom) = serde_json::from_slice::<Atom>(bytes) {
+                    atoms.insert(key_str.into_owned(), atom);
+                } else if let Ok(atom_ref) = serde_json::from_slice::<AtomRef>(bytes) {
                     ref_atoms.insert(key_str.into_owned(), atom_ref);
-                } else if let Ok(collection) =
-                    serde_json::from_slice::<AtomRefCollection>(result.1.as_ref())
-                {
+                } else if let Ok(collection) = serde_json::from_slice::<AtomRefCollection>(bytes) {
                     ref_collections.insert(key_str.into_owned(), collection);
                 }
             }
@@ -64,12 +72,12 @@ impl AtomManager {
         // Try from disk
         let aref = self
             .db_ops
-            .get_item::<AtomRef>(aref_uuid)?
+            .get_item::<AtomRef>(&format!("ref:{}", aref_uuid))?
             .ok_or("AtomRef not found")?;
 
         let atom = self
             .db_ops
-            .get_item::<Atom>(aref.get_atom_uuid())?
+            .get_item::<Atom>(&format!("atom:{}", aref.get_atom_uuid()))?
             .ok_or("Atom not found")?;
 
         Ok(atom)
@@ -87,7 +95,7 @@ impl AtomManager {
         while let Some(prev_uuid) = current_atom.prev_atom_uuid() {
             current_atom = self
                 .db_ops
-                .get_item::<Atom>(prev_uuid)?
+                .get_item::<Atom>(&format!("atom:{}", prev_uuid))?
                 .ok_or("Previous atom not found")?;
             history.push(current_atom.clone());
         }
