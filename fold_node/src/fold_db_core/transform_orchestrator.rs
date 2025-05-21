@@ -11,6 +11,7 @@ use super::transform_manager::types::TransformRunner;
 struct QueueState {
     queue: VecDeque<String>,
     queued: HashSet<String>,
+    processed: HashSet<String>,
 }
 
 pub struct TransformOrchestrator {
@@ -22,8 +23,9 @@ impl TransformOrchestrator {
     pub fn new(manager: Arc<dyn TransformRunner>) -> Self {
         Self {
             queue: Mutex::new(QueueState {
-                queue: VecDeque::new(),
-                queued: HashSet::new(),
+            queue: VecDeque::new(),
+            queued: HashSet::new(),
+            processed: HashSet::new(),
             }),
             manager,
         }
@@ -44,6 +46,9 @@ impl TransformOrchestrator {
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire queue lock".to_string()))?;
         for id in ids {
+            if q.processed.contains(&id) {
+                continue;
+            }
             if q.queued.insert(id.clone()) {
                 q.queue.push_back(id);
             }
@@ -78,7 +83,7 @@ impl TransformOrchestrator {
             })?;
 
         info!("Adding transform {} to queue", transform_id);
-        if q.queued.insert(transform_id.to_string()) {
+        if !q.processed.contains(transform_id) && q.queued.insert(transform_id.to_string()) {
             q.queue.push_back(transform_id.to_string());
         }
 
@@ -100,6 +105,7 @@ impl TransformOrchestrator {
             match q.queue.pop_front() {
                 Some(id) => {
                     q.queued.remove(&id);
+                    q.processed.insert(id.clone());
                     id
                 }
                 None => return None,
