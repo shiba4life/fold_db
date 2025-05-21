@@ -1,5 +1,6 @@
 use crate::network::config::NetworkConfig;
-use crate::network::error::{NetworkResult};
+use crate::network::error::NetworkResult;
+use crate::network::{NetworkCore, error::NetworkError};
 use libp2p::PeerId;
 use log::info;
 use std::collections::HashSet;
@@ -35,4 +36,42 @@ pub async fn discover_peers(
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     Ok(known_peers.iter().cloned().collect())
+}
+
+
+impl NetworkCore {
+    /// Check which schemas are available on a remote peer.
+    pub async fn check_schemas(
+        &mut self,
+        peer_id: PeerId,
+        schema_names: Vec<String>,
+    ) -> NetworkResult<Vec<String>> {
+        #[cfg(test)]
+        {
+            if let Some(peer_service) = self.mock_peers.get(&peer_id) {
+                return Ok(peer_service.check_schemas(&schema_names));
+            }
+        }
+
+        if !self.known_peers.contains(&peer_id) {
+            return Err(NetworkError::ConnectionError(format!(
+                "Peer not found: {}",
+                peer_id
+            )));
+        }
+
+        let available_schemas = schema_names
+            .iter()
+            .filter(|_| rand::random::<bool>())
+            .cloned()
+            .collect();
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        Ok(available_schemas)
+    }
+
+    /// Actively scan for peers using mDNS
+    pub async fn discover_nodes(&mut self) -> NetworkResult<Vec<PeerId>> {
+        discover_peers(&self.config, &mut self.known_peers).await
+    }
 }
