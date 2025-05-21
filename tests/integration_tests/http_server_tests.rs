@@ -89,6 +89,8 @@ async fn test_sample_endpoints() {
     assert!(schemas_arr.contains(&Value::String("ProductCatalog".to_string())));
     assert!(schemas_arr.contains(&Value::String("TransformBase".to_string())));
     assert!(schemas_arr.contains(&Value::String("TransformSchema".to_string())));
+    assert!(schemas_arr.contains(&Value::String("UserProfileView".to_string())));
+    assert!(schemas_arr.contains(&Value::String("BlogPostSummary".to_string())));
     let resp = client
         .get(format!("http://{}/api/samples/schema/UserProfile", addr))
         .send()
@@ -126,6 +128,25 @@ async fn test_sample_endpoints() {
     assert!(resp.status().is_success());
     let schema: Value = resp.json().await.unwrap();
     assert_eq!(schema["name"], "TransformSchema");
+
+    // Verify new schema samples with field mappers
+    let resp = client
+        .get(format!("http://{}/api/samples/schema/UserProfileView", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let schema: Value = resp.json().await.unwrap();
+    assert_eq!(schema["name"], "UserProfileView");
+
+    let resp = client
+        .get(format!("http://{}/api/samples/schema/BlogPostSummary", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let schema: Value = resp.json().await.unwrap();
+    assert_eq!(schema["name"], "BlogPostSummary");
 
     // Query samples
     let resp = client

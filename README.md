@@ -135,6 +135,13 @@ Run all unit and integration tests across the workspace:
 cargo test --workspace
 ```
 
+If you encounter `cargo: command not found`, install Rust with `rustup` first:
+
+```bash
+curl https://sh.rustup.rs -sSf | sh
+rustup component add clippy
+```
+
 Run only integration tests:
 
 ```bash
