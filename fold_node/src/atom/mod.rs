@@ -4,7 +4,9 @@ use serde_json::Value;
 use uuid::Uuid;
 
 mod atom_ref;
-pub use atom_ref::{AtomRef, AtomRefBehavior, AtomRefCollection, AtomRefStatus};
+pub use atom_ref::{
+    AtomRef, AtomRefBehavior, AtomRefCollection, AtomRefStatus, AtomRefWrapper,
+};
 
 /// An immutable data container that represents a single version of content in the database.
 ///
