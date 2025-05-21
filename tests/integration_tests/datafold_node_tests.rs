@@ -73,9 +73,10 @@ fn test_version_history() {
     // Get initial schema to see the field's ref_atom_uuid
     let initial_schema = node.get_schema("user_profile").unwrap().unwrap();
     let initial_name_field = initial_schema.fields.get("name").unwrap();
-    println!(
-        "Initial name field ref_atom_uuid: {:?}",
-        initial_name_field.get_ref_atom_uuid()
+    // Ensure the field has a ref_atom_uuid set
+    assert!(
+        initial_name_field.get_ref_atom_uuid().is_some(),
+        "name field should have a ref_atom_uuid"
     );
 
     // Create initial data
@@ -84,14 +85,16 @@ fn test_version_history() {
     // Get schema after first mutation to check ref_atom_uuid
     let schema_after_create = node.get_schema("user_profile").unwrap().unwrap();
     let name_field_after_create = schema_after_create.fields.get("name").unwrap();
-    println!(
-        "Name field ref_atom_uuid after create: {:?}",
-        name_field_after_create.get_ref_atom_uuid()
+    // The ref_atom_uuid should remain unchanged after create
+    assert_eq!(
+        initial_name_field.get_ref_atom_uuid(),
+        name_field_after_create.get_ref_atom_uuid(),
+        "create should not modify the ref_atom_uuid"
     );
 
     // Query current value
     let result1 = query_value(&mut node, "user_profile", "name").unwrap();
-    println!("Value after create: {:?}", result1);
+    assert_eq!(result1, json!("John Doe"));
 
     // Update data
     let mutation2 = Mutation {
@@ -107,19 +110,20 @@ fn test_version_history() {
 
     // Query updated value
     let result2 = query_value(&mut node, "user_profile", "name").unwrap();
-    println!("Value after update: {:?}", result2);
+    assert_eq!(result2, json!("Jane Doe"));
 
     // Get schema after update to check ref_atom_uuid
     let schema_after_update = node.get_schema("user_profile").unwrap().unwrap();
     let name_field_after_update = schema_after_update.fields.get("name").unwrap();
-    println!(
-        "Name field ref_atom_uuid after update: {:?}",
-        name_field_after_update.get_ref_atom_uuid()
+    // ref_atom_uuid should remain the same after update as well
+    assert_eq!(
+        initial_name_field.get_ref_atom_uuid(),
+        name_field_after_update.get_ref_atom_uuid(),
+        "update should not modify the ref_atom_uuid"
     );
 
     // Get history using the actual ref_atom_uuid
     let history = node.get_history(&name_field_after_update.get_ref_atom_uuid().unwrap());
-    println!("History result: {:?}", history);
 
     assert!(history.is_ok());
 
