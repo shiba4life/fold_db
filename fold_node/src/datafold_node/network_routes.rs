@@ -123,5 +123,96 @@ mod tests {
         let resp = list_nodes(state).await.respond_to(&req);
         assert_eq!(resp.status(), 500);
     }
+
+    fn create_state() -> web::Data<super::super::http_server::AppState> {
+        let dir = tempdir().unwrap();
+        let config = NodeConfig::new(dir.path().to_path_buf());
+        let node = DataFoldNode::new(config).unwrap();
+        web::Data::new(super::super::http_server::AppState {
+            node: std::sync::Arc::new(tokio::sync::Mutex::new(node)),
+            sample_manager: super::super::sample_manager::SampleManager { schemas: Default::default(), queries: Default::default(), mutations: Default::default() },
+        })
+    }
+
+    #[tokio::test]
+    async fn init_network_applies_config() {
+        use actix_web::test;
+        let state = create_state();
+        let payload = NetworkConfigPayload {
+            listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
+            discovery_port: Some(1234),
+            max_connections: Some(5),
+            connection_timeout_secs: Some(1),
+            announcement_interval_secs: Some(2),
+            enable_discovery: Some(false),
+        };
+        let req = test::TestRequest::default().to_http_request();
+        let resp = init_network(web::Json(payload), state.clone())
+            .await
+            .respond_to(&req);
+        assert_eq!(resp.status(), 200);
+        let node = state.node.lock().await;
+        assert!(node.network.is_some());
+    }
+
+    #[tokio::test]
+    async fn start_and_stop_network_responses() {
+        use actix_web::test;
+        let state = create_state();
+        let req = test::TestRequest::default().to_http_request();
+        let start_resp = start_network(state.clone()).await.respond_to(&req);
+        assert_eq!(start_resp.status(), 500);
+
+        let payload = NetworkConfigPayload { listen_address: "/ip4/127.0.0.1/tcp/0".to_string(), discovery_port: None, max_connections: None, connection_timeout_secs: None, announcement_interval_secs: None, enable_discovery: None };
+        let _ = init_network(web::Json(payload), state.clone()).await;
+
+        let start_resp = start_network(state.clone()).await.respond_to(&req);
+        assert_eq!(start_resp.status(), 200);
+        let stop_resp = stop_network(state.clone()).await.respond_to(&req);
+        assert_eq!(stop_resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn get_network_status_uninitialized_vs_initialized() {
+        use actix_web::test;
+        let state = create_state();
+        let req = test::TestRequest::default().to_http_request();
+        let resp = get_network_status(state.clone()).await.respond_to(&req);
+        assert_eq!(resp.status(), 200);
+        let body_bytes = actix_web::body::to_bytes(resp.into_body())
+            .await
+            .unwrap_or_else(|_| panic!("body error"));
+        let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+        assert_eq!(body["data"]["initialized"], false);
+
+        let payload = NetworkConfigPayload { listen_address: "/ip4/127.0.0.1/tcp/0".to_string(), discovery_port: None, max_connections: None, connection_timeout_secs: None, announcement_interval_secs: None, enable_discovery: None };
+        let _ = init_network(web::Json(payload), state.clone()).await;
+        let resp2 = get_network_status(state.clone()).await.respond_to(&req);
+        assert_eq!(resp2.status(), 200);
+        let body_bytes = actix_web::body::to_bytes(resp2.into_body())
+            .await
+            .unwrap_or_else(|_| panic!("body error"));
+        let body2: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+        assert_eq!(body2["data"]["initialized"], true);
+    }
+
+    #[tokio::test]
+    async fn connect_and_discover_nodes() {
+        use actix_web::test;
+        let state = create_state();
+        let req = test::TestRequest::default().to_http_request();
+        let resp = discover_nodes(state.clone()).await.respond_to(&req);
+        assert_eq!(resp.status(), 500);
+
+        let payload = NetworkConfigPayload { listen_address: "/ip4/127.0.0.1/tcp/0".to_string(), discovery_port: None, max_connections: None, connection_timeout_secs: None, announcement_interval_secs: None, enable_discovery: None };
+        let _ = init_network(web::Json(payload), state.clone()).await;
+        let resp = connect_to_node(web::Json(ConnectRequest { node_id: "peer1".into() }), state.clone()).await.respond_to(&req);
+        assert_eq!(resp.status(), 200);
+        let node = state.node.lock().await;
+        assert!(node.trusted_nodes.contains_key("peer1"));
+        drop(node);
+        let resp = discover_nodes(state.clone()).await.respond_to(&req);
+        assert_eq!(resp.status(), 200);
+    }
 }
 
