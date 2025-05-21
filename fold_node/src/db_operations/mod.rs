@@ -29,6 +29,11 @@ impl DbOperations {
             .insert(key.as_bytes(), bytes)
             .map_err(|e| SchemaError::InvalidData(format!("Failed to store item: {}", e)))?;
 
+        // Ensure the data is durably written to disk
+        self.db
+            .flush()
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush db: {}", e)))?;
+
         Ok(())
     }
 
@@ -207,5 +212,35 @@ mod tests {
         assert_eq!(stored.uuid(), collection.uuid());
         assert_eq!(stored.get_atom_uuid("a"), Some(&atom1.uuid().to_string()));
         assert_eq!(stored.get_atom_uuid("b"), Some(&atom2.uuid().to_string()));
+    }
+
+    #[test]
+    fn test_persistence_across_reopen() {
+        // Use a temporary directory so the DB persists across instances
+        let dir = tempfile::tempdir().unwrap();
+        let db = sled::open(dir.path()).unwrap();
+        let db_ops = DbOperations::new(db);
+
+        let atom = db_ops
+            .create_atom("TestSchema", "owner".to_string(), None, json!({"v": 1}), None)
+            .unwrap();
+        let _aref = db_ops
+            .update_atom_ref("ref_persist", atom.uuid().to_string(), "owner".to_string())
+            .unwrap();
+
+        // Drop first instance to close the database
+        drop(db_ops);
+
+        // Re-open the database and verify the items exist
+        let db2 = sled::open(dir.path()).unwrap();
+        let db_ops2 = DbOperations::new(db2);
+        let stored_atom: Option<Atom> = db_ops2
+            .get_item(&format!("atom:{}", atom.uuid()))
+            .unwrap();
+        let stored_aref: Option<AtomRef> = db_ops2.get_item("ref:ref_persist").unwrap();
+
+        assert!(stored_atom.is_some());
+        assert!(stored_aref.is_some());
+        assert_eq!(stored_aref.unwrap().get_atom_uuid(), &atom.uuid().to_string());
     }
 }
