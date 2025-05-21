@@ -199,7 +199,8 @@ impl FoldDB {
         schema: &Schema,
         transform: &Transform,
         cross_re: &Regex,
-    ) -> Result<(Vec<String>, Vec<String>), SchemaError> {
+    ) -> Result<(Vec<(String, String)>, Vec<String>), SchemaError> {
+        let mut input_pairs = Vec::new();
         let mut input_arefs = Vec::new();
         let mut trigger_fields = Vec::new();
         let mut seen_cross = std::collections::HashSet::new();
@@ -213,7 +214,8 @@ impl FoldDB {
                     if let Some(dep_schema) = self.schema_manager.get_schema(schema_name)? {
                         if let Some(dep_field) = dep_schema.fields.get(field_dep) {
                             if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
-                                input_arefs.push(dep_aref);
+                                input_arefs.push(dep_aref.clone());
+                                input_pairs.push((dep_aref, format!("{}.{}", schema_name, field_dep)));
                             }
                         }
                     }
@@ -228,7 +230,8 @@ impl FoldDB {
                 if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
                     if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
                         if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
-                            input_arefs.push(dep_aref);
+                            input_arefs.push(dep_aref.clone());
+                            input_pairs.push((dep_aref, format!("{}.{}", schema_name, field_dep)));
                         }
                     }
                 }
@@ -247,13 +250,14 @@ impl FoldDB {
             if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
                 if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
                     if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
-                        input_arefs.push(dep_aref);
+                        input_arefs.push(dep_aref.clone());
+                        input_pairs.push((dep_aref, format!("{}.{}", schema_name, field_dep)));
                     }
                 }
             }
         }
 
-        Ok((input_arefs, trigger_fields))
+        Ok((input_pairs, trigger_fields))
     }
 
     fn register_transform_internal(
@@ -262,6 +266,7 @@ impl FoldDB {
         field_name: &str,
         transform: &Transform,
         input_arefs: Vec<String>,
+        input_names: Vec<String>,
         mut trigger_fields: Vec<String>,
         output_aref: String,
     ) -> Result<(), SchemaError> {
@@ -271,6 +276,7 @@ impl FoldDB {
             transform_id: transform_id.clone(),
             transform: transform.clone(),
             input_arefs,
+            input_names,
             trigger_fields,
             output_aref,
             schema_name: schema.name.clone(),
@@ -287,13 +293,20 @@ impl FoldDB {
         for (field_name, field) in &schema.fields {
             if let Some(transform) = field.get_transform() {
                 let output_aref = self.parse_output_field(schema, field_name, field, transform)?;
-                let (input_arefs, trigger_fields) =
+                let (pairs, trigger_fields) =
                     self.collect_input_arefs(schema, transform, &cross_re)?;
+                let mut input_arefs = Vec::new();
+                let mut input_names = Vec::new();
+                for (a, n) in pairs {
+                    input_arefs.push(a);
+                    input_names.push(n);
+                }
                 self.register_transform_internal(
                     schema,
                     field_name,
                     transform,
                     input_arefs,
+                    input_names,
                     trigger_fields,
                     output_aref,
                 )?;

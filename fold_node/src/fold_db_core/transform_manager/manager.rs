@@ -15,6 +15,8 @@ pub struct TransformManager {
     aref_to_transforms: RwLock<HashMap<String, HashSet<String>>>,
     /// Maps transform IDs to their dependent atom reference UUIDs
     transform_to_arefs: RwLock<HashMap<String, HashSet<String>>>,
+    /// Maps transform IDs to input field names keyed by atom ref UUID
+    transform_input_names: RwLock<HashMap<String, HashMap<String, String>>>,
     /// Maps schema.field keys to transforms triggered by them
     field_to_transforms: RwLock<HashMap<String, HashSet<String>>>,
     /// Maps transform IDs to the fields that trigger them
@@ -56,6 +58,7 @@ impl TransformManager {
             registered_transforms: RwLock::new(registered_transforms),
             aref_to_transforms: RwLock::new(HashMap::new()),
             transform_to_arefs: RwLock::new(HashMap::new()),
+            transform_input_names: RwLock::new(HashMap::new()),
             field_to_transforms: RwLock::new(HashMap::new()),
             transform_to_fields: RwLock::new(HashMap::new()),
             transform_outputs: RwLock::new(HashMap::new()),
@@ -74,6 +77,7 @@ impl TransformManager {
             transform_id,
             mut transform,
             input_arefs,
+            input_names,
             trigger_fields,
             output_aref,
             schema_name,
@@ -135,12 +139,27 @@ impl TransformManager {
                     )
                 })?;
             let mut aref_set = HashSet::new();
-
             for aref_uuid in &input_arefs {
                 aref_set.insert(aref_uuid.clone());
             }
-
             transform_to_arefs.insert(transform_id.clone(), aref_set);
+        }
+
+        // Store mapping of input names to refs
+        {
+            let mut transform_input_names = self
+                .transform_input_names
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire transform_input_names lock".to_string(),
+                    )
+                })?;
+            let mut map = HashMap::new();
+            for (aref_uuid, name) in input_arefs.iter().zip(input_names.iter()) {
+                map.insert(aref_uuid.clone(), name.clone());
+            }
+            transform_input_names.insert(transform_id.clone(), map);
         }
 
         // Register the fields that trigger this transform
@@ -218,6 +237,7 @@ impl TransformManager {
                 transform_id,
                 transform,
                 input_arefs: dependencies,
+                input_names: Vec::new(),
                 trigger_fields,
                 output_aref,
                 schema_name,
@@ -307,6 +327,19 @@ impl TransformManager {
                     })?;
                 transform_to_arefs.remove(transform_id).unwrap_or_default()
             };
+
+            // Remove input name mapping
+            {
+                let mut transform_input_names = self
+                    .transform_input_names
+                    .write()
+                    .map_err(|_| {
+                        SchemaError::InvalidData(
+                            "Failed to acquire transform_input_names lock".to_string(),
+                        )
+                    })?;
+                transform_input_names.remove(transform_id);
+            }
             
             // Update the reverse mapping (aref -> transforms)
             {
@@ -423,6 +456,21 @@ impl TransformManager {
             .cloned()
             .unwrap_or_default();
 
+        let name_map = {
+            let transform_input_names = self
+                .transform_input_names
+                .read()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire transform_input_names lock".to_string(),
+                    )
+                })?;
+            transform_input_names
+                .get(transform_id)
+                .cloned()
+                .unwrap_or_default()
+        };
+
         let mut input_values = HashMap::new();
 
         let inputs = transform.get_inputs();
@@ -439,7 +487,11 @@ impl TransformManager {
             let atom = (get_atom_fn)(aref).map_err(|e| {
                 SchemaError::InvalidField(format!("Failed to get input '{}': {}", aref, e))
             })?;
-            input_values.insert(aref.clone(), atom.content().clone());
+            let key = name_map
+                .get(aref)
+                .cloned()
+                .unwrap_or_else(|| aref.clone());
+            input_values.insert(key, atom.content().clone());
         }
 
         info!("Input values for {}: {:?}", transform_id, input_values);
