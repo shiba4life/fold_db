@@ -2,6 +2,8 @@ use std::sync::{Arc, Mutex};
 
 use fold_node::fold_db_core::transform_manager::types::TransformRunner;
 use fold_node::fold_db_core::transform_orchestrator::TransformOrchestrator;
+use tempfile::tempdir;
+use sled;
 use fold_node::schema::SchemaError;
 use serde_json::json;
 
@@ -21,6 +23,13 @@ impl MockTransformManager {
             field_map: HashMap::new(),
         }
     }
+}
+
+fn create_orchestrator(manager: Arc<MockTransformManager>) -> (TransformOrchestrator, tempfile::TempDir) {
+    let dir = tempdir().unwrap();
+    let db = sled::open(dir.path()).unwrap();
+    let tree = db.open_tree("orchestrator").unwrap();
+    (TransformOrchestrator::new(manager, tree), dir)
 }
 
 impl TransformRunner for MockTransformManager {
@@ -51,7 +60,7 @@ fn field_update_adds_to_queue() {
     let mut mgr = MockTransformManager::new();
     mgr.field_map.insert("SchemaA.field1".to_string(), vec!["SchemaA.field1".to_string()]);
     let manager = Arc::new(mgr);
-    let orchestrator = TransformOrchestrator::new(manager.clone());
+    let (orchestrator, _dir) = create_orchestrator(manager.clone());
 
     orchestrator.add_task("SchemaA", "field1", "h1").unwrap();
 
@@ -68,7 +77,7 @@ fn sequential_processing_of_tasks() {
     mgr.field_map.insert("Schema.b".to_string(), vec!["Schema.b".to_string()]);
     mgr.field_map.insert("Schema.c".to_string(), vec!["Schema.c".to_string()]);
     let manager = Arc::new(mgr);
-    let orchestrator = TransformOrchestrator::new(manager.clone());
+    let (orchestrator, _dir) = create_orchestrator(manager.clone());
 
     orchestrator.add_task("Schema", "a", "h2").unwrap();
     orchestrator.add_task("Schema", "b", "h2").unwrap();
@@ -89,7 +98,7 @@ fn mapping_adds_specific_transform() {
     let mut mgr = MockTransformManager::new();
     mgr.field_map.insert("SchemaA.field".to_string(), vec!["SchemaB.other".to_string()]);
     let manager = Arc::new(mgr);
-    let orchestrator = TransformOrchestrator::new(manager.clone());
+    let (orchestrator, _dir) = create_orchestrator(manager.clone());
 
     orchestrator.add_task("SchemaA", "field", "h3").unwrap();
     assert_eq!(orchestrator.len().unwrap(), 1);
@@ -105,7 +114,7 @@ fn mapping_adds_specific_transform() {
 fn duplicate_ids_are_deduped() {
     let mgr = MockTransformManager::new();
     let manager = Arc::new(mgr);
-    let orchestrator = TransformOrchestrator::new(manager.clone());
+    let (orchestrator, _dir) = create_orchestrator(manager.clone());
 
     orchestrator.add_transform("T1", "h4").unwrap();
     orchestrator.add_transform("T1", "h4").unwrap();
@@ -121,7 +130,7 @@ fn duplicate_ids_are_deduped() {
 fn processed_prevents_rerun() {
     let mgr = MockTransformManager::new();
     let manager = Arc::new(mgr);
-    let orchestrator = TransformOrchestrator::new(manager.clone());
+    let (orchestrator, _dir) = create_orchestrator(manager.clone());
 
     orchestrator.add_transform("T2", "h5").unwrap();
     orchestrator.process_queue();
@@ -139,4 +148,23 @@ fn processed_prevents_rerun() {
     orchestrator.process_queue();
     let exec = manager.executed.lock().unwrap();
     assert_eq!(exec.len(), 2);
+}
+
+#[test]
+fn state_persists_on_disk() {
+    let mgr = MockTransformManager::new();
+    let manager = Arc::new(mgr);
+    let dir = tempdir().unwrap();
+    {
+        let db = sled::open(dir.path()).unwrap();
+        let tree = db.open_tree("orchestrator").unwrap();
+        let orchestrator = TransformOrchestrator::new(manager.clone(), tree);
+        orchestrator.add_transform("T3", "h7").unwrap();
+        assert_eq!(orchestrator.len().unwrap(), 1);
+    }
+
+    let db = sled::open(dir.path()).unwrap();
+    let tree = db.open_tree("orchestrator").unwrap();
+    let orchestrator = TransformOrchestrator::new(manager.clone(), tree);
+    assert_eq!(orchestrator.len().unwrap(), 1);
 }
