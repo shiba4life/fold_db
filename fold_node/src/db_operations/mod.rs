@@ -68,7 +68,9 @@ impl DbOperations {
         }
 
         atom = atom.with_status(status.unwrap_or(AtomStatus::Active));
-        self.store_item(atom.uuid(), &atom)?;
+        // Persist with an "atom:" prefix so we can easily distinguish entries
+        // when reloading from disk
+        self.store_item(&format!("atom:{}", atom.uuid()), &atom)?;
         Ok(atom)
     }
 
@@ -79,13 +81,13 @@ impl DbOperations {
         atom_uuid: String,
         source_pub_key: String,
     ) -> Result<AtomRef, SchemaError> {
-        let mut aref = match self.get_item::<AtomRef>(aref_uuid)? {
+        let mut aref = match self.get_item::<AtomRef>(&format!("ref:{}", aref_uuid))? {
             Some(existing_aref) => existing_aref,
             None => AtomRef::new(atom_uuid.clone(), source_pub_key),
         };
 
         aref.set_atom_uuid(atom_uuid);
-        self.store_item(aref_uuid, &aref)?;
+        self.store_item(&format!("ref:{}", aref_uuid), &aref)?;
         Ok(aref)
     }
 
@@ -97,13 +99,13 @@ impl DbOperations {
         key: String,
         source_pub_key: String,
     ) -> Result<AtomRefCollection, SchemaError> {
-        let mut aref = match self.get_item::<AtomRefCollection>(aref_uuid)? {
+        let mut aref = match self.get_item::<AtomRefCollection>(&format!("ref:{}", aref_uuid))? {
             Some(existing_aref) => existing_aref,
             None => AtomRefCollection::new(source_pub_key),
         };
 
         aref.set_atom_uuid(key, atom_uuid);
-        self.store_item(aref_uuid, &aref)?;
+        self.store_item(&format!("ref:{}", aref_uuid), &aref)?;
         Ok(aref)
     }
 }
@@ -142,7 +144,7 @@ mod tests {
         let atom = db_ops
             .create_atom("TestSchema", "owner".to_string(), None, content.clone(), None)
             .unwrap();
-        let stored: Option<Atom> = db_ops.get_item(atom.uuid()).unwrap();
+        let stored: Option<Atom> = db_ops.get_item(&format!("atom:{}", atom.uuid())).unwrap();
         assert!(stored.is_some());
         assert_eq!(stored.unwrap().content(), &content);
     }
@@ -165,7 +167,7 @@ mod tests {
             .update_atom_ref("ref1", atom2.uuid().to_string(), "owner".to_string())
             .unwrap();
 
-        let stored: Option<AtomRef> = db_ops.get_item("ref1").unwrap();
+        let stored: Option<AtomRef> = db_ops.get_item("ref:ref1").unwrap();
         let stored = stored.unwrap();
         assert_eq!(stored.uuid(), aref.uuid());
         assert_eq!(stored.get_atom_uuid(), &atom2.uuid().to_string());
@@ -200,7 +202,7 @@ mod tests {
             )
             .unwrap();
 
-        let stored: Option<AtomRefCollection> = db_ops.get_item("col1").unwrap();
+        let stored: Option<AtomRefCollection> = db_ops.get_item("ref:col1").unwrap();
         let stored = stored.unwrap();
         assert_eq!(stored.uuid(), collection.uuid());
         assert_eq!(stored.get_atom_uuid("a"), Some(&atom1.uuid().to_string()));
