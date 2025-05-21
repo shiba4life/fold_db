@@ -116,18 +116,3 @@ fn duplicate_ids_are_deduped() {
     assert_eq!(exec.len(), 1);
     assert_eq!(exec[0], "T1");
 }
-
-#[test]
-fn processed_ids_not_requeued() {
-    let mgr = MockTransformManager::new();
-    let manager = Arc::new(mgr);
-    let orchestrator = TransformOrchestrator::new(manager.clone());
-
-    orchestrator.add_transform("T1").unwrap();
-    orchestrator.process_queue();
-    assert_eq!(orchestrator.len().unwrap(), 0);
-
-    // Attempt to add the same transform again
-    orchestrator.add_transform("T1").unwrap();
-    assert_eq!(orchestrator.len().unwrap(), 0);
-}

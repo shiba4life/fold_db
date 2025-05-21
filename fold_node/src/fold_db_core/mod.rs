@@ -7,7 +7,7 @@ pub mod transform_orchestrator;
 
 use std::sync::Arc;
 use std::collections::HashMap;
-use crate::atom::{Atom, AtomRefBehavior, AtomReference};
+use crate::atom::{Atom, AtomRefBehavior};
 use crate::db_operations::DbOperations;
 use crate::permissions::PermissionWrapper;
 use crate::schema::types::{Mutation, MutationType, Query, Transform, TransformRegistration};
@@ -323,26 +323,17 @@ impl FoldDB {
         // Get the atom refs that need to be persisted
         let atom_refs = self.schema_manager.map_fields(&name)?;
 
-        // Persist each atom ref or collection
+        // Persist each atom ref
         for atom_ref in atom_refs {
-            match atom_ref {
-                AtomReference::Single(aref) => {
-                    let aref_uuid = aref.uuid().to_string();
-                    let atom_uuid = aref.get_atom_uuid().clone();
-                    self.atom_manager
-                        .update_atom_ref(&aref_uuid, atom_uuid, "system".to_string())
-                        .map_err(|e| {
-                            SchemaError::InvalidData(format!("Failed to persist atom ref: {}", e))
-                        })?;
-                }
-                AtomReference::Collection(col) => {
-                    self.atom_manager
-                        .create_atom_ref_collection(col)
-                        .map_err(|e| {
-                            SchemaError::InvalidData(format!("Failed to persist atom ref collection: {}", e))
-                        })?;
-                }
-            }
+            let aref_uuid = atom_ref.uuid().to_string();
+            let atom_uuid = atom_ref.get_atom_uuid().clone();
+
+            // Store the atom ref in the database
+            self.atom_manager
+                .update_atom_ref(&aref_uuid, atom_uuid, "system".to_string())
+                .map_err(|e| {
+                    SchemaError::InvalidData(format!("Failed to persist atom ref: {}", e))
+                })?;
         }
 
         if let Some(loaded_schema) = self.schema_manager.get_schema(&name)? {
