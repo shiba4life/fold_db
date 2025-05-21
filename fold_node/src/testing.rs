@@ -4,6 +4,7 @@ pub use crate::schema::types::{Mutation, MutationType, Operation, Query};
 pub use crate::schema::Schema;
 pub use crate::schema::SchemaCore;
 pub use crate::schema::SchemaError;
+pub use crate::schema::SchemaValidator;
 
 pub use crate::permissions::types::policy::{ExplicitCounts, PermissionsPolicy, TrustDistance};
 pub use crate::permissions::PermissionWrapper;

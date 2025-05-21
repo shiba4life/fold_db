@@ -29,6 +29,8 @@ pub mod types;
 // Public re-exports
 pub use core::SchemaCore;
 pub use types::{errors::SchemaError, schema::Schema, Transform};
+pub mod validator;
+pub use validator::SchemaValidator;
 pub use crate::{Operation, MutationType};
 
 /// Public prelude module containing types needed by tests and external code
