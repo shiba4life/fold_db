@@ -64,6 +64,22 @@ impl AtomRef {
         }
     }
 
+    /// Creates a new AtomRef with an explicit uuid.
+    #[must_use]
+    pub fn new_with_uuid(atom_uuid: String, source_pub_key: String, uuid: String) -> Self {
+        Self {
+            uuid,
+            atom_uuid,
+            updated_at: Utc::now(),
+            status: AtomRefStatus::Active,
+            update_history: vec![AtomRefUpdate {
+                timestamp: Utc::now(),
+                status: AtomRefStatus::Active,
+                source_pub_key,
+            }],
+        }
+    }
+
     /// Updates the reference to point to a new Atom version.
     pub fn set_atom_uuid(&mut self, atom_uuid: String) {
         self.atom_uuid = atom_uuid;
@@ -133,6 +149,22 @@ impl AtomRefCollection {
         }
     }
 
+    /// Creates a new empty AtomRefCollection with a specified uuid.
+    #[must_use]
+    pub fn new_with_uuid(source_pub_key: String, uuid: String) -> Self {
+        Self {
+            uuid,
+            atom_uuids: HashMap::new(),
+            updated_at: Utc::now(),
+            status: AtomRefStatus::Active,
+            update_history: vec![AtomRefUpdate {
+                timestamp: Utc::now(),
+                status: AtomRefStatus::Active,
+                source_pub_key,
+            }],
+        }
+    }
+
     /// Updates or adds a reference at the specified key.
     pub fn set_atom_uuid(&mut self, key: String, atom_uuid: String) {
         self.atom_uuids.insert(key, atom_uuid);
@@ -181,6 +213,23 @@ impl AtomRefBehavior for AtomRefCollection {
 
     fn update_history(&self) -> &Vec<AtomRefUpdate> {
         &self.update_history
+    }
+}
+
+/// Enum representing either a single AtomRef or a collection of references.
+#[derive(Debug, Clone)]
+pub enum AtomReference {
+    Single(AtomRef),
+    Collection(AtomRefCollection),
+}
+
+impl AtomReference {
+    /// Get the uuid of the underlying reference.
+    pub fn uuid(&self) -> &str {
+        match self {
+            AtomReference::Single(r) => r.uuid(),
+            AtomReference::Collection(c) => c.uuid(),
+        }
     }
 }
 
