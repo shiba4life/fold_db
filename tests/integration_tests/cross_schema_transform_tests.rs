@@ -118,6 +118,41 @@ fn test_cross_schema_transform_with_inputs() {
 }
 
 #[test]
+fn test_cross_schema_transform_auto_inputs() {
+    let mut node = create_test_node();
+
+    // Load Schema A and set value
+    let schema_a = create_schema_a();
+    node.load_schema(schema_a).unwrap();
+
+    let mutation = Mutation {
+        mutation_type: MutationType::Create,
+        schema_name: "SchemaA".to_string(),
+        pub_key: "test_key".to_string(),
+        trust_distance: 1,
+        fields_and_values: vec![("a_test_field".to_string(), json!(4))]
+            .into_iter()
+            .collect(),
+    };
+    node.mutate(mutation).unwrap();
+
+    // Create Schema B with transform referencing SchemaA.a_test_field + 5
+    let parser = TransformParser::new();
+    let expr = parser.parse_expression("SchemaA.a_test_field + 5").unwrap();
+    let transform = Transform::new_with_expr(
+        "SchemaA.a_test_field + 5".to_string(),
+        expr,
+        "SchemaB.b_test_field".to_string(),
+    );
+    let schema_b = create_schema_b(transform);
+    node.load_schema(schema_b).unwrap();
+
+    // Execute transform through the node
+    let result = node.run_transform("SchemaB.b_test_field").unwrap();
+    assert_eq!(result, json!(9.0));
+}
+
+#[test]
 fn test_transform_persists_to_output_field() {
     let mut node = create_test_node();
 

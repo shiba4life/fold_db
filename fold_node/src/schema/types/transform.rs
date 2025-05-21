@@ -37,6 +37,9 @@ pub struct TransformRegistration {
     pub transform: Transform,
     /// Input atom reference UUIDs
     pub input_arefs: Vec<String>,
+    /// Names of input fields corresponding to the atom references
+    #[serde(default)]
+    pub input_names: Vec<String>,
     /// Fields that trigger the transform
     pub trigger_fields: Vec<String>,
     /// Output atom reference UUID
