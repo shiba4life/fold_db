@@ -37,13 +37,6 @@ pub trait AtomRefBehavior {
     fn update_history(&self) -> &Vec<AtomRefUpdate>;
 }
 
-/// Wrapper enum for either a single [`AtomRef`] or an [`AtomRefCollection`].
-#[derive(Debug, Clone)]
-pub enum AtomRefWrapper {
-    Single(AtomRef),
-    Collection(AtomRefCollection),
-}
-
 /// A reference to a single atom version.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AtomRef {
@@ -60,22 +53,6 @@ impl AtomRef {
     pub fn new(atom_uuid: String, source_pub_key: String) -> Self {
         Self {
             uuid: Uuid::new_v4().to_string(),
-            atom_uuid,
-            updated_at: Utc::now(),
-            status: AtomRefStatus::Active,
-            update_history: vec![AtomRefUpdate {
-                timestamp: Utc::now(),
-                status: AtomRefStatus::Active,
-                source_pub_key,
-            }],
-        }
-    }
-
-    /// Creates a new AtomRef with a provided UUID.
-    #[must_use]
-    pub fn new_with_uuid(atom_uuid: String, source_pub_key: String, uuid: String) -> Self {
-        Self {
-            uuid,
             atom_uuid,
             updated_at: Utc::now(),
             status: AtomRefStatus::Active,
@@ -145,22 +122,6 @@ impl AtomRefCollection {
     pub fn new(source_pub_key: String) -> Self {
         Self {
             uuid: Uuid::new_v4().to_string(),
-            atom_uuids: HashMap::new(),
-            updated_at: Utc::now(),
-            status: AtomRefStatus::Active,
-            update_history: vec![AtomRefUpdate {
-                timestamp: Utc::now(),
-                status: AtomRefStatus::Active,
-                source_pub_key,
-            }],
-        }
-    }
-
-    /// Creates a new AtomRefCollection with the specified UUID.
-    #[must_use]
-    pub fn new_with_uuid(source_pub_key: String, uuid: String) -> Self {
-        Self {
-            uuid,
             atom_uuids: HashMap::new(),
             updated_at: Utc::now(),
             status: AtomRefStatus::Active,
