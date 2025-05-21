@@ -20,7 +20,7 @@
       "field_mappers": {},
       "transform": {
         "logic": "TransformBase.value1 + TransformBase.value2",
-        "inputs": [],
+        "inputs": ["TransformBase.value1", "TransformBase.value2"],
         "output": "TransformSchema.result"
       }
     }
