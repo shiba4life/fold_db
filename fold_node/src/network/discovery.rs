@@ -36,3 +36,37 @@ pub async fn discover_peers(
 
     Ok(known_peers.iter().cloned().collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[tokio::test]
+    async fn test_discover_peers_mdns_disabled() {
+        let mut config = NetworkConfig::default();
+        config.enable_mdns = false;
+        let mut known_peers = HashSet::new();
+
+        let peers = discover_peers(&config, &mut known_peers)
+            .await
+            .expect("discovery should succeed");
+
+        assert!(peers.is_empty(), "expected no peers when mDNS disabled");
+        assert!(known_peers.is_empty());
+    }
+
+    #[cfg(feature = "simulate-peers")]
+    #[tokio::test]
+    async fn test_discover_peers_with_simulated_peers() {
+        let config = NetworkConfig::default();
+        let mut known_peers = HashSet::new();
+
+        let peers = discover_peers(&config, &mut known_peers)
+            .await
+            .expect("discovery should succeed");
+
+        assert!(!peers.is_empty(), "expected simulated peers to be discovered");
+        assert_eq!(peers.len(), known_peers.len());
+    }
+}
