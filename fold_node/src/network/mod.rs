@@ -25,6 +25,7 @@ pub mod config;
 pub mod core;
 pub mod connections;
 pub mod discovery;
+pub mod forward;
 pub mod error;
 pub mod schema_protocol;
 pub mod schema_service;
