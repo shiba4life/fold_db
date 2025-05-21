@@ -106,6 +106,11 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
                 {field.transform.name}
               </div>
             )}
+            {field.ref_atom_uuid && (
+              <div className="text-xs text-gray-500 break-all">
+                {field.ref_atom_uuid}
+              </div>
+            )}
           </div>
           <span className={`
             inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
