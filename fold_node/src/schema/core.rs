@@ -1,4 +1,4 @@
-use crate::atom::AtomRef;
+use crate::atom::{AtomRef, AtomRefCollection, AtomRefWrapper};
 use crate::schema::types::fields::FieldType;
 use crate::schema::types::{
     JsonSchemaDefinition, JsonSchemaField, Schema, SchemaError, SchemaField,
@@ -186,7 +186,7 @@ impl SchemaCore {
 
     /// Maps fields between schemas based on their defined relationships.
     /// Returns a list of AtomRefs that need to be persisted in FoldDB.
-    pub fn map_fields(&self, schema_name: &str) -> Result<Vec<AtomRef>, SchemaError> {
+    pub fn map_fields(&self, schema_name: &str) -> Result<Vec<AtomRefWrapper>, SchemaError> {
         let schemas = self
             .schemas
             .lock()
@@ -233,20 +233,21 @@ impl SchemaCore {
             if field.get_ref_atom_uuid().is_none() {
                 let ref_atom_uuid = Uuid::new_v4().to_string();
 
-                // Create a new AtomRef for this field
-                let atom_ref = if field.field_type() == &FieldType::Collection {
-                    // For collection fields, we'll create a placeholder AtomRef
-                    // The actual collection will be created when data is added
-                    AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
+                let aref = if field.field_type() == &FieldType::Collection {
+                    AtomRefWrapper::Collection(AtomRefCollection::new_with_uuid(
+                        "system".to_string(),
+                        ref_atom_uuid.clone(),
+                    ))
                 } else {
-                    // For single fields, create a normal AtomRef
-                    AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
+                    AtomRefWrapper::Single(AtomRef::new_with_uuid(
+                        Uuid::new_v4().to_string(),
+                        "system".to_string(),
+                        ref_atom_uuid.clone(),
+                    ))
                 };
 
-                // Add the AtomRef to the list to be persisted
-                atom_refs.push(atom_ref);
+                atom_refs.push(aref);
 
-                // Set the ref_atom_uuid in the field
                 field.set_ref_atom_uuid(ref_atom_uuid);
             }
         }

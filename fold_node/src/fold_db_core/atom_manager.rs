@@ -1,4 +1,4 @@
-use crate::atom::{Atom, AtomRef, AtomRefCollection, AtomStatus};
+use crate::atom::{Atom, AtomRef, AtomRefBehavior, AtomRefCollection, AtomStatus};
 use crate::db_operations::DbOperations;
 use crate::schema::types::SchemaError;
 use serde_json::Value;
@@ -160,6 +160,22 @@ impl AtomManager {
             .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string()))?
             .insert(aref_uuid.to_string(), collection.clone());
         Ok(collection)
+    }
+
+    pub fn create_atom_ref_collection(
+        &self,
+        collection: AtomRefCollection,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.db_ops
+            .store_item(&format!("ref:{}", collection.uuid()), &collection)?;
+        self
+            .ref_collections
+            .lock()
+            .map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string())
+            })?
+            .insert(collection.uuid().to_string(), collection);
+        Ok(())
     }
 
     pub fn get_ref_atoms(&self) -> Arc<Mutex<HashMap<String, AtomRef>>> {
