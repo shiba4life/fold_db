@@ -6,6 +6,13 @@ use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
 use log::{error, info};
 
+const AREF_TO_TRANSFORMS_KEY: &str = "map_aref_to_transforms";
+const TRANSFORM_TO_AREFS_KEY: &str = "map_transform_to_arefs";
+const TRANSFORM_INPUT_NAMES_KEY: &str = "map_transform_input_names";
+const FIELD_TO_TRANSFORMS_KEY: &str = "map_field_to_transforms";
+const TRANSFORM_TO_FIELDS_KEY: &str = "map_transform_to_fields";
+const TRANSFORM_OUTPUTS_KEY: &str = "map_transform_outputs";
+
 pub struct TransformManager {
     /// Tree for storing transforms
     transforms_tree: sled::Tree,
@@ -45,23 +52,67 @@ impl TransformManager {
         // Load any persisted transforms
         let mut registered_transforms = HashMap::new();
         for (key, value) in transforms_tree.iter().flatten() {
-            if let (Ok(field_key), Ok(transform)) = (
-                String::from_utf8(key.to_vec()),
-                serde_json::from_slice::<Transform>(&value),
-            ) {
-                registered_transforms.insert(field_key, transform);
+            if let Ok(field_key) = String::from_utf8(key.to_vec()) {
+                if field_key.starts_with("map_") {
+                    continue;
+                }
+                if let Ok(transform) = serde_json::from_slice::<Transform>(&value) {
+                    registered_transforms.insert(field_key, transform);
+                }
             }
         }
+
+        let aref_to_transforms = transforms_tree
+            .get(AREF_TO_TRANSFORMS_KEY)
+            .ok()
+            .and_then(|v| v)
+            .and_then(|v| serde_json::from_slice(&v).ok())
+            .unwrap_or_else(HashMap::new);
+
+        let transform_to_arefs = transforms_tree
+            .get(TRANSFORM_TO_AREFS_KEY)
+            .ok()
+            .and_then(|v| v)
+            .and_then(|v| serde_json::from_slice(&v).ok())
+            .unwrap_or_else(HashMap::new);
+
+        let transform_input_names = transforms_tree
+            .get(TRANSFORM_INPUT_NAMES_KEY)
+            .ok()
+            .and_then(|v| v)
+            .and_then(|v| serde_json::from_slice(&v).ok())
+            .unwrap_or_else(HashMap::new);
+
+        let field_to_transforms = transforms_tree
+            .get(FIELD_TO_TRANSFORMS_KEY)
+            .ok()
+            .and_then(|v| v)
+            .and_then(|v| serde_json::from_slice(&v).ok())
+            .unwrap_or_else(HashMap::new);
+
+        let transform_to_fields = transforms_tree
+            .get(TRANSFORM_TO_FIELDS_KEY)
+            .ok()
+            .and_then(|v| v)
+            .and_then(|v| serde_json::from_slice(&v).ok())
+            .unwrap_or_else(HashMap::new);
+
+        let transform_outputs = transforms_tree
+            .get(TRANSFORM_OUTPUTS_KEY)
+            .ok()
+            .and_then(|v| v)
+            .and_then(|v| serde_json::from_slice(&v).ok())
+            .unwrap_or_else(HashMap::new);
 
         Self {
             transforms_tree,
             registered_transforms: RwLock::new(registered_transforms),
-            aref_to_transforms: RwLock::new(HashMap::new()),
-            transform_to_arefs: RwLock::new(HashMap::new()),
-            transform_input_names: RwLock::new(HashMap::new()),
-            field_to_transforms: RwLock::new(HashMap::new()),
-            transform_to_fields: RwLock::new(HashMap::new()),
-            transform_outputs: RwLock::new(HashMap::new()),
+            aref_to_transforms: RwLock::new(aref_to_transforms),
+            transform_to_arefs: RwLock::new(transform_to_arefs),
+            transform_input_names: RwLock::new(transform_input_names),
+            field_to_transforms: RwLock::new(field_to_transforms),
+            transform_to_fields: RwLock::new(transform_to_fields),
+            transform_outputs: RwLock::new(transform_outputs),
             get_atom_fn,
             create_atom_fn,
             update_atom_ref_fn,
@@ -214,7 +265,7 @@ impl TransformManager {
             output_field,
             inputs_len
         );
-
+        self.persist_mappings()?;
         Ok(())
     }
 
@@ -364,7 +415,11 @@ impl TransformManager {
                 }
             }
         }
-        
+
+        if found {
+            self.persist_mappings()?;
+        }
+
         Ok(found)
     }
 
@@ -655,7 +710,7 @@ impl TransformManager {
     }
 
     /// Execute transforms for a specific schema field
-pub fn execute_field_transforms(
+    pub fn execute_field_transforms(
         &self,
         schema_name: &str,
         field_name: &str,
@@ -681,6 +736,71 @@ pub fn execute_field_transforms(
             }
         }
 
+        Ok(())
+    }
+
+    fn persist_mappings(&self) -> Result<(), SchemaError> {
+        {
+            let map = self.aref_to_transforms.read().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire aref_to_transforms lock".to_string())
+            })?;
+            let json = serde_json::to_vec(&*map).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize aref_to_transforms: {}", e))
+            })?;
+            self.transforms_tree.insert(AREF_TO_TRANSFORMS_KEY.as_bytes(), json)?;
+        }
+
+        {
+            let map = self.transform_to_arefs.read().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire transform_to_arefs lock".to_string())
+            })?;
+            let json = serde_json::to_vec(&*map).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize transform_to_arefs: {}", e))
+            })?;
+            self.transforms_tree.insert(TRANSFORM_TO_AREFS_KEY.as_bytes(), json)?;
+        }
+
+        {
+            let map = self.transform_input_names.read().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire transform_input_names lock".to_string())
+            })?;
+            let json = serde_json::to_vec(&*map).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize transform_input_names: {}", e))
+            })?;
+            self.transforms_tree.insert(TRANSFORM_INPUT_NAMES_KEY.as_bytes(), json)?;
+        }
+
+        {
+            let map = self.field_to_transforms.read().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire field_to_transforms lock".to_string())
+            })?;
+            let json = serde_json::to_vec(&*map).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize field_to_transforms: {}", e))
+            })?;
+            self.transforms_tree.insert(FIELD_TO_TRANSFORMS_KEY.as_bytes(), json)?;
+        }
+
+        {
+            let map = self.transform_to_fields.read().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire transform_to_fields lock".to_string())
+            })?;
+            let json = serde_json::to_vec(&*map).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize transform_to_fields: {}", e))
+            })?;
+            self.transforms_tree.insert(TRANSFORM_TO_FIELDS_KEY.as_bytes(), json)?;
+        }
+
+        {
+            let map = self.transform_outputs.read().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire transform_outputs lock".to_string())
+            })?;
+            let json = serde_json::to_vec(&*map).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize transform_outputs: {}", e))
+            })?;
+            self.transforms_tree.insert(TRANSFORM_OUTPUTS_KEY.as_bytes(), json)?;
+        }
+
+        self.transforms_tree.flush()?;
         Ok(())
     }
 }
