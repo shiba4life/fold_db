@@ -119,9 +119,10 @@ impl FieldManager {
         };
 
         info!(
-            "get_field_value - schema: {}, field: {}, result: {:?}",
+            "get_field_value - schema: {}, field: {}, aref_uuid: {:?}, result: {:?}",
             schema.name,
             field,
+            field_def.get_ref_atom_uuid(),
             result
         );
 
@@ -158,9 +159,10 @@ impl FieldManager {
         ctx.create_and_update_atom(prev_atom_uuid, content.clone(), None)?;
 
         info!(
-            "set_field_value - schema: {}, field: {}, result: success",
+            "set_field_value - schema: {}, field: {}, aref_uuid: {}, result: success",
             schema.name,
-            field
+            field,
+            aref_uuid
         );
 
         Ok(())
@@ -188,9 +190,10 @@ impl FieldManager {
         ctx.create_and_update_atom(Some(prev_atom_uuid), content.clone(), None)?;
 
         info!(
-            "update_field - schema: {}, field: {}, result: success",
+            "update_field - schema: {}, field: {}, aref_uuid: {}, result: success",
             schema.name,
-            field
+            field,
+            aref_uuid
         );
 
         Ok(())
@@ -217,9 +220,10 @@ impl FieldManager {
         ctx.create_and_update_atom(Some(prev_atom_uuid), Value::Null, Some(AtomStatus::Deleted))?;
 
         info!(
-            "delete_field - schema: {}, field: {}, result: success",
+            "delete_field - schema: {}, field: {}, aref_uuid: {}, result: success",
             schema.name,
-            field
+            field,
+            aref_uuid
         );
 
         Ok(())
