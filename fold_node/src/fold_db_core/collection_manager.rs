@@ -31,13 +31,15 @@ impl CollectionManager {
             &mut self.field_manager.atom_manager,
         );
         ctx.validate_field_type(FieldType::Collection)?;
+        let aref_uuid = ctx.get_or_create_atom_ref()?;
         ctx.create_and_update_collection_atom(None, content.clone(), None, id.clone())?;
 
         info!(
-            "add_collection_field_value - schema: {}, field: {}, id: {}, result: success",
+            "add_collection_field_value - schema: {}, field: {}, id: {}, aref_uuid: {}, result: success",
             schema.name,
             field,
-            id
+            id,
+            aref_uuid
         );
 
         Ok(())
@@ -65,10 +67,11 @@ impl CollectionManager {
         ctx.create_and_update_collection_atom(Some(prev_atom_uuid), content.clone(), None, id.clone())?;
 
         info!(
-            "update_collection_field_value - schema: {}, field: {}, id: {}, result: success",
+            "update_collection_field_value - schema: {}, field: {}, id: {}, aref_uuid: {}, result: success",
             schema.name,
             field,
-            id
+            id,
+            aref_uuid
         );
 
         Ok(())
@@ -100,10 +103,11 @@ impl CollectionManager {
         )?;
 
         info!(
-            "delete_collection_field_value - schema: {}, field: {}, id: {}, result: success",
+            "delete_collection_field_value - schema: {}, field: {}, id: {}, aref_uuid: {}, result: success",
             schema.name,
             field,
-            id
+            id,
+            aref_uuid
         );
 
         Ok(())
