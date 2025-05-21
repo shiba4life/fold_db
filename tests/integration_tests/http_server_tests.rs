@@ -126,6 +126,44 @@ async fn test_sample_endpoints() {
     assert!(resp.status().is_success());
     let schema: Value = resp.json().await.unwrap();
     assert_eq!(schema["name"], "TransformSchema");
+
+    // Query samples
+    let resp = client
+        .get(format!("http://{}/api/samples/queries", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let queries: Value = resp.json().await.unwrap();
+    let q_arr = queries["data"].as_array().unwrap();
+    assert!(q_arr.contains(&Value::String("BasicUserQuery".to_string())));
+
+    let resp = client
+        .get(format!("http://{}/api/samples/query/BasicUserQuery", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let _query: Value = resp.json().await.unwrap();
+
+    // Mutation samples
+    let resp = client
+        .get(format!("http://{}/api/samples/mutations", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let muts: Value = resp.json().await.unwrap();
+    let m_arr = muts["data"].as_array().unwrap();
+    assert!(m_arr.contains(&Value::String("CreateUser".to_string())));
+
+    let resp = client
+        .get(format!("http://{}/api/samples/mutation/CreateUser", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let _mutation: Value = resp.json().await.unwrap();
     handle.abort();
 }
 
