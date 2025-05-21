@@ -70,9 +70,11 @@ impl DataFoldHttpServer {
         // Create sample manager
         let sample_manager = SampleManager::new().await?;
 
-        // Load sample schemas into the node
-        for (_, schema_value) in sample_manager.schemas.iter() {
-            let schema: Schema = serde_json::from_value(schema_value.clone())
+        // Load sample schemas into the node in name order to satisfy dependencies
+        let mut sample_schemas: Vec<_> = sample_manager.schemas.values().cloned().collect();
+        sample_schemas.sort_by_key(|v| v.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string());
+        for schema_value in sample_schemas {
+            let schema: Schema = serde_json::from_value(schema_value)
                 .map_err(|e| FoldDbError::Config(format!("Failed to deserialize sample schema: {}", e)))?;
             info!("Loading sample schema into node: {}", schema.name);
             node.load_schema(schema)?;

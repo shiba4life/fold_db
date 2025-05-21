@@ -49,17 +49,18 @@ pub fn load_schema_from_file<P: AsRef<Path>>(
     node: &mut DataFoldNode,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let schema_str = fs::read_to_string(path.as_ref())?;
-    match serde_json::from_str::<Schema>(&schema_str) {
-        Ok(schema) => {
-            node.load_schema(schema)?;
-        }
+
+    // Deserialize either a full `Schema` or a `JsonSchemaDefinition`
+    let schema: Schema = match serde_json::from_str::<Schema>(&schema_str) {
+        Ok(schema) => schema,
         Err(_) => {
             let json_schema: JsonSchemaDefinition = serde_json::from_str(&schema_str)?;
             let core = SchemaCore::init_default()?;
-            let schema = core.interpret_schema(json_schema)?;
-            node.load_schema(schema)?;
+            core.interpret_schema(json_schema)?
         }
-    }
+    };
+
+    node.load_schema(schema)?;
     Ok(())
 }
 
@@ -68,6 +69,15 @@ mod tests {
     use super::*;
     use crate::datafold_node::config::NodeConfig;
     use tempfile::tempdir;
+
+    fn create_node(path: &std::path::Path) -> Result<DataFoldNode, Box<dyn std::error::Error>> {
+        let config = NodeConfig {
+            storage_path: path.into(),
+            default_trust_distance: 1,
+            network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
+        };
+        Ok(DataFoldNode::new(config)?)
+    }
 
     #[test]
     fn test_load_schema_from_config() -> Result<(), Box<dyn std::error::Error>> {
@@ -86,13 +96,7 @@ mod tests {
         }"#;
         fs::write(&schema_path, test_schema)?;
 
-        let config = NodeConfig {
-            storage_path: db_path.into(),
-            default_trust_distance: 1,
-            network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-        };
-
-        let mut node = DataFoldNode::new(config)?;
+        let mut node = create_node(&db_path)?;
         load_schema_from_file(&schema_path, &mut node)?;
         Ok(())
     }
@@ -136,13 +140,7 @@ mod tests {
         }"#;
         fs::write(&schema_path, test_schema)?;
 
-        let config = NodeConfig {
-            storage_path: db_path.into(),
-            default_trust_distance: 1,
-            network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-        };
-
-        let mut node = DataFoldNode::new(config)?;
+        let mut node = create_node(&db_path)?;
         load_schema_from_file(&schema_path, &mut node)?;
 
         // Verify the schema was loaded with the transform
@@ -155,6 +153,30 @@ mod tests {
             .expect("field not found");
         assert!(field.transform.is_some());
         assert_eq!(field.transform.as_ref().unwrap().logic, "4 + 5");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_schema_invalid_fails() -> Result<(), Box<dyn std::error::Error>> {
+        let test_dir = tempdir()?;
+        let db_path = test_dir.path().join("test_db");
+
+        // Create an invalid schema (base_multiplier <= 0)
+        let schema_path = test_dir.path().join("invalid_schema.json");
+        let invalid_schema = r#"{
+            "name": "invalid_schema",
+            "fields": {},
+            "payment_config": {
+                "base_multiplier": 0.0,
+                "min_payment_threshold": 0
+            }
+        }"#;
+        fs::write(&schema_path, invalid_schema)?;
+
+        let mut node = create_node(&db_path)?;
+        let res = load_schema_from_file(&schema_path, &mut node);
+        assert!(res.is_err(), "invalid schema should fail to load");
 
         Ok(())
     }

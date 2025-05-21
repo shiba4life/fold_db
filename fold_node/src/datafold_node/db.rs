@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::error::{FoldDbError, FoldDbResult};
 use crate::schema::types::{Mutation, Operation, Query, Transform};
-use crate::schema::{Schema, SchemaError};
+use crate::schema::{Schema, SchemaError, SchemaValidator};
 
 use super::DataFoldNode;
 
@@ -15,6 +15,19 @@ impl DataFoldNode {
             .db
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+
+        // Apply transform output fix and validate before loading
+        let mut schema = schema;
+        for (fname, field) in schema.fields.iter_mut() {
+            if let Some(transform) = field.transform.as_mut() {
+                if transform.get_output().starts_with("test.") {
+                    transform.set_output(format!("{}.{}", schema_name, fname));
+                }
+            }
+        }
+
+        let validator = SchemaValidator::new(&db.schema_manager);
+        validator.validate(&schema)?;
         db.load_schema(schema)?;
         drop(db);
         self.grant_schema_permission(&schema_name)?;
@@ -168,18 +181,34 @@ mod tests {
     use crate::datafold_node::config::NodeConfig;
     use crate::schema::Schema;
 
-    #[test]
-    fn load_and_list_schema() {
-        let dir = tempdir().unwrap();
+    fn create_node(path: &std::path::Path) -> DataFoldNode {
         let config = NodeConfig {
-            storage_path: dir.path().to_path_buf(),
+            storage_path: path.into(),
             default_trust_distance: 1,
             network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
         };
-        let mut node = DataFoldNode::new(config).unwrap();
+        DataFoldNode::new(config).unwrap()
+    }
+
+    #[test]
+    fn load_and_list_schema() {
+        let dir = tempdir().unwrap();
+        let mut node = create_node(dir.path());
         let schema = Schema::new("Test".to_string());
         node.load_schema(schema).unwrap();
         let schemas = node.list_schemas().unwrap();
         assert_eq!(schemas.len(), 1);
+    }
+
+    #[test]
+    fn load_schema_invalid_fails() {
+        let dir = tempdir().unwrap();
+        let mut node = create_node(dir.path());
+
+        let mut schema = Schema::new("Bad".to_string());
+        schema.payment_config.base_multiplier = 0.0;
+
+        let res = node.load_schema(schema);
+        assert!(res.is_err());
     }
 }
