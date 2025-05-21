@@ -87,6 +87,7 @@ impl FoldDB {
         let metadata_tree = db.open_tree("metadata")?;
         let permissions_tree = db.open_tree("node_id_schema_permissions")?;
         let transforms_tree = db.open_tree("transforms")?;
+        let orchestrator_tree = db.open_tree("orchestrator_state")?;
 
         let db_ops = DbOperations::new(db.clone());
         let atom_manager = AtomManager::new(db_ops);
@@ -135,7 +136,7 @@ impl FoldDB {
         field_manager
             .set_transform_manager(Arc::clone(&transform_manager))
             .map_err(|e| sled::Error::Unsupported(e.to_string()))?;
-        let orchestrator = Arc::new(TransformOrchestrator::new(transform_manager.clone()));
+        let orchestrator = Arc::new(TransformOrchestrator::new(transform_manager.clone(), orchestrator_tree));
         field_manager
             .set_orchestrator(Arc::clone(&orchestrator))
             .map_err(|e| sled::Error::Unsupported(e.to_string()))?;

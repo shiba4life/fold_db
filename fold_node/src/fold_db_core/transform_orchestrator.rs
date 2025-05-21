@@ -1,5 +1,7 @@
 use std::collections::{HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
+use serde::{Deserialize, Serialize};
+use sled::Tree;
 
 use serde_json::Value as JsonValue;
 use log::{info, error};
@@ -8,12 +10,13 @@ use crate::schema::SchemaError;
 use super::transform_manager::types::TransformRunner;
 
 /// Orchestrates execution of transforms sequentially.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 struct QueueItem {
     id: String,
     mutation_hash: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 struct QueueState {
     queue: VecDeque<QueueItem>,
     queued: HashSet<String>,
@@ -23,18 +26,44 @@ struct QueueState {
 pub struct TransformOrchestrator {
     queue: Mutex<QueueState>,
     manager: Arc<dyn TransformRunner>,
+    tree: Tree,
 }
 
 impl TransformOrchestrator {
-    pub fn new(manager: Arc<dyn TransformRunner>) -> Self {
-        Self {
-            queue: Mutex::new(QueueState {
+    pub fn new(manager: Arc<dyn TransformRunner>, tree: Tree) -> Self {
+        let state = tree
+            .get("state")
+            .ok()
+            .flatten()
+            .and_then(|v| serde_json::from_slice::<QueueState>(&v).ok())
+            .unwrap_or_else(|| QueueState {
                 queue: VecDeque::new(),
                 queued: HashSet::new(),
                 processed: HashSet::new(),
-            }),
+            });
+        Self {
+            queue: Mutex::new(state),
             manager,
+            tree,
         }
+    }
+
+    fn persist_state(&self) -> Result<(), SchemaError> {
+        let state = {
+            let q = self
+                .queue
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire queue lock".to_string()))?;
+            serde_json::to_vec(&*q)
+                .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize state: {}", e)))?
+        };
+        self.tree
+            .insert("state", state)
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to persist orchestrator state: {}", e)))?;
+        self.tree
+            .flush()
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush orchestrator state: {}", e)))?;
+        Ok(())
     }
 
     /// Add a task for the given schema and field.
@@ -62,6 +91,8 @@ impl TransformOrchestrator {
                 q.queue.push_back(QueueItem { id, mutation_hash: mutation_hash.to_string() });
             }
         }
+        drop(q);
+        self.persist_state()?;
         Ok(())
     }
 
@@ -100,7 +131,10 @@ impl TransformOrchestrator {
         // Log queue state
         info!("Current queue length: {}", q.queue.len());
         info!("Queue contents: {:?}", q.queue);
-        
+
+        drop(q);
+        self.persist_state()?;
+
         Ok(())
     }
 
@@ -112,7 +146,7 @@ impl TransformOrchestrator {
                 .lock()
                 .map_err(|_| SchemaError::InvalidData("Failed to acquire queue lock".to_string()))
                 .ok()?;
-            match q.queue.pop_front() {
+            let res = match q.queue.pop_front() {
                 Some(item) => {
                     let key = format!("{}|{}", item.id, item.mutation_hash);
                     let processed = q.processed.contains(&key);
@@ -120,8 +154,13 @@ impl TransformOrchestrator {
                     (item.id, item.mutation_hash, processed)
                 }
                 None => return None,
-            }
+            };
+            res
         };
+
+        if self.persist_state().is_err() {
+            return Some(Err(SchemaError::InvalidData("Failed to persist state".to_string())));
+        }
 
         if already_processed {
             return Some(Ok(JsonValue::Null));
@@ -136,6 +175,10 @@ impl TransformOrchestrator {
                 .lock()
                 .expect("queue lock");
             q.processed.insert(format!("{}|{}", transform_id, mutation_hash));
+            drop(q);
+            if let Err(e) = self.persist_state() {
+                return Some(Err(e));
+            }
         }
         info!("Result for transform {}: {:?}", transform_id, result);
         Some(result)
