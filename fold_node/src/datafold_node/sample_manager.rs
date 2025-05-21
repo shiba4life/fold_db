@@ -125,6 +125,8 @@ mod tests {
         let schemas = manager.list_schema_samples();
         assert!(schemas.contains(&"UserProfile".to_string()));
         assert!(schemas.contains(&"ProductCatalog".to_string()));
+        assert!(schemas.contains(&"UserProfileView".to_string()));
+        assert!(schemas.contains(&"BlogPostSummary".to_string()));
     }
 }
 
