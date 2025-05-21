@@ -363,10 +363,14 @@ impl SchemaCore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fees::types::config::FieldPaymentConfig;
+    use crate::fees::FieldPaymentConfig;
 
     use crate::permissions::types::policy::PermissionsPolicy;
     use crate::schema::types::fields::{FieldType, SchemaField};
+    use crate::schema::types::{JsonSchemaDefinition, JsonSchemaField};
+    use crate::schema::types::json_schema::{JsonFieldPaymentConfig, JsonPermissionPolicy};
+    use crate::fees::{SchemaPaymentConfig, TrustDistanceScaling};
+    use crate::permissions::types::policy::TrustDistance;
     use std::fs;
 
     fn cleanup_test_schema(name: &str) {
@@ -388,6 +392,34 @@ mod tests {
             field = field.with_ref_atom_uuid(uuid);
         }
         field
+    }
+
+    fn build_json_schema(name: &str) -> JsonSchemaDefinition {
+        let permission_policy = JsonPermissionPolicy {
+            read: TrustDistance::Distance(0),
+            write: TrustDistance::Distance(0),
+            explicit_read: None,
+            explicit_write: None,
+        };
+        let field = JsonSchemaField {
+            permission_policy,
+            ref_atom_uuid: "uuid".to_string(),
+            payment_config: JsonFieldPaymentConfig {
+                base_multiplier: 1.0,
+                trust_distance_scaling: TrustDistanceScaling::None,
+                min_payment: None,
+            },
+            field_mappers: HashMap::new(),
+            field_type: FieldType::Single,
+            transform: None,
+        };
+        let mut fields = HashMap::new();
+        fields.insert("field".to_string(), field);
+        JsonSchemaDefinition {
+            name: name.to_string(),
+            fields,
+            payment_config: SchemaPaymentConfig::default(),
+        }
     }
 
     #[test]
@@ -466,5 +498,52 @@ mod tests {
             mapped_field.get_ref_atom_uuid(),
             Some("test_uuid".to_string())
         );
+    }
+
+    #[test]
+    fn test_validate_schema_valid() {
+        let core = SchemaCore::new("data").unwrap();
+        let schema = build_json_schema("valid");
+        assert!(core.validate_schema(&schema).is_ok());
+    }
+
+    #[test]
+    fn test_validate_schema_empty_name() {
+        let core = SchemaCore::new("data").unwrap();
+        let schema = build_json_schema("");
+        let result = core.validate_schema(&schema);
+        assert!(matches!(result, Err(SchemaError::InvalidField(msg)) if msg == "Schema name cannot be empty"));
+    }
+
+    #[test]
+    fn test_validate_schema_empty_field_name() {
+        let core = SchemaCore::new("data").unwrap();
+        let mut schema = build_json_schema("valid");
+        let field = schema.fields.remove("field").unwrap();
+        schema.fields.insert("".to_string(), field);
+        let result = core.validate_schema(&schema);
+        assert!(matches!(result, Err(SchemaError::InvalidField(msg)) if msg == "Field name cannot be empty"));
+    }
+
+    #[test]
+    fn test_validate_schema_invalid_mapper() {
+        let core = SchemaCore::new("data").unwrap();
+        let mut schema = build_json_schema("valid");
+        if let Some(field) = schema.fields.get_mut("field") {
+            field.field_mappers.insert(String::new(), "v".to_string());
+        }
+        let result = core.validate_schema(&schema);
+        assert!(matches!(result, Err(SchemaError::InvalidField(msg)) if msg.contains("invalid field mapper")));
+    }
+
+    #[test]
+    fn test_validate_schema_min_payment_zero() {
+        let core = SchemaCore::new("data").unwrap();
+        let mut schema = build_json_schema("valid");
+        if let Some(field) = schema.fields.get_mut("field") {
+            field.payment_config.min_payment = Some(0);
+        }
+        let result = core.validate_schema(&schema);
+        assert!(matches!(result, Err(SchemaError::InvalidField(msg)) if msg.contains("min_payment cannot be zero")));
     }
 }
