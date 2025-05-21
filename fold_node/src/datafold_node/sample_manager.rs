@@ -58,25 +58,41 @@ impl SampleManager {
                 }
             }
 
-            if let Ok(content) = fs::read_to_string(entry.path()).await {
-                if let Ok(value) = serde_json::from_str::<Value>(&content) {
-                    let name = entry
-                        .file_name()
-                        .to_string_lossy()
-                        .trim_end_matches(".json")
-                        .to_string();
+            match fs::read_to_string(entry.path()).await {
+                Ok(content) => match serde_json::from_str::<Value>(&content) {
+                    Ok(value) => {
+                        let name = entry
+                            .file_name()
+                            .to_string_lossy()
+                            .trim_end_matches(".json")
+                            .to_string();
 
-                    match value.get("type").and_then(|v| v.as_str()) {
-                        Some("query") => {
-                            self.queries.insert(name, value);
-                        }
-                        Some("mutation") => {
-                            self.mutations.insert(name, value);
-                        }
-                        _ => {
-                            self.schemas.insert(name, value);
+                        match value.get("type").and_then(|v| v.as_str()) {
+                            Some("query") => {
+                                self.queries.insert(name, value);
+                            }
+                            Some("mutation") => {
+                                self.mutations.insert(name, value);
+                            }
+                            _ => {
+                                self.schemas.insert(name, value);
+                            }
                         }
                     }
+                    Err(e) => {
+                        error!(
+                            "Failed to parse sample file {}: {}",
+                            entry.path().display(),
+                            e
+                        );
+                    }
+                },
+                Err(e) => {
+                    error!(
+                        "Failed to read sample file {}: {}",
+                        entry.path().display(),
+                        e
+                    );
                 }
             }
         }
