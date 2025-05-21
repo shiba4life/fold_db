@@ -110,6 +110,10 @@ Sample JSON files live under
 `fold_node/src/datafold_node/samples/data/`. Add your own files to this
 directory to make them available in the Samples tab.
 
+The `TransformSchema` example relies on values from the accompanying
+`TransformBase` schema. Populate `value1` and `value2` on `TransformBase`
+before running the `TransformSchema.result` transform.
+
 ### Network Features
 
 The **Network** tab exposes new peer‑to‑peer features:
