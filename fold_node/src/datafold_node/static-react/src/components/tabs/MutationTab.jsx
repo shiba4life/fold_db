@@ -1,9 +1,28 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 function MutationTab({ schemas, onResult }) {
   const [selectedSchema, setSelectedSchema] = useState('')
   const [mutationData, setMutationData] = useState({})
   const [mutationType, setMutationType] = useState('create')
+  const [sampleMutations, setSampleMutations] = useState([])
+  const [selectedSample, setSelectedSample] = useState('')
+  const [loadingSample, setLoadingSample] = useState(false)
+  const [samplesError, setSamplesError] = useState(null)
+
+  useEffect(() => {
+    fetchSampleMutations()
+  }, [])
+
+  const fetchSampleMutations = async () => {
+    try {
+      const resp = await fetch('/api/samples/mutations')
+      const data = await resp.json()
+      setSampleMutations(data.data || [])
+    } catch (err) {
+      console.error('Failed to fetch sample mutations:', err)
+      setSamplesError('Failed to load sample mutations')
+    }
+  }
 
   const handleSchemaChange = (e) => {
     const schemaName = e.target.value
@@ -55,6 +74,39 @@ function MutationTab({ schemas, onResult }) {
     } catch (error) {
       console.error('Failed to execute mutation:', error)
       onResult({ error: 'Failed to execute mutation' })
+    }
+  }
+
+  const runSampleMutation = async () => {
+    if (!selectedSample) return
+    setLoadingSample(true)
+    setSamplesError(null)
+
+    try {
+      const resp = await fetch(`/api/samples/mutation/${selectedSample}`)
+      if (!resp.ok) {
+        throw new Error(`Failed to fetch sample: ${resp.status}`)
+      }
+      const mutation = await resp.json()
+      const execResp = await fetch('/api/mutation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(mutation)
+      })
+      const data = await execResp.json()
+      onResult(data)
+      if (data.success) {
+        setMutationData({})
+      }
+      setSelectedSample('')
+    } catch (err) {
+      console.error('Failed to run sample mutation:', err)
+      setSamplesError('Failed to run sample mutation')
+      onResult({ error: 'Failed to run sample mutation' })
+    } finally {
+      setLoadingSample(false)
     }
   }
 
@@ -136,6 +188,37 @@ function MutationTab({ schemas, onResult }) {
 
   return (
     <div className="p-6">
+      <div className="mb-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Run Sample Mutation</h3>
+        <div className="flex items-center space-x-2">
+          <select
+            className="border-gray-300 rounded-md px-3 py-2"
+            value={selectedSample}
+            onChange={(e) => setSelectedSample(e.target.value)}
+          >
+            <option value="">Select a sample...</option>
+            {sampleMutations.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={runSampleMutation}
+            disabled={!selectedSample || loadingSample}
+            className={`px-4 py-2 text-sm font-medium rounded-md text-white ${
+              !selectedSample || loadingSample
+                ? 'bg-gray-300 cursor-not-allowed'
+                : 'bg-primary hover:bg-primary/90'
+            }`}
+          >
+            {loadingSample ? 'Running...' : 'Run'}
+          </button>
+        </div>
+        {samplesError && (
+          <p className="mt-2 text-sm text-red-600">{samplesError}</p>
+        )}
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-2 gap-4">
           <div>
