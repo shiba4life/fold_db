@@ -56,24 +56,31 @@ impl<'a> SchemaValidator<'a> {
                         )))?;
 
                     if sname == schema.name {
-                        return Err(SchemaError::InvalidTransform(format!(
-                            "Transform input {input} cannot reference its own schema",
-                        )));
-                    }
+                        if fname == field_name {
+                            return Err(SchemaError::InvalidTransform(format!(
+                                "Transform input {input} cannot reference its own field",
+                            )));
+                        }
+                        if !schema.fields.contains_key(fname) {
+                            return Err(SchemaError::InvalidTransform(format!(
+                                "Input {input} references unknown field",
+                            )));
+                        }
+                    } else {
+                        let src_schema = self
+                            .core
+                            .get_schema(sname)?
+                            .ok_or_else(|| {
+                                SchemaError::InvalidTransform(format!(
+                                    "Schema {sname} not found for input {input}",
+                                ))
+                            })?;
 
-                    let src_schema = self
-                        .core
-                        .get_schema(sname)?
-                        .ok_or_else(|| {
-                            SchemaError::InvalidTransform(format!(
-                                "Schema {sname} not found for input {input}",
-                            ))
-                        })?;
-
-                    if !src_schema.fields.contains_key(fname) {
-                        return Err(SchemaError::InvalidTransform(format!(
-                            "Input {input} references unknown field",
-                        )));
+                        if !src_schema.fields.contains_key(fname) {
+                            return Err(SchemaError::InvalidTransform(format!(
+                                "Input {input} references unknown field",
+                            )));
+                        }
                     }
                 }
 
@@ -84,18 +91,26 @@ impl<'a> SchemaValidator<'a> {
                         transform.output
                     )))?;
 
-                if out_schema != schema.name {
-                    return Err(SchemaError::InvalidTransform(format!(
-                        "Transform output {} must belong to schema {}",
-                        transform.output, schema.name
-                    )));
-                }
+                if out_schema == schema.name {
+                    if out_field != field_name {
+                        return Err(SchemaError::InvalidTransform(format!(
+                            "Transform output {} does not match field name {}",
+                            transform.output, field_name
+                        )));
+                    }
+                } else {
+                    let target = self.core.get_schema(out_schema)?.ok_or_else(|| {
+                        SchemaError::InvalidTransform(format!(
+                            "Schema {out_schema} not found for output {out_schema}.{out_field}",
+                        ))
+                    })?;
 
-                if out_field != field_name {
-                    return Err(SchemaError::InvalidTransform(format!(
-                        "Transform output {} does not match field name {}",
-                        transform.output, field_name
-                    )));
+                    if !target.fields.contains_key(out_field) {
+                        return Err(SchemaError::InvalidTransform(format!(
+                            "Output field {} not found in schema {}",
+                            out_field, out_schema
+                        )));
+                    }
                 }
             }
         }
