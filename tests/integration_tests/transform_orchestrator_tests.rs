@@ -132,6 +132,7 @@ fn processed_prevents_rerun() {
 
     let exec = manager.executed.lock().unwrap();
     assert_eq!(exec.len(), 1);
+    drop(exec);
 
     // New hash should trigger execution
     orchestrator.add_transform("T2", "h6").unwrap();
