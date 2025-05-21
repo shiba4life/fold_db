@@ -68,7 +68,7 @@ impl<'de> Deserialize<'de> for MutationType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Mutation {
     pub schema_name: String,
     pub fields_and_values: HashMap<String, Value>,

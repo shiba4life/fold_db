@@ -53,7 +53,7 @@ fn field_update_adds_to_queue() {
     let manager = Arc::new(mgr);
     let orchestrator = TransformOrchestrator::new(manager.clone());
 
-    orchestrator.add_task("SchemaA", "field1").unwrap();
+    orchestrator.add_task("SchemaA", "field1", "h1").unwrap();
 
     assert_eq!(orchestrator.len().unwrap(), 1);
     let calls = manager.lookup.lock().unwrap();
@@ -70,9 +70,9 @@ fn sequential_processing_of_tasks() {
     let manager = Arc::new(mgr);
     let orchestrator = TransformOrchestrator::new(manager.clone());
 
-    orchestrator.add_task("Schema", "a").unwrap();
-    orchestrator.add_task("Schema", "b").unwrap();
-    orchestrator.add_task("Schema", "c").unwrap();
+    orchestrator.add_task("Schema", "a", "h2").unwrap();
+    orchestrator.add_task("Schema", "b", "h2").unwrap();
+    orchestrator.add_task("Schema", "c", "h2").unwrap();
 
     orchestrator.process_queue();
 
@@ -91,7 +91,7 @@ fn mapping_adds_specific_transform() {
     let manager = Arc::new(mgr);
     let orchestrator = TransformOrchestrator::new(manager.clone());
 
-    orchestrator.add_task("SchemaA", "field").unwrap();
+    orchestrator.add_task("SchemaA", "field", "h3").unwrap();
     assert_eq!(orchestrator.len().unwrap(), 1);
 
     orchestrator.process_queue();
@@ -107,12 +107,35 @@ fn duplicate_ids_are_deduped() {
     let manager = Arc::new(mgr);
     let orchestrator = TransformOrchestrator::new(manager.clone());
 
-    orchestrator.add_transform("T1").unwrap();
-    orchestrator.add_transform("T1").unwrap();
+    orchestrator.add_transform("T1", "h4").unwrap();
+    orchestrator.add_transform("T1", "h4").unwrap();
     assert_eq!(orchestrator.len().unwrap(), 1);
 
     orchestrator.process_queue();
     let exec = manager.executed.lock().unwrap();
     assert_eq!(exec.len(), 1);
     assert_eq!(exec[0], "T1");
+}
+
+#[test]
+fn processed_prevents_rerun() {
+    let mgr = MockTransformManager::new();
+    let manager = Arc::new(mgr);
+    let orchestrator = TransformOrchestrator::new(manager.clone());
+
+    orchestrator.add_transform("T2", "h5").unwrap();
+    orchestrator.process_queue();
+
+    // Queue again with same hash
+    orchestrator.add_transform("T2", "h5").unwrap();
+    orchestrator.process_queue();
+
+    let exec = manager.executed.lock().unwrap();
+    assert_eq!(exec.len(), 1);
+
+    // New hash should trigger execution
+    orchestrator.add_transform("T2", "h6").unwrap();
+    orchestrator.process_queue();
+    let exec = manager.executed.lock().unwrap();
+    assert_eq!(exec.len(), 2);
 }

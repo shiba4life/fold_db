@@ -22,6 +22,7 @@ sled = "0.34"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1"
+sha2 = "0.10"
 async-trait = "0.1"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "sync", "time", "fs", "signal", "io-util"] }
 thiserror = "1.0"

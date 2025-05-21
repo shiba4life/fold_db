@@ -403,6 +403,13 @@ impl FoldDB {
             return Err(SchemaError::InvalidData("No fields to write".to_string()));
         }
 
+        let mutation_bytes = serde_json::to_vec(&mutation)
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize mutation: {}", e)))?;
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(mutation_bytes);
+        let mutation_hash = format!("{:x}", hasher.finalize());
+
         let schema = self
             .schema_manager
             .get_schema(&mutation.schema_name)?
@@ -476,7 +483,9 @@ impl FoldDB {
                 }
             }
 
-            let _ = self.transform_orchestrator.add_task(&schema.name, field_name);
+            let _ = self
+                .transform_orchestrator
+                .add_task(&schema.name, field_name, &mutation_hash);
         }
         Ok(())
     }
