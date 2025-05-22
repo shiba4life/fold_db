@@ -2,7 +2,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use crate::error::{FoldDbError, FoldDbResult};
-use crate::schema::types::{Mutation, Operation, Query, Transform};
+use crate::schema::types::{Fold, Mutation, Operation, Query, Transform};
 use crate::schema::{Schema, SchemaError, SchemaValidator};
 
 use super::DataFoldNode;
@@ -162,6 +162,42 @@ impl DataFoldNode {
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
         db.unload_schema(schema_name).map_err(|e| e.into())
+    }
+
+    /// Load a fold into the database.
+    pub fn load_fold(&self, fold: Fold) -> FoldDbResult<()> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.load_fold(fold).map_err(|e| e.into())
+    }
+
+    /// Get a fold by name.
+    pub fn get_fold(&self, name: &str) -> FoldDbResult<Option<Fold>> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        Ok(db.get_fold(name)?)
+    }
+
+    /// List all loaded folds.
+    pub fn list_folds(&self) -> FoldDbResult<Vec<String>> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        Ok(db.list_folds()?)
+    }
+
+    /// Unload a fold from memory.
+    pub fn unload_fold(&self, name: &str) -> FoldDbResult<()> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.unload_fold(name).map_err(|e| e.into())
     }
 
 
