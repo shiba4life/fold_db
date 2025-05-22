@@ -134,8 +134,8 @@ impl SchemaCore {
         Ok(())
     }
 
-    /// Unloads a schema from the manager and removes its persistent storage.
-    pub fn unload_schema(&self, schema_name: &str) -> Result<bool, SchemaError> {
+    /// Removes a schema from the manager and deletes its persistent storage.
+    pub fn delete_schema(&self, schema_name: &str) -> Result<bool, SchemaError> {
         let mut schemas = self
             .schemas
             .lock()
@@ -221,6 +221,11 @@ impl SchemaCore {
         } else {
             Err(SchemaError::NotFound(format!("Schema {schema_name} not found")))
         }
+    }
+
+    /// Unload a schema from memory without deleting its persisted file.
+    pub fn unload_schema(&self, schema_name: &str) -> Result<(), SchemaError> {
+        self.set_unloaded(schema_name)
     }
 
     /// Loads all schema files from the schemas directory.
@@ -518,8 +523,8 @@ mod tests {
             Some("test_uuid".to_string())
         );
 
-        // Test unload removes file
-        core.unload_schema(test_schema_name).unwrap();
+        // Test delete removes file
+        core.delete_schema(test_schema_name).unwrap();
         assert!(!schema_path.exists());
 
         cleanup_test_schema(test_schema_name);

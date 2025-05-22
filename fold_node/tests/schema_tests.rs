@@ -111,8 +111,8 @@ fn test_schema_persistence() {
     let reloaded_schema = new_manager.get_schema("test_persistence").unwrap().unwrap();
     assert_eq!(reloaded_schema.name, "test_persistence");
 
-    // Test schema unloading
-    assert!(manager.unload_schema("test_persistence").unwrap());
+    // Test schema deletion
+    assert!(manager.delete_schema("test_persistence").unwrap());
 
     // Verify schema was removed
     let removed_schema = manager.get_schema("test_persistence").unwrap();
