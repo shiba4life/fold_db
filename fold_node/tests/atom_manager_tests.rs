@@ -202,5 +202,30 @@ fn test_reference_updates() {
             .unwrap(),
         &col_atom2.uuid().to_string()
     );
+
+    // range update
+    let range_uuid = Uuid::new_v4().to_string();
+    let range_atom1 = manager
+        .create_atom("schema", "key".to_string(), None, json!("r1"), None)
+        .unwrap();
+    manager
+        .update_atom_ref_range(
+            &range_uuid,
+            range_atom1.uuid().to_string(),
+            "a".to_string(),
+            "key".to_string(),
+        )
+        .unwrap();
+    let range_map = manager.get_ref_ranges();
+    assert_eq!(
+        range_map
+            .lock()
+            .unwrap()
+            .get(&range_uuid)
+            .unwrap()
+            .get_atom_uuid("a")
+            .unwrap(),
+        &range_atom1.uuid().to_string()
+    );
 }
 

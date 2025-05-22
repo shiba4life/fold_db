@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -184,6 +184,84 @@ impl AtomRefBehavior for AtomRefCollection {
     }
 }
 
+/// A range-based collection of atom references stored in a BTreeMap.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AtomRefRange {
+    uuid: String,
+    atom_uuids: BTreeMap<String, String>,
+    updated_at: DateTime<Utc>,
+    status: AtomRefStatus,
+    update_history: Vec<AtomRefUpdate>,
+}
+
+impl AtomRefRange {
+    /// Creates a new empty AtomRefRange.
+    #[must_use]
+    pub fn new(source_pub_key: String) -> Self {
+        Self {
+            uuid: Uuid::new_v4().to_string(),
+            atom_uuids: BTreeMap::new(),
+            updated_at: Utc::now(),
+            status: AtomRefStatus::Active,
+            update_history: vec![AtomRefUpdate {
+                timestamp: Utc::now(),
+                status: AtomRefStatus::Active,
+                source_pub_key,
+            }],
+        }
+    }
+
+    /// Updates or adds a reference at the specified key.
+    pub fn set_atom_uuid(&mut self, key: String, atom_uuid: String) {
+        self.atom_uuids.insert(key, atom_uuid);
+        self.updated_at = Utc::now();
+    }
+
+    /// Returns the UUID of the Atom referenced by the specified key.
+    #[must_use]
+    pub fn get_atom_uuid(&self, key: &str) -> Option<&String> {
+        self.atom_uuids.get(key)
+    }
+
+    /// Removes the reference at the specified key.
+    pub fn remove_atom_uuid(&mut self, key: &str) -> Option<String> {
+        let result = self.atom_uuids.remove(key);
+        if result.is_some() {
+            self.updated_at = Utc::now();
+        }
+        result
+    }
+}
+
+impl AtomRefBehavior for AtomRefRange {
+    fn uuid(&self) -> &str {
+        &self.uuid
+    }
+
+    fn updated_at(&self) -> DateTime<Utc> {
+        self.updated_at
+    }
+
+    fn status(&self) -> &AtomRefStatus {
+        &self.status
+    }
+
+    fn set_status(&mut self, status: &AtomRefStatus, source_pub_key: String) {
+        let status_clone = status.clone();
+        self.status = status_clone.clone();
+        self.updated_at = Utc::now();
+        self.update_history.push(AtomRefUpdate {
+            timestamp: Utc::now(),
+            status: status_clone,
+            source_pub_key,
+        });
+    }
+
+    fn update_history(&self) -> &Vec<AtomRefUpdate> {
+        &self.update_history
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259,6 +337,38 @@ mod tests {
 
         // Test behavior trait
         assert!(collection.updated_at() > Utc::now() - chrono::Duration::seconds(1));
+    }
+
+    #[test]
+    fn test_atom_ref_range() {
+        use super::AtomRefBehavior;
+
+        let atoms: Vec<_> = (0..3)
+            .map(|i| {
+                Atom::new(
+                    "test_schema".to_string(),
+                    "test_key".to_string(),
+                    json!({ "index": i }),
+                )
+            })
+            .collect();
+
+        let mut range = AtomRefRange::new("test_key".to_string());
+        range.set_atom_uuid("a".to_string(), atoms[0].uuid().to_string());
+        range.set_atom_uuid("b".to_string(), atoms[1].uuid().to_string());
+        range.set_atom_uuid("c".to_string(), atoms[2].uuid().to_string());
+
+        let keys: Vec<_> = range.atom_uuids.keys().cloned().collect();
+        assert_eq!(keys, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+
+        assert_eq!(range.get_atom_uuid("b"), Some(&atoms[1].uuid().to_string()));
+        assert_eq!(
+            range.remove_atom_uuid("b"),
+            Some(atoms[1].uuid().to_string())
+        );
+        assert!(range.get_atom_uuid("b").is_none());
+
+        assert!(range.updated_at() > Utc::now() - chrono::Duration::seconds(1));
     }
 
 }
