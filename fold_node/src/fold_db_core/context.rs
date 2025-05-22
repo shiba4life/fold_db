@@ -1,5 +1,5 @@
 use super::atom_manager::AtomManager;
-use crate::atom::{AtomRef, AtomRefCollection, AtomStatus};
+use crate::atom::{AtomRef, AtomRefCollection, AtomRefRange, AtomStatus};
 use crate::schema::types::fields::FieldType;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
@@ -60,6 +60,14 @@ impl<'a> AtomContext<'a> {
                         .lock()
                         .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string()))?;
                     guard.insert(aref_uuid.clone(), collection);
+                }
+                FieldType::Range => {
+                    let range = AtomRefRange::new(self.source_pub_key.clone());
+                    let ref_ranges = self.atom_manager.get_ref_ranges();
+                    let mut guard = ref_ranges
+                        .lock()
+                        .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_ranges lock".to_string()))?;
+                    guard.insert(aref_uuid.clone(), range);
                 }
             }
             aref_uuid
@@ -136,6 +144,16 @@ impl<'a> AtomContext<'a> {
                     )
                     .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
             }
+            FieldType::Range => {
+                self.atom_manager
+                    .update_atom_ref_range(
+                        &aref_uuid,
+                        atom.uuid().to_string(),
+                        "0".to_string(),
+                        self.source_pub_key.clone(),
+                    )
+                    .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+            }
         }
 
         Ok(())
@@ -179,6 +197,7 @@ impl<'a> AtomContext<'a> {
             let msg = match expected_type {
                 FieldType::Single => "Collection fields cannot be updated without id",
                 FieldType::Collection => "Single fields cannot be updated with collection id",
+                FieldType::Range => "Incorrect field type for range operation",
             };
             return Err(SchemaError::InvalidField(msg.to_string()));
         }

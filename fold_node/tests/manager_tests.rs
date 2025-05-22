@@ -160,5 +160,6 @@ fn test_atom_context_type_validation() {
     let mut ctx = AtomContext::new(&schema, "single", "key".to_string(), &mut atom_manager);
     assert!(ctx.validate_field_type(FieldType::Single).is_ok());
     assert!(ctx.validate_field_type(FieldType::Collection).is_err());
+    assert!(ctx.validate_field_type(FieldType::Range).is_err());
 }
 

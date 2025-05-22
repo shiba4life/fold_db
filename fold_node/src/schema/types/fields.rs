@@ -12,6 +12,7 @@ use crate::schema::types::Transform;
 pub enum FieldType {
     Single,
     Collection,
+    Range,
 }
 
 impl fmt::Display for FieldType {
@@ -19,6 +20,7 @@ impl fmt::Display for FieldType {
         match self {
             FieldType::Single => write!(f, "single"),
             FieldType::Collection => write!(f, "collection"),
+            FieldType::Range => write!(f, "range"),
         }
     }
 }
@@ -168,6 +170,12 @@ impl SchemaField {
         self.field_type == FieldType::Collection
     }
 
+    /// Returns whether this field is a range
+    #[must_use]
+    pub fn is_range(&self) -> bool {
+        self.field_type == FieldType::Range
+    }
+
     /// Returns the type of this field
     #[must_use]
     pub fn field_type(&self) -> &FieldType {
@@ -306,6 +314,7 @@ mod tests {
         );
         assert_eq!(field_single.field_type(), &FieldType::Single);
         assert!(!field_single.is_collection());
+        assert!(!field_single.is_range());
 
         let field_collection = SchemaField::new(
             PermissionsPolicy::default(),
@@ -315,6 +324,17 @@ mod tests {
         );
         assert_eq!(field_collection.field_type(), &FieldType::Collection);
         assert!(field_collection.is_collection());
+        assert!(!field_collection.is_range());
+
+        let field_range = SchemaField::new(
+            PermissionsPolicy::default(),
+            create_default_payment_config(),
+            HashMap::new(),
+            Some(FieldType::Range),
+        );
+        assert_eq!(field_range.field_type(), &FieldType::Range);
+        assert!(!field_range.is_collection());
+        assert!(field_range.is_range());
     }
 
     #[test]
@@ -382,5 +402,26 @@ mod tests {
 
         let field: SchemaField = serde_json::from_str(json_input).unwrap();
         assert!(field.transform.is_none());
+    }
+
+    #[test]
+    fn test_field_deserialization_range_type() {
+        let json_input = r#"{
+            "permission_policy": {
+                "read_policy": { "Distance": 0 },
+                "write_policy": { "Distance": 0 }
+            },
+            "payment_config": {
+                "base_multiplier": 1.0,
+                "trust_distance_scaling": "None",
+                "min_payment": null
+            },
+            "ref_atom_uuid": "some-uuid",
+            "field_type": "Range",
+            "field_mappers": {}
+        }"#;
+
+        let field: SchemaField = serde_json::from_str(json_input).unwrap();
+        assert_eq!(field.field_type(), &FieldType::Range);
     }
 }
