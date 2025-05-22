@@ -18,8 +18,8 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
       const data = await resp.json()
       setSampleSchemas(data.data || [])
     } catch (err) {
-      console.error('Failed to fetch sample schemas:', err)
-      setSamplesError('Failed to load sample schemas')
+      console.error('Failed to fetch sample folds:', err)
+      setSamplesError('Failed to load sample folds')
     }
   }
 
@@ -34,13 +34,13 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     try {
       const resp = await fetch(`/api/schema/${schemaName}`, { method: 'DELETE' })
       if (!resp.ok) {
-        throw new Error(`Failed to remove schema: ${resp.status}`)
+        throw new Error(`Failed to remove fold: ${resp.status}`)
       }
       if (onSchemaUpdated) {
         onSchemaUpdated()
       }
     } catch (err) {
-      console.error('Failed to remove schema:', err)
+      console.error('Failed to remove fold:', err)
     }
   }
 
@@ -66,7 +66,7 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
       const data = await createResp.json()
 
       if (!createResp.ok) {
-        throw new Error(data.error || 'Failed to load schema')
+        throw new Error(data.error || 'Failed to load fold')
       }
 
       if (onResult) {
@@ -77,10 +77,10 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
       }
       setSelectedSample('')
     } catch (err) {
-      console.error('Failed to load sample schema:', err)
-      setSamplesError('Failed to load sample schema')
+      console.error('Failed to load sample fold:', err)
+      setSamplesError('Failed to load sample fold')
       if (onResult) {
-        onResult({ error: 'Failed to load sample schema' })
+        onResult({ error: 'Failed to load sample fold' })
       }
     } finally {
       setLoadingSample(false)
@@ -175,7 +175,7 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Load Sample Schema</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Load Sample Fold</h3>
         <div className="flex items-center space-x-2">
           <select
             className="border-gray-300 rounded-md px-3 py-2"

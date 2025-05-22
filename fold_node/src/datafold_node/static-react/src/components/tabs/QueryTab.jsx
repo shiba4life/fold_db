@@ -138,14 +138,14 @@ function QueryTab({ schemas, onResult }) {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Schema
+            Select Fold
           </label>
           <select
             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary rounded-md"
             value={selectedSchema}
             onChange={handleSchemaChange}
           >
-            <option value="">Select a schema...</option>
+            <option value="">Select a fold...</option>
             {schemas.map(schema => (
               <option key={schema.name} value={schema.name}>
                 {schema.name}

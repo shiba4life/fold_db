@@ -46,8 +46,8 @@ function SchemasTab() {
       // The backend wraps the schemas in a data field
       setSchemas(result.data || [])
     } catch (err) {
-      console.error('Failed to load schemas:', err)
-      setError('Failed to load schemas. Please try again.')
+      console.error('Failed to load folds:', err)
+      setError('Failed to load folds. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -63,12 +63,12 @@ function SchemasTab() {
         method: 'DELETE'
       })
       if (!resp.ok) {
-        throw new Error(`Failed to remove schema: ${resp.status}`)
+        throw new Error(`Failed to remove fold: ${resp.status}`)
       }
       await loadSchemas()
     } catch (err) {
-      console.error('Failed to remove schema:', err)
-      setError('Failed to remove schema. Please try again.')
+      console.error('Failed to remove fold:', err)
+      setError('Failed to remove fold. Please try again.')
     }
   }
 
@@ -188,7 +188,7 @@ function SchemasTab() {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-blue-700">
-                No schemas loaded. Use the Schema tab to load a schema.
+                No folds loaded. Use the Fold tab to load a fold.
               </p>
             </div>
           </div>

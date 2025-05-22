@@ -15,8 +15,8 @@ import QueryTab from './tabs/QueryTab'
 import MutationTab from './tabs/MutationTab'
 
 const TABS = [
-  { id: 'schemas', label: 'Loaded Schemas', icon: FolderIcon, component: SchemasTab },
-  { id: 'schema', label: 'Schema', icon: DocumentIcon, component: SchemaTab },
+  { id: 'schemas', label: 'Loaded Folds', icon: FolderIcon, component: SchemasTab },
+  { id: 'schema', label: 'Fold', icon: DocumentIcon, component: SchemaTab },
   { id: 'query', label: 'Query', icon: SearchIcon, component: QueryTab },
   { id: 'mutation', label: 'Mutation', icon: CodeIcon, component: MutationTab },
   { id: 'samples', label: 'Samples', icon: LibraryIcon },
