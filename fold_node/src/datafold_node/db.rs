@@ -155,13 +155,25 @@ impl DataFoldNode {
         Ok(history.into_iter().map(|a| a.content().clone()).collect())
     }
 
-    /// Mark a schema as unloaded without removing its transforms.
+    /// Mark a schema as unloaded without removing it from disk.
     pub fn unload_schema(&mut self, schema_name: &str) -> FoldDbResult<()> {
         let db = self
             .db
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
         db.unload_schema(schema_name).map_err(|e| e.into())
+    }
+
+    /// Completely remove a schema from the system, deleting it from disk.
+    pub fn remove_schema(&mut self, schema_name: &str) -> FoldDbResult<()> {
+        let mut db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.schema_manager
+            .unload_schema(schema_name)
+            .map(|_| ())
+            .map_err(|e| e.into())
     }
 
     /// List all registered transforms.
@@ -219,5 +231,22 @@ mod tests {
 
         let res = node.load_schema(schema);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn remove_schema_deletes_file() {
+        let dir = tempdir().unwrap();
+        let mut node = create_node(dir.path());
+        let schema = Schema::new("DeleteMe".to_string());
+        node.load_schema(schema).unwrap();
+
+        // Ensure schema is listed as available
+        let available = node.list_available_schemas().unwrap();
+        assert!(available.contains(&"DeleteMe".to_string()));
+
+        node.remove_schema("DeleteMe").unwrap();
+
+        let available_after = node.list_available_schemas().unwrap();
+        assert!(!available_after.contains(&"DeleteMe".to_string()));
     }
 }

@@ -239,11 +239,16 @@ impl TcpServer {
 
         match operation {
             "list_schemas" => {
-                // List schemas
+                // List loaded schemas
                 let node_guard = node.lock().await;
                 let schemas = node_guard.list_schemas()?;
-                let schema_names: Vec<String> = schemas.iter().map(|s| s.name.clone()).collect();
-                Ok(serde_json::to_value(schema_names)?)
+                let names: Vec<String> = schemas.iter().map(|s| s.name.clone()).collect();
+                Ok(serde_json::to_value(names)?)
+            }
+            "list_available_schemas" => {
+                let node_guard = node.lock().await;
+                let names = node_guard.list_available_schemas()?;
+                Ok(serde_json::to_value(names)?)
             }
             "get_schema" => {
                 // Get schema
@@ -321,6 +326,22 @@ impl TcpServer {
 
                 let mut node_guard = node.lock().await;
                 node_guard.unload_schema(schema_name)?;
+
+                Ok(serde_json::json!({ "success": true }))
+            }
+            "remove_schema" => {
+                let schema_name = request
+                    .get("params")
+                    .and_then(|v| v.get("schema_name"))
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        crate::error::FoldDbError::Config(
+                            "Missing schema_name parameter".to_string(),
+                        )
+                    })?;
+
+                let mut node_guard = node.lock().await;
+                node_guard.remove_schema(schema_name)?;
 
                 Ok(serde_json::json!({ "success": true }))
             }
