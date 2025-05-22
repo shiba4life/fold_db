@@ -82,7 +82,7 @@ function App() {
               }`}
               onClick={() => handleTabChange('schemas')}
             >
-              Schemas
+              Folds
             </button>
             <button
               className={`px-4 py-2 text-sm font-medium ${

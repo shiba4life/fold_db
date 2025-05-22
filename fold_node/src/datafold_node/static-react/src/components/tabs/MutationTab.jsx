@@ -223,21 +223,21 @@ function MutationTab({ schemas, onResult }) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Schema
+              Fold
             </label>
             <select
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary rounded-md"
               value={selectedSchema}
               onChange={handleSchemaChange}
             >
-              <option value="">Select a schema...</option>
+              <option value="">Select a fold...</option>
               {schemas.map(schema => (
                 <option key={schema.name} value={schema.name}>
                   {schema.name}
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-gray-500">Select the schema to operate on</p>
+            <p className="mt-1 text-xs text-gray-500">Select the fold to operate on</p>
           </div>
           
           <div>
@@ -263,12 +263,12 @@ function MutationTab({ schemas, onResult }) {
               <div className="bg-gray-50 rounded-lg p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Delete Operation</h3>
                 <p className="text-sm text-gray-600">
-                  This will delete the selected schema. No additional fields are required.
+                  This will delete the selected fold. No additional fields are required.
                 </p>
               </div>
             ) : (
               <div className="bg-gray-50 rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Schema Fields</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Fold Fields</h3>
                 <div className="space-y-6">
                   {Object.entries(selectedSchemaFields).map(([fieldName, field]) =>
                     renderField(fieldName, field)
