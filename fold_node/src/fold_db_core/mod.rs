@@ -13,6 +13,7 @@ use crate::permissions::PermissionWrapper;
 use crate::schema::types::{Mutation, MutationType, Query, Transform, TransformRegistration};
 use crate::schema::SchemaCore;
 use crate::schema::{Schema, SchemaError};
+use crate::fold::FoldManager;
 use serde_json;
 use serde_json::Value;
 use uuid::Uuid;
@@ -30,6 +31,7 @@ pub struct FoldDB {
     pub(crate) field_manager: FieldManager,
     pub(crate) collection_manager: CollectionManager,
     pub(crate) schema_manager: Arc<SchemaCore>,
+    pub(crate) fold_manager: Arc<FoldManager>,
     pub(crate) transform_manager: Arc<TransformManager>,
     pub(crate) transform_orchestrator: Arc<TransformOrchestrator>,
     permission_wrapper: PermissionWrapper,
@@ -97,6 +99,10 @@ impl FoldDB {
             SchemaCore::new(path)
                 .map_err(|e| sled::Error::Unsupported(e.to_string()))?,
         );
+        let fold_manager = Arc::new(
+            FoldManager::new(path)
+                .map_err(|e| sled::Error::Unsupported(e.to_string()))?,
+        );
         let atom_manager_clone = atom_manager.clone();
         let get_atom_fn = Arc::new(move |aref_uuid: &str| {
             atom_manager_clone.get_latest_atom(aref_uuid)
@@ -141,12 +147,14 @@ impl FoldDB {
             .set_orchestrator(Arc::clone(&orchestrator))
             .map_err(|e| sled::Error::Unsupported(e.to_string()))?;
         let _ = schema_manager.load_schemas_from_disk();
+        let _ = fold_manager.load_folds_from_disk();
 
         Ok(Self {
             atom_manager,
             field_manager,
             collection_manager,
             schema_manager,
+            fold_manager,
             transform_manager,
             transform_orchestrator: orchestrator,
             permission_wrapper: PermissionWrapper::new(),
@@ -516,5 +524,25 @@ impl FoldDB {
     /// Mark a schema as unloaded without removing transforms.
     pub fn unload_schema(&self, schema_name: &str) -> Result<(), SchemaError> {
         self.schema_manager.unload_schema(schema_name)
+    }
+
+    /// Load a fold into the fold manager and persist it.
+    pub fn load_fold(&self, fold: crate::schema::types::Fold) -> Result<(), SchemaError> {
+        self.fold_manager.load_fold(fold)
+    }
+
+    /// Retrieve a fold by name.
+    pub fn get_fold(&self, name: &str) -> Result<Option<crate::schema::types::Fold>, SchemaError> {
+        self.fold_manager.get_fold(name)
+    }
+
+    /// List names of all loaded folds.
+    pub fn list_folds(&self) -> Result<Vec<String>, SchemaError> {
+        self.fold_manager.list_folds()
+    }
+
+    /// Unload a fold from memory without removing it from disk.
+    pub fn unload_fold(&self, name: &str) -> Result<(), SchemaError> {
+        self.fold_manager.unload_fold(name)
     }
 }

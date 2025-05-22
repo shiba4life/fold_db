@@ -2,12 +2,39 @@ use fold_node::testing::{
     ExplicitCounts, FieldPaymentConfig, FieldType, Mutation, MutationType, PermissionsPolicy,
     Query, Schema, SchemaField, SchemaPaymentConfig, TrustDistance, TrustDistanceScaling,
 };
+use fold_node::schema::types::field::Field;
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
 
 fn create_default_payment_config() -> FieldPaymentConfig {
     FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
+}
+
+#[test]
+fn test_fold_manager_via_db() {
+    let (db, db_path) = setup_test_db();
+
+    use fold_node::schema::types::{FieldVariant, SingleField};
+
+    let mut fold = fold_node::schema::types::Fold::new("test_fold".to_string());
+    let mut field = SingleField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+        HashMap::new(),
+    );
+    field.set_ref_atom_uuid(Uuid::new_v4().to_string());
+    fold.add_field("field".to_string(), FieldVariant::Single(field));
+
+    db.load_fold(fold.clone()).expect("load fold");
+    let list = db.list_folds().expect("list folds");
+    assert!(list.contains(&"test_fold".to_string()));
+    let loaded = db.get_fold("test_fold").expect("get fold").unwrap();
+    assert_eq!(loaded.name, fold.name);
+    db.unload_fold("test_fold").unwrap();
+    assert!(db.get_fold("test_fold").unwrap().is_none());
+
+    cleanup_test_db(&db_path);
 }
 
 mod test_data;
