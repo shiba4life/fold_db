@@ -538,4 +538,9 @@ impl FoldDB {
             ))),
         }
     }
+
+    /// Mark a schema as unloaded without removing transforms.
+    pub fn set_schema_unloaded(&self, schema_name: &str) -> Result<(), SchemaError> {
+        self.schema_manager.set_unloaded(schema_name)
+    }
 }
