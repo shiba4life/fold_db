@@ -200,7 +200,7 @@ impl TcpServer {
     /// * `get_schema` - Get a specific schema by name
     /// * `create_schema` - Create a new schema
     /// * `update_schema` - Update an existing schema
-    /// * `delete_schema` - Delete a schema
+    /// * `unload_schema` - Unload a schema
     /// * `query` - Execute a query against a schema
     /// * `mutation` - Execute a mutation against a schema
     /// * `discover_nodes` - Discover other nodes in the network
@@ -298,17 +298,17 @@ impl TcpServer {
                 // Deserialize the schema directly from the JSON
                 let schema: Schema = serde_json::from_value(schema_json.clone())?;
 
-                // First remove the existing schema
+                // First unload the existing schema
                 let mut node_guard = node.lock().await;
-                let _ = node_guard.remove_schema(&schema.name);
+                let _ = node_guard.unload_schema(&schema.name);
 
                 // Then load the updated schema
                 node_guard.load_schema(schema)?;
 
                 Ok(serde_json::json!({ "success": true }))
             }
-            "delete_schema" => {
-                // Delete schema
+            "unload_schema" => {
+                // Unload schema
                 let schema_name = request
                     .get("params")
                     .and_then(|v| v.get("schema_name"))
@@ -320,7 +320,7 @@ impl TcpServer {
                     })?;
 
                 let mut node_guard = node.lock().await;
-                node_guard.remove_schema(schema_name)?;
+                node_guard.unload_schema(schema_name)?;
 
                 Ok(serde_json::json!({ "success": true }))
             }

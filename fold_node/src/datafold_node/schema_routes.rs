@@ -53,7 +53,7 @@ pub async fn update_schema(path: web::Path<String>, schema: web::Json<Schema>, s
 
     let mut node_guard = state.node.lock().await;
 
-    let _ = node_guard.remove_schema(&name);
+    let _ = node_guard.unload_schema(&name);
 
     match node_guard.load_schema(schema_data) {
         Ok(_) => HttpResponse::Ok().json(json!({"success": true})),
@@ -61,12 +61,12 @@ pub async fn update_schema(path: web::Path<String>, schema: web::Json<Schema>, s
     }
 }
 
-/// Delete a schema.
-pub async fn delete_schema(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
+/// Unload a schema so it is no longer active.
+pub async fn unload_schema_route(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
     let name = path.into_inner();
     let mut node_guard = state.node.lock().await;
 
-    match node_guard.remove_schema(&name) {
+    match node_guard.unload_schema(&name) {
         Ok(_) => HttpResponse::Ok().json(json!({"success": true})),
         Err(e) => HttpResponse::InternalServerError().json(json!({"error": format!("Failed to delete schema: {}", e)})),
     }

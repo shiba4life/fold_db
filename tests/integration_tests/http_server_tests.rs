@@ -339,7 +339,7 @@ async fn test_sample_transform_visible() {
 }
 
 #[tokio::test]
-async fn test_delete_schema_removes_transforms() {
+async fn test_unload_schema_keeps_transforms() {
     let (handle, addr) = start_server().await;
     let client = Client::new();
 
@@ -409,7 +409,7 @@ async fn test_delete_schema_removes_transforms() {
         .unwrap();
     assert!(resp.status().is_success());
     let body: Value = resp.json().await.unwrap();
-    assert!(!body["data"].as_object().unwrap().contains_key("delete_schema.calc"));
+    assert!(body["data"].as_object().unwrap().contains_key("delete_schema.calc"));
 
     handle.abort();
 }

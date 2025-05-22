@@ -260,14 +260,14 @@ Updates an existing schema.
 }
 ```
 
-### 5. Delete Schema
+### 5. Unload Schema
 
-Deletes a schema from the database.
+Marks a schema as unloaded so it is no longer queryable.
 
 **Request:**
 ```json
 {
-  "operation": "delete_schema",
+  "operation": "unload_schema",
   "params": {
     "schema_name": "product"
   }
