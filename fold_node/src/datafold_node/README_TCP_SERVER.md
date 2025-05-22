@@ -98,9 +98,12 @@ The TCP server uses a simple protocol for communication:
 
 The TCP server supports the following operations:
 
-- `list_schemas`: List all available schemas
+- `list_schemas`: List schemas currently loaded
+- `list_available_schemas`: List all schemas stored on disk
 - `get_schema`: Get a schema by name
 - `create_schema`: Create a new schema
+- `update_schema`: Replace an existing schema
+- `unload_schema`: Unload a schema from memory
 - `query`: Query data from a schema
 - `mutation`: Mutate data in a schema
 - `discover_nodes`: Discover remote nodes
