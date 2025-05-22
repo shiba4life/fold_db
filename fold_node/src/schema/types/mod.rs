@@ -9,7 +9,7 @@ pub mod transform;
 
 pub use errors::SchemaError;
 pub use fields::SchemaField;
-pub use field::{Field, SingleField, CollectionField, RangeField};
+pub use field::{Field, FieldVariant, SingleField, CollectionField, RangeField};
 pub use json_schema::{JsonSchemaDefinition, JsonSchemaField};
 pub use operation::Operation;
 pub use operations::{Mutation, MutationType, Query};
