@@ -1,8 +1,9 @@
 use clap::{Parser, Subcommand};
 use fold_node::{
     load_schema_from_file, load_node_config, DataFoldNode, MutationType, NodeConfig,
-    Operation,
+    Operation, Fold,
 };
+use fold_node::schema::types::JsonFoldDefinition;
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
@@ -36,6 +37,26 @@ enum Commands {
     /// Unload a schema
     UnloadSchema {
         /// Schema name to unload
+        #[arg(long, short, required = true)]
+        name: String,
+    },
+    /// Load a fold from a JSON file
+    LoadFold {
+        /// Path to the fold JSON file
+        #[arg(required = true)]
+        path: PathBuf,
+    },
+    /// List all loaded folds
+    ListFolds {},
+    /// Get a fold by name
+    GetFold {
+        /// Fold name to retrieve
+        #[arg(long, short, required = true)]
+        name: String,
+    },
+    /// Unload a fold
+    UnloadFold {
+        /// Fold name to unload
         #[arg(long, short, required = true)]
         name: String,
     },
@@ -86,6 +107,39 @@ fn handle_load_schema(path: PathBuf, node: &mut DataFoldNode) -> Result<(), Box<
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{Cli, Commands};
+    use clap::Parser;
+    use std::path::PathBuf;
+
+    #[test]
+    fn parse_load_fold() {
+        let cli = Cli::parse_from(["test", "load-fold", "foo.json"]);
+        match cli.command {
+            Commands::LoadFold { path } => {
+                assert_eq!(path, PathBuf::from("foo.json"));
+            }
+            _ => panic!("expected LoadFold"),
+        }
+    }
+
+    #[test]
+    fn parse_list_folds() {
+        let cli = Cli::parse_from(["test", "list-folds"]);
+        matches!(cli.command, Commands::ListFolds {});
+    }
+
+    #[test]
+    fn parse_get_fold() {
+        let cli = Cli::parse_from(["test", "get-fold", "--name", "foo"]);
+        match cli.command {
+            Commands::GetFold { name } => assert_eq!(name, "foo"),
+            _ => panic!("expected GetFold"),
+        }
+    }
+}
+
 fn handle_list_schemas(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
     let schemas = node.list_schemas()?;
     info!("Loaded schemas:");
@@ -107,6 +161,44 @@ fn handle_list_available_schemas(node: &mut DataFoldNode) -> Result<(), Box<dyn 
 fn handle_unload_schema(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
     node.unload_schema(&name)?;
     info!("Schema '{}' unloaded", name);
+    Ok(())
+}
+
+fn handle_load_fold(path: PathBuf, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Loading fold from: {}", path.display());
+    let json = fs::read_to_string(path)?;
+    let fold: Fold = match serde_json::from_str(&json) {
+        Ok(f) => f,
+        Err(_) => {
+            let def: JsonFoldDefinition = serde_json::from_str(&json)?;
+            Fold::try_from(def)?
+        }
+    };
+    node.load_fold(fold)?;
+    info!("Fold loaded successfully");
+    Ok(())
+}
+
+fn handle_list_folds(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    let folds = node.list_folds()?;
+    info!("Loaded folds:");
+    for name in folds {
+        info!("  - {}", name);
+    }
+    Ok(())
+}
+
+fn handle_get_fold(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    match node.get_fold(&name)? {
+        Some(fold) => info!("{}", serde_json::to_string_pretty(&fold)?),
+        None => warn!("Fold '{}' not found", name),
+    }
+    Ok(())
+}
+
+fn handle_unload_fold(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    node.unload_fold(&name)?;
+    info!("Fold '{}' unloaded", name);
     Ok(())
 }
 
@@ -196,6 +288,10 @@ fn handle_execute(path: PathBuf, node: &mut DataFoldNode) -> Result<(), Box<dyn 
 ///   * `list-schemas` - List all loaded schemas
 ///   * `list-available-schemas` - List schemas stored on disk
 ///   * `unload-schema --name <NAME>` - Unload a schema
+///   * `load-fold <PATH>` - Load a fold from a JSON file
+///   * `list-folds` - List all loaded folds
+///   * `get-fold --name <NAME>` - Get a fold by name
+///   * `unload-fold --name <NAME>` - Unload a fold
 ///   * `query` - Execute a query operation
 ///   * `mutate` - Execute a mutation operation
 ///   * `execute <PATH>` - Load an operation from a JSON file
@@ -240,6 +336,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             data,
         } => handle_mutate(&mut node, schema, mutation_type, data)?,
         Commands::UnloadSchema { name } => handle_unload_schema(name, &mut node)?,
+        Commands::LoadFold { path } => handle_load_fold(path, &mut node)?,
+        Commands::ListFolds {} => handle_list_folds(&mut node)?,
+        Commands::GetFold { name } => handle_get_fold(name, &mut node)?,
+        Commands::UnloadFold { name } => handle_unload_fold(name, &mut node)?,
         Commands::Execute { path } => handle_execute(path, &mut node)?,
     }
 
