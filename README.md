@@ -194,6 +194,7 @@ See **datafold_api_examples/** for Python scripts that demonstrate:
 
 - Creating a user
 - Listing schemas
+- Unloading schemas
 - Querying data
 - Executing mutations
 - Updating records

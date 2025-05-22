@@ -68,7 +68,7 @@ pub async fn unload_schema_route(path: web::Path<String>, state: web::Data<AppSt
 
     match node_guard.unload_schema(&name) {
         Ok(_) => HttpResponse::Ok().json(json!({"success": true})),
-        Err(e) => HttpResponse::InternalServerError().json(json!({"error": format!("Failed to delete schema: {}", e)})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({"error": format!("Failed to unload schema: {}", e)})),
     }
 }
 
