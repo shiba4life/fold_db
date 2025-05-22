@@ -5,6 +5,7 @@ pub mod json_schema;
 pub mod operation;
 pub mod operations;
 pub mod schema;
+pub mod fold;
 pub mod transform;
 
 pub use errors::SchemaError;
@@ -14,4 +15,5 @@ pub use json_schema::{JsonSchemaDefinition, JsonSchemaField};
 pub use operation::Operation;
 pub use operations::{Mutation, MutationType, Query};
 pub use schema::Schema;
+pub use fold::Fold;
 pub use transform::{Transform, TransformRegistration};
