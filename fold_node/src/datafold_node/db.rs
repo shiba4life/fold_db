@@ -155,22 +155,13 @@ impl DataFoldNode {
         Ok(history.into_iter().map(|a| a.content().clone()).collect())
     }
 
-    /// Removes a schema from the database.
-    pub fn remove_schema(&mut self, schema_name: &str) -> FoldDbResult<()> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.remove_schema(schema_name).map_err(|e| e.into())
-    }
-
     /// Mark a schema as unloaded without removing its transforms.
-    pub fn set_schema_unloaded(&mut self, schema_name: &str) -> FoldDbResult<()> {
+    pub fn unload_schema(&mut self, schema_name: &str) -> FoldDbResult<()> {
         let db = self
             .db
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.set_schema_unloaded(schema_name).map_err(|e| e.into())
+        db.unload_schema(schema_name).map_err(|e| e.into())
     }
 
     /// List all registered transforms.
