@@ -8,6 +8,13 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
+
+/// State of a schema within the system
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SchemaState {
+    Loaded,
+    Unloaded,
+}
 use uuid::Uuid;
 
 /// Core schema management system that combines schema interpretation, validation, and management.
@@ -23,6 +30,8 @@ use uuid::Uuid;
 pub struct SchemaCore {
     /// Thread-safe storage for loaded schemas
     schemas: Mutex<HashMap<String, Schema>>,
+    /// All schemas known to the system and their load state
+    available: Mutex<HashMap<String, (Schema, SchemaState)>>,
     /// Base directory for schema storage
     schemas_dir: PathBuf,
 }
@@ -41,6 +50,7 @@ impl SchemaCore {
 
         Ok(Self {
             schemas: Mutex::new(HashMap::new()),
+            available: Mutex::new(HashMap::new()),
             schemas_dir,
         })
     }
@@ -105,10 +115,21 @@ impl SchemaCore {
         self.persist_schema(&schema)?;
 
         // Then add it to memory
-        self.schemas
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?
-            .insert(schema.name.clone(), schema);
+        let name = schema.name.clone();
+        {
+            let mut loaded = self
+                .schemas
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            loaded.insert(name.clone(), schema.clone());
+        }
+        {
+            let mut all = self
+                .available
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            all.insert(name, (schema, SchemaState::Loaded));
+        }
 
         Ok(())
     }
@@ -121,6 +142,13 @@ impl SchemaCore {
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
 
         let was_present = schemas.remove(schema_name).is_some();
+        {
+            let mut available = self
+                .available
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            available.remove(schema_name);
+        }
 
         if was_present {
             // Remove the schema file if it exists
@@ -145,12 +173,26 @@ impl SchemaCore {
     }
 
     /// Lists all schema names currently loaded.
-    pub fn list_schemas(&self) -> Result<Vec<String>, SchemaError> {
+    pub fn list_loaded_schemas(&self) -> Result<Vec<String>, SchemaError> {
         let schemas = self
             .schemas
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
         Ok(schemas.keys().cloned().collect())
+    }
+
+    /// Lists all schemas available on disk and their state.
+    pub fn list_available_schemas(&self) -> Result<Vec<String>, SchemaError> {
+        let available = self
+            .available
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+        Ok(available.keys().cloned().collect())
+    }
+
+    /// Backwards compatible method for listing loaded schemas.
+    pub fn list_schemas(&self) -> Result<Vec<String>, SchemaError> {
+        self.list_loaded_schemas()
     }
 
     /// Checks if a schema exists in the manager.
@@ -160,6 +202,25 @@ impl SchemaCore {
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
         Ok(schemas.contains_key(schema_name))
+    }
+
+    /// Mark a schema as unloaded but keep it available in memory
+    pub fn set_unloaded(&self, schema_name: &str) -> Result<(), SchemaError> {
+        let mut schemas = self
+            .schemas
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+        schemas.remove(schema_name);
+        let mut available = self
+            .available
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+        if let Some((_, state)) = available.get_mut(schema_name) {
+            *state = SchemaState::Unloaded;
+            Ok(())
+        } else {
+            Err(SchemaError::NotFound(format!("Schema {schema_name} not found")))
+        }
     }
 
     /// Loads all schema files from the schemas directory.

@@ -89,7 +89,7 @@ impl DataFoldNode {
             .db
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        let schema_names = db.schema_manager.list_schemas()?;
+        let schema_names = db.schema_manager.list_loaded_schemas()?;
         let mut schemas = Vec::new();
         for name in schema_names {
             if let Some(schema) = db.schema_manager.get_schema(&name)? {
@@ -97,6 +97,15 @@ impl DataFoldNode {
             }
         }
         Ok(schemas)
+    }
+
+    /// List the names of all schemas available on disk.
+    pub fn list_available_schemas(&self) -> FoldDbResult<Vec<String>> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        Ok(db.schema_manager.list_available_schemas()?)
     }
 
     /// Executes a query against the database.
@@ -153,6 +162,15 @@ impl DataFoldNode {
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
         db.remove_schema(schema_name).map_err(|e| e.into())
+    }
+
+    /// Mark a schema as unloaded without removing its transforms.
+    pub fn set_schema_unloaded(&mut self, schema_name: &str) -> FoldDbResult<()> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.set_schema_unloaded(schema_name).map_err(|e| e.into())
     }
 
     /// List all registered transforms.
