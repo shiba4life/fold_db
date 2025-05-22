@@ -1,0 +1,180 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+use crate::fees::types::config::FieldPaymentConfig;
+use crate::permissions::types::policy::PermissionsPolicy;
+use crate::schema::types::Transform;
+
+/// Common interface for all schema fields.
+///
+/// The `Field` trait exposes accessors for properties shared by all field
+/// implementations. These mirror the methods that previously existed on
+/// `SchemaField`.
+pub trait Field {
+    /// Returns the permission policy associated with this field.
+    fn permission_policy(&self) -> &PermissionsPolicy;
+
+    /// Returns the payment configuration for this field.
+    fn payment_config(&self) -> &FieldPaymentConfig;
+
+    /// Gets the atom reference uuid for this field, if one exists.
+    fn ref_atom_uuid(&self) -> Option<&String>;
+
+    /// Sets the atom reference uuid for this field.
+    fn set_ref_atom_uuid(&mut self, uuid: String);
+
+    /// Returns any field mappers configured for this field.
+    fn field_mappers(&self) -> &HashMap<String, String>;
+
+    /// Sets the field mappers for this field.
+    fn set_field_mappers(&mut self, mappers: HashMap<String, String>);
+
+    /// Returns the transform associated with this field, if any.
+    fn transform(&self) -> Option<&Transform>;
+
+    /// Sets the transform for this field.
+    fn set_transform(&mut self, transform: Transform);
+
+    /// Indicates whether this field is writable.
+    fn writable(&self) -> bool;
+
+    /// Sets whether this field can be written to.
+    fn set_writable(&mut self, writable: bool);
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct FieldCommon {
+    permission_policy: PermissionsPolicy,
+    payment_config: FieldPaymentConfig,
+    ref_atom_uuid: Option<String>,
+    field_mappers: HashMap<String, String>,
+    transform: Option<Transform>,
+    writable: bool,
+}
+
+impl FieldCommon {
+    fn new(
+        permission_policy: PermissionsPolicy,
+        payment_config: FieldPaymentConfig,
+        field_mappers: HashMap<String, String>,
+    ) -> Self {
+        Self {
+            permission_policy,
+            payment_config,
+            ref_atom_uuid: None,
+            field_mappers,
+            transform: None,
+            writable: true,
+        }
+    }
+}
+
+macro_rules! impl_field {
+    ($t:ty) => {
+        impl Field for $t {
+            fn permission_policy(&self) -> &PermissionsPolicy {
+                &self.inner.permission_policy
+            }
+
+            fn payment_config(&self) -> &FieldPaymentConfig {
+                &self.inner.payment_config
+            }
+
+            fn ref_atom_uuid(&self) -> Option<&String> {
+                self.inner.ref_atom_uuid.as_ref()
+            }
+
+            fn set_ref_atom_uuid(&mut self, uuid: String) {
+                self.inner.ref_atom_uuid = Some(uuid);
+            }
+
+            fn field_mappers(&self) -> &HashMap<String, String> {
+                &self.inner.field_mappers
+            }
+
+            fn set_field_mappers(&mut self, mappers: HashMap<String, String>) {
+                self.inner.field_mappers = mappers;
+            }
+
+            fn transform(&self) -> Option<&Transform> {
+                self.inner.transform.as_ref()
+            }
+
+            fn set_transform(&mut self, transform: Transform) {
+                self.inner.transform = Some(transform);
+            }
+
+            fn writable(&self) -> bool {
+                self.inner.writable
+            }
+
+            fn set_writable(&mut self, writable: bool) {
+                self.inner.writable = writable;
+            }
+        }
+    };
+}
+
+/// Field storing a single value.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SingleField {
+    inner: FieldCommon,
+}
+
+impl SingleField {
+    #[must_use]
+    pub fn new(
+        permission_policy: PermissionsPolicy,
+        payment_config: FieldPaymentConfig,
+        field_mappers: HashMap<String, String>,
+    ) -> Self {
+        Self {
+            inner: FieldCommon::new(permission_policy, payment_config, field_mappers),
+        }
+    }
+}
+
+impl_field!(SingleField);
+
+/// Field storing a collection of values.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollectionField {
+    inner: FieldCommon,
+}
+
+impl CollectionField {
+    #[must_use]
+    pub fn new(
+        permission_policy: PermissionsPolicy,
+        payment_config: FieldPaymentConfig,
+        field_mappers: HashMap<String, String>,
+    ) -> Self {
+        Self {
+            inner: FieldCommon::new(permission_policy, payment_config, field_mappers),
+        }
+    }
+}
+
+impl_field!(CollectionField);
+
+/// Field storing a range of values.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RangeField {
+    inner: FieldCommon,
+}
+
+impl RangeField {
+    #[must_use]
+    pub fn new(
+        permission_policy: PermissionsPolicy,
+        payment_config: FieldPaymentConfig,
+        field_mappers: HashMap<String, String>,
+    ) -> Self {
+        Self {
+            inner: FieldCommon::new(permission_policy, payment_config, field_mappers),
+        }
+    }
+}
+
+impl_field!(RangeField);
+
