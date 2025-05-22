@@ -179,3 +179,28 @@ fn missing_config_uses_default() {
         .expect("command failed");
     assert!(status.success());
 }
+
+#[test]
+fn unload_and_list_available() {
+    let (_dir, config, schema, _) = setup_files();
+    let exe = cli_path();
+
+    assert!(Command::new(&exe)
+        .args(["-c", config.to_str().unwrap(), "load-schema", schema.to_str().unwrap()])
+        .status()
+        .unwrap()
+        .success());
+
+    assert!(Command::new(&exe)
+        .args(["-c", config.to_str().unwrap(), "unload-schema", "--name", "TestSchema"])
+        .status()
+        .unwrap()
+        .success());
+
+    let output = Command::new(&exe)
+        .args(["-c", config.to_str().unwrap(), "list-available-schemas"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("TestSchema"));
+}

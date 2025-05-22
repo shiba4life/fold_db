@@ -31,6 +31,14 @@ enum Commands {
     },
     /// List all loaded schemas
     ListSchemas {},
+    /// List all schemas available on disk
+    ListAvailableSchemas {},
+    /// Unload a schema
+    UnloadSchema {
+        /// Schema name to unload
+        #[arg(long, short, required = true)]
+        name: String,
+    },
     /// Execute a query operation
     Query {
         /// Schema name to query
@@ -86,6 +94,22 @@ fn handle_list_schemas(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error
     }
     Ok(())
 }
+
+fn handle_list_available_schemas(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    let names = node.list_available_schemas()?;
+    info!("Available schemas:");
+    for name in names {
+        info!("  - {}", name);
+    }
+    Ok(())
+}
+
+fn handle_unload_schema(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    node.unload_schema(&name)?;
+    info!("Schema '{}' unloaded", name);
+    Ok(())
+}
+
 
 fn handle_query(
     node: &mut DataFoldNode,
@@ -170,6 +194,8 @@ fn handle_execute(path: PathBuf, node: &mut DataFoldNode) -> Result<(), Box<dyn 
 /// * Subcommands:
 ///   * `load-schema <PATH>` - Load a schema from a JSON file
 ///   * `list-schemas` - List all loaded schemas
+///   * `list-available-schemas` - List schemas stored on disk
+///   * `unload-schema --name <NAME>` - Unload a schema
 ///   * `query` - Execute a query operation
 ///   * `mutate` - Execute a mutation operation
 ///   * `execute <PATH>` - Load an operation from a JSON file
@@ -201,6 +227,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         Commands::LoadSchema { path } => handle_load_schema(path, &mut node)?,
         Commands::ListSchemas {} => handle_list_schemas(&mut node)?,
+        Commands::ListAvailableSchemas {} => handle_list_available_schemas(&mut node)?,
         Commands::Query {
             schema,
             fields,
@@ -212,6 +239,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             mutation_type,
             data,
         } => handle_mutate(&mut node, schema, mutation_type, data)?,
+        Commands::UnloadSchema { name } => handle_unload_schema(name, &mut node)?,
         Commands::Execute { path } => handle_execute(path, &mut node)?,
     }
 

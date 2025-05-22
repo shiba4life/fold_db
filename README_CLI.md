@@ -31,6 +31,11 @@ Example configuration file:
 datafold_cli [OPTIONS] <COMMAND>
 ```
 
+## Schema States
+
+Schemas can be **Loaded** (active) or **Unloaded** (stored on disk but not
+active). `list-available-schemas` displays all schemas with either state.
+
 ### Options
 
 - `-c, --config <CONFIG>`: Path to the node configuration file (default: `config/node_config.json`)
@@ -59,6 +64,22 @@ List all loaded schemas:
 
 ```bash
 datafold_cli list-schemas
+```
+
+#### List Available Schemas
+
+List all schemas stored on disk regardless of state:
+
+```bash
+datafold_cli list-available-schemas
+```
+
+#### Unload Schema
+
+Unload a schema so it is no longer active:
+
+```bash
+datafold_cli unload-schema --name <SCHEMA>
 ```
 
 #### Query
