@@ -155,7 +155,7 @@ impl DataFoldNode {
         Ok(history.into_iter().map(|a| a.content().clone()).collect())
     }
 
-    /// Mark a schema as unloaded without removing its transforms.
+    /// Mark a schema as unloaded without removing it from disk.
     pub fn unload_schema(&mut self, schema_name: &str) -> FoldDbResult<()> {
         let db = self
             .db
@@ -163,6 +163,7 @@ impl DataFoldNode {
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
         db.unload_schema(schema_name).map_err(|e| e.into())
     }
+
 
     /// List all registered transforms.
     pub fn list_transforms(&self) -> FoldDbResult<HashMap<String, Transform>> {
@@ -220,4 +221,5 @@ mod tests {
         let res = node.load_schema(schema);
         assert!(res.is_err());
     }
+
 }
