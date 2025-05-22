@@ -26,6 +26,7 @@ pub mod tcp_server;
 pub mod tcp_protocol;
 pub mod tcp_connections;
 pub mod tests;
+pub mod unified_response;
 
 // Re-export the DataFoldNode struct for easier imports
 pub use config::NodeConfig;
@@ -35,3 +36,4 @@ pub use sample_manager::SampleManager;
 pub use loader::load_schema_from_file;
 pub use node::DataFoldNode;
 pub use tcp_server::TcpServer;
+pub use unified_response::UnifiedResponse;

@@ -2,6 +2,7 @@ use super::http_server::AppState;
 use actix_web::{web, HttpResponse, Responder};
 use serde::Deserialize;
 use serde_json::json;
+use super::unified_response::UnifiedResponse;
 use crate::network::NetworkConfig;
 
 #[derive(Deserialize)]
@@ -43,32 +44,32 @@ pub async fn init_network(
     }
 
     match node.init_network(network_config).await {
-        Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": format!("Failed to init network: {}", e) })),
+        Ok(_) => HttpResponse::Ok().json(UnifiedResponse::success(None)),
+        Err(e) => HttpResponse::Ok().json(UnifiedResponse::error(format!("Failed to init network: {}", e))),
     }
 }
 
 pub async fn start_network(state: web::Data<AppState>) -> impl Responder {
     let node = state.node.lock().await;
     match node.start_network().await {
-        Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": format!("Failed to start network: {}", e) })),
+        Ok(_) => HttpResponse::Ok().json(UnifiedResponse::success(None)),
+        Err(e) => HttpResponse::Ok().json(UnifiedResponse::error(format!("Failed to start network: {}", e))),
     }
 }
 
 pub async fn stop_network(state: web::Data<AppState>) -> impl Responder {
     let node = state.node.lock().await;
     match node.stop_network().await {
-        Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": format!("Failed to stop network: {}", e) })),
+        Ok(_) => HttpResponse::Ok().json(UnifiedResponse::success(None)),
+        Err(e) => HttpResponse::Ok().json(UnifiedResponse::error(format!("Failed to stop network: {}", e))),
     }
 }
 
 pub async fn get_network_status(state: web::Data<AppState>) -> impl Responder {
     let node = state.node.lock().await;
     match node.get_network_status().await {
-        Ok(status) => HttpResponse::Ok().json(json!({ "data": status })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": format!("Failed to get network status: {}", e) })),
+        Ok(status) => HttpResponse::Ok().json(UnifiedResponse::success(Some(json!(status)))),
+        Err(e) => HttpResponse::Ok().json(UnifiedResponse::error(format!("Failed to get network status: {}", e))),
     }
 }
 
@@ -78,8 +79,8 @@ pub async fn connect_to_node(
 ) -> impl Responder {
     let mut node = state.node.lock().await;
     match node.connect_to_node(&req.node_id).await {
-        Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": format!("Failed to connect to node: {}", e) })),
+        Ok(_) => HttpResponse::Ok().json(UnifiedResponse::success(None)),
+        Err(e) => HttpResponse::Ok().json(UnifiedResponse::error(format!("Failed to connect to node: {}", e))),
     }
 }
 
@@ -88,17 +89,17 @@ pub async fn discover_nodes(state: web::Data<AppState>) -> impl Responder {
     match node.discover_nodes().await {
         Ok(peers) => {
             let peers: Vec<String> = peers.into_iter().map(|p| p.to_string()).collect();
-            HttpResponse::Ok().json(json!({ "data": peers }))
+            HttpResponse::Ok().json(UnifiedResponse::success(Some(json!(peers))))
         }
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": format!("Failed to discover nodes: {}", e) })),
+        Err(e) => HttpResponse::Ok().json(UnifiedResponse::error(format!("Failed to discover nodes: {}", e))),
     }
 }
 
 pub async fn list_nodes(state: web::Data<AppState>) -> impl Responder {
     let node = state.node.lock().await;
     match node.get_known_nodes().await {
-        Ok(nodes) => HttpResponse::Ok().json(json!({ "data": nodes })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": format!("Failed to list nodes: {}", e) })),
+        Ok(nodes) => HttpResponse::Ok().json(UnifiedResponse::success(Some(json!(nodes)))),
+        Err(e) => HttpResponse::Ok().json(UnifiedResponse::error(format!("Failed to list nodes: {}", e))),
     }
 }
 
@@ -121,7 +122,12 @@ mod tests {
         use actix_web::test;
         let req = test::TestRequest::default().to_http_request();
         let resp = list_nodes(state).await.respond_to(&req);
-        assert_eq!(resp.status(), 500);
+        assert_eq!(resp.status(), 200);
+        let body_bytes = actix_web::body::to_bytes(resp.into_body())
+            .await
+            .unwrap_or_else(|_| panic!("body error"));
+        let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+        assert_eq!(body["success"], false);
     }
 
     fn create_state() -> web::Data<super::super::http_server::AppState> {
@@ -161,7 +167,12 @@ mod tests {
         let state = create_state();
         let req = test::TestRequest::default().to_http_request();
         let start_resp = start_network(state.clone()).await.respond_to(&req);
-        assert_eq!(start_resp.status(), 500);
+        assert_eq!(start_resp.status(), 200);
+        let body_bytes = actix_web::body::to_bytes(start_resp.into_body())
+            .await
+            .unwrap_or_else(|_| panic!("body error"));
+        let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+        assert_eq!(body["success"], false);
 
         let payload = NetworkConfigPayload { listen_address: "/ip4/127.0.0.1/tcp/0".to_string(), discovery_port: None, max_connections: None, connection_timeout_secs: None, announcement_interval_secs: None, enable_discovery: None };
         let _ = init_network(web::Json(payload), state.clone()).await;
@@ -202,7 +213,12 @@ mod tests {
         let state = create_state();
         let req = test::TestRequest::default().to_http_request();
         let resp = discover_nodes(state.clone()).await.respond_to(&req);
-        assert_eq!(resp.status(), 500);
+        assert_eq!(resp.status(), 200);
+        let body_bytes = actix_web::body::to_bytes(resp.into_body())
+            .await
+            .unwrap_or_else(|_| panic!("body error"));
+        let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+        assert_eq!(body["success"], false);
 
         let payload = NetworkConfigPayload { listen_address: "/ip4/127.0.0.1/tcp/0".to_string(), discovery_port: None, max_connections: None, connection_timeout_secs: None, announcement_interval_secs: None, enable_discovery: None };
         let _ = init_network(web::Json(payload), state.clone()).await;

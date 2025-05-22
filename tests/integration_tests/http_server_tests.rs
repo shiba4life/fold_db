@@ -45,7 +45,7 @@ async fn test_get_schema_route() {
         .unwrap();
     assert!(resp.status().is_success());
     let body: Value = resp.json().await.unwrap();
-    assert_eq!(body["name"], "UserProfile");
+    assert_eq!(body["data"]["name"], "UserProfile");
     handle.abort();
 }
 
@@ -98,7 +98,7 @@ async fn test_sample_endpoints() {
         .unwrap();
     assert!(resp.status().is_success());
     let schema: Value = resp.json().await.unwrap();
-    assert_eq!(schema["name"], "UserProfile");
+    assert_eq!(schema["data"]["name"], "UserProfile");
 
     // Verify second sample as well
     let resp = client
@@ -108,7 +108,7 @@ async fn test_sample_endpoints() {
         .unwrap();
     assert!(resp.status().is_success());
     let schema: Value = resp.json().await.unwrap();
-    assert_eq!(schema["name"], "ProductCatalog");
+    assert_eq!(schema["data"]["name"], "ProductCatalog");
 
     // Verify transform sample schemas
     let resp = client
@@ -118,7 +118,7 @@ async fn test_sample_endpoints() {
         .unwrap();
     assert!(resp.status().is_success());
     let schema: Value = resp.json().await.unwrap();
-    assert_eq!(schema["name"], "TransformBase");
+    assert_eq!(schema["data"]["name"], "TransformBase");
 
     let resp = client
         .get(format!("http://{}/api/samples/schema/TransformSchema", addr))
@@ -127,7 +127,7 @@ async fn test_sample_endpoints() {
         .unwrap();
     assert!(resp.status().is_success());
     let schema: Value = resp.json().await.unwrap();
-    assert_eq!(schema["name"], "TransformSchema");
+    assert_eq!(schema["data"]["name"], "TransformSchema");
 
     // Verify new schema samples with field mappers
     let resp = client
@@ -137,7 +137,7 @@ async fn test_sample_endpoints() {
         .unwrap();
     assert!(resp.status().is_success());
     let schema: Value = resp.json().await.unwrap();
-    assert_eq!(schema["name"], "UserProfileView");
+    assert_eq!(schema["data"]["name"], "UserProfileView");
 
     let resp = client
         .get(format!("http://{}/api/samples/schema/BlogPostSummary", addr))
@@ -146,7 +146,7 @@ async fn test_sample_endpoints() {
         .unwrap();
     assert!(resp.status().is_success());
     let schema: Value = resp.json().await.unwrap();
-    assert_eq!(schema["name"], "BlogPostSummary");
+    assert_eq!(schema["data"]["name"], "BlogPostSummary");
 
     // Query samples
     let resp = client
@@ -400,7 +400,9 @@ async fn test_unload_schema_keeps_transforms() {
         .send()
         .await
         .unwrap();
-    assert_eq!(resp.status(), reqwest::StatusCode::NOT_FOUND);
+    assert!(resp.status().is_success());
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body["success"], false);
 
     let resp = client
         .get(format!("http://{}/api/transforms", addr))

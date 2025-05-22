@@ -4,10 +4,10 @@ use log::{error, info};
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
-use super::{DataFoldNode, TcpServer};
+use super::{DataFoldNode, TcpServer, unified_response::UnifiedResponse};
 use crate::datafold_node::tcp_protocol::{read_request, send_response};
 use crate::error::{FoldDbError, FoldDbResult};
-use serde_json::json;
+use serde_json::to_value;
 
 impl TcpServer {
     /// Handle a single client connection.
@@ -24,7 +24,10 @@ impl TcpServer {
                 Ok(resp) => resp,
                 Err(e) => {
                     error!("Error processing request: {}", e);
-                    json!({ "error": format!("Error processing request: {}", e) })
+                    to_value(UnifiedResponse::error(format!(
+                        "Error processing request: {}",
+                        e
+                    )))?
                 }
             };
 

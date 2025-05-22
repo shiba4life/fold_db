@@ -3,7 +3,8 @@ use crate::error::{FoldDbError, FoldDbResult};
 use crate::schema::types::operations::MutationType;
 use crate::schema::Schema;
 use libp2p::PeerId;
-use serde_json::Value;
+use serde_json::{Value, json};
+use super::unified_response::UnifiedResponse;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
@@ -289,7 +290,7 @@ impl TcpServer {
                 let mut node_guard = node.lock().await;
                 node_guard.load_schema(schema)?;
 
-                Ok(serde_json::json!({ "success": true }))
+                Ok(serde_json::to_value(UnifiedResponse::success(None))?)
             }
             "update_schema" => {
                 // Update schema
@@ -310,7 +311,7 @@ impl TcpServer {
                 // Then load the updated schema
                 node_guard.load_schema(schema)?;
 
-                Ok(serde_json::json!({ "success": true }))
+                Ok(serde_json::to_value(UnifiedResponse::success(None))?)
             }
             "unload_schema" => {
                 // Unload schema
@@ -327,7 +328,7 @@ impl TcpServer {
                 let mut node_guard = node.lock().await;
                 node_guard.unload_schema(schema_name)?;
 
-                Ok(serde_json::json!({ "success": true }))
+                Ok(serde_json::to_value(UnifiedResponse::success(None))?)
             }
             "query" => {
                 // Query
@@ -363,10 +364,10 @@ impl TcpServer {
                 let result = node_guard.execute_operation(operation)?;
 
                 // Format the result as a QueryResult
-                Ok(serde_json::json!({
+                Ok(serde_json::to_value(UnifiedResponse::success(Some(json!({
                     "results": result,
                     "errors": []
-                }))
+                }))))?)
             }
             "mutation" => {
                 // Mutation
@@ -418,9 +419,7 @@ impl TcpServer {
                 let _ = node_guard.execute_operation(operation)?;
 
                 // Return a success response
-                Ok(serde_json::json!({
-                    "success": true,
-                }))
+                Ok(serde_json::to_value(UnifiedResponse::success(None))?)
             }
             "discover_nodes" => {
                 // Discover nodes
@@ -437,7 +436,7 @@ impl TcpServer {
                     })
                     .collect::<Vec<_>>();
 
-                Ok(serde_json::to_value(node_infos)?)
+                Ok(serde_json::to_value(UnifiedResponse::success(Some(json!(node_infos))))?)
             }
             _ => Err(crate::error::FoldDbError::Config(format!(
                 "Unknown operation: {}",

@@ -22,6 +22,16 @@ All HTTP routes are prefixed with `/api`.
 | `DELETE` | `/schema/{name}` | Unload a schema without deleting it from disk. |
 | `POST` | `/execute` | Execute a query or mutation operation. |
 
+All responses share the same JSON structure:
+
+```json
+{
+  "success": true,
+  "data": {},
+  "error": null
+}
+```
+
 The TCP protocol accepts the same operations. Additional operation `list_available_schemas` returns all schemas stored on disk with their state.
 
 ### Example: Unload a Schema via HTTP
