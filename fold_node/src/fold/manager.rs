@@ -1,4 +1,6 @@
 use crate::schema::types::{Fold, errors::SchemaError};
+use crate::schema::types::JsonFoldDefinition;
+use std::convert::TryFrom;
 use serde_json;
 use std::collections::HashMap;
 use std::fs;
@@ -112,6 +114,10 @@ impl FoldManager {
                     if let Ok(contents) = fs::read_to_string(entry.path()) {
                         if let Ok(fold) = serde_json::from_str::<Fold>(&contents) {
                             let _ = self.load_fold(fold);
+                        } else if let Ok(json_fold) = serde_json::from_str::<JsonFoldDefinition>(&contents) {
+                            if let Ok(fold) = Fold::try_from(json_fold) {
+                                let _ = self.load_fold(fold);
+                            }
                         }
                     }
                 }
@@ -122,6 +128,10 @@ impl FoldManager {
 
     /// Loads a fold from a JSON string.
     pub fn load_fold_from_json(&self, json: &str) -> Result<(), SchemaError> {
+        if let Ok(json_fold) = serde_json::from_str::<JsonFoldDefinition>(json) {
+            let fold = Fold::try_from(json_fold)?;
+            return self.load_fold(fold);
+        }
         let fold: Fold = serde_json::from_str(json)
             .map_err(|e| SchemaError::InvalidData(format!("Invalid JSON fold: {}", e)))?;
         self.load_fold(fold)
@@ -187,5 +197,52 @@ mod tests {
         manager.load_fold(fold).unwrap();
         manager.unload_fold("temp").unwrap();
         assert!(manager.get_fold("temp").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_load_fold_from_json_definition() {
+        let dir = tempdir().unwrap();
+        let manager = FoldManager::new(dir.path().to_str().unwrap()).unwrap();
+        let json = r#"{
+            "name": "json_fold",
+            "fields": {
+                "field": {
+                    "permission_policy": {
+                        "read_policy": { "Distance": 0 },
+                        "write_policy": { "Distance": 0 },
+                        "explicit_read_policy": null,
+                        "explicit_write_policy": null
+                    },
+                    "ref_atom_uuid": "uuid1",
+                    "payment_config": {
+                        "base_multiplier": 1.0,
+                        "trust_distance_scaling": { "None": null },
+                        "min_payment": null
+                    },
+                    "field_mappers": {},
+                    "field_type": "Single"
+                }
+            },
+            "payment_config": {
+                "base_multiplier": 1.0,
+                "min_payment_threshold": 0
+            }
+        }"#;
+
+        manager.load_fold_from_json(json).unwrap();
+        assert!(manager.get_fold("json_fold").unwrap().is_some());
+    }
+
+    #[test]
+    fn test_load_invalid_json_definition() {
+        let dir = tempdir().unwrap();
+        let manager = FoldManager::new(dir.path().to_str().unwrap()).unwrap();
+        let json = r#"{
+            "name": "bad_fold",
+            "fields": {},
+            "payment_config": { "base_multiplier": 0.0, "min_payment_threshold": 0 }
+        }"#;
+        let res = manager.load_fold_from_json(json);
+        assert!(res.is_err());
     }
 }
