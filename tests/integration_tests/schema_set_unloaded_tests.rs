@@ -6,7 +6,7 @@ use fold_node::transform::{Transform, TransformParser};
 use crate::test_data::test_helpers::create_test_node;
 
 #[test]
-fn set_unloaded_keeps_transforms() {
+fn unload_schema_keeps_transforms() {
     let mut node = create_test_node();
 
     let mut schema = Schema::new("UnloadSchema".to_string());
@@ -31,7 +31,7 @@ fn set_unloaded_keeps_transforms() {
 
     assert!(node.list_transforms().unwrap().contains_key("UnloadSchema.calc"));
 
-    node.set_schema_unloaded("UnloadSchema").unwrap();
+    node.unload_schema("UnloadSchema").unwrap();
 
     assert!(node.list_transforms().unwrap().contains_key("UnloadSchema.calc"));
     assert!(node.get_schema("UnloadSchema").unwrap().is_none());

@@ -165,12 +165,18 @@ impl DataFoldNode {
     }
 
     /// Mark a schema as unloaded without removing its transforms.
-    pub fn set_schema_unloaded(&mut self, schema_name: &str) -> FoldDbResult<()> {
+    pub fn unload_schema(&mut self, schema_name: &str) -> FoldDbResult<()> {
         let db = self
             .db
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.set_schema_unloaded(schema_name).map_err(|e| e.into())
+        db.unload_schema(schema_name).map_err(|e| e.into())
+    }
+
+    /// Deprecated alias for [`unload_schema`].
+    #[allow(dead_code)]
+    pub fn set_schema_unloaded(&mut self, schema_name: &str) -> FoldDbResult<()> {
+        self.unload_schema(schema_name)
     }
 
     /// List all registered transforms.
