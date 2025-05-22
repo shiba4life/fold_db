@@ -1,4 +1,4 @@
-use crate::atom::{Atom, AtomRef, AtomRefCollection, AtomStatus};
+use crate::atom::{Atom, AtomRef, AtomRefCollection, AtomRefRange, AtomStatus};
 use crate::schema::SchemaError;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
@@ -113,6 +113,24 @@ impl DbOperations {
         self.store_item(&format!("ref:{}", aref_uuid), &aref)?;
         Ok(aref)
     }
+
+    /// Creates or updates a range of atom references
+    pub fn update_atom_ref_range(
+        &self,
+        aref_uuid: &str,
+        atom_uuid: String,
+        key: String,
+        source_pub_key: String,
+    ) -> Result<AtomRefRange, SchemaError> {
+        let mut aref = match self.get_item::<AtomRefRange>(&format!("ref:{}", aref_uuid))? {
+            Some(existing_aref) => existing_aref,
+            None => AtomRefRange::new(source_pub_key),
+        };
+
+        aref.set_atom_uuid(key, atom_uuid);
+        self.store_item(&format!("ref:{}", aref_uuid), &aref)?;
+        Ok(aref)
+    }
 }
 
 
@@ -210,6 +228,42 @@ mod tests {
         let stored: Option<AtomRefCollection> = db_ops.get_item("ref:col1").unwrap();
         let stored = stored.unwrap();
         assert_eq!(stored.uuid(), collection.uuid());
+        assert_eq!(stored.get_atom_uuid("a"), Some(&atom1.uuid().to_string()));
+        assert_eq!(stored.get_atom_uuid("b"), Some(&atom2.uuid().to_string()));
+    }
+
+    #[test]
+    fn test_update_atom_ref_range_persists() {
+        let db_ops = create_temp_db();
+        let atom1 = db_ops
+            .create_atom("TestSchema", "owner".to_string(), None, json!({"idx": 1}), None)
+            .unwrap();
+        let atom2 = db_ops
+            .create_atom("TestSchema", "owner".to_string(), None, json!({"idx": 2}), None)
+            .unwrap();
+
+        let mut range = db_ops
+            .update_atom_ref_range(
+                "range1",
+                atom1.uuid().to_string(),
+                "a".to_string(),
+                "owner".to_string(),
+            )
+            .unwrap();
+        assert_eq!(range.get_atom_uuid("a"), Some(&atom1.uuid().to_string()));
+
+        range = db_ops
+            .update_atom_ref_range(
+                "range1",
+                atom2.uuid().to_string(),
+                "b".to_string(),
+                "owner".to_string(),
+            )
+            .unwrap();
+
+        let stored: Option<AtomRefRange> = db_ops.get_item("ref:range1").unwrap();
+        let stored = stored.unwrap();
+        assert_eq!(stored.uuid(), range.uuid());
         assert_eq!(stored.get_atom_uuid("a"), Some(&atom1.uuid().to_string()));
         assert_eq!(stored.get_atom_uuid("b"), Some(&atom2.uuid().to_string()));
     }

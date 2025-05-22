@@ -1,4 +1,4 @@
-use crate::atom::{Atom, AtomRef, AtomRefCollection, AtomStatus};
+use crate::atom::{Atom, AtomRef, AtomRefCollection, AtomRefRange, AtomStatus};
 use crate::db_operations::DbOperations;
 use crate::schema::types::SchemaError;
 use serde_json::Value;
@@ -10,6 +10,7 @@ pub struct AtomManager {
     atoms: Arc<Mutex<HashMap<String, Atom>>>,
     ref_atoms: Arc<Mutex<HashMap<String, AtomRef>>>,
     ref_collections: Arc<Mutex<HashMap<String, AtomRefCollection>>>,
+    ref_ranges: Arc<Mutex<HashMap<String, AtomRefRange>>>,
 }
 
 impl AtomManager {
@@ -17,6 +18,7 @@ impl AtomManager {
         let mut atoms = HashMap::new();
         let mut ref_atoms = HashMap::new();
         let mut ref_collections = HashMap::new();
+        let mut ref_ranges = HashMap::new();
 
         for result in db_ops.db().iter().flatten() {
             let key_str = String::from_utf8_lossy(result.0.as_ref());
@@ -31,6 +33,8 @@ impl AtomManager {
                     ref_atoms.insert(stripped.to_string(), atom_ref);
                 } else if let Ok(collection) = serde_json::from_slice::<AtomRefCollection>(bytes) {
                     ref_collections.insert(stripped.to_string(), collection);
+                } else if let Ok(range) = serde_json::from_slice::<AtomRefRange>(bytes) {
+                    ref_ranges.insert(stripped.to_string(), range);
                 }
             } else {
                 // Backwards compatibility: entries without prefixes
@@ -40,6 +44,8 @@ impl AtomManager {
                     ref_atoms.insert(key_str.into_owned(), atom_ref);
                 } else if let Ok(collection) = serde_json::from_slice::<AtomRefCollection>(bytes) {
                     ref_collections.insert(key_str.into_owned(), collection);
+                } else if let Ok(range) = serde_json::from_slice::<AtomRefRange>(bytes) {
+                    ref_ranges.insert(key_str.into_owned(), range);
                 }
             }
         }
@@ -49,6 +55,7 @@ impl AtomManager {
             atoms: Arc::new(Mutex::new(atoms)),
             ref_atoms: Arc::new(Mutex::new(ref_atoms)),
             ref_collections: Arc::new(Mutex::new(ref_collections)),
+            ref_ranges: Arc::new(Mutex::new(ref_ranges)),
         }
     }
 
@@ -162,12 +169,34 @@ impl AtomManager {
         Ok(collection)
     }
 
+    pub fn update_atom_ref_range(
+        &self,
+        aref_uuid: &str,
+        atom_uuid: String,
+        key: String,
+        source_pub_key: String,
+    ) -> Result<AtomRefRange, Box<dyn std::error::Error>> {
+        let range = self
+            .db_ops
+            .update_atom_ref_range(aref_uuid, atom_uuid, key, source_pub_key)?;
+        self
+            .ref_ranges
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_ranges lock".to_string()))?
+            .insert(aref_uuid.to_string(), range.clone());
+        Ok(range)
+    }
+
     pub fn get_ref_atoms(&self) -> Arc<Mutex<HashMap<String, AtomRef>>> {
         Arc::clone(&self.ref_atoms)
     }
 
     pub fn get_ref_collections(&self) -> Arc<Mutex<HashMap<String, AtomRefCollection>>> {
         Arc::clone(&self.ref_collections)
+    }
+
+    pub fn get_ref_ranges(&self) -> Arc<Mutex<HashMap<String, AtomRefRange>>> {
+        Arc::clone(&self.ref_ranges)
     }
 
     pub fn get_atoms(&self) -> Arc<Mutex<HashMap<String, Atom>>> {
@@ -183,6 +212,7 @@ impl Clone for AtomManager {
             atoms: Arc::clone(&self.atoms),
             ref_atoms: Arc::clone(&self.ref_atoms),
             ref_collections: Arc::clone(&self.ref_collections),
+            ref_ranges: Arc::clone(&self.ref_ranges),
         }
     }
 }

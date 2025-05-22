@@ -11,7 +11,9 @@ pub use crate::permissions::PermissionWrapper;
 
 pub use crate::fees::{FieldPaymentConfig, SchemaPaymentConfig, TrustDistanceScaling};
 
-pub use crate::atom::{Atom, AtomRef, AtomRefBehavior, AtomRefCollection, AtomStatus};
+pub use crate::atom::{
+    Atom, AtomRef, AtomRefBehavior, AtomRefCollection, AtomRefRange, AtomStatus,
+};
 
 use serde_json::Value;
 use std::collections::HashMap;
