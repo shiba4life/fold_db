@@ -134,34 +134,6 @@ impl SchemaCore {
         Ok(())
     }
 
-    /// Removes a schema from the manager and deletes its persistent storage.
-    pub fn delete_schema(&self, schema_name: &str) -> Result<bool, SchemaError> {
-        let mut schemas = self
-            .schemas
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-
-        let was_present = schemas.remove(schema_name).is_some();
-        {
-            let mut available = self
-                .available
-                .lock()
-                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-            available.remove(schema_name);
-        }
-
-        if was_present {
-            // Remove the schema file if it exists
-            let path = self.schema_path(schema_name);
-            if path.exists() {
-                fs::remove_file(&path).map_err(|e| {
-                    SchemaError::InvalidData(format!("Failed to delete schema file: {}", e))
-                })?;
-            }
-        }
-
-        Ok(was_present)
-    }
 
     /// Retrieves a schema by name.
     pub fn get_schema(&self, schema_name: &str) -> Result<Option<Schema>, SchemaError> {
@@ -523,9 +495,9 @@ mod tests {
             Some("test_uuid".to_string())
         );
 
-        // Test delete removes file
-        core.delete_schema(test_schema_name).unwrap();
-        assert!(!schema_path.exists());
+        // Unload schema should keep file on disk
+        core.unload_schema(test_schema_name).unwrap();
+        assert!(schema_path.exists());
 
         cleanup_test_schema(test_schema_name);
     }
