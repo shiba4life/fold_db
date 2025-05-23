@@ -61,6 +61,7 @@ Additional server flags:
 ### Command‑Line Interface
 
 See [README_CLI.md](README_CLI.md) for detailed CLI commands: loading schemas and folds, listing them, querying, mutating, and executing operations from JSON.
+Schema-related CLI commands (`load-schema`, `list-schemas`, `list-available-schemas`, and `unload-schema`) are deprecated and will be removed in a future release.
 
 ### Running a DataFold Node
 

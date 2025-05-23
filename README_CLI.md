@@ -46,6 +46,8 @@ active). `list-available-schemas` displays all schemas with either state.
 
 ### Commands
 
+**Deprecated:** `load-schema`, `list-schemas`, `list-available-schemas`, and `unload-schema` will be removed in a future release. Use fold commands instead.
+
 #### Load Schema
 
 Load a schema from a JSON file:

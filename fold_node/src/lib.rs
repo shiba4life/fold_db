@@ -34,7 +34,6 @@ pub mod fold_db_core;
 pub mod fold;
 pub mod network;
 pub mod permissions;
-#[deprecated(note = "schema module is deprecated, use fold definitions instead")]
 pub mod schema;
 pub mod transform;
 pub mod testing;
