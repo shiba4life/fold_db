@@ -150,6 +150,15 @@ impl FoldManager {
         self.list_loaded_folds()
     }
 
+    /// Checks if a fold exists in the manager.
+    pub fn fold_exists(&self, name: &str) -> Result<bool, SchemaError> {
+        let folds = self
+            .folds
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire fold lock".to_string()))?;
+        Ok(folds.contains_key(name))
+    }
+
     /// Loads all fold files from the folds directory.
     pub fn load_folds_from_disk(&self) -> Result<(), SchemaError> {
         if let Ok(entries) = fs::read_dir(&self.folds_dir) {
@@ -305,5 +314,15 @@ mod tests {
         }"#;
         let res = manager.load_fold_from_json(json);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_fold_exists() {
+        let dir = tempdir().unwrap();
+        let manager = FoldManager::new(dir.path().to_str().unwrap()).unwrap();
+        assert!(!manager.fold_exists("missing").unwrap());
+        let fold = create_fold("exists");
+        manager.load_fold(fold).unwrap();
+        assert!(manager.fold_exists("exists").unwrap());
     }
 }
