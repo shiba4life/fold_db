@@ -536,6 +536,11 @@ impl FoldDB {
         self.fold_manager.get_fold(name)
     }
 
+    /// Check if a fold exists.
+    pub fn fold_exists(&self, name: &str) -> Result<bool, SchemaError> {
+        self.fold_manager.fold_exists(name)
+    }
+
     /// List names of all loaded folds.
     pub fn list_folds(&self) -> Result<Vec<String>, SchemaError> {
         self.fold_manager.list_folds()

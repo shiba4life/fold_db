@@ -182,6 +182,15 @@ impl DataFoldNode {
         Ok(db.get_fold(name)?)
     }
 
+    /// Check if a fold exists.
+    pub fn fold_exists(&self, name: &str) -> FoldDbResult<bool> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        Ok(db.fold_exists(name)?)
+    }
+
     /// List all loaded folds.
     pub fn list_folds(&self) -> FoldDbResult<Vec<String>> {
         let db = self

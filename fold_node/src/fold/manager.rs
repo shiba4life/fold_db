@@ -150,6 +150,17 @@ impl FoldManager {
         self.list_loaded_folds()
     }
 
+    /// Checks if a fold exists in the manager.
+    pub fn fold_exists(&self, fold_name: &str) -> Result<bool, SchemaError> {
+        let folds = self
+            .folds
+            .lock()
+            .map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire fold lock".to_string())
+            })?;
+        Ok(folds.contains_key(fold_name))
+    }
+
     /// Loads all fold files from the folds directory.
     pub fn load_folds_from_disk(&self) -> Result<(), SchemaError> {
         let mut errors = Vec::new();
@@ -268,6 +279,18 @@ mod tests {
         assert!(manager.get_fold("temp").unwrap().is_none());
         let available = manager.list_available_folds().unwrap();
         assert!(available.contains(&"temp".to_string()));
+    }
+
+    #[test]
+    fn test_fold_exists() {
+        let dir = tempdir().unwrap();
+        let manager = FoldManager::new(dir.path().to_str().unwrap()).unwrap();
+        let fold = create_fold("exists");
+        manager.load_fold(fold).unwrap();
+        assert!(manager.fold_exists("exists").unwrap());
+        assert!(!manager.fold_exists("missing").unwrap());
+        manager.unload_fold("exists").unwrap();
+        assert!(!manager.fold_exists("exists").unwrap());
     }
 
     #[test]
