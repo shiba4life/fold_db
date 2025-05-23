@@ -541,6 +541,16 @@ impl FoldDB {
         self.fold_manager.list_folds()
     }
 
+    /// List names of all loaded folds.
+    pub fn list_loaded_folds(&self) -> Result<Vec<String>, SchemaError> {
+        self.fold_manager.list_loaded_folds()
+    }
+
+    /// List names of all folds stored on disk.
+    pub fn list_available_folds(&self) -> Result<Vec<String>, SchemaError> {
+        self.fold_manager.list_available_folds()
+    }
+
     /// Unload a fold from memory without removing it from disk.
     pub fn unload_fold(&self, name: &str) -> Result<(), SchemaError> {
         self.fold_manager.unload_fold(name)

@@ -48,6 +48,8 @@ enum Commands {
     },
     /// List all loaded folds
     ListFolds {},
+    /// List all folds available on disk
+    ListAvailableFolds {},
     /// Get a fold by name
     GetFold {
         /// Fold name to retrieve
@@ -131,6 +133,12 @@ mod tests {
     }
 
     #[test]
+    fn parse_list_available_folds() {
+        let cli = Cli::parse_from(["test", "list-available-folds"]);
+        matches!(cli.command, Commands::ListAvailableFolds {});
+    }
+
+    #[test]
     fn parse_get_fold() {
         let cli = Cli::parse_from(["test", "get-fold", "--name", "foo"]);
         match cli.command {
@@ -183,6 +191,15 @@ fn handle_list_folds(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::
     let folds = node.list_folds()?;
     info!("Loaded folds:");
     for name in folds {
+        info!("  - {}", name);
+    }
+    Ok(())
+}
+
+fn handle_list_available_folds(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    let names = node.list_available_folds()?;
+    info!("Available folds:");
+    for name in names {
         info!("  - {}", name);
     }
     Ok(())
@@ -338,6 +355,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::UnloadSchema { name } => handle_unload_schema(name, &mut node)?,
         Commands::LoadFold { path } => handle_load_fold(path, &mut node)?,
         Commands::ListFolds {} => handle_list_folds(&mut node)?,
+        Commands::ListAvailableFolds {} => handle_list_available_folds(&mut node)?,
         Commands::GetFold { name } => handle_get_fold(name, &mut node)?,
         Commands::UnloadFold { name } => handle_unload_fold(name, &mut node)?,
         Commands::Execute { path } => handle_execute(path, &mut node)?,
