@@ -67,42 +67,42 @@ impl TransformManager {
             .ok()
             .and_then(|v| v)
             .and_then(|v| serde_json::from_slice(&v).ok())
-            .unwrap_or_else(HashMap::new);
+            .unwrap_or_default();
 
         let transform_to_arefs = transforms_tree
             .get(TRANSFORM_TO_AREFS_KEY)
             .ok()
             .and_then(|v| v)
             .and_then(|v| serde_json::from_slice(&v).ok())
-            .unwrap_or_else(HashMap::new);
+            .unwrap_or_default();
 
         let transform_input_names = transforms_tree
             .get(TRANSFORM_INPUT_NAMES_KEY)
             .ok()
             .and_then(|v| v)
             .and_then(|v| serde_json::from_slice(&v).ok())
-            .unwrap_or_else(HashMap::new);
+            .unwrap_or_default();
 
         let field_to_transforms = transforms_tree
             .get(FIELD_TO_TRANSFORMS_KEY)
             .ok()
             .and_then(|v| v)
             .and_then(|v| serde_json::from_slice(&v).ok())
-            .unwrap_or_else(HashMap::new);
+            .unwrap_or_default();
 
         let transform_to_fields = transforms_tree
             .get(TRANSFORM_TO_FIELDS_KEY)
             .ok()
             .and_then(|v| v)
             .and_then(|v| serde_json::from_slice(&v).ok())
-            .unwrap_or_else(HashMap::new);
+            .unwrap_or_default();
 
         let transform_outputs = transforms_tree
             .get(TRANSFORM_OUTPUTS_KEY)
             .ok()
             .and_then(|v| v)
             .and_then(|v| serde_json::from_slice(&v).ok())
-            .unwrap_or_else(HashMap::new);
+            .unwrap_or_default();
 
         Self {
             transforms_tree,
