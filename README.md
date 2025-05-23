@@ -194,7 +194,7 @@ cargo test --package fold_node
 
 ### UI Tests
 
-The React UI can include its own test suite. If a `test` script exists in the
+The React UI uses Node's built-in test runner. If a `test` script exists in the
 package configuration, run the tests with:
 
 1. Install Node.js dependencies:
