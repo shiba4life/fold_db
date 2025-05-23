@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "echo \"No frontend tests configured\""
+    "test": "node --test tests/dependencyUtils.test.js"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
