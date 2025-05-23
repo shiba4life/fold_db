@@ -68,9 +68,9 @@ enum Commands {
     },
     /// Execute a query operation
     Query {
-        /// Schema name to query
-        #[arg(short, long, required = true)]
-        schema: String,
+        /// Fold name to query
+        #[arg(short = 'n', long, required = true)]
+        fold: String,
 
         /// Fields to retrieve (comma-separated)
         #[arg(short, long, required = true, value_delimiter = ',')]
@@ -86,9 +86,9 @@ enum Commands {
     },
     /// Execute a mutation operation
     Mutate {
-        /// Schema name to mutate
-        #[arg(short, long, required = true)]
-        schema: String,
+        /// Fold name to mutate
+        #[arg(short = 'n', long, required = true)]
+        fold: String,
 
         /// Mutation type
         #[arg(short, long, required = true, value_enum)]
@@ -230,12 +230,12 @@ fn handle_unload_fold(name: String, node: &mut DataFoldNode) -> Result<(), Box<d
 
 fn handle_query(
     node: &mut DataFoldNode,
-    schema: String,
+    fold: String,
     fields: Vec<String>,
     filter: Option<String>,
     output: String,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Executing query on schema: {}", schema);
+    info!("Executing query on fold: {}", fold);
 
     let filter_value = if let Some(filter_str) = filter {
         Some(serde_json::from_str(&filter_str)?)
@@ -244,7 +244,7 @@ fn handle_query(
     };
 
     let operation = Operation::Query {
-        schema,
+        schema: fold,
         fields,
         filter: filter_value,
     };
@@ -262,16 +262,16 @@ fn handle_query(
 
 fn handle_mutate(
     node: &mut DataFoldNode,
-    schema: String,
+    fold: String,
     mutation_type: MutationType,
     data: String,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Executing mutation on schema: {}", schema);
+    info!("Executing mutation on fold: {}", fold);
 
     let data_value: Value = serde_json::from_str(&data)?;
 
     let operation = Operation::Mutation {
-        schema,
+        schema: fold,
         data: data_value,
         mutation_type,
     };
@@ -350,16 +350,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::ListSchemas {} => handle_list_schemas(&mut node)?,
         Commands::ListAvailableSchemas {} => handle_list_available_schemas(&mut node)?,
         Commands::Query {
-            schema,
+            fold,
             fields,
             filter,
             output,
-        } => handle_query(&mut node, schema, fields, filter, output)?,
+        } => handle_query(&mut node, fold, fields, filter, output)?,
         Commands::Mutate {
-            schema,
+            fold,
             mutation_type,
             data,
-        } => handle_mutate(&mut node, schema, mutation_type, data)?,
+        } => handle_mutate(&mut node, fold, mutation_type, data)?,
         Commands::UnloadSchema { name } => handle_unload_schema(name, &mut node)?,
         Commands::LoadFold { path } => handle_load_fold(path, &mut node)?,
         Commands::ListFolds {} => handle_list_folds(&mut node)?,

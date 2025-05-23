@@ -155,11 +155,11 @@ curl -X DELETE http://localhost:9001/api/fold/my_fold
 Execute a query operation:
 
 ```bash
-datafold_cli query --schema <SCHEMA> --fields <FIELDS> [--filter <FILTER>] [--output <OUTPUT>]
+datafold_cli query --fold <FOLD> --fields <FIELDS> [--filter <FILTER>] [--output <OUTPUT>]
 ```
 
 Options:
-- `-s, --schema <SCHEMA>`: Schema name to query
+- `-s, --fold <FOLD>`: Fold name to query
 - `-f, --fields <FIELDS>`: Fields to retrieve (comma-separated)
 - `-i, --filter <FILTER>`: Optional filter in JSON format
 - `-o, --output <OUTPUT>`: Output format (json or pretty, default: pretty)
@@ -167,13 +167,13 @@ Options:
 Example:
 
 ```bash
-datafold_cli query --schema UserProfile --fields username,email
+datafold_cli query --fold UserProfile --fields username,email
 ```
 
 With filter:
 
 ```bash
-datafold_cli query --schema UserProfile --fields username,email --filter '{"username": "johndoe"}'
+datafold_cli query --fold UserProfile --fields username,email --filter '{"username": "johndoe"}'
 ```
 
 #### Mutate
@@ -181,11 +181,11 @@ datafold_cli query --schema UserProfile --fields username,email --filter '{"user
 Execute a mutation operation:
 
 ```bash
-datafold_cli mutate --schema <SCHEMA> --mutation-type <MUTATION_TYPE> --data <DATA>
+datafold_cli mutate --fold <FOLD> --mutation-type <MUTATION_TYPE> --data <DATA>
 ```
 
 Options:
-- `-s, --schema <SCHEMA>`: Schema name to mutate
+- `-s, --fold <FOLD>`: Fold name to mutate
 - `-m, --mutation-type <MUTATION_TYPE>`: Mutation type (see `--help` for allowed values)
 - `-d, --data <DATA>`: Data in JSON format
 
@@ -197,25 +197,25 @@ Mutation types:
 Example:
 
 ```bash
-datafold_cli mutate --schema UserProfile --mutation-type create --data '{"username": "johndoe", "email": "john@example.com"}'
+datafold_cli mutate --fold UserProfile --mutation-type create --data '{"username": "johndoe", "email": "john@example.com"}'
 ```
 
 Add to collection:
 
 ```bash
-datafold_cli mutate --schema UserProfile --mutation-type add_to_collection:friends --data '{"id": "friend42"}'
+datafold_cli mutate --fold UserProfile --mutation-type add_to_collection:friends --data '{"id": "friend42"}'
 ```
 
 Update in collection:
 
 ```bash
-datafold_cli mutate --schema UserProfile --mutation-type update_to_collection:friends --data '{"id": "friend42", "nickname": "JD"}'
+datafold_cli mutate --fold UserProfile --mutation-type update_to_collection:friends --data '{"id": "friend42", "nickname": "JD"}'
 ```
 
 Delete from collection:
 
 ```bash
-datafold_cli mutate --schema UserProfile --mutation-type delete_from_collection:friends --data '{"id": "friend42"}'
+datafold_cli mutate --fold UserProfile --mutation-type delete_from_collection:friends --data '{"id": "friend42"}'
 ```
 
 #### Execute
