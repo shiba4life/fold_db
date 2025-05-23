@@ -57,20 +57,18 @@ fn cli_path() -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let exe = manifest_dir.join("target/debug/datafold_cli");
 
-    if !exe.exists() {
-        // Build the CLI binary if it hasn't been compiled yet
-        let status = Command::new("cargo")
-            .args([
-                "build",
-                "--manifest-path",
-                "fold_node/Cargo.toml",
-                "--bin",
-                "datafold_cli",
-            ])
-            .status()
-            .expect("failed to build datafold_cli");
-        assert!(status.success());
-    }
+    // Build the CLI binary to ensure it is up to date
+    let status = Command::new("cargo")
+        .args([
+            "build",
+            "--manifest-path",
+            "fold_node/Cargo.toml",
+            "--bin",
+            "datafold_cli",
+        ])
+        .status()
+        .expect("failed to build datafold_cli");
+    assert!(status.success());
 
     exe
 }
@@ -111,7 +109,7 @@ fn mutate_query_execute() {
             "-c",
             config.to_str().unwrap(),
             "mutate",
-            "--schema",
+            "--fold",
             "TestSchema",
             "--mutation-type",
             "create",
@@ -127,7 +125,7 @@ fn mutate_query_execute() {
             "-c",
             config.to_str().unwrap(),
             "query",
-            "--schema",
+            "--fold",
             "TestSchema",
             "--fields",
             "username",
