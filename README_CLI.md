@@ -2,6 +2,8 @@
 
 A command-line interface for interacting with the DataFold node, allowing you to load schemas, run queries, and execute mutations.
 
+**Note:** The schema commands are deprecated and will be removed in favor of fold-based workflows.
+
 ## Installation
 
 The CLI is built as part of the main project. To build it, run:
