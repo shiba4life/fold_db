@@ -2,8 +2,6 @@
 
 DataFold is a Rust-based distributed data platform providing a core library, a node server, and a command‑line interface to load schemas, run queries, and execute mutations across connected nodes.
 
-**Note:** The legacy schema system is now deprecated. New development should use fold definitions in place of schemas.
-
 ## Repository Structure
 
 - **src/**  
