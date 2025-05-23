@@ -21,7 +21,7 @@ function App() {
 
   const fetchSchemas = async () => {
     try {
-      const response = await fetch('/api/schemas')
+      const response = await fetch('/api/folds')
       const data = await response.json()
       setSchemas(data.data || [])
     } catch (error) {
