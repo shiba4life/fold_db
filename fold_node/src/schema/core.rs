@@ -202,24 +202,48 @@ impl SchemaCore {
 
     /// Loads all schema files from the schemas directory.
     pub fn load_schemas_from_disk(&self) -> Result<(), SchemaError> {
+        let mut errors = Vec::new();
+
         if let Ok(entries) = std::fs::read_dir(&self.schemas_dir) {
             for entry in entries.flatten() {
                 if let Some(ext) = entry.path().extension() {
                     if ext == "json" {
-                        if let Ok(contents) = std::fs::read_to_string(entry.path()) {
-                            if let Ok(schema) = serde_json::from_str::<Schema>(&contents) {
-                                let _ = self.load_schema(schema);
-                            } else if let Ok(json_schema) = serde_json::from_str::<JsonSchemaDefinition>(&contents) {
-                                if let Ok(schema) = self.interpret_schema(json_schema) {
-                                    let _ = self.load_schema(schema);
+                        match std::fs::read_to_string(entry.path()) {
+                            Ok(contents) => {
+                                match serde_json::from_str::<Schema>(&contents) {
+                                    Ok(schema) => {
+                                        if let Err(e) = self.load_schema(schema) {
+                                            errors.push(e.to_string());
+                                        }
+                                    }
+                                    Err(_) => match serde_json::from_str::<JsonSchemaDefinition>(&contents) {
+                                        Ok(json_schema) => match self.interpret_schema(json_schema) {
+                                            Ok(schema) => {
+                                                if let Err(e) = self.load_schema(schema) {
+                                                    errors.push(e.to_string());
+                                                }
+                                            }
+                                            Err(e) => errors.push(e.to_string()),
+                                        },
+                                        Err(e) => errors.push(e.to_string()),
+                                    },
                                 }
                             }
+                            Err(e) => errors.push(e.to_string()),
                         }
                     }
                 }
             }
         }
-        Ok(())
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(SchemaError::InvalidData(format!(
+                "Failed to load schemas: {}",
+                errors.join("; ")
+            )))
+        }
     }
 
     /// Maps fields between schemas based on their defined relationships.

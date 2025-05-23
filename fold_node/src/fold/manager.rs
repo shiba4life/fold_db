@@ -152,23 +152,47 @@ impl FoldManager {
 
     /// Loads all fold files from the folds directory.
     pub fn load_folds_from_disk(&self) -> Result<(), SchemaError> {
+        let mut errors = Vec::new();
+
         if let Ok(entries) = fs::read_dir(&self.folds_dir) {
             for entry in entries.flatten() {
                 if entry.path().extension().map(|e| e == "json").unwrap_or(false)
                 {
-                    if let Ok(contents) = fs::read_to_string(entry.path()) {
-                        if let Ok(fold) = serde_json::from_str::<Fold>(&contents) {
-                            let _ = self.load_fold(fold);
-                        } else if let Ok(json_fold) = serde_json::from_str::<JsonFoldDefinition>(&contents) {
-                            if let Ok(fold) = Fold::try_from(json_fold) {
-                                let _ = self.load_fold(fold);
+                    match fs::read_to_string(entry.path()) {
+                        Ok(contents) => {
+                            match serde_json::from_str::<Fold>(&contents) {
+                                Ok(fold) => {
+                                    if let Err(e) = self.load_fold(fold) {
+                                        errors.push(e.to_string());
+                                    }
+                                }
+                                Err(_) => match serde_json::from_str::<JsonFoldDefinition>(&contents) {
+                                    Ok(json_fold) => match Fold::try_from(json_fold) {
+                                        Ok(fold) => {
+                                            if let Err(e) = self.load_fold(fold) {
+                                                errors.push(e.to_string());
+                                            }
+                                        }
+                                        Err(e) => errors.push(e.to_string()),
+                                    },
+                                    Err(e) => errors.push(e.to_string()),
+                                },
                             }
                         }
+                        Err(e) => errors.push(e.to_string()),
                     }
                 }
             }
         }
-        Ok(())
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(SchemaError::InvalidData(format!(
+                "Failed to load folds: {}",
+                errors.join("; ")
+            )))
+        }
     }
 
     /// Loads a fold from a JSON string.
@@ -304,6 +328,23 @@ mod tests {
             "payment_config": { "base_multiplier": 0.0, "min_payment_threshold": 0 }
         }"#;
         let res = manager.load_fold_from_json(json);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_load_folds_from_disk_invalid_file() {
+        use std::fs::{self, File};
+        use std::io::Write;
+
+        let dir = tempdir().unwrap();
+        let fold_dir = dir.path().join("folds");
+        fs::create_dir_all(&fold_dir).unwrap();
+        let file_path = fold_dir.join("bad.json");
+        let mut file = File::create(&file_path).unwrap();
+        file.write_all(b"not json").unwrap();
+
+        let manager = FoldManager::new(dir.path().to_str().unwrap()).unwrap();
+        let res = manager.load_folds_from_disk();
         assert!(res.is_err());
     }
 }
