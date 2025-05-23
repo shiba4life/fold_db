@@ -7,12 +7,21 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+/// State of a fold within the system
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FoldState {
+    Loaded,
+    Unloaded,
+}
+
 /// Manages Fold objects loaded from disk or memory.
 ///
 /// Similar to [`SchemaCore`], `FoldManager` provides basic persistence
 /// and retrieval operations for [`Fold`] definitions.
 pub struct FoldManager {
     folds: Mutex<HashMap<String, Fold>>, // loaded folds
+    /// All folds known to the system and their load state
+    available: Mutex<HashMap<String, (Fold, FoldState)>>,
     folds_dir: PathBuf,
 }
 
@@ -28,6 +37,7 @@ impl FoldManager {
         }
         Ok(Self {
             folds: Mutex::new(HashMap::new()),
+            available: Mutex::new(HashMap::new()),
             folds_dir,
         })
     }
@@ -69,11 +79,18 @@ impl FoldManager {
     /// Loads a fold into memory and persists it to disk.
     pub fn load_fold(&self, fold: Fold) -> Result<(), SchemaError> {
         self.persist_fold(&fold)?;
-        let mut folds = self
-            .folds
+        {
+            let mut folds = self
+                .folds
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire fold lock".to_string()))?;
+            folds.insert(fold.name.clone(), fold.clone());
+        }
+        let mut all = self
+            .available
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire fold lock".to_string()))?;
-        folds.insert(fold.name.clone(), fold);
+        all.insert(fold.name.clone(), (fold, FoldState::Loaded));
         Ok(())
     }
 
@@ -86,23 +103,51 @@ impl FoldManager {
         Ok(folds.get(name).cloned())
     }
 
-    /// Unloads a fold from memory without deleting its file.
-    pub fn unload_fold(&self, name: &str) -> Result<(), SchemaError> {
+    /// Mark a fold as unloaded but keep it available in memory
+    pub fn set_unloaded(&self, name: &str) -> Result<(), SchemaError> {
         let mut folds = self
             .folds
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire fold lock".to_string()))?;
         folds.remove(name);
-        Ok(())
+        let mut available = self
+            .available
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire fold lock".to_string()))?;
+        if let Some((_, state)) = available.get_mut(name) {
+            *state = FoldState::Unloaded;
+            Ok(())
+        } else {
+            Err(SchemaError::NotFound(format!("Fold {name} not found")))
+        }
+    }
+
+    /// Unloads a fold from memory without deleting its file.
+    pub fn unload_fold(&self, name: &str) -> Result<(), SchemaError> {
+        self.set_unloaded(name)
     }
 
     /// Lists all loaded folds.
-    pub fn list_folds(&self) -> Result<Vec<String>, SchemaError> {
+    pub fn list_loaded_folds(&self) -> Result<Vec<String>, SchemaError> {
         let folds = self
             .folds
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire fold lock".to_string()))?;
         Ok(folds.keys().cloned().collect())
+    }
+
+    /// Lists all folds available on disk and their state.
+    pub fn list_available_folds(&self) -> Result<Vec<String>, SchemaError> {
+        let available = self
+            .available
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire fold lock".to_string()))?;
+        Ok(available.keys().cloned().collect())
+    }
+
+    /// Backwards compatible method for listing loaded folds.
+    pub fn list_folds(&self) -> Result<Vec<String>, SchemaError> {
+        self.list_loaded_folds()
     }
 
     /// Loads all fold files from the folds directory.
@@ -197,6 +242,22 @@ mod tests {
         manager.load_fold(fold).unwrap();
         manager.unload_fold("temp").unwrap();
         assert!(manager.get_fold("temp").unwrap().is_none());
+        let available = manager.list_available_folds().unwrap();
+        assert!(available.contains(&"temp".to_string()));
+    }
+
+    #[test]
+    fn test_list_loaded_and_available() {
+        let dir = tempdir().unwrap();
+        let manager = FoldManager::new(dir.path().to_str().unwrap()).unwrap();
+        manager.load_fold(create_fold("a")).unwrap();
+        manager.load_fold(create_fold("b")).unwrap();
+        manager.unload_fold("b").unwrap();
+        let loaded = manager.list_loaded_folds().unwrap();
+        assert_eq!(loaded, vec!["a".to_string()]);
+        let available = manager.list_available_folds().unwrap();
+        assert!(available.contains(&"a".to_string()));
+        assert!(available.contains(&"b".to_string()));
     }
 
     #[test]

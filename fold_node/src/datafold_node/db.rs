@@ -191,6 +191,24 @@ impl DataFoldNode {
         Ok(db.list_folds()?)
     }
 
+    /// List all loaded folds.
+    pub fn list_loaded_folds(&self) -> FoldDbResult<Vec<String>> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        Ok(db.list_loaded_folds()?)
+    }
+
+    /// List all folds available on disk.
+    pub fn list_available_folds(&self) -> FoldDbResult<Vec<String>> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        Ok(db.list_available_folds()?)
+    }
+
     /// Unload a fold from memory.
     pub fn unload_fold(&self, name: &str) -> FoldDbResult<()> {
         let db = self
