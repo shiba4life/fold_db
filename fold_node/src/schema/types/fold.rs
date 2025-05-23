@@ -52,6 +52,7 @@ impl Fold {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use crate::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
     use crate::permissions::types::policy::{PermissionsPolicy, TrustDistance};
     use crate::schema::types::field::{Field, SingleField};
@@ -113,5 +114,99 @@ mod tests {
     fn test_multi_field_count() {
         let fold = multi_field_fold();
         assert_eq!(fold.fields.len(), 3);
+    }
+
+    #[test]
+    fn test_fold_field_permissions() {
+        let mut fold = Fold::new("test_fold".to_string());
+        let field_name = "protected_field".to_string();
+        let field = create_field(PermissionsPolicy::new(
+            TrustDistance::Distance(2),
+            TrustDistance::Distance(3),
+        ));
+
+        fold.add_field(field_name.clone(), field);
+
+        let stored_field = fold.fields.get(&field_name).unwrap();
+        match stored_field.permission_policy().read_policy {
+            TrustDistance::Distance(d) => assert_eq!(d, 2),
+            _ => panic!("Expected Distance variant"),
+        }
+        match stored_field.permission_policy().write_policy {
+            TrustDistance::Distance(d) => assert_eq!(d, 3),
+            _ => panic!("Expected Distance variant"),
+        }
+    }
+
+    #[test]
+    fn test_fold_field_mappers() {
+        let mut fold = Fold::new("test_fold".to_string());
+        let field_name = "mapped_field".to_string();
+        let mut mappers = HashMap::new();
+        mappers.insert("transform".to_string(), "uppercase".to_string());
+
+        let mut field = create_field(PermissionsPolicy::default());
+        field.set_field_mappers(mappers.clone());
+
+        fold.add_field(field_name.clone(), field);
+
+        let stored_field = fold.fields.get(&field_name).unwrap();
+        assert_eq!(stored_field.field_mappers(), &mappers);
+    }
+
+    #[test]
+    fn test_multi_field_permissions() {
+        let fold = multi_field_fold();
+
+        match fold
+            .fields
+            .get("public_field")
+            .unwrap()
+            .permission_policy()
+            .read_policy
+        {
+            TrustDistance::Distance(d) => assert_eq!(d, 0),
+            _ => panic!("Expected Distance variant"),
+        }
+        match fold
+            .fields
+            .get("protected_field")
+            .unwrap()
+            .permission_policy()
+            .read_policy
+        {
+            TrustDistance::Distance(d) => assert_eq!(d, 1),
+            _ => panic!("Expected Distance variant"),
+        }
+        match fold
+            .fields
+            .get("private_field")
+            .unwrap()
+            .permission_policy()
+            .read_policy
+        {
+            TrustDistance::Distance(d) => assert_eq!(d, 3),
+            _ => panic!("Expected Distance variant"),
+        }
+    }
+
+    #[test]
+    fn test_fold_deserialization_with_field_transforms() {
+        let json_input = "{\n            \"name\": \"test_fold_with_transforms\",\n            \"fields\": {\n                \"calculated_field\": {\n                    \"permission_policy\": {\n                        \"read_policy\": { \"Distance\": 0 },\n                        \"write_policy\": { \"Distance\": 0 }\n                    },\n                    \"payment_config\": {\n                        \"base_multiplier\": 0.5,\n                        \"trust_distance_scaling\": \"None\",\n                        \"min_payment\": null\n                    },\n                    \"ref_atom_uuid\": null,\n                    \"field_type\": \"Single\",\n                    \"field_mappers\": {},\n                    \"writable\": true,\n                    \"transform\": \"transform temp_calc { logic: { return 1; } }\"\n                }\n            },\n            \"payment_config\": {\n                \"base_multiplier\": 1.0,\n                \"min_payment_threshold\": 0\n            }\n        }";
+
+        let fold: Fold = serde_json::from_str(json_input).expect("Failed to deserialize fold");
+
+        assert_eq!(fold.name, "test_fold_with_transforms");
+        assert_eq!(fold.fields.len(), 1);
+
+        let calculated_field = fold
+            .fields
+            .get("calculated_field")
+            .expect("calculated_field not found");
+        assert!(calculated_field.transform().is_some());
+        assert_eq!(
+            calculated_field.transform().unwrap().logic,
+            "return 1"
+        );
     }
 }
