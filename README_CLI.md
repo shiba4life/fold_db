@@ -124,6 +124,32 @@ Unload a fold so it is no longer active:
 datafold_cli unload-fold --name <FOLD>
 ```
 
+### HTTP Fold API
+
+The fold commands correspond to `/api/fold` HTTP endpoints. You can
+manage folds directly with `curl` when the HTTP server is running.
+
+```bash
+# Add a fold from fold.json
+curl -X POST http://localhost:9001/api/fold \
+  -H 'Content-Type: application/json' \
+  -d @fold.json
+
+# List folds
+curl http://localhost:9001/api/folds
+
+# Get a fold
+curl http://localhost:9001/api/fold/my_fold
+
+# Update a fold
+curl -X PUT http://localhost:9001/api/fold/my_fold \
+  -H 'Content-Type: application/json' \
+  -d @fold.json
+
+# Unload a fold
+curl -X DELETE http://localhost:9001/api/fold/my_fold
+```
+
 #### Query
 
 Execute a query operation:

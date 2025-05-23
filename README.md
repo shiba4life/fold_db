@@ -129,6 +129,42 @@ The **Network** tab exposes new peer‑to‑peer features:
 These operations map to the `/api/network/*` endpoints served by
 `datafold_http_server`.
 
+### Fold HTTP API
+
+The HTTP server also exposes endpoints for managing **folds**. The basic
+routes mirror the schema API but operate on fold definitions:
+
+```
+GET    /api/folds              # list loaded folds
+POST   /api/fold               # create a fold from JSON
+GET    /api/fold/<NAME>        # retrieve a fold by name
+PUT    /api/fold/<NAME>        # update an existing fold
+DELETE /api/fold/<NAME>        # unload a fold
+```
+
+Example `curl` usage:
+
+```bash
+# Create a fold from fold.json
+curl -X POST http://localhost:9001/api/fold \
+  -H 'Content-Type: application/json' \
+  -d @fold.json
+
+# List all folds
+curl http://localhost:9001/api/folds
+
+# Retrieve the newly created fold
+curl http://localhost:9001/api/fold/my_fold
+
+# Update the fold
+curl -X PUT http://localhost:9001/api/fold/my_fold \
+  -H 'Content-Type: application/json' \
+  -d @fold.json
+
+# Unload the fold
+curl -X DELETE http://localhost:9001/api/fold/my_fold
+```
+
 ## Running Tests
 
 Run all unit and integration tests across the workspace:
