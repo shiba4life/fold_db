@@ -204,3 +204,21 @@ fn test_transform_placeholder_output_on_disk_load() {
     let transform = field.get_transform().unwrap();
     assert_eq!(transform.get_output(), "placeholder_schema.calc");
 }
+
+#[test]
+fn test_load_schemas_from_disk_invalid_file() {
+    use std::fs::{self, File};
+    use std::io::Write;
+
+    let test_dir = tempdir().unwrap();
+    let schema_dir = test_dir.path().join("schemas");
+    fs::create_dir_all(&schema_dir).unwrap();
+
+    let schema_path = schema_dir.join("bad.json");
+    let mut file = File::create(&schema_path).unwrap();
+    file.write_all(b"not json").unwrap();
+
+    let manager = SchemaCore::new(test_dir.path().to_str().unwrap()).unwrap();
+    let res = manager.load_schemas_from_disk();
+    assert!(res.is_err());
+}
