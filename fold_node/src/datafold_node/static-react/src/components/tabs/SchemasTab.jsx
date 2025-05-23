@@ -38,7 +38,7 @@ function SchemasTab() {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetch('/api/schemas')
+      const response = await fetch('/api/folds')
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -59,7 +59,7 @@ function SchemasTab() {
 
   const removeSchema = async (schemaName) => {
     try {
-      const resp = await fetch(`/api/schema/${schemaName}`, {
+      const resp = await fetch(`/api/fold/${schemaName}`, {
         method: 'DELETE'
       })
       if (!resp.ok) {

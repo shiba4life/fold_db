@@ -14,7 +14,7 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
 
   const fetchSampleSchemas = async () => {
     try {
-      const resp = await fetch('/api/samples/schemas')
+      const resp = await fetch('/api/samples/folds')
       const data = await resp.json()
       setSampleSchemas(data.data || [])
     } catch (err) {
@@ -32,7 +32,7 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
 
   const removeSchema = async (schemaName) => {
     try {
-      const resp = await fetch(`/api/schema/${schemaName}`, { method: 'DELETE' })
+      const resp = await fetch(`/api/fold/${schemaName}`, { method: 'DELETE' })
       if (!resp.ok) {
         throw new Error(`Failed to remove fold: ${resp.status}`)
       }
@@ -50,12 +50,12 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     setSamplesError(null)
 
     try {
-      const resp = await fetch(`/api/samples/schema/${selectedSample}`)
+      const resp = await fetch(`/api/samples/fold/${selectedSample}`)
       if (!resp.ok) {
         throw new Error(`Failed to fetch sample: ${resp.status}`)
       }
       const schema = await resp.json()
-      const createResp = await fetch('/api/schema', {
+      const createResp = await fetch('/api/fold', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
