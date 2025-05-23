@@ -54,3 +54,4 @@ pub use schema::types::operations::MutationType;
 pub use schema::Schema;
 pub use schema::types::Fold;
 pub use fold::FoldManager;
+pub use fold::FoldError;
