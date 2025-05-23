@@ -2,7 +2,7 @@ use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
 use crate::schema::Schema;
 use super::sample_manager::SampleManager;
-use super::{schema_routes, query_routes, network_routes};
+use super::{schema_routes, query_routes, network_routes, fold_routes};
 use super::log_routes;
 
 use actix_cors::Cors;
@@ -131,6 +131,12 @@ impl DataFoldHttpServer {
                         .route("/schema", web::post().to(schema_routes::create_schema))
                         .route("/schema/{name}", web::put().to(schema_routes::update_schema))
                         .route("/schema/{name}", web::delete().to(schema_routes::unload_schema_route))
+                        // Fold endpoints
+                        .route("/folds", web::get().to(fold_routes::list_folds))
+                        .route("/fold/{name}", web::get().to(fold_routes::get_fold))
+                        .route("/fold", web::post().to(fold_routes::load_fold))
+                        .route("/fold/{name}", web::put().to(fold_routes::update_fold))
+                        .route("/fold/{name}", web::delete().to(fold_routes::unload_fold_route))
                         // Operation endpoints
                         .route("/execute", web::post().to(query_routes::execute_operation))
                         .route("/query", web::post().to(query_routes::execute_query))

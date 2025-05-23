@@ -414,3 +414,96 @@ async fn test_unload_schema_keeps_transforms() {
     handle.abort();
 }
 
+#[tokio::test]
+async fn test_fold_endpoints() {
+    let (handle, addr) = start_server().await;
+    let client = Client::new();
+
+    // List should be empty
+    let resp = client
+        .get(format!("http://{}/api/folds", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let body: Value = resp.json().await.unwrap();
+    assert!(body["data"].as_array().unwrap().is_empty());
+
+    let fold_json = serde_json::json!({
+        "name": "test_fold",
+        "fields": {
+            "field": {
+                "permission_policy": {
+                    "read_policy": { "Distance": 0 },
+                    "write_policy": { "Distance": 0 },
+                    "explicit_read_policy": null,
+                    "explicit_write_policy": null
+                },
+                "ref_atom_uuid": "uuid1",
+                "payment_config": {
+                    "base_multiplier": 1.0,
+                    "trust_distance_scaling": { "None": null },
+                    "min_payment": null
+                },
+                "field_mappers": {},
+                "field_type": "Single",
+                "writable": true
+            }
+        },
+        "payment_config": { "base_multiplier": 1.0, "min_payment_threshold": 0 }
+    });
+
+    let resp = client
+        .post(format!("http://{}/api/fold", addr))
+        .json(&fold_json)
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success(), "{}", resp.text().await.unwrap());
+
+    let resp = client
+        .get(format!("http://{}/api/fold/test_fold", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body["name"], "test_fold");
+
+    let mut updated = fold_json.clone();
+    updated["payment_config"]["base_multiplier"] = serde_json::json!(2.0);
+
+    let resp = client
+        .put(format!("http://{}/api/fold/test_fold", addr))
+        .json(&updated)
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success(), "{}", resp.text().await.unwrap());
+
+    let resp = client
+        .get(format!("http://{}/api/fold/test_fold", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body["payment_config"]["base_multiplier"], 2.0);
+
+    let resp = client
+        .delete(format!("http://{}/api/fold/test_fold", addr))
+        .send()
+        .await
+        .unwrap();
+    assert!(resp.status().is_success());
+
+    let resp = client
+        .get(format!("http://{}/api/fold/test_fold", addr))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), reqwest::StatusCode::NOT_FOUND);
+
+    handle.abort();
+}
+
