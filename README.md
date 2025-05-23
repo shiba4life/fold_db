@@ -58,7 +58,7 @@ Additional server flags:
 
 ### Command‑Line Interface
 
-See [README_CLI.md](README_CLI.md) for detailed CLI commands: loading schemas, listing schemas, querying, mutating, and executing operations from JSON.
+See [README_CLI.md](README_CLI.md) for detailed CLI commands: loading schemas and folds, listing them, querying, mutating, and executing operations from JSON.
 
 ### Running a DataFold Node
 

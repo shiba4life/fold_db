@@ -82,6 +82,46 @@ Unload a schema so it is no longer active:
 datafold_cli unload-schema --name <SCHEMA>
 ```
 
+#### Load Fold
+
+Load a fold from a JSON file:
+
+```bash
+datafold_cli load-fold <PATH>
+```
+
+#### List Folds
+
+List all loaded folds:
+
+```bash
+datafold_cli list-folds
+```
+
+#### List Available Folds
+
+List all folds stored on disk:
+
+```bash
+datafold_cli list-available-folds
+```
+
+#### Get Fold
+
+Display a fold by name:
+
+```bash
+datafold_cli get-fold --name <FOLD>
+```
+
+#### Unload Fold
+
+Unload a fold so it is no longer active:
+
+```bash
+datafold_cli unload-fold --name <FOLD>
+```
+
 #### Query
 
 Execute a query operation:
