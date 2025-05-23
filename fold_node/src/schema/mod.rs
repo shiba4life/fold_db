@@ -21,6 +21,8 @@
 //! Schemas are loaded from JSON definitions, validated, and then used to process
 //! queries and mutations against the database.
 
+#![deprecated(note = "The schema module is deprecated and will be removed in a future release. Use fold definitions instead.")]
+
 // Internal modules
 pub(crate) mod core;
 pub mod types;

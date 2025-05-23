@@ -29,6 +29,7 @@ use crate::transform::ast::TransformDeclaration;
 /// ```
 /// Parameters for registering a transform
 #[derive(Debug, Clone)]
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Serialize, Deserialize)]
 pub struct TransformRegistration {
     /// The ID of the transform
@@ -50,6 +51,7 @@ pub struct TransformRegistration {
     pub field_name: String,
 }
 
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize)]
 pub struct Transform {
     /// Explicit input fields in `Schema.field` format

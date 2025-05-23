@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Represents a complete JSON schema definition
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonSchemaDefinition {
     pub name: String,
@@ -18,6 +19,7 @@ pub struct JsonSchemaDefinition {
 }
 
 /// Represents a field in the JSON schema
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonSchemaField {
     pub permission_policy: JsonPermissionPolicy,
@@ -36,6 +38,7 @@ pub struct JsonSchemaField {
 /// fields in the incoming JSON will cause a deserialization error so
 /// that stale attributes such as `reversible` or `signature` do not
 /// silently pass through the system.
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct JsonTransform {
@@ -51,6 +54,7 @@ pub struct JsonTransform {
 }
 
 /// JSON representation of permission policy
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonPermissionPolicy {
     #[serde(rename = "read_policy")]
@@ -64,6 +68,7 @@ pub struct JsonPermissionPolicy {
 }
 
 /// JSON representation of field payment config
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonFieldPaymentConfig {
     pub base_multiplier: f64,

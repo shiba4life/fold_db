@@ -25,16 +25,20 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Load a schema from a JSON file
+    #[deprecated(note = "Schema commands are deprecated and will be removed")] 
     LoadSchema {
         /// Path to the schema JSON file
         #[arg(required = true)]
         path: PathBuf,
     },
     /// List all loaded schemas
+    #[deprecated(note = "Schema commands are deprecated and will be removed")]
     ListSchemas {},
     /// List all schemas available on disk
+    #[deprecated(note = "Schema commands are deprecated and will be removed")]
     ListAvailableSchemas {},
     /// Unload a schema
+    #[deprecated(note = "Schema commands are deprecated and will be removed")]
     UnloadSchema {
         /// Schema name to unload
         #[arg(long, short, required = true)]
@@ -103,6 +107,7 @@ enum Commands {
 }
 
 fn handle_load_schema(path: PathBuf, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    warn!("Schema commands are deprecated and will be removed");
     info!("Loading schema from: {}", path.display());
     load_schema_from_file(path, node)?;
     info!("Schema loaded successfully");
@@ -149,6 +154,7 @@ mod tests {
 }
 
 fn handle_list_schemas(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    warn!("Schema commands are deprecated and will be removed");
     let schemas = node.list_schemas()?;
     info!("Loaded schemas:");
     for schema in schemas {
@@ -158,6 +164,7 @@ fn handle_list_schemas(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error
 }
 
 fn handle_list_available_schemas(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    warn!("Schema commands are deprecated and will be removed");
     let names = node.list_available_schemas()?;
     info!("Available schemas:");
     for name in names {
@@ -167,6 +174,7 @@ fn handle_list_available_schemas(node: &mut DataFoldNode) -> Result<(), Box<dyn 
 }
 
 fn handle_unload_schema(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    warn!("Schema commands are deprecated and will be removed");
     node.unload_schema(&name)?;
     info!("Schema '{}' unloaded", name);
     Ok(())

@@ -116,6 +116,7 @@ macro_rules! impl_field {
 }
 
 /// Field storing a single value.
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SingleField {
     inner: FieldCommon,
@@ -137,6 +138,7 @@ impl SingleField {
 impl_field!(SingleField);
 
 /// Field storing a collection of values.
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CollectionField {
     inner: FieldCommon,
@@ -158,6 +160,7 @@ impl CollectionField {
 impl_field!(CollectionField);
 
 /// Field storing a range of values.
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RangeField {
     inner: FieldCommon,

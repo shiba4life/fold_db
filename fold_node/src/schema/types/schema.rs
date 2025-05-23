@@ -18,6 +18,7 @@ use std::collections::HashMap;
 /// - Proper access control
 /// - Payment validation
 /// - Data transformation rules
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Schema {
     /// Unique name identifying this schema

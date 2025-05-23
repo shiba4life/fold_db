@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Query {
     pub schema_name: String,
@@ -68,6 +69,7 @@ impl<'de> Deserialize<'de> for MutationType {
     }
 }
 
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize)]
 pub struct Mutation {
     pub schema_name: String,

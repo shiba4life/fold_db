@@ -38,6 +38,7 @@ impl fmt::Display for FieldType {
 /// - Specific payment requirements for data access
 /// - Links to stored data through atom references
 /// - Transformation mappings for schema evolution
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize)] // Removed Deserialize
 pub struct SchemaField {
     /// Permission policy controlling read/write access to this field

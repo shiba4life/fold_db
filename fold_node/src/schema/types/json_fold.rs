@@ -8,6 +8,7 @@ use crate::transform::parser::TransformParser;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonFoldDefinition {
     pub name: String,
@@ -15,6 +16,7 @@ pub struct JsonFoldDefinition {
     pub payment_config: SchemaPaymentConfig,
 }
 
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonFoldField {
     pub permission_policy: JsonPermissionPolicy,

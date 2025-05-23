@@ -8,6 +8,7 @@ use std::collections::HashMap;
 /// A Fold mirrors the behaviour of a `Schema` but stores its
 /// fields using the `FieldVariant` type so that each field can
 /// be represented as a `SingleField`, `CollectionField` or `RangeField`.
+#[deprecated(note = "Schema system is deprecated and will be removed")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Fold {
     /// Unique name identifying this fold
