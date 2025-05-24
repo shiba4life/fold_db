@@ -37,7 +37,7 @@ pub struct DataFoldHttpServer {
 
 
 /// Shared application state for the HTTP server.
-pub(crate) struct AppState {
+pub struct AppState {
     /// The DataFold node
     pub(crate) node: Arc<tokio::sync::Mutex<DataFoldNode>>,
     /// The sample data manager

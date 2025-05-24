@@ -6,7 +6,7 @@ use crate::schema::types::Operation;
 
 /// Execute an operation (query or mutation).
 #[derive(Deserialize)]
-pub(crate) struct OperationRequest {
+pub struct OperationRequest {
     operation: String,
 }
 

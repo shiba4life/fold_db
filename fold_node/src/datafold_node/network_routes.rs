@@ -5,7 +5,7 @@ use serde_json::json;
 use crate::network::NetworkConfig;
 
 #[derive(Deserialize)]
-pub(crate) struct NetworkConfigPayload {
+pub struct NetworkConfigPayload {
     listen_address: String,
     discovery_port: Option<u16>,
     max_connections: Option<usize>,
@@ -15,7 +15,7 @@ pub(crate) struct NetworkConfigPayload {
 }
 
 #[derive(Deserialize)]
-pub(crate) struct ConnectRequest {
+pub struct ConnectRequest {
     node_id: String,
 }
 

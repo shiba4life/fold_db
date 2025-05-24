@@ -18,6 +18,17 @@ use serde_json::Value;
 use uuid::Uuid;
 use regex::Regex;
 
+// Type alias to reduce complexity
+type TransformInputResult = Result<(Vec<(String, String)>, Vec<String>), SchemaError>;
+
+// Struct to group transform registration parameters
+struct TransformRegistrationParams {
+    input_arefs: Vec<String>,
+    input_names: Vec<String>,
+    trigger_fields: Vec<String>,
+    output_aref: String,
+}
+
 use self::atom_manager::AtomManager;
 use self::collection_manager::CollectionManager;
 use self::field_manager::FieldManager;
@@ -200,7 +211,7 @@ impl FoldDB {
         schema: &Schema,
         transform: &Transform,
         cross_re: &Regex,
-    ) -> Result<(Vec<(String, String)>, Vec<String>), SchemaError> {
+    ) -> TransformInputResult {
         let mut input_pairs = Vec::new();
         let mut input_arefs = Vec::new();
         let mut trigger_fields = Vec::new();
@@ -266,20 +277,18 @@ impl FoldDB {
         schema: &Schema,
         field_name: &str,
         transform: &Transform,
-        input_arefs: Vec<String>,
-        input_names: Vec<String>,
-        mut trigger_fields: Vec<String>,
-        output_aref: String,
+        params: TransformRegistrationParams,
     ) -> Result<(), SchemaError> {
         let transform_id = format!("{}.{}", schema.name, field_name);
+        let mut trigger_fields = params.trigger_fields;
         trigger_fields.push(transform_id.clone());
         let registration = TransformRegistration {
             transform_id: transform_id.clone(),
             transform: transform.clone(),
-            input_arefs,
-            input_names,
+            input_arefs: params.input_arefs,
+            input_names: params.input_names,
             trigger_fields,
-            output_aref,
+            output_aref: params.output_aref,
             schema_name: schema.name.clone(),
             field_name: field_name.to_string(),
         };
@@ -306,10 +315,12 @@ impl FoldDB {
                     schema,
                     field_name,
                     transform,
-                    input_arefs,
-                    input_names,
-                    trigger_fields,
-                    output_aref,
+                    TransformRegistrationParams {
+                        input_arefs,
+                        input_names,
+                        trigger_fields,
+                        output_aref,
+                    },
                 )?;
             }
         }
