@@ -1,26 +1,27 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use uuid::Uuid;
 use crate::atom::atom_ref_types::{AtomRefStatus, AtomRefUpdate};
 use crate::atom::atom_ref_behavior::AtomRefBehavior;
 
-/// A reference to a single atom version.
+/// A range-based collection of atom references stored in a BTreeMap.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AtomRef {
+pub struct AtomRefRange {
     uuid: String,
-    atom_uuid: String,
+    pub(crate) atom_uuids: BTreeMap<String, String>,
     updated_at: DateTime<Utc>,
     status: AtomRefStatus,
     update_history: Vec<AtomRefUpdate>,
 }
 
-impl AtomRef {
-    /// Creates a new AtomRef pointing to the specified Atom.
+impl AtomRefRange {
+    /// Creates a new empty AtomRefRange.
     #[must_use]
-    pub fn new(atom_uuid: String, source_pub_key: String) -> Self {
+    pub fn new(source_pub_key: String) -> Self {
         Self {
             uuid: Uuid::new_v4().to_string(),
-            atom_uuid,
+            atom_uuids: BTreeMap::new(),
             updated_at: Utc::now(),
             status: AtomRefStatus::Active,
             update_history: vec![AtomRefUpdate {
@@ -31,20 +32,29 @@ impl AtomRef {
         }
     }
 
-    /// Updates the reference to point to a new Atom version.
-    pub fn set_atom_uuid(&mut self, atom_uuid: String) {
-        self.atom_uuid = atom_uuid;
+    /// Updates or adds a reference at the specified key.
+    pub fn set_atom_uuid(&mut self, key: String, atom_uuid: String) {
+        self.atom_uuids.insert(key, atom_uuid);
         self.updated_at = Utc::now();
     }
 
-    /// Returns the UUID of the referenced Atom.
+    /// Returns the UUID of the Atom referenced by the specified key.
     #[must_use]
-    pub fn get_atom_uuid(&self) -> &String {
-        &self.atom_uuid
+    pub fn get_atom_uuid(&self, key: &str) -> Option<&String> {
+        self.atom_uuids.get(key)
+    }
+
+    /// Removes the reference at the specified key.
+    pub fn remove_atom_uuid(&mut self, key: &str) -> Option<String> {
+        let result = self.atom_uuids.remove(key);
+        if result.is_some() {
+            self.updated_at = Utc::now();
+        }
+        result
     }
 }
 
-impl AtomRefBehavior for AtomRef {
+impl AtomRefBehavior for AtomRefRange {
     fn uuid(&self) -> &str {
         &self.uuid
     }
