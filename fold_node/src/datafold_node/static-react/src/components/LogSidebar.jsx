@@ -7,8 +7,8 @@ function LogSidebar() {
   useEffect(() => {
     fetch('/api/logs')
       .then(res => res.json())
-      .then(data => setLogs(data))
-      .catch(() => {})
+      .then(data => setLogs(Array.isArray(data) ? data : []))
+      .catch(() => setLogs([]))
 
     const es = new EventSource('/api/logs/stream')
     es.onmessage = (e) => {
