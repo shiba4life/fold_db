@@ -1,7 +1,6 @@
 use crate::atom::AtomRef;
-use crate::schema::types::fields::FieldType;
 use crate::schema::types::{
-    JsonSchemaDefinition, JsonSchemaField, Schema, SchemaError, SchemaField,
+    JsonSchemaDefinition, JsonSchemaField, Schema, SchemaError, Field, FieldVariant, SingleField,
 };
 use serde_json;
 use std::collections::HashMap;
@@ -103,10 +102,12 @@ impl SchemaCore {
     pub fn load_schema(&self, mut schema: Schema) -> Result<(), SchemaError> {
         // Ensure any transforms on fields have the correct output schema
         for (field_name, field) in schema.fields.iter_mut() {
-            if let Some(transform) = field.transform.as_mut() {
+            if let Some(transform) = field.transform() {
                 let out_schema = transform.get_output();
                 if out_schema.starts_with("test.") {
-                    transform.set_output(format!("{}.{}", schema.name, field_name));
+                    let mut new_transform = (*transform).clone();
+                    new_transform.set_output(format!("{}.{}", schema.name, field_name));
+                    field.set_transform(new_transform);
                 }
             }
         }
@@ -234,10 +235,10 @@ impl SchemaCore {
         let mut field_mappings = Vec::new();
         if let Some(schema) = schemas.get(schema_name) {
             for (field_name, field) in &schema.fields {
-                for (source_schema_name, source_field_name) in &field.field_mappers {
+                for (source_schema_name, source_field_name) in field.field_mappers() {
                     if let Some(source_schema) = schemas.get(source_schema_name) {
                         if let Some(source_field) = source_schema.fields.get(source_field_name) {
-                            if let Some(ref_atom_uuid) = source_field.get_ref_atom_uuid() {
+                            if let Some(ref_atom_uuid) = source_field.ref_atom_uuid() {
                                 field_mappings.push((field_name.clone(), ref_atom_uuid.clone()));
                             }
                         }
@@ -268,17 +269,20 @@ impl SchemaCore {
 
         // For unmapped fields, create a new ref_atom_uuid and AtomRef
         for field in schema.fields.values_mut() {
-            if field.get_ref_atom_uuid().is_none() {
+            if field.ref_atom_uuid().is_none() {
                 let ref_atom_uuid = Uuid::new_v4().to_string();
 
                 // Create a new AtomRef for this field
-                let atom_ref = if field.field_type() == &FieldType::Collection {
-                    // For collection fields, we'll create a placeholder AtomRef
-                    // The actual collection will be created when data is added
-                    AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
-                } else {
-                    // For single fields, create a normal AtomRef
-                    AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
+                let atom_ref = match field {
+                    FieldVariant::Collection(_) => {
+                        // For collection fields, we'll create a placeholder AtomRef
+                        // The actual collection will be created when data is added
+                        AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
+                    }
+                    _ => {
+                        // For single fields, create a normal AtomRef
+                        AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
+                    }
                 };
 
                 // Add the AtomRef to the list to be persisted
@@ -340,22 +344,26 @@ impl SchemaCore {
         Ok(())
     }
 
-    /// Converts a JSON schema field to a SchemaField.
-    fn convert_field(json_field: JsonSchemaField) -> SchemaField {
-        let mut field = SchemaField::new(
+    /// Converts a JSON schema field to a FieldVariant.
+    fn convert_field(json_field: JsonSchemaField) -> FieldVariant {
+        let mut single_field = SingleField::new(
             json_field.permission_policy.into(),
             json_field.payment_config.into(),
             json_field.field_mappers,
-            Some(json_field.field_type),
-        )
-        .with_ref_atom_uuid(json_field.ref_atom_uuid);
+        );
+        
+        if let Some(ref_atom_uuid) = json_field.ref_atom_uuid {
+            single_field.set_ref_atom_uuid(ref_atom_uuid);
+        }
         
         // Add transform if present
         if let Some(json_transform) = json_field.transform {
-            field = field.with_transform(json_transform.into());
+            single_field.set_transform(json_transform.into());
         }
         
-        field
+        // For now, we'll create all fields as Single fields
+        // TODO: Handle Collection and Range field types based on json_field.field_type
+        FieldVariant::Single(single_field)
     }
 
     /// Interprets a JSON schema definition and converts it to a Schema.
@@ -404,7 +412,7 @@ mod tests {
     use crate::fees::FieldPaymentConfig;
 
     use crate::permissions::types::policy::PermissionsPolicy;
-    use crate::schema::types::fields::{FieldType, SchemaField};
+    use crate::schema::types::field::FieldType;
     use crate::schema::types::{JsonSchemaDefinition, JsonSchemaField};
     use crate::schema::types::json_schema::{JsonFieldPaymentConfig, JsonPermissionPolicy};
     use crate::fees::{SchemaPaymentConfig, TrustDistanceScaling};
@@ -419,17 +427,16 @@ mod tests {
     fn create_test_field(
         ref_atom_uuid: Option<String>,
         field_mappers: HashMap<String, String>,
-    ) -> SchemaField {
-        let mut field = SchemaField::new(
+    ) -> FieldVariant {
+        let mut single_field = SingleField::new(
             PermissionsPolicy::default(),
             FieldPaymentConfig::default(),
             field_mappers,
-            Some(FieldType::Single),
         );
         if let Some(uuid) = ref_atom_uuid {
-            field = field.with_ref_atom_uuid(uuid);
+            single_field.set_ref_atom_uuid(uuid);
         }
-        field
+        FieldVariant::Single(single_field)
     }
 
     fn build_json_schema(name: &str) -> JsonSchemaDefinition {
@@ -441,7 +448,7 @@ mod tests {
         };
         let field = JsonSchemaField {
             permission_policy,
-            ref_atom_uuid: "uuid".to_string(),
+            ref_atom_uuid: Some("uuid".to_string()),
             payment_config: JsonFieldPaymentConfig {
                 base_multiplier: 1.0,
                 trust_distance_scaling: TrustDistanceScaling::None,
@@ -491,8 +498,8 @@ mod tests {
                 .fields
                 .get("test_field")
                 .unwrap()
-                .get_ref_atom_uuid(),
-            Some("test_uuid".to_string())
+                .ref_atom_uuid(),
+            Some(&"test_uuid".to_string())
         );
 
         // Unload schema should keep file on disk
@@ -533,8 +540,8 @@ mod tests {
         let mapped_schema = core.get_schema("target_schema").unwrap().unwrap();
         let mapped_field = mapped_schema.fields.get("target_field").unwrap();
         assert_eq!(
-            mapped_field.get_ref_atom_uuid(),
-            Some("test_uuid".to_string())
+            mapped_field.ref_atom_uuid(),
+            Some(&"test_uuid".to_string())
         );
     }
 

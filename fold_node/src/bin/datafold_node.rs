@@ -1,13 +1,9 @@
 use fold_node::{
-    datafold_node::{load_node_config, NodeConfig, DataFoldNode, TcpServer},
+    datafold_node::{load_node_config, DataFoldNode, TcpServer},
     network::NetworkConfig,
 };
 
-use std::env;
-use std::path::PathBuf;
-use std::fs;
 use clap::Parser;
-use env_logger;
 use log::{info, error};
 
 /// Command line options for the datafold node binary.

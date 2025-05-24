@@ -1,5 +1,5 @@
 use crate::permissions::permission_manager::PermissionManager;
-use crate::schema::types::{Mutation, Query, SchemaError};
+use crate::schema::types::{Field, Mutation, Query, SchemaError};
 use crate::schema::SchemaCore;
 
 /// Provides a high-level interface for permission validation on schema operations.
@@ -102,7 +102,7 @@ impl PermissionWrapper {
             |field| {
                 let allowed = self.permission_manager.has_read_permission(
                     &query.pub_key,
-                    &field.permission_policy,
+                    field.permission_policy(),
                     query.trust_distance,
                 );
 
@@ -179,7 +179,7 @@ impl PermissionWrapper {
                 ))),
             },
             |field| {
-                if !field.is_writable() {
+                if !field.writable() {
                     return FieldPermissionResult {
                         field_name: field_name.to_string(),
                         allowed: false,
@@ -191,7 +191,7 @@ impl PermissionWrapper {
 
                 let allowed = self.permission_manager.has_write_permission(
                     &mutation.pub_key,
-                    &field.permission_policy,
+                    field.permission_policy(),
                     mutation.trust_distance,
                 );
 

@@ -1,9 +1,11 @@
 use crate::test_data::test_helpers::{setup_test_db, cleanup_test_db};
 use fold_node::testing::{
-    PermissionsPolicy, FieldPaymentConfig, FieldType, Schema, SchemaField,
-    TrustDistance, TrustDistanceScaling, Mutation, MutationType,
+    Field, FieldVariant, SingleField, Schema, Mutation, MutationType,
 };
-use fold_node::transform::{Transform, TransformParser};
+use fold_node::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
+use fold_node::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+use fold_node::schema::types::Transform;
+use fold_node::transform::parser::TransformParser;
 use serde_json::json;
 
 #[test]
@@ -19,13 +21,13 @@ fn mutation_enqueues_transform() {
         expr,
         "EnqueueSchema.calc".to_string()
     );
-    let field = SchemaField::new(
+    let mut field = SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(0), TrustDistance::Distance(0)),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         std::collections::HashMap::new(),
-        Some(FieldType::Single),
-    ).with_transform(transform);
-    schema.add_field("calc".to_string(), field);
+    );
+    field.set_transform(transform);
+    schema.add_field("calc".to_string(), FieldVariant::Single(field));
 
     db.load_schema(schema).unwrap();
     db.allow_schema("EnqueueSchema").unwrap();

@@ -1,4 +1,4 @@
-use fold_node::testing::{Mutation, MutationType, Query};
+use fold_node::testing::{Field, Mutation, MutationType, Query};
 use serde_json::json;
 use crate::test_data::test_helpers::create_test_node;
 use crate::test_data::test_helpers::node_operations::{
@@ -75,7 +75,7 @@ fn test_version_history() {
     let initial_name_field = initial_schema.fields.get("name").unwrap();
     // Ensure the field has a ref_atom_uuid set
     assert!(
-        initial_name_field.get_ref_atom_uuid().is_some(),
+        initial_name_field.ref_atom_uuid().is_some(),
         "name field should have a ref_atom_uuid"
     );
 
@@ -87,8 +87,8 @@ fn test_version_history() {
     let name_field_after_create = schema_after_create.fields.get("name").unwrap();
     // The ref_atom_uuid should remain unchanged after create
     assert_eq!(
-        initial_name_field.get_ref_atom_uuid(),
-        name_field_after_create.get_ref_atom_uuid(),
+        initial_name_field.ref_atom_uuid(),
+        name_field_after_create.ref_atom_uuid(),
         "create should not modify the ref_atom_uuid"
     );
 
@@ -117,13 +117,13 @@ fn test_version_history() {
     let name_field_after_update = schema_after_update.fields.get("name").unwrap();
     // ref_atom_uuid should remain the same after update as well
     assert_eq!(
-        initial_name_field.get_ref_atom_uuid(),
-        name_field_after_update.get_ref_atom_uuid(),
+        initial_name_field.ref_atom_uuid(),
+        name_field_after_update.ref_atom_uuid(),
         "update should not modify the ref_atom_uuid"
     );
 
     // Get history using the actual ref_atom_uuid
-    let history = node.get_history(&name_field_after_update.get_ref_atom_uuid().unwrap());
+    let history = node.get_history(name_field_after_update.ref_atom_uuid().unwrap());
 
     assert!(history.is_ok());
 

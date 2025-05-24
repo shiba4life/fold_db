@@ -2,7 +2,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use crate::error::{FoldDbError, FoldDbResult};
-use crate::schema::types::{Mutation, Operation, Query, Transform};
+use crate::schema::types::{Field, Mutation, Operation, Query, Transform};
 use crate::schema::{Schema, SchemaError, SchemaValidator};
 
 use super::DataFoldNode;
@@ -19,9 +19,11 @@ impl DataFoldNode {
         // Apply transform output fix and validate before loading
         let mut schema = schema;
         for (fname, field) in schema.fields.iter_mut() {
-            if let Some(transform) = field.transform.as_mut() {
+            if let Some(transform) = field.transform() {
+                let mut transform = transform.clone();
                 if transform.get_output().starts_with("test.") {
                     transform.set_output(format!("{}.{}", schema_name, fname));
+                    field.set_transform(transform);
                 }
             }
         }

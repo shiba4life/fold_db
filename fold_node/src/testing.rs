@@ -1,10 +1,13 @@
 // Re-export types needed for testing
-pub use crate::schema::types::fields::{FieldType, SchemaField};
-pub use crate::schema::types::{Mutation, MutationType, Operation, Query};
+pub use crate::schema::types::field::{FieldType};
+pub use crate::schema::types::{Field, FieldVariant, SingleField, CollectionField, RangeField};
+pub use crate::schema::types::{Mutation, MutationType, Operation, Query, Transform};
 pub use crate::schema::Schema;
 pub use crate::schema::SchemaCore;
 pub use crate::schema::SchemaError;
 pub use crate::schema::SchemaValidator;
+
+pub use crate::transform::parser::TransformParser;
 
 pub use crate::permissions::types::policy::{ExplicitCounts, PermissionsPolicy, TrustDistance};
 pub use crate::permissions::PermissionWrapper;

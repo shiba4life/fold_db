@@ -90,10 +90,8 @@ pub fn cleanup_tmp_dir() {
     // Remove all contents with retries
     let cleanup_contents = || -> std::io::Result<()> {
         if let Ok(entries) = fs::read_dir(&tmp_dir) {
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    let _ = fs::remove_dir_all(entry.path());
-                }
+            for entry in entries.flatten() {
+                let _ = fs::remove_dir_all(entry.path());
             }
         }
         Ok(())

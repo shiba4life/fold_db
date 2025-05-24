@@ -1,4 +1,4 @@
-use fold_node::testing::{Schema, SchemaCore};
+use fold_node::testing::{Field, Schema, SchemaCore};
 use tempfile::tempdir;
 mod test_data;
 use test_data::schema_test_data::*;
@@ -21,10 +21,10 @@ fn test_schema_field_management() {
     assert!(schema.fields.contains_key(field_name));
     let stored_field = schema.fields.get(field_name).unwrap();
     assert_eq!(
-        stored_field.get_ref_atom_uuid(),
-        Some("test-uuid".to_string())
+        stored_field.ref_atom_uuid(),
+        Some(&"test-uuid".to_string())
     );
-    assert!(stored_field.field_mappers.is_empty());
+    assert!(stored_field.field_mappers().is_empty());
 }
 
 #[test]
@@ -33,23 +33,23 @@ fn test_schema_field_permissions() {
 
     // Verify permissions for each field
     let public_field = schema.fields.get("public_field").unwrap();
-    match public_field.permission_policy.read_policy {
+    match public_field.permission_policy().read_policy {
         fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 0),
         _ => panic!("Expected Distance variant"),
     }
 
     let protected_field = schema.fields.get("protected_field").unwrap();
-    match protected_field.permission_policy.read_policy {
+    match protected_field.permission_policy().read_policy {
         fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 1),
         _ => panic!("Expected Distance variant"),
     }
-    match protected_field.permission_policy.write_policy {
+    match protected_field.permission_policy().write_policy {
         fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 2),
         _ => panic!("Expected Distance variant"),
     }
 
     let private_field = schema.fields.get("private_field").unwrap();
-    match private_field.permission_policy.read_policy {
+    match private_field.permission_policy().read_policy {
         fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 3),
         _ => panic!("Expected Distance variant"),
     }
@@ -65,19 +65,19 @@ fn test_user_profile_schema() {
 
     // Verify field permissions
     let username_field = schema.fields.get("username").unwrap();
-    match username_field.permission_policy.read_policy {
+    match username_field.permission_policy().read_policy {
         fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 0), // Public read
         _ => panic!("Expected Distance variant"),
     }
 
     let email_field = schema.fields.get("email").unwrap();
-    match email_field.permission_policy.read_policy {
+    match email_field.permission_policy().read_policy {
         fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 1), // Limited read
         _ => panic!("Expected Distance variant"),
     }
 
     let payment_field = schema.fields.get("payment_info").unwrap();
-    match payment_field.permission_policy.read_policy {
+    match payment_field.permission_policy().read_policy {
         fold_node::testing::TrustDistance::Distance(d) => assert_eq!(d, 3), // Restricted read
         _ => panic!("Expected Distance variant"),
     }
@@ -101,8 +101,8 @@ fn test_schema_persistence() {
             .fields
             .get("test_field")
             .unwrap()
-            .get_ref_atom_uuid(),
-        Some("test-uuid".to_string())
+            .ref_atom_uuid(),
+        Some(&"test-uuid".to_string())
     );
 
     // Create a new manager instance to verify disk persistence
@@ -201,6 +201,6 @@ fn test_transform_placeholder_output_on_disk_load() {
         .unwrap()
         .unwrap();
     let field = schema.fields.get("calc").unwrap();
-    let transform = field.get_transform().unwrap();
+    let transform = field.transform().unwrap();
     assert_eq!(transform.get_output(), "placeholder_schema.calc");
 }

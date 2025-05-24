@@ -1,5 +1,5 @@
 use fold_node::testing::{
-    ExplicitCounts, FieldPaymentConfig, FieldType, PermissionsPolicy, Schema, SchemaField,
+    ExplicitCounts, Field, FieldPaymentConfig, PermissionsPolicy, Schema, SingleField, FieldVariant,
     SchemaPaymentConfig, TrustDistance,
 };
 use std::collections::HashMap;
@@ -11,8 +11,8 @@ pub fn create_field_with_permissions(
     write_distance: u32,
     explicit_read_keys: Option<HashMap<String, u8>>,
     explicit_write_keys: Option<HashMap<String, u8>>,
-) -> SchemaField {
-    SchemaField::new(
+) -> FieldVariant {
+    let mut field = SingleField::new(
         PermissionsPolicy {
             read_policy: TrustDistance::Distance(read_distance),
             write_policy: TrustDistance::Distance(write_distance),
@@ -25,13 +25,13 @@ pub fn create_field_with_permissions(
         },
         FieldPaymentConfig::default(),
         HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_ref_atom_uuid(ref_atom_uuid)
+    );
+    field.set_ref_atom_uuid(ref_atom_uuid);
+    FieldVariant::Single(field)
 }
 
 #[allow(dead_code)]
-pub fn create_schema_with_fields(name: String, fields: HashMap<String, SchemaField>) -> Schema {
+pub fn create_schema_with_fields(name: String, fields: HashMap<String, FieldVariant>) -> Schema {
     Schema::new(name)
         .with_fields(fields)
         .with_payment_config(SchemaPaymentConfig::default())

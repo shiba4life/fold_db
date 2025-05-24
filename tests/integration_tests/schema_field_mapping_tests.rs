@@ -1,4 +1,5 @@
 use fold_node::schema::Schema;
+use fold_node::testing::Field;
 use crate::test_data::test_helpers::create_test_node;
 use serde_json::json;
 
@@ -74,11 +75,11 @@ fn test_field_mappers_share_aref_uuid() {
 
     // Get the ref_atom_uuid from the source field
     let source_field = source_schema.fields.get("username").unwrap();
-    let source_ref_atom_uuid = source_field.get_ref_atom_uuid();
+    let source_ref_atom_uuid = source_field.ref_atom_uuid();
 
     // Get the ref_atom_uuid from the target field
     let target_field = target_schema.fields.get("user_name").unwrap();
-    let target_ref_atom_uuid = target_field.get_ref_atom_uuid();
+    let target_ref_atom_uuid = target_field.ref_atom_uuid();
 
     // Verify that both fields have ref_atom_uuid values
     assert!(

@@ -1,7 +1,7 @@
 use super::context::AtomContext;
 use super::field_manager::FieldManager;
 use crate::atom::AtomStatus;
-use crate::schema::types::fields::FieldType;
+use crate::schema::types::field::FieldType;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
 use serde_json::Value;

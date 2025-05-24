@@ -2,7 +2,7 @@ use crate::fees::payment_config::SchemaPaymentConfig;
 use crate::fees::types::config::FieldPaymentConfig;
 use crate::fees::types::config::TrustDistanceScaling;
 use crate::permissions::types::policy::{ExplicitCounts, PermissionsPolicy, TrustDistance};
-use crate::schema::types::fields::FieldType;
+use crate::schema::types::field::FieldType;
 use crate::schema::types::SchemaError;
 use crate::schema::types::Transform;
 use crate::transform::parser::TransformParser;
@@ -21,7 +21,8 @@ pub struct JsonSchemaDefinition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonSchemaField {
     pub permission_policy: JsonPermissionPolicy,
-    pub ref_atom_uuid: String,
+    #[serde(default)]
+    pub ref_atom_uuid: Option<String>,
     pub payment_config: JsonFieldPaymentConfig,
     pub field_mappers: HashMap<String, String>,
     #[serde(default = "default_field_type")]

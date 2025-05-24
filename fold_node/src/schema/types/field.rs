@@ -42,6 +42,13 @@ pub trait Field {
     fn set_writable(&mut self, writable: bool);
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum FieldType {
+    Single,
+    Collection,
+    Range,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct FieldCommon {
     permission_policy: PermissionsPolicy,
@@ -49,7 +56,12 @@ struct FieldCommon {
     ref_atom_uuid: Option<String>,
     field_mappers: HashMap<String, String>,
     transform: Option<Transform>,
+    #[serde(default = "default_writable")]
     writable: bool,
+}
+
+fn default_writable() -> bool {
+    true
 }
 
 impl FieldCommon {
@@ -276,7 +288,7 @@ impl Serialize for FieldVariant {
     where
         S: Serializer,
     {
-        use crate::schema::types::fields::FieldType;
+        use crate::schema::types::field::FieldType;
 
         #[derive(Serialize)]
         struct Helper<'a> {
@@ -295,12 +307,13 @@ impl Serialize for FieldVariant {
     }
 }
 
+
 impl<'de> Deserialize<'de> for FieldVariant {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        use crate::schema::types::fields::FieldType;
+        use crate::schema::types::field::FieldType;
 
         #[derive(Deserialize)]
         struct Helper {
@@ -317,4 +330,5 @@ impl<'de> Deserialize<'de> for FieldVariant {
         })
     }
 }
+
 

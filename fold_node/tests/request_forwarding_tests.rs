@@ -4,7 +4,6 @@ use serde_json::json;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::sleep;
-use env_logger;
 
 #[tokio::test]
 async fn test_request_forwarding() {

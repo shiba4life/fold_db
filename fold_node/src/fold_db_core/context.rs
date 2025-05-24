@@ -1,6 +1,7 @@
 use super::atom_manager::AtomManager;
 use crate::atom::{AtomRef, AtomRefCollection, AtomRefRange, AtomStatus};
-use crate::schema::types::fields::FieldType;
+use crate::schema::types::field::FieldType;
+use crate::schema::types::Field;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
 use serde_json::Value;
@@ -30,7 +31,7 @@ impl<'a> AtomContext<'a> {
 
     pub fn get_field_def(
         &self,
-    ) -> Result<&'a crate::schema::types::fields::SchemaField, SchemaError> {
+    ) -> Result<&'a crate::schema::types::FieldVariant, SchemaError> {
         self.schema
             .fields
             .get(self.field)
@@ -40,12 +41,12 @@ impl<'a> AtomContext<'a> {
     pub fn get_or_create_atom_ref(&mut self) -> Result<String, SchemaError> {
         let field_def = self.get_field_def()?;
 
-        let aref_uuid = if let Some(uuid) = field_def.get_ref_atom_uuid() {
-            uuid
+        let aref_uuid = if let Some(uuid) = field_def.ref_atom_uuid() {
+            uuid.clone()
         } else {
             let aref_uuid = Uuid::new_v4().to_string();
-            match field_def.field_type() {
-                FieldType::Single => {
+            match field_def {
+                crate::schema::types::FieldVariant::Single(_) => {
                     let aref = AtomRef::new(aref_uuid.clone(), self.source_pub_key.clone());
                     let ref_atoms = self.atom_manager.get_ref_atoms();
                     let mut guard = ref_atoms
@@ -53,7 +54,7 @@ impl<'a> AtomContext<'a> {
                         .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
                     guard.insert(aref_uuid.clone(), aref);
                 }
-                FieldType::Collection => {
+                crate::schema::types::FieldVariant::Collection(_) => {
                     let collection = AtomRefCollection::new(self.source_pub_key.clone());
                     let ref_collections = self.atom_manager.get_ref_collections();
                     let mut guard = ref_collections
@@ -61,7 +62,7 @@ impl<'a> AtomContext<'a> {
                         .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string()))?;
                     guard.insert(aref_uuid.clone(), collection);
                 }
-                FieldType::Range => {
+                crate::schema::types::FieldVariant::Range(_) => {
                     let range = AtomRefRange::new(self.source_pub_key.clone());
                     let ref_ranges = self.atom_manager.get_ref_ranges();
                     let mut guard = ref_ranges
@@ -124,8 +125,8 @@ impl<'a> AtomContext<'a> {
         let aref_uuid = self.get_or_create_atom_ref()?;
         let field_def = self.get_field_def()?;
 
-        match field_def.field_type() {
-            FieldType::Single => {
+        match field_def {
+            crate::schema::types::FieldVariant::Single(_) => {
                 self.atom_manager
                     .update_atom_ref(
                         &aref_uuid,
@@ -134,7 +135,7 @@ impl<'a> AtomContext<'a> {
                     )
                     .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
             }
-            FieldType::Collection => {
+            crate::schema::types::FieldVariant::Collection(_) => {
                 self.atom_manager
                     .update_atom_ref_collection(
                         &aref_uuid,
@@ -144,7 +145,7 @@ impl<'a> AtomContext<'a> {
                     )
                     .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
             }
-            FieldType::Range => {
+            crate::schema::types::FieldVariant::Range(_) => {
                 self.atom_manager
                     .update_atom_ref_range(
                         &aref_uuid,
@@ -193,8 +194,14 @@ impl<'a> AtomContext<'a> {
 
     pub fn validate_field_type(&self, expected_type: FieldType) -> Result<(), SchemaError> {
         let field_def = self.get_field_def()?;
-        if *field_def.field_type() != expected_type {
-            let msg = match expected_type {
+        let matches = matches!((field_def, &expected_type),
+            (crate::schema::types::FieldVariant::Single(_), &FieldType::Single) |
+            (crate::schema::types::FieldVariant::Collection(_), &FieldType::Collection) |
+            (crate::schema::types::FieldVariant::Range(_), &FieldType::Range)
+        );
+        
+        if !matches {
+            let msg = match &expected_type {
                 FieldType::Single => "Collection fields cannot be updated without id",
                 FieldType::Collection => "Single fields cannot be updated with collection id",
                 FieldType::Range => "Incorrect field type for range operation",

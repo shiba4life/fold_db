@@ -2,7 +2,7 @@ use super::atom_manager::AtomManager;
 use super::context::AtomContext;
 use super::transform_manager::TransformManager;
 use crate::atom::AtomStatus;
-use crate::schema::types::fields::FieldType;
+use crate::schema::types::Field;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
 use serde_json::Value;
@@ -81,7 +81,7 @@ impl FieldManager {
             .get(field)
             .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
 
-        let result = if let Some(ref_atom_uuid) = field_def.get_ref_atom_uuid() {
+        let result = if let Some(ref_atom_uuid) = field_def.ref_atom_uuid() {
             // Try to get the atom reference
             let ref_atoms = self.atom_manager.get_ref_atoms();
             let atoms = self.atom_manager.get_atoms();
@@ -91,7 +91,7 @@ impl FieldManager {
                     .lock()
                     .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
                 guard
-                    .get(&ref_atom_uuid)
+                    .get(ref_atom_uuid.as_str())
                     .map(|aref| aref.get_atom_uuid().clone())
             };
 
@@ -104,13 +104,13 @@ impl FieldManager {
                     atom.content().clone()
                 } else {
                     self.atom_manager
-                        .get_latest_atom(&ref_atom_uuid)
+                        .get_latest_atom(ref_atom_uuid)
                         .map(|a| a.content().clone())
                         .unwrap_or_else(|_| Self::default_value(field))
                 }
             } else {
                 self.atom_manager
-                    .get_latest_atom(&ref_atom_uuid)
+                    .get_latest_atom(ref_atom_uuid)
                     .map(|a| a.content().clone())
                     .unwrap_or_else(|_| Self::default_value(field))
             }
@@ -122,7 +122,7 @@ impl FieldManager {
             "get_field_value - schema: {}, field: {}, aref_uuid: {:?}, result: {:?}",
             schema.name,
             field,
-            field_def.get_ref_atom_uuid(),
+            field_def.ref_atom_uuid(),
             result
         );
 
@@ -139,7 +139,7 @@ impl FieldManager {
         let mut ctx = AtomContext::new(schema, field, source_pub_key, &mut self.atom_manager);
 
         let field_def = ctx.get_field_def()?;
-        if FieldType::Collection == *field_def.field_type() {
+        if matches!(field_def, crate::schema::types::FieldVariant::Collection(_)) {
             return Err(SchemaError::InvalidField(
                 "Collection fields cannot be updated without id".to_string(),
             ));
@@ -178,7 +178,7 @@ impl FieldManager {
         let mut ctx = AtomContext::new(schema, field, source_pub_key, &mut self.atom_manager);
 
         let field_def = ctx.get_field_def()?;
-        if FieldType::Collection == *field_def.field_type() {
+        if matches!(field_def, crate::schema::types::FieldVariant::Collection(_)) {
             return Err(SchemaError::InvalidField(
                 "Collection fields cannot be updated".to_string(),
             ));
@@ -208,7 +208,7 @@ impl FieldManager {
         let mut ctx = AtomContext::new(schema, field, source_pub_key, &mut self.atom_manager);
 
         let field_def = ctx.get_field_def()?;
-        if FieldType::Collection == *field_def.field_type() {
+        if matches!(field_def, crate::schema::types::FieldVariant::Collection(_)) {
             return Err(SchemaError::InvalidField(
                 "Collection fields cannot be deleted without id".to_string(),
             ));

@@ -182,7 +182,7 @@ mod tests {
         assert!(!rate.is_stale(Duration::from_secs(60)));
 
         // Force last_updated to be in the past
-        rate.last_updated = rate.last_updated - chrono::Duration::seconds(120);
+        rate.last_updated -= chrono::Duration::seconds(120);
 
         // Should be stale now
         assert!(rate.is_stale(Duration::from_secs(60)));

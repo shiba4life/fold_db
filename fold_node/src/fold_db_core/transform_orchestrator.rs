@@ -146,7 +146,8 @@ impl TransformOrchestrator {
                 .lock()
                 .map_err(|_| SchemaError::InvalidData("Failed to acquire queue lock".to_string()))
                 .ok()?;
-            let res = match q.queue.pop_front() {
+            
+            match q.queue.pop_front() {
                 Some(item) => {
                     let key = format!("{}|{}", item.id, item.mutation_hash);
                     let processed = q.processed.contains(&key);
@@ -154,8 +155,7 @@ impl TransformOrchestrator {
                     (item.id, item.mutation_hash, processed)
                 }
                 None => return None,
-            };
-            res
+            }
         };
 
         if self.persist_state().is_err() {

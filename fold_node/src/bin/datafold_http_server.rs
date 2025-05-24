@@ -1,12 +1,6 @@
-use fold_node::{
-    datafold_node::{load_node_config, NodeConfig, DataFoldNode, DataFoldHttpServer},
-};
-use std::env;
-use std::path::PathBuf;
-use std::fs;
+use fold_node::datafold_node::{load_node_config, DataFoldNode, DataFoldHttpServer};
 use clap::Parser;
-use env_logger;
-use log::{info, error};
+use log::info;
 
 /// Command line options for the HTTP server binary.
 #[derive(Parser, Debug)]

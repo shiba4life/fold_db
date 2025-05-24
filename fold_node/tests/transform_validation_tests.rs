@@ -1,7 +1,7 @@
 use fold_node::schema::types::json_schema::{
     JsonSchemaDefinition, JsonSchemaField, JsonTransform, JsonPermissionPolicy, JsonFieldPaymentConfig
 };
-use fold_node::schema::types::fields::FieldType;
+use fold_node::schema::types::field::FieldType;
 use fold_node::schema::types::SchemaError;
 use fold_node::fees::{SchemaPaymentConfig, TrustDistanceScaling};
 use fold_node::permissions::types::policy::TrustDistance;
@@ -17,7 +17,7 @@ fn build_schema(transform_logic: &str) -> JsonSchemaDefinition {
 
     let field = JsonSchemaField {
         permission_policy: permission,
-        ref_atom_uuid: "uuid".to_string(),
+        ref_atom_uuid: Some("uuid".to_string()),
         payment_config: JsonFieldPaymentConfig {
             base_multiplier: 1.0,
             trust_distance_scaling: TrustDistanceScaling::None,

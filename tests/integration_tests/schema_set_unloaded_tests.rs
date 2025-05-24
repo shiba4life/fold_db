@@ -1,8 +1,10 @@
 use fold_node::testing::{
-    PermissionsPolicy, FieldPaymentConfig, FieldType, Schema, SchemaField,
-    TrustDistance, TrustDistanceScaling,
+    Field, FieldVariant, SingleField, Schema,
 };
-use fold_node::transform::{Transform, TransformParser};
+use fold_node::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
+use fold_node::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+use fold_node::schema::types::Transform;
+use fold_node::transform::parser::TransformParser;
 use crate::test_data::test_helpers::create_test_node;
 
 #[test]
@@ -17,14 +19,13 @@ fn set_unloaded_keeps_transforms() {
         expr,
         "UnloadSchema.calc".to_string(),
     );
-    let field = SchemaField::new(
+    let mut field = SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(0), TrustDistance::Distance(0)),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         std::collections::HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_transform(transform);
-    schema.add_field("calc".to_string(), field);
+    );
+    field.set_transform(transform);
+    schema.add_field("calc".to_string(), FieldVariant::Single(field));
 
     node.load_schema(schema).unwrap();
     node.allow_schema("UnloadSchema").unwrap();

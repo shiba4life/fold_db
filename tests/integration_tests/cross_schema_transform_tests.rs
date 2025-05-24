@@ -1,7 +1,10 @@
 use fold_node::testing::{
-    FieldPaymentConfig, FieldType, Mutation, MutationType, PermissionsPolicy, Query, Schema, SchemaField, TrustDistance, TrustDistanceScaling,
+    Field, FieldVariant, SingleField, Mutation, MutationType, Query, Schema,
+    Transform, TransformParser,
 };
-use fold_node::transform::{Transform, TransformExecutor, TransformParser};
+use fold_node::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
+use fold_node::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+use fold_node::transform::TransformExecutor;
 use crate::test_data::test_helpers::create_test_node;
 use serde_json::json;
 use std::collections::HashMap;
@@ -9,26 +12,24 @@ use std::collections::HashMap;
 
 fn create_schema_a() -> Schema {
     let mut schema = Schema::new("SchemaA".to_string());
-    let field = SchemaField::new(
+    let field = FieldVariant::Single(SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
-        Some(FieldType::Single),
-    );
+    ));
     schema.add_field("a_test_field".to_string(), field);
     schema
 }
 
 fn create_schema_b(transform: Transform) -> Schema {
     let mut schema = Schema::new("SchemaB".to_string());
-    let field = SchemaField::new(
+    let mut field = SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_transform(transform);
-    schema.add_field("b_test_field".to_string(), field);
+    );
+    field.set_transform(transform);
+    schema.add_field("b_test_field".to_string(), FieldVariant::Single(field));
     schema
 }
 
@@ -158,24 +159,22 @@ fn test_transform_persists_to_output_field() {
 
     // Create Schema B with an output field
     let mut schema_b = Schema::new("SchemaB".to_string());
-    let output_field = SchemaField::new(
+    let output_field = FieldVariant::Single(SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
-        Some(FieldType::Single),
-    );
+    ));
     schema_b.add_field("b_out".to_string(), output_field);
     node.load_schema(schema_b).unwrap();
     node.allow_schema("SchemaB").unwrap();
 
     // Create Schema A with input field and transform writing to SchemaB.b_out
     let mut schema_a = Schema::new("SchemaA".to_string());
-    let input_field = SchemaField::new(
+    let input_field = FieldVariant::Single(SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
-        Some(FieldType::Single),
-    );
+    ));
     schema_a.add_field("a_in".to_string(), input_field);
 
     let parser = TransformParser::new();
@@ -186,14 +185,13 @@ fn test_transform_persists_to_output_field() {
         "SchemaB.b_out".to_string(),
     );
     transform.set_inputs(vec!["SchemaA.a_in".to_string()]);
-    let t_field = SchemaField::new(
+    let mut t_field = SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_transform(transform);
-    schema_a.add_field("calc".to_string(), t_field);
+    );
+    t_field.set_transform(transform);
+    schema_a.add_field("calc".to_string(), FieldVariant::Single(t_field));
 
     node.load_schema(schema_a).unwrap();
     node.allow_schema("SchemaA").unwrap();

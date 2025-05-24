@@ -1,5 +1,5 @@
 use fold_node::testing::{
-    FieldPaymentConfig, FieldType, PermissionsPolicy, Schema, SchemaField,
+    Field, FieldPaymentConfig, PermissionsPolicy, Schema, SingleField, FieldVariant,
     SchemaCore, SchemaValidator, SchemaError, TrustDistance, TrustDistanceScaling,
 };
 use fold_node::transform::{Transform, TransformParser};
@@ -12,14 +12,14 @@ fn create_core() -> SchemaCore {
     SchemaCore::new(dir.path().to_str().unwrap()).unwrap()
 }
 
-fn base_field() -> SchemaField {
-    SchemaField::new(
+fn base_field() -> FieldVariant {
+    let mut field = SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_ref_atom_uuid(Uuid::new_v4().to_string())
+    );
+    field.set_ref_atom_uuid(Uuid::new_v4().to_string());
+    FieldVariant::Single(field)
 }
 
 #[test]
@@ -38,13 +38,13 @@ fn validator_accepts_valid_transform() {
     );
     transform.set_inputs(vec!["Src.value".to_string()]);
 
-    let field = SchemaField::new(
+    let mut field = SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_transform(transform);
+    );
+    field.set_transform(transform);
+    let field = FieldVariant::Single(field);
 
     let mut target = Schema::new("Target".to_string());
     target.add_field("result".to_string(), field);
@@ -65,13 +65,13 @@ fn validator_rejects_self_input() {
     );
     transform.set_inputs(vec!["Self.result".to_string()]);
 
-    let field = SchemaField::new(
+    let mut field = SingleField::new(
         PermissionsPolicy::default(),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_transform(transform);
+    );
+    field.set_transform(transform);
+    let field = FieldVariant::Single(field);
 
     let mut schema = Schema::new("Self".to_string());
     schema.add_field("result".to_string(), field);
@@ -92,13 +92,13 @@ fn validator_rejects_wrong_output() {
         "Other.field".to_string(),
     );
 
-    let field = SchemaField::new(
+    let mut field = SingleField::new(
         PermissionsPolicy::default(),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_transform(transform);
+    );
+    field.set_transform(transform);
+    let field = FieldVariant::Single(field);
 
     let mut schema = Schema::new("Test".to_string());
     schema.add_field("calc".to_string(), field);

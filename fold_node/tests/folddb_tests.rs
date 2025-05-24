@@ -1,6 +1,6 @@
 use fold_node::testing::{
-    ExplicitCounts, FieldPaymentConfig, FieldType, Mutation, MutationType, PermissionsPolicy,
-    Query, Schema, SchemaField, SchemaPaymentConfig, TrustDistance, TrustDistanceScaling,
+    ExplicitCounts, Field, FieldPaymentConfig, Mutation, MutationType, PermissionsPolicy,
+    Query, Schema, SingleField, FieldVariant, SchemaPaymentConfig, TrustDistance, TrustDistanceScaling,
 };
 use serde_json::json;
 use std::collections::HashMap;
@@ -33,22 +33,19 @@ fn test_schema_operations() {
     let mut write_counts = HashMap::new();
     write_counts.insert("test_key".to_string(), 1);
 
-    fields.insert(
-        "name".to_string(),
-        SchemaField::new(
-            PermissionsPolicy {
-                read_policy: TrustDistance::Distance(5),
-                write_policy: TrustDistance::Distance(0),
-                explicit_write_policy: Some(ExplicitCounts {
-                    counts_by_pub_key: write_counts,
-                }),
-                explicit_read_policy: None,
-            },
-            create_default_payment_config(),
-            HashMap::new(),
-            Some(FieldType::Single),
-        ),
+    let field = SingleField::new(
+        PermissionsPolicy {
+            read_policy: TrustDistance::Distance(5),
+            write_policy: TrustDistance::Distance(0),
+            explicit_write_policy: Some(ExplicitCounts {
+                counts_by_pub_key: write_counts,
+            }),
+            explicit_read_policy: None,
+        },
+        create_default_payment_config(),
+        HashMap::new(),
     );
+    fields.insert("name".to_string(), FieldVariant::Single(field));
 
     let schema = Schema {
         name: "test_schema".to_string(),
@@ -75,22 +72,19 @@ fn test_write_and_query() {
     let mut write_counts = HashMap::new();
     write_counts.insert("test_key".to_string(), 1);
 
-    fields.insert(
-        "test_field".to_string(),
-        SchemaField::new(
-            PermissionsPolicy {
-                read_policy: TrustDistance::Distance(5), // Allow reads with trust distance up to 5
-                write_policy: TrustDistance::Distance(0),
-                explicit_write_policy: Some(ExplicitCounts {
-                    counts_by_pub_key: write_counts,
-                }),
-                explicit_read_policy: None,
-            },
-            create_default_payment_config(),
-            HashMap::new(),
-            Some(FieldType::Single),
-        ),
+    let field = SingleField::new(
+        PermissionsPolicy {
+            read_policy: TrustDistance::Distance(5), // Allow reads with trust distance up to 5
+            write_policy: TrustDistance::Distance(0),
+            explicit_write_policy: Some(ExplicitCounts {
+                counts_by_pub_key: write_counts,
+            }),
+            explicit_read_policy: None,
+        },
+        create_default_payment_config(),
+        HashMap::new(),
     );
+    fields.insert("test_field".to_string(), FieldVariant::Single(field));
 
     let schema = Schema {
         name: "test_schema".to_string(),
@@ -145,23 +139,20 @@ fn test_atom_history() {
     let mut write_counts = HashMap::new();
     write_counts.insert("test_key".to_string(), 1);
 
-    fields.insert(
-        "version_field".to_string(),
-        SchemaField::new(
-            PermissionsPolicy {
-                read_policy: TrustDistance::Distance(5),
-                write_policy: TrustDistance::Distance(0),
-                explicit_write_policy: Some(ExplicitCounts {
-                    counts_by_pub_key: write_counts,
-                }),
-                explicit_read_policy: None,
-            },
-            create_default_payment_config(),
-            HashMap::new(),
-            Some(FieldType::Single),
-        )
-        .with_ref_atom_uuid(field_uuid.clone()),
+    let mut field = SingleField::new(
+        PermissionsPolicy {
+            read_policy: TrustDistance::Distance(5),
+            write_policy: TrustDistance::Distance(0),
+            explicit_write_policy: Some(ExplicitCounts {
+                counts_by_pub_key: write_counts,
+            }),
+            explicit_read_policy: None,
+        },
+        create_default_payment_config(),
+        HashMap::new(),
     );
+    field.set_ref_atom_uuid(field_uuid.clone());
+    fields.insert("version_field".to_string(), FieldVariant::Single(field));
 
     let schema = Schema {
         name: "test_schema".to_string(),

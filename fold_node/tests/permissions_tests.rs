@@ -1,12 +1,11 @@
 use fold_node::testing::{
-    ExplicitCounts, FieldPaymentConfig, FieldType, Mutation, MutationType, PermissionWrapper,
-    PermissionsPolicy, Query, Schema, SchemaCore, SchemaField, SchemaPaymentConfig, TrustDistance,
+    ExplicitCounts, Field, FieldPaymentConfig, Mutation, MutationType, PermissionWrapper,
+    PermissionsPolicy, Query, Schema, SchemaCore, SingleField, FieldVariant, SchemaPaymentConfig, TrustDistance,
     TrustDistanceScaling,
 };
 use fold_node::schema::types::Transform;
 use serde_json::Value;
 use std::collections::HashMap;
-use env_logger;
 
 fn create_default_payment_config() -> FieldPaymentConfig {
     FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
@@ -22,17 +21,16 @@ fn test_non_reversible_transform_not_writable() {
         "1 + 1".to_string(),
         "test_schema.calc".to_string(),
     );
-    let field = SchemaField::new(
+    let mut field = SingleField::new(
         PermissionsPolicy::default(),
         create_default_payment_config(),
         HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_ref_atom_uuid("calc_uuid".to_string())
-    .with_transform(transform);
+    );
+    field.set_ref_atom_uuid("calc_uuid".to_string());
+    field.set_transform(transform);
 
     let mut fields = HashMap::new();
-    fields.insert("calc".to_string(), field);
+    fields.insert("calc".to_string(), FieldVariant::Single(field));
 
     let schema = Schema {
         name: "test_schema".to_string(),
@@ -67,18 +65,17 @@ fn test_permission_wrapper_query() {
 
     // Create a test schema
     let mut fields = HashMap::new();
-    let field = SchemaField::new(
+    let mut field = SingleField::new(
         PermissionsPolicy::new(
             TrustDistance::Distance(2), // Allow read within trust distance 2
             TrustDistance::Distance(0),
         ),
         create_default_payment_config(),
         HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_ref_atom_uuid("test_ref".to_string())
-    .with_field_mappers(HashMap::new());
-    fields.insert("test_field".to_string(), field);
+    );
+    field.set_ref_atom_uuid("test_ref".to_string());
+    field.set_field_mappers(HashMap::new());
+    fields.insert("test_field".to_string(), FieldVariant::Single(field));
 
     let schema = Schema {
         name: "test_schema".to_string(),
@@ -127,18 +124,17 @@ fn test_permission_wrapper_no_requirement() {
 
     // Create a test schema with no distance requirement
     let mut fields = HashMap::new();
-    let field = SchemaField::new(
+    let mut field = SingleField::new(
         PermissionsPolicy::new(
             TrustDistance::NoRequirement, // No distance requirement for reads
             TrustDistance::Distance(0),
         ),
         create_default_payment_config(),
         HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_ref_atom_uuid("test_ref".to_string())
-    .with_field_mappers(HashMap::new());
-    fields.insert("test_field".to_string(), field);
+    );
+    field.set_ref_atom_uuid("test_ref".to_string());
+    field.set_field_mappers(HashMap::new());
+    fields.insert("test_field".to_string(), FieldVariant::Single(field));
 
     let schema = Schema {
         name: "test_schema".to_string(),
@@ -187,15 +183,14 @@ fn test_permission_wrapper_mutation() {
     policy.explicit_write_policy = Some(ExplicitCounts {
         counts_by_pub_key: explicit_counts,
     });
-    let field = SchemaField::new(
+    let mut field = SingleField::new(
         policy,
         create_default_payment_config(),
         HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_ref_atom_uuid("test_ref".to_string())
-    .with_field_mappers(HashMap::new());
-    fields.insert("test_field".to_string(), field);
+    );
+    field.set_ref_atom_uuid("test_ref".to_string());
+    field.set_field_mappers(HashMap::new());
+    fields.insert("test_field".to_string(), FieldVariant::Single(field));
 
     let schema = Schema {
         name: "test_schema".to_string(),

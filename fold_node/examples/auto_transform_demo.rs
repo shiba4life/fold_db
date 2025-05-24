@@ -4,7 +4,6 @@
 
 use fold_node::transform::{TransformParser, Interpreter, Value};
 use std::collections::HashMap;
-use serde_json;
 
 // This is needed to ensure the main function is properly recognized
 #[allow(dead_code)]

@@ -1,13 +1,12 @@
 use clap::{Parser, Subcommand};
 use fold_node::{
-    load_schema_from_file, load_node_config, DataFoldNode, MutationType, NodeConfig,
+    load_schema_from_file, load_node_config, DataFoldNode, MutationType,
     Operation,
 };
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
-use env_logger;
-use log::{error, info, warn};
+use log::info;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

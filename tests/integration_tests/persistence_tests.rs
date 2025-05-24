@@ -1,10 +1,12 @@
 use fold_node::testing::{
-    FieldPaymentConfig, FieldType, PermissionsPolicy, Schema, SchemaField,
-    TrustDistance, TrustDistanceScaling, Mutation, MutationType, Query,
+    Field, FieldVariant, SingleField, Schema, Query,
 };
+use fold_node::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
+use fold_node::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+use fold_node::schema::types::Transform;
+use fold_node::transform::parser::TransformParser;
 use fold_node::{DataFoldNode, NodeConfig};
 use crate::test_data::test_helpers::node_operations::{load_and_allow, insert_value, query_value};
-use fold_node::transform::{Transform, TransformParser};
 use serde_json::json;
 use std::collections::HashMap;
 use tempfile::tempdir;
@@ -12,12 +14,11 @@ use tempfile::tempdir;
 fn create_persistence_schema() -> Schema {
     let mut schema = Schema::new("PersistSchema".to_string());
     // Input field
-    let input_field = SchemaField::new(
+    let input_field = FieldVariant::Single(SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
-        Some(FieldType::Single),
-    );
+    ));
     schema.add_field("input_field".to_string(), input_field);
 
     // Transform field that depends on input_field
@@ -28,14 +29,13 @@ fn create_persistence_schema() -> Schema {
         expr,
         "PersistSchema.transform_field".to_string(),
     );
-    let transform_field = SchemaField::new(
+    let mut transform_field = SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_transform(transform);
-    schema.add_field("transform_field".to_string(), transform_field);
+    );
+    transform_field.set_transform(transform);
+    schema.add_field("transform_field".to_string(), FieldVariant::Single(transform_field));
 
     schema
 }
@@ -71,7 +71,7 @@ fn test_db_and_transform_persistence() {
     // Verify schema exists and transform persisted
     let loaded_schema = node2.get_schema("PersistSchema").unwrap().unwrap();
     let field = loaded_schema.fields.get("transform_field").unwrap();
-    assert!(field.get_transform().is_some(), "Transform should persist across reload");
+    assert!(field.transform().is_some(), "Transform should persist across reload");
 
     // Verify stored data persists
     let query2 = Query {

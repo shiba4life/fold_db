@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use tempfile::tempdir;
 
 use fold_node::testing::{
-    FieldPaymentConfig, FieldType, Mutation, MutationType, PermissionsPolicy, Schema, SchemaField,
+    FieldPaymentConfig, Mutation, MutationType, PermissionsPolicy, Schema, SingleField, FieldVariant,
     TrustDistance,
 };
 use fold_node::{datafold_node::config::NodeConfig, DataFoldNode};
@@ -22,22 +22,20 @@ fn setup_test_node() -> DataFoldNode {
     let mut test_schema = Schema::new("TestProfile".to_string());
 
     // Add username field
-    let username_field = SchemaField::new(
+    let username_field = SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(0), TrustDistance::Distance(0)),
         FieldPaymentConfig::default(),
         HashMap::new(),
-        Some(FieldType::Single),
     );
-    test_schema.add_field(String::from("username"), username_field);
+    test_schema.add_field(String::from("username"), FieldVariant::Single(username_field));
 
     // Add age field
-    let age_field = SchemaField::new(
+    let age_field = SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(0), TrustDistance::Distance(0)),
         FieldPaymentConfig::default(),
         HashMap::new(),
-        Some(FieldType::Single),
     );
-    test_schema.add_field(String::from("age"), age_field);
+    test_schema.add_field(String::from("age"), FieldVariant::Single(age_field));
 
     node.load_schema(test_schema)
         .expect("Failed to load schema");

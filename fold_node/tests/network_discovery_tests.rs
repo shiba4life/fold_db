@@ -3,7 +3,6 @@ use std::thread;
 use std::time::Duration;
 
 use fold_node::{datafold_node::config::NodeConfig, network::NetworkConfig, DataFoldNode};
-use env_logger;
 
 // Helper function to create a test network config with random ports
 fn create_test_network_config(enable_discovery: bool) -> NetworkConfig {

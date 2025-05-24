@@ -1,4 +1,4 @@
-use super::{core::SchemaCore, types::{Schema, SchemaError}};
+use super::{core::SchemaCore, types::{Field, Schema, SchemaError}};
 use crate::transform::TransformExecutor;
 
 /// Validates a [`Schema`] before it is loaded into the database.
@@ -30,13 +30,13 @@ impl<'a> SchemaValidator<'a> {
         }
 
         for (field_name, field) in &schema.fields {
-            if field.payment_config.base_multiplier <= 0.0 {
+            if field.payment_config().base_multiplier <= 0.0 {
                 return Err(SchemaError::InvalidField(format!(
                     "Field {field_name} base_multiplier must be positive",
                 )));
             }
 
-            if let Some(min) = field.payment_config.min_payment {
+            if let Some(min) = field.payment_config().min_payment {
                 if min == 0 {
                     return Err(SchemaError::InvalidField(format!(
                         "Field {field_name} min_payment cannot be zero",
@@ -44,7 +44,7 @@ impl<'a> SchemaValidator<'a> {
                 }
             }
 
-            if let Some(transform) = &field.transform {
+            if let Some(transform) = field.transform() {
                 // Basic syntax validation
                 TransformExecutor::validate_transform(transform)?;
 

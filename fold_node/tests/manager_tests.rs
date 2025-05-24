@@ -9,11 +9,14 @@ use fold_node::fold_db_core::{
     field_manager::FieldManager,
 };
 use fold_node::testing::{
+    CollectionField,
+    Field,
     FieldPaymentConfig,
     FieldType,
     PermissionsPolicy,
     Schema,
-    SchemaField,
+    SingleField,
+    FieldVariant,
     SchemaError,
     TrustDistanceScaling,
 };
@@ -30,24 +33,24 @@ fn setup_managers() -> (FieldManager, CollectionManager, AtomManager) {
     (field_manager, collection_manager, atom_manager)
 }
 
-fn create_single_field() -> SchemaField {
-    SchemaField::new(
+fn create_single_field() -> FieldVariant {
+    let mut field = SingleField::new(
         PermissionsPolicy::default(),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
-        Some(FieldType::Single),
-    )
-    .with_ref_atom_uuid(Uuid::new_v4().to_string())
+    );
+    field.set_ref_atom_uuid(Uuid::new_v4().to_string());
+    FieldVariant::Single(field)
 }
 
-fn create_collection_field() -> SchemaField {
-    SchemaField::new(
+fn create_collection_field() -> FieldVariant {
+    let mut field = CollectionField::new(
         PermissionsPolicy::default(),
         FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap(),
         HashMap::new(),
-        Some(FieldType::Collection),
-    )
-    .with_ref_atom_uuid(Uuid::new_v4().to_string())
+    );
+    field.set_ref_atom_uuid(Uuid::new_v4().to_string());
+    FieldVariant::Collection(field)
 }
 
 #[test]
@@ -93,7 +96,7 @@ fn test_field_manager_collection_error() {
 
 #[test]
 fn test_collection_manager_operations() {
-    let (mut field_manager, mut collection_manager, atom_manager) = setup_managers();
+    let (_field_manager, mut collection_manager, atom_manager) = setup_managers();
 
     let mut schema = Schema::new("test".to_string());
     schema.add_field("items".to_string(), create_collection_field());
@@ -101,7 +104,7 @@ fn test_collection_manager_operations() {
         .fields
         .get("items")
         .unwrap()
-        .get_ref_atom_uuid()
+        .ref_atom_uuid()
         .unwrap();
 
     collection_manager
@@ -127,7 +130,7 @@ fn test_collection_manager_operations() {
     let atom_uuid = {
         let collections = atom_manager.get_ref_collections();
         let col = collections.lock().unwrap();
-        let col_ref = col.get(&aref_uuid).unwrap();
+        let col_ref = col.get(aref_uuid.as_str()).unwrap();
         col_ref.get_atom_uuid("1").unwrap().clone()
     };
     let atoms = atom_manager.get_atoms();
@@ -141,7 +144,7 @@ fn test_collection_manager_operations() {
     let atom_uuid = {
         let collections = atom_manager.get_ref_collections();
         let col = collections.lock().unwrap();
-        let col_ref = col.get(&aref_uuid).unwrap();
+        let col_ref = col.get(aref_uuid.as_str()).unwrap();
         col_ref.get_atom_uuid("1").unwrap().clone()
     };
     let atoms = atom_manager.get_atoms();
@@ -151,13 +154,13 @@ fn test_collection_manager_operations() {
 
 #[test]
 fn test_atom_context_type_validation() {
-    let (mut field_manager, _, mut atom_manager) = setup_managers();
+    let (_field_manager, _, mut atom_manager) = setup_managers();
     let schema = {
         let mut s = Schema::new("test".to_string());
         s.add_field("single".to_string(), create_single_field());
         s
     };
-    let mut ctx = AtomContext::new(&schema, "single", "key".to_string(), &mut atom_manager);
+    let ctx = AtomContext::new(&schema, "single", "key".to_string(), &mut atom_manager);
     assert!(ctx.validate_field_type(FieldType::Single).is_ok());
     assert!(ctx.validate_field_type(FieldType::Collection).is_err());
     assert!(ctx.validate_field_type(FieldType::Range).is_err());

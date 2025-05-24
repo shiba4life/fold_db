@@ -68,6 +68,7 @@ pub fn load_schema_from_file<P: AsRef<Path>>(
 mod tests {
     use super::*;
     use crate::datafold_node::config::NodeConfig;
+    use crate::schema::types::field::Field;
     use tempfile::tempdir;
 
     fn create_node(path: &std::path::Path) -> Result<DataFoldNode, Box<dyn std::error::Error>> {
@@ -151,8 +152,8 @@ mod tests {
             .fields
             .get("computed")
             .expect("field not found");
-        assert!(field.transform.is_some());
-        assert_eq!(field.transform.as_ref().unwrap().logic, "4 + 5");
+        assert!(field.transform().is_some());
+        assert_eq!(field.transform().unwrap().logic, "4 + 5");
 
         Ok(())
     }

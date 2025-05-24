@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use crate::atom::{Atom, AtomRefBehavior};
 use crate::db_operations::DbOperations;
 use crate::permissions::PermissionWrapper;
-use crate::schema::types::{Mutation, MutationType, Query, Transform, TransformRegistration};
+use crate::schema::types::{Field, Mutation, MutationType, Query, Transform, TransformRegistration};
 use crate::schema::SchemaCore;
 use crate::schema::{Schema, SchemaError};
 use serde_json;
@@ -164,7 +164,7 @@ impl FoldDB {
         &self,
         schema: &Schema,
         field_name: &str,
-        field: &crate::schema::types::SchemaField,
+        field: &crate::schema::types::FieldVariant,
         transform: &Transform,
     ) -> Result<String, SchemaError> {
         let (out_schema_name, out_field_name) = match transform.get_output().split_once('.') {
@@ -173,24 +173,24 @@ impl FoldDB {
         };
 
         if out_schema_name == schema.name && out_field_name == field_name {
-            field.get_ref_atom_uuid().ok_or_else(|| {
+            field.ref_atom_uuid().ok_or_else(|| {
                 SchemaError::InvalidData(format!("Field {} missing atom reference", field_name))
-            })
+            }).cloned()
         } else {
             match self
                 .schema_manager
                 .get_schema(&out_schema_name)?
                 .and_then(|s| s.fields.get(&out_field_name).cloned())
             {
-                Some(of) => of.get_ref_atom_uuid().ok_or_else(|| {
+                Some(of) => of.ref_atom_uuid().ok_or_else(|| {
                     SchemaError::InvalidData(format!(
                         "Field {}.{} missing atom reference",
                         out_schema_name, out_field_name
                     ))
-                }),
-                None => field.get_ref_atom_uuid().ok_or_else(|| {
+                }).cloned(),
+                None => field.ref_atom_uuid().ok_or_else(|| {
                     SchemaError::InvalidData(format!("Field {} missing atom reference", field_name))
-                }),
+                }).cloned(),
             }
         }
     }
@@ -214,9 +214,9 @@ impl FoldDB {
                     trigger_fields.push(format!("{}.{}", schema_name, field_dep));
                     if let Some(dep_schema) = self.schema_manager.get_schema(schema_name)? {
                         if let Some(dep_field) = dep_schema.fields.get(field_dep) {
-                            if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
+                            if let Some(dep_aref) = dep_field.ref_atom_uuid() {
                                 input_arefs.push(dep_aref.clone());
-                                input_pairs.push((dep_aref, format!("{}.{}", schema_name, field_dep)));
+                                input_pairs.push((dep_aref.clone(), format!("{}.{}", schema_name, field_dep)));
                             }
                         }
                     }
@@ -230,9 +230,9 @@ impl FoldDB {
                 trigger_fields.push(format!("{}.{}", schema_name, field_dep));
                 if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
                     if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
-                        if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
+                        if let Some(dep_aref) = dep_field.ref_atom_uuid() {
                             input_arefs.push(dep_aref.clone());
-                            input_pairs.push((dep_aref, format!("{}.{}", schema_name, field_dep)));
+                            input_pairs.push((dep_aref.clone(), format!("{}.{}", schema_name, field_dep)));
                         }
                     }
                 }
@@ -250,9 +250,9 @@ impl FoldDB {
 
             if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
                 if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
-                    if let Some(dep_aref) = dep_field.get_ref_atom_uuid() {
+                    if let Some(dep_aref) = dep_field.ref_atom_uuid() {
                         input_arefs.push(dep_aref.clone());
-                        input_pairs.push((dep_aref, format!("{}.{}", schema_name, field_dep)));
+                        input_pairs.push((dep_aref.clone(), format!("{}.{}", schema_name, field_dep)));
                     }
                 }
             }
@@ -292,7 +292,7 @@ impl FoldDB {
         let cross_re = Regex::new(r"([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)").unwrap();
 
         for (field_name, field) in &schema.fields {
-            if let Some(transform) = field.get_transform() {
+            if let Some(transform) = field.transform() {
                 let output_aref = self.parse_output_field(schema, field_name, field, transform)?;
                 let (pairs, trigger_fields) =
                     self.collect_input_arefs(schema, transform, &cross_re)?;
