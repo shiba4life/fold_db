@@ -4,7 +4,6 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 /// Load a schema into the node and allow access.
-#[allow(dead_code)]
 pub fn load_and_allow(node: &mut DataFoldNode, schema: Schema) -> FoldDbResult<()> {
     let name = schema.name.clone();
     node.load_schema(schema)?;
@@ -12,16 +11,7 @@ pub fn load_and_allow(node: &mut DataFoldNode, schema: Schema) -> FoldDbResult<(
     Ok(())
 }
 
-/// Create a new node with the given schema loaded and allowed.
-#[allow(dead_code)]
-pub fn create_node_with_schema(schema: Schema) -> DataFoldNode {
-    let mut node = super::create_test_node();
-    load_and_allow(&mut node, schema).expect("failed to load schema");
-    node
-}
-
 /// Execute a single field create mutation on the node.
-#[allow(dead_code)]
 pub fn insert_value(
     node: &mut DataFoldNode,
     schema: &str,
@@ -41,7 +31,6 @@ pub fn insert_value(
 }
 
 /// Query a single field from the node and return the value.
-#[allow(dead_code)]
 pub fn query_value(
     node: &mut DataFoldNode,
     schema: &str,

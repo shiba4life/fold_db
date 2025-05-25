@@ -2,7 +2,6 @@ use fold_node::testing::{Mutation, MutationType, Query};
 use serde_json::Value;
 use std::collections::HashMap;
 
-#[allow(dead_code)]
 pub fn create_query(
     schema_name: String,
     fields: Vec<String>,
@@ -18,7 +17,6 @@ pub fn create_query(
     }
 }
 
-#[allow(dead_code)]
 pub fn create_mutation(
     schema_name: String,
     fields_and_values: HashMap<String, Value>,
@@ -34,7 +32,6 @@ pub fn create_mutation(
     }
 }
 
-#[allow(dead_code)]
 pub fn create_single_field_mutation(
     schema_name: String,
     field: String,
