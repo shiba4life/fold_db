@@ -23,7 +23,11 @@ function App() {
     try {
       const response = await fetch('/api/schemas')
       const data = await response.json()
-      setSchemas(data.data || [])
+      const schemas = Array.isArray(data.data) ? data.data : []
+      const loadedSchemas = schemas.filter(
+        (s) => s.state && s.state.toLowerCase() === 'loaded'
+      )
+      setSchemas(loadedSchemas)
     } catch (error) {
       console.error('Failed to fetch schemas:', error)
     }
