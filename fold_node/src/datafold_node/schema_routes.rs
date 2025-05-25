@@ -11,7 +11,7 @@ pub async fn list_schemas(state: web::Data<AppState>) -> impl Responder {
     info!("Received request to list schemas");
     let node_guard = state.node.lock().await;
 
-    match node_guard.list_schemas() {
+    match node_guard.list_schemas_with_state() {
         Ok(schemas) => HttpResponse::Ok().json(json!({"data": schemas})),
         Err(e) => {
             error!("Failed to list schemas: {}", e);

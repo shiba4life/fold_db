@@ -30,7 +30,9 @@ async fn test_list_schemas_route() {
         .unwrap();
     assert!(resp.status().is_success());
     let body: Value = resp.json().await.unwrap();
-    assert!(body["data"].as_array().map(|a| !a.is_empty()).unwrap_or(false));
+    let arr = body["data"].as_array().expect("data array");
+    assert!(!arr.is_empty());
+    assert_eq!(arr[0]["state"], "Loaded");
     handle.abort();
 }
 
