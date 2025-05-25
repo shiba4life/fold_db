@@ -139,7 +139,7 @@ impl SchemaCore {
         }
 
         // Persist state changes
-        self.persist_states()?;
+        self.set_schema_state(&name, SchemaState::Loaded)?;
         info!("Schema '{}' loaded and state persisted", name);
 
         Ok(())
@@ -198,6 +198,21 @@ impl SchemaCore {
         available.get(schema_name).map(|(_, s)| *s)
     }
 
+    /// Sets the state for a schema and persists all schema states.
+    pub fn set_schema_state(&self, schema_name: &str, state: SchemaState) -> Result<(), SchemaError> {
+        let mut available = self
+            .available
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+        if let Some((_, st)) = available.get_mut(schema_name) {
+            *st = state;
+        } else {
+            return Err(SchemaError::NotFound(format!("Schema {} not found", schema_name)));
+        }
+        drop(available);
+        self.persist_states()
+    }
+
     /// Backwards compatible method for listing loaded schemas.
     pub fn list_schemas(&self) -> Result<Vec<String>, SchemaError> {
         self.list_loaded_schemas()
@@ -220,20 +235,10 @@ impl SchemaCore {
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
         schemas.remove(schema_name);
-        let mut available = self
-            .available
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-        if let Some((_, state)) = available.get_mut(schema_name) {
-            *state = SchemaState::Unloaded;
-            // persist state change
-            drop(available);
-            self.persist_states()?;
-            info!("Schema '{}' marked as unloaded", schema_name);
-            Ok(())
-        } else {
-            Err(SchemaError::NotFound(format!("Schema {schema_name} not found")))
-        }
+        drop(schemas);
+        self.set_schema_state(schema_name, SchemaState::Unloaded)?;
+        info!("Schema '{}' marked as unloaded", schema_name);
+        Ok(())
     }
 
     /// Unload a schema from memory without deleting its persisted file.
