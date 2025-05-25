@@ -106,10 +106,7 @@ pub fn cleanup_tmp_dir() {
             if entries.count() == 0 {
                 Ok(())
             } else {
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Directory not empty",
-                ))
+                Err(std::io::Error::other("Directory not empty"))
             }
         } else {
             Ok(())
