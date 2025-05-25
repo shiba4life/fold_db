@@ -4,6 +4,7 @@ use crate::schema::types::{
 };
 use serde_json;
 use serde::{Serialize, Deserialize};
+use sled::Tree;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -35,11 +36,13 @@ pub struct SchemaCore {
     available: Mutex<HashMap<String, (Schema, SchemaState)>>,
     /// Base directory for schema storage
     schemas_dir: PathBuf,
+    /// Sled tree storing schema states
+    schema_states_tree: Tree,
 }
 
 impl SchemaCore {
     /// Internal helper to create the schema directory and construct the struct.
-    fn init_with_dir(schemas_dir: PathBuf) -> Result<Self, SchemaError> {
+    fn init_with_dir(schemas_dir: PathBuf, schema_states_tree: Tree) -> Result<Self, SchemaError> {
         if let Err(e) = fs::create_dir_all(&schemas_dir) {
             if e.kind() != std::io::ErrorKind::AlreadyExists {
                 return Err(SchemaError::InvalidData(format!(
@@ -53,21 +56,32 @@ impl SchemaCore {
             schemas: Mutex::new(HashMap::new()),
             available: Mutex::new(HashMap::new()),
             schemas_dir,
+            schema_states_tree,
         })
     }
 
     /// Creates a new `SchemaCore` using the default `data/schemas` directory.
     #[must_use = "This returns a Result that should be handled"]
     pub fn init_default() -> Result<Self, SchemaError> {
+        let db = sled::open("data")?;
+        let tree = db.open_tree("schema_states")?;
         let schemas_dir = PathBuf::from("data/schemas");
-        Self::init_with_dir(schemas_dir)
+        Self::init_with_dir(schemas_dir, tree)
     }
 
     /// Creates a new `SchemaCore` instance with a custom schemas directory.
     #[must_use = "This returns a Result containing the schema core that should be handled"]
     pub fn new(path: &str) -> Result<Self, SchemaError> {
+        let db = sled::open(path)?;
+        let tree = db.open_tree("schema_states")?;
         let schemas_dir = PathBuf::from(path).join("schemas");
-        Self::init_with_dir(schemas_dir)
+        Self::init_with_dir(schemas_dir, tree)
+    }
+
+    /// Creates a new `SchemaCore` using an existing sled tree for schema states.
+    pub fn new_with_tree(path: &str, schema_states_tree: Tree) -> Result<Self, SchemaError> {
+        let schemas_dir = PathBuf::from(path).join("schemas");
+        Self::init_with_dir(schemas_dir, schema_states_tree)
     }
 
     /// Gets the path for a schema file.
@@ -75,40 +89,44 @@ impl SchemaCore {
         self.schemas_dir.join(format!("{}.json", schema_name))
     }
 
-    /// Path to the schema states file
-    fn states_path(&self) -> PathBuf {
-        self.schemas_dir.join("schema_states.json")
-    }
-
-    /// Persist all schema load states to disk
+    /// Persist all schema load states to the sled tree
     fn persist_states(&self) -> Result<(), SchemaError> {
-        info!("Persisting schema states to disk");
+        info!("Persisting schema states to sled tree");
         let available = self
             .available
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-        let states: HashMap<String, SchemaState> = available
-            .iter()
-            .map(|(n, (_, s))| (n.clone(), *s))
-            .collect();
-        let json = serde_json::to_string_pretty(&states)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize states: {}", e)))?;
-        std::fs::write(self.states_path(), json)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to write states file: {}", e)))?;
+        // Remove stale entries
+        for key in self.schema_states_tree.iter().keys() {
+            let k = key?;
+            if let Ok(name) = std::str::from_utf8(&k) {
+                if !available.contains_key(name) {
+                    self.schema_states_tree.remove(name)?;
+                }
+            }
+        }
+
+        for (name, (_, state)) in available.iter() {
+            let bytes = serde_json::to_vec(state)
+                .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize state: {}", e)))?;
+            self.schema_states_tree.insert(name.as_bytes(), bytes)?;
+        }
+        self.schema_states_tree.flush()?;
         info!("Schema states persisted successfully");
         Ok(())
     }
 
-    /// Load schema states from disk
+    /// Load schema states from the sled tree
     fn load_states(&self) -> HashMap<String, SchemaState> {
-        let path = self.states_path();
-        if let Ok(contents) = std::fs::read_to_string(&path) {
-            info!("Loaded schema states from {}", path.display());
-            serde_json::from_str(&contents).unwrap_or_default()
-        } else {
-            debug!("No schema states file found at {}", path.display());
-            HashMap::new()
+        let mut map = HashMap::new();
+        for item in self.schema_states_tree.iter().flatten() {
+            if let Ok(name) = String::from_utf8(item.0.to_vec()) {
+                if let Ok(state) = serde_json::from_slice::<SchemaState>(&item.1) {
+                    map.insert(name, state);
+                }
+            }
         }
+        map
     }
 
     /// Persists a schema to disk.
@@ -291,9 +309,6 @@ impl SchemaCore {
         if let Ok(entries) = std::fs::read_dir(&self.schemas_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.file_name() == Some(std::ffi::OsStr::new("schema_states.json")) {
-                    continue;
-                }
                 if path.extension().map(|e| e == "json").unwrap_or(false) {
                     if let Ok(contents) = std::fs::read_to_string(&path) {
                         let mut schema_opt = serde_json::from_str::<Schema>(&contents).ok();
