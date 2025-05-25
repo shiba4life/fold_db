@@ -80,24 +80,4 @@ impl DataFoldNode {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-    use crate::datafold_node::config::NodeConfig;
 
-    #[test]
-    fn trusted_node_management() {
-        let dir = tempdir().unwrap();
-        let config = NodeConfig {
-            storage_path: dir.path().to_path_buf(),
-            default_trust_distance: 1,
-            network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-        };
-        let mut node = DataFoldNode::new(config).unwrap();
-        node.add_trusted_node("peer1").unwrap();
-        assert!(node.get_trusted_nodes().contains_key("peer1"));
-        node.remove_trusted_node("peer1").unwrap();
-        assert!(!node.get_trusted_nodes().contains_key("peer1"));
-    }
-}

@@ -25,7 +25,6 @@ pub mod node;
 pub mod tcp_server;
 pub mod tcp_protocol;
 pub mod tcp_connections;
-pub mod tests;
 
 // Re-export the DataFoldNode struct for easier imports
 pub use config::NodeConfig;

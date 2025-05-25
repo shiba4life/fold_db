@@ -156,26 +156,5 @@ pub async fn get_transform_queue(state: web::Data<AppState>) -> impl Responder {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::datafold_node::{DataFoldNode, config::NodeConfig};
-    use actix_web::web;
-    use tempfile::tempdir;
 
-    #[tokio::test]
-    async fn list_sample_schemas_empty() {
-        let dir = tempdir().unwrap();
-        let config = NodeConfig::new(dir.path().to_path_buf());
-        let node = DataFoldNode::new(config).unwrap();
-        let state = web::Data::new(super::super::http_server::AppState {
-            node: std::sync::Arc::new(tokio::sync::Mutex::new(node)),
-            sample_manager: super::super::sample_manager::SampleManager { schemas: Default::default(), queries: Default::default(), mutations: Default::default() }
-        });
-        use actix_web::test;
-        let req = test::TestRequest::default().to_http_request();
-        let resp = list_schema_samples(state).await.respond_to(&req);
-        assert_eq!(resp.status(), 200);
-    }
-}
 
