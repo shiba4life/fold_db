@@ -238,212 +238,192 @@ impl TcpServer {
         }
 
         match operation {
-            "list_schemas" => {
-                // List loaded schemas
-                let node_guard = node.lock().await;
-                let schemas = node_guard.list_schemas()?;
-                let names: Vec<String> = schemas.iter().map(|s| s.name.clone()).collect();
-                Ok(serde_json::to_value(names)?)
-            }
+            "list_schemas" => Self::handle_list_schemas(node.clone()).await,
             "list_available_schemas" => {
-                let node_guard = node.lock().await;
-                let names = node_guard.list_available_schemas()?;
-                Ok(serde_json::to_value(names)?)
+                Self::handle_list_available_schemas(node.clone()).await
             }
-            "get_schema" => {
-                // Get schema
-                let schema_name = request
-                    .get("params")
-                    .and_then(|v| v.get("schema_name"))
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        crate::error::FoldDbError::Config(
-                            "Missing schema_name parameter".to_string(),
-                        )
-                    })?;
-
-                let node_guard = node.lock().await;
-                let schema = node_guard.get_schema(schema_name)?;
-
-                match schema {
-                    Some(s) => Ok(serde_json::to_value(s)?),
-                    None => Err(crate::error::FoldDbError::Config(format!(
-                        "Schema not found: {}",
-                        schema_name
-                    ))),
-                }
-            }
-            "create_schema" => {
-                // Create schema
-                let schema_json = request
-                    .get("params")
-                    .and_then(|v| v.get("schema"))
-                    .ok_or_else(|| {
-                        crate::error::FoldDbError::Config("Missing schema parameter".to_string())
-                    })?;
-
-                // Deserialize the schema directly from the JSON
-                let schema: Schema = serde_json::from_value(schema_json.clone())?;
-
-                // Load the schema into the node
-                let mut node_guard = node.lock().await;
-                node_guard.load_schema(schema)?;
-
-                Ok(serde_json::json!({ "success": true }))
-            }
-            "update_schema" => {
-                // Update schema
-                let schema_json = request
-                    .get("params")
-                    .and_then(|v| v.get("schema"))
-                    .ok_or_else(|| {
-                        crate::error::FoldDbError::Config("Missing schema parameter".to_string())
-                    })?;
-
-                // Deserialize the schema directly from the JSON
-                let schema: Schema = serde_json::from_value(schema_json.clone())?;
-
-                // First unload the existing schema
-                let mut node_guard = node.lock().await;
-                let _ = node_guard.unload_schema(&schema.name);
-
-                // Then load the updated schema
-                node_guard.load_schema(schema)?;
-
-                Ok(serde_json::json!({ "success": true }))
-            }
-            "unload_schema" => {
-                // Unload schema
-                let schema_name = request
-                    .get("params")
-                    .and_then(|v| v.get("schema_name"))
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        crate::error::FoldDbError::Config(
-                            "Missing schema_name parameter".to_string(),
-                        )
-                    })?;
-
-                let mut node_guard = node.lock().await;
-                node_guard.unload_schema(schema_name)?;
-
-                Ok(serde_json::json!({ "success": true }))
-            }
-            "query" => {
-                // Query
-                let schema = request
-                    .get("params")
-                    .and_then(|v| v.get("schema"))
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        crate::error::FoldDbError::Config("Missing schema parameter".to_string())
-                    })?;
-
-                let fields = request
-                    .get("params")
-                    .and_then(|v| v.get("fields"))
-                    .and_then(|v| v.as_array())
-                    .ok_or_else(|| {
-                        crate::error::FoldDbError::Config("Missing fields parameter".to_string())
-                    })?
-                    .iter()
-                    .filter_map(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .collect();
-
-                let filter = request.get("params").and_then(|v| v.get("filter")).cloned();
-
-                let operation = crate::schema::types::Operation::Query {
-                    schema: schema.to_string(),
-                    fields,
-                    filter,
-                };
-
-                let mut node_guard = node.lock().await;
-                let result = node_guard.execute_operation(operation)?;
-
-                // Format the result as a QueryResult
-                Ok(serde_json::json!({
-                    "results": result,
-                    "errors": []
-                }))
-            }
-            "mutation" => {
-                // Mutation
-                let schema = request
-                    .get("params")
-                    .and_then(|v| v.get("schema"))
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        crate::error::FoldDbError::Config("Missing schema parameter".to_string())
-                    })?;
-
-                let data = request
-                    .get("params")
-                    .and_then(|v| v.get("data"))
-                    .cloned()
-                    .ok_or_else(|| {
-                        crate::error::FoldDbError::Config("Missing data parameter".to_string())
-                    })?;
-
-                let mutation_type_str = request
-                    .get("params")
-                    .and_then(|v| v.get("mutation_type"))
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        crate::error::FoldDbError::Config(
-                            "Missing mutation_type parameter".to_string(),
-                        )
-                    })?;
-
-                let mutation_type = match mutation_type_str {
-                    "create" => MutationType::Create,
-                    "update" => MutationType::Update,
-                    "delete" => MutationType::Delete,
-                    _ => {
-                        return Err(crate::error::FoldDbError::Config(format!(
-                            "Invalid mutation type: {}",
-                            mutation_type_str
-                        )))
-                    }
-                };
-
-                let operation = crate::schema::types::Operation::Mutation {
-                    schema: schema.to_string(),
-                    data,
-                    mutation_type,
-                };
-
-                let mut node_guard = node.lock().await;
-                let _ = node_guard.execute_operation(operation)?;
-
-                // Return a success response
-                Ok(serde_json::json!({
-                    "success": true,
-                }))
-            }
-            "discover_nodes" => {
-                // Discover nodes
-                let node_guard = node.lock().await;
-                let nodes = node_guard.discover_nodes().await?;
-
-                let node_infos = nodes
-                    .iter()
-                    .map(|peer_id| {
-                        serde_json::json!({
-                            "id": peer_id.to_string(),
-                            "trust_distance": 1
-                        })
-                    })
-                    .collect::<Vec<_>>();
-
-                Ok(serde_json::to_value(node_infos)?)
-            }
+            "get_schema" => Self::handle_get_schema(request, node.clone()).await,
+            "create_schema" => Self::handle_create_schema(request, node.clone()).await,
+            "update_schema" => Self::handle_update_schema(request, node.clone()).await,
+            "unload_schema" => Self::handle_unload_schema(request, node.clone()).await,
+            "query" => Self::handle_query(request, node.clone()).await,
+            "mutation" => Self::handle_mutation(request, node.clone()).await,
+            "discover_nodes" => Self::handle_discover_nodes(node.clone()).await,
             _ => Err(crate::error::FoldDbError::Config(format!(
                 "Unknown operation: {}",
                 operation
             ))),
         }
+    }
+
+    async fn handle_list_schemas(node: Arc<Mutex<DataFoldNode>>) -> FoldDbResult<Value> {
+        let node_guard = node.lock().await;
+        let schemas = node_guard.list_schemas()?;
+        let names: Vec<String> = schemas.iter().map(|s| s.name.clone()).collect();
+        Ok(serde_json::to_value(names)?)
+    }
+
+    async fn handle_list_available_schemas(node: Arc<Mutex<DataFoldNode>>) -> FoldDbResult<Value> {
+        let node_guard = node.lock().await;
+        let names = node_guard.list_available_schemas()?;
+        Ok(serde_json::to_value(names)?)
+    }
+
+    async fn handle_get_schema(request: &Value, node: Arc<Mutex<DataFoldNode>>) -> FoldDbResult<Value> {
+        let schema_name = request
+            .get("params")
+            .and_then(|v| v.get("schema_name"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| crate::error::FoldDbError::Config("Missing schema_name parameter".to_string()))?;
+
+        let node_guard = node.lock().await;
+        let schema = node_guard.get_schema(schema_name)?;
+
+        match schema {
+            Some(s) => Ok(serde_json::to_value(s)?),
+            None => Err(crate::error::FoldDbError::Config(format!(
+                "Schema not found: {}",
+                schema_name
+            ))),
+        }
+    }
+
+    async fn handle_create_schema(request: &Value, node: Arc<Mutex<DataFoldNode>>) -> FoldDbResult<Value> {
+        let schema_json = request
+            .get("params")
+            .and_then(|v| v.get("schema"))
+            .ok_or_else(|| crate::error::FoldDbError::Config("Missing schema parameter".to_string()))?;
+
+        let schema: Schema = serde_json::from_value(schema_json.clone())?;
+
+        let mut node_guard = node.lock().await;
+        node_guard.load_schema(schema)?;
+
+        Ok(serde_json::json!({ "success": true }))
+    }
+
+    async fn handle_update_schema(request: &Value, node: Arc<Mutex<DataFoldNode>>) -> FoldDbResult<Value> {
+        let schema_json = request
+            .get("params")
+            .and_then(|v| v.get("schema"))
+            .ok_or_else(|| crate::error::FoldDbError::Config("Missing schema parameter".to_string()))?;
+
+        let schema: Schema = serde_json::from_value(schema_json.clone())?;
+
+        let mut node_guard = node.lock().await;
+        let _ = node_guard.unload_schema(&schema.name);
+        node_guard.load_schema(schema)?;
+
+        Ok(serde_json::json!({ "success": true }))
+    }
+
+    async fn handle_unload_schema(request: &Value, node: Arc<Mutex<DataFoldNode>>) -> FoldDbResult<Value> {
+        let schema_name = request
+            .get("params")
+            .and_then(|v| v.get("schema_name"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| crate::error::FoldDbError::Config("Missing schema_name parameter".to_string()))?;
+
+        let mut node_guard = node.lock().await;
+        node_guard.unload_schema(schema_name)?;
+
+        Ok(serde_json::json!({ "success": true }))
+    }
+
+    async fn handle_query(request: &Value, node: Arc<Mutex<DataFoldNode>>) -> FoldDbResult<Value> {
+        let schema = request
+            .get("params")
+            .and_then(|v| v.get("schema"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| crate::error::FoldDbError::Config("Missing schema parameter".to_string()))?;
+
+        let fields = request
+            .get("params")
+            .and_then(|v| v.get("fields"))
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| crate::error::FoldDbError::Config("Missing fields parameter".to_string()))?
+            .iter()
+            .filter_map(|v| v.as_str())
+            .map(|s| s.to_string())
+            .collect();
+
+        let filter = request.get("params").and_then(|v| v.get("filter")).cloned();
+
+        let operation = crate::schema::types::Operation::Query {
+            schema: schema.to_string(),
+            fields,
+            filter,
+        };
+
+        let mut node_guard = node.lock().await;
+        let result = node_guard.execute_operation(operation)?;
+
+        Ok(serde_json::json!({
+            "results": result,
+            "errors": []
+        }))
+    }
+
+    async fn handle_mutation(request: &Value, node: Arc<Mutex<DataFoldNode>>) -> FoldDbResult<Value> {
+        let schema = request
+            .get("params")
+            .and_then(|v| v.get("schema"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| crate::error::FoldDbError::Config("Missing schema parameter".to_string()))?;
+
+        let data = request
+            .get("params")
+            .and_then(|v| v.get("data"))
+            .cloned()
+            .ok_or_else(|| crate::error::FoldDbError::Config("Missing data parameter".to_string()))?;
+
+        let mutation_type_str = request
+            .get("params")
+            .and_then(|v| v.get("mutation_type"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| crate::error::FoldDbError::Config("Missing mutation_type parameter".to_string()))?;
+
+        let mutation_type = match mutation_type_str {
+            "create" => MutationType::Create,
+            "update" => MutationType::Update,
+            "delete" => MutationType::Delete,
+            _ => {
+                return Err(crate::error::FoldDbError::Config(format!(
+                    "Invalid mutation type: {}",
+                    mutation_type_str
+                )))
+            }
+        };
+
+        let operation = crate::schema::types::Operation::Mutation {
+            schema: schema.to_string(),
+            data,
+            mutation_type,
+        };
+
+        let mut node_guard = node.lock().await;
+        let _ = node_guard.execute_operation(operation)?;
+
+        Ok(serde_json::json!({
+            "success": true,
+        }))
+    }
+
+    async fn handle_discover_nodes(node: Arc<Mutex<DataFoldNode>>) -> FoldDbResult<Value> {
+        let node_guard = node.lock().await;
+        let nodes = node_guard.discover_nodes().await?;
+
+        let node_infos = nodes
+            .iter()
+            .map(|peer_id| {
+                serde_json::json!({
+                    "id": peer_id.to_string(),
+                    "trust_distance": 1
+                })
+            })
+            .collect::<Vec<_>>();
+
+        Ok(serde_json::to_value(node_infos)?)
     }
 
     /// Forward a request to another node
