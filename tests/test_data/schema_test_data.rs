@@ -1,5 +1,6 @@
 use fold_node::testing::{
-    FieldPaymentConfig, PermissionsPolicy, Schema, FieldVariant, SingleField, TrustDistance, TrustDistanceScaling,
+    FieldPaymentConfig, PermissionsPolicy, Schema, FieldVariant, SingleField, RangeField,
+    TrustDistance, TrustDistanceScaling,
 };
 use std::collections::HashMap;
 
@@ -116,5 +117,18 @@ pub fn create_multi_field_schema() -> Schema {
         );
     }
 
+    schema
+}
+
+#[allow(dead_code)]
+pub fn create_range_field_schema() -> Schema {
+    let mut schema = Schema::new("range_schema".to_string());
+    let range_field = RangeField::new_with_range(
+        PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
+        create_default_payment_config(),
+        HashMap::new(),
+        "test_key".to_string(),
+    );
+    schema.add_field("numbers".to_string(), FieldVariant::Range(range_field));
     schema
 }
