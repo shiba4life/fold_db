@@ -337,6 +337,9 @@ impl SchemaCore {
                 }
             }
         }
+        // Persist any changes to schema states from newly discovered schemas
+        self.persist_states()?;
+
         Ok(())
     }
 
@@ -547,6 +550,7 @@ mod tests {
     use crate::schema::types::json_schema::{JsonFieldPaymentConfig, JsonPermissionPolicy};
     use crate::fees::{SchemaPaymentConfig, TrustDistanceScaling};
     use crate::permissions::types::policy::TrustDistance;
+    use tempfile::tempdir;
     use std::fs;
 
     fn cleanup_test_schema(name: &str) {
@@ -720,5 +724,24 @@ mod tests {
         }
         let result = core.validate_schema(&schema);
         assert!(matches!(result, Err(SchemaError::InvalidField(msg)) if msg.contains("min_payment cannot be zero")));
+    }
+
+    #[test]
+    fn test_load_schemas_from_disk_persists_state() {
+        let dir = tempdir().unwrap();
+        let schema_dir = dir.path().join("schemas");
+        std::fs::create_dir_all(&schema_dir).unwrap();
+        let schema_path = schema_dir.join("disk.json");
+
+        let schema = Schema::new("disk".to_string());
+        std::fs::write(&schema_path, serde_json::to_string_pretty(&schema).unwrap()).unwrap();
+
+        let core = SchemaCore::new(dir.path().to_str().unwrap()).unwrap();
+        core.load_schemas_from_disk().unwrap();
+        drop(core);
+
+        let db = sled::open(dir.path()).unwrap();
+        let tree = db.open_tree("schema_states").unwrap();
+        assert!(tree.get("disk").unwrap().is_some());
     }
 }
