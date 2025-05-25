@@ -28,8 +28,7 @@ use log::info;
 /// #[tokio::main]
 /// async fn main() -> NetworkResult<()> {
 ///     let config = NetworkConfig::new("/ip4/0.0.0.0/tcp/9000")
-///         .with_mdns(true)
-///         .with_request_timeout(30);
+///         .with_mdns(true);
 ///
 ///     let mut network = NetworkCore::new(config).await?;
 ///     network.run("/ip4/0.0.0.0/tcp/9000").await?;
@@ -47,9 +46,6 @@ pub struct NetworkCore {
     pub(crate) local_peer_id: PeerId,
     /// Known peers
     pub(crate) known_peers: HashSet<PeerId>,
-    /// Request timeout in seconds
-    #[allow(dead_code)]
-    pub(crate) request_timeout: u64,
     /// Network configuration
     pub(crate) config: NetworkConfig,
     /// Mapping from node IDs (UUIDs) to peer IDs
@@ -75,7 +71,6 @@ impl NetworkCore {
             schema_service: SchemaService::new(),
             local_peer_id,
             known_peers: HashSet::new(),
-            request_timeout: config.request_timeout,
             config,
             node_to_peer_map: HashMap::new(),
             peer_to_node_map: HashMap::new(),

@@ -70,7 +70,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listen_address = format!("/ip4/0.0.0.0/tcp/{}", port);
     let network_config = NetworkConfig::new(&listen_address)
         .with_mdns(true)
-        .with_request_timeout(30)
         .with_max_connections(50)
         .with_keep_alive_interval(20)
         .with_max_message_size(1_000_000);

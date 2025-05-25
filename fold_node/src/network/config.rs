@@ -3,8 +3,6 @@
 pub struct NetworkConfig {
     /// Local listening address
     pub listen_address: String,
-    /// Request timeout in seconds
-    pub request_timeout: u64,
     /// Enable mDNS discovery
     pub enable_mdns: bool,
     /// Maximum number of concurrent connections
@@ -25,7 +23,6 @@ impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
             listen_address: "/ip4/0.0.0.0/tcp/0".to_string(),
-            request_timeout: 30,
             enable_mdns: true,
             max_connections: 50,
             keep_alive_interval: 20,
@@ -44,12 +41,6 @@ impl NetworkConfig {
             listen_address: listen_address.to_string(),
             ..Default::default()
         }
-    }
-
-    /// Set the request timeout in seconds
-    pub fn with_request_timeout(mut self, timeout: u64) -> Self {
-        self.request_timeout = timeout;
-        self
     }
 
     /// Enable or disable mDNS discovery
