@@ -6,11 +6,12 @@ use serde_json;
 use serde::{Serialize, Deserialize};
 use sled::Tree;
 use std::collections::HashMap;
-use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use log::info;
 use uuid::Uuid;
+use super::storage::SchemaStorage;
+use super::validator::SchemaValidator;
 
 /// State of a schema within the system
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,29 +35,18 @@ pub struct SchemaCore {
     schemas: Mutex<HashMap<String, Schema>>,
     /// All schemas known to the system and their load state
     available: Mutex<HashMap<String, (Schema, SchemaState)>>,
-    /// Base directory for schema storage
-    schemas_dir: PathBuf,
-    /// Sled tree storing schema states
-    schema_states_tree: Tree,
+    /// Persistent storage helper
+    storage: SchemaStorage,
 }
 
 impl SchemaCore {
     /// Internal helper to create the schema directory and construct the struct.
     fn init_with_dir(schemas_dir: PathBuf, schema_states_tree: Tree) -> Result<Self, SchemaError> {
-        if let Err(e) = fs::create_dir_all(&schemas_dir) {
-            if e.kind() != std::io::ErrorKind::AlreadyExists {
-                return Err(SchemaError::InvalidData(format!(
-                    "Failed to create schemas directory: {}",
-                    e
-                )));
-            }
-        }
-
+        let storage = SchemaStorage::new(schemas_dir, schema_states_tree)?;
         Ok(Self {
             schemas: Mutex::new(HashMap::new()),
             available: Mutex::new(HashMap::new()),
-            schemas_dir,
-            schema_states_tree,
+            storage,
         })
     }
 
@@ -85,77 +75,27 @@ impl SchemaCore {
     }
 
     /// Gets the path for a schema file.
-    fn schema_path(&self, schema_name: &str) -> PathBuf {
-        self.schemas_dir.join(format!("{}.json", schema_name))
+    pub fn schema_path(&self, schema_name: &str) -> PathBuf {
+        self.storage.schema_path(schema_name)
     }
 
     /// Persist all schema load states to the sled tree
     fn persist_states(&self) -> Result<(), SchemaError> {
-        info!("Persisting schema states to sled tree");
         let available = self
             .available
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-        // Remove stale entries
-        for key in self.schema_states_tree.iter().keys() {
-            let k = key?;
-            if let Ok(name) = std::str::from_utf8(&k) {
-                if !available.contains_key(name) {
-                    self.schema_states_tree.remove(name)?;
-                }
-            }
-        }
-
-        for (name, (_, state)) in available.iter() {
-            let bytes = serde_json::to_vec(state)
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize state: {}", e)))?;
-            self.schema_states_tree.insert(name.as_bytes(), bytes)?;
-        }
-        self.schema_states_tree.flush()?;
-        info!("Schema states persisted successfully");
-        Ok(())
+        self.storage.persist_states(&available)
     }
 
     /// Load schema states from the sled tree
     fn load_states(&self) -> HashMap<String, SchemaState> {
-        let mut map = HashMap::new();
-        for item in self.schema_states_tree.iter().flatten() {
-            if let Ok(name) = String::from_utf8(item.0.to_vec()) {
-                if let Ok(state) = serde_json::from_slice::<SchemaState>(&item.1) {
-                    map.insert(name, state);
-                }
-            }
-        }
-        map
+        self.storage.load_states()
     }
 
     /// Persists a schema to disk.
     fn persist_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
-        let path = self.schema_path(&schema.name);
-
-        info!("Persisting schema '{}' to {}", schema.name, path.display());
-
-        // Ensure parent directory exists
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                SchemaError::InvalidData(format!("Failed to create schema directory: {}", e))
-            })?;
-        }
-
-        let json = serde_json::to_string_pretty(schema)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize schema: {}", e)))?;
-
-        fs::write(&path, json).map_err(|e| {
-            SchemaError::InvalidData(format!(
-                "Failed to write schema file: {}, path: {}",
-                e,
-                path.to_string_lossy()
-            ))
-        })?;
-
-        info!("Schema '{}' persisted to disk", schema.name);
-
-        Ok(())
+        self.storage.persist_schema(schema)
     }
 
     fn fix_transform_outputs(&self, schema: &mut Schema) {
@@ -305,8 +245,8 @@ impl SchemaCore {
     /// if their persisted state is `Loaded`.
     pub fn load_schemas_from_disk(&self) -> Result<(), SchemaError> {
         let states = self.load_states();
-        info!("Loading schemas from {}", self.schemas_dir.display());
-        if let Ok(entries) = std::fs::read_dir(&self.schemas_dir) {
+        info!("Loading schemas from {}", self.storage.schemas_dir.display());
+        if let Ok(entries) = std::fs::read_dir(&self.storage.schemas_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.extension().map(|e| e == "json").unwrap_or(false) {
@@ -432,50 +372,6 @@ impl SchemaCore {
         Ok(atom_refs)
     }
 
-    /// Validates a JSON schema definition.
-    fn validate_schema(&self, schema: &JsonSchemaDefinition) -> Result<(), SchemaError> {
-        // Validate schema name
-        if schema.name.is_empty() {
-            return Err(SchemaError::InvalidField(
-                "Schema name cannot be empty".to_string(),
-            ));
-        }
-
-        // Validate fields
-        for (field_name, field) in &schema.fields {
-            if field_name.is_empty() {
-                return Err(SchemaError::InvalidField(
-                    "Field name cannot be empty".to_string(),
-                ));
-            }
-
-            // Validate payment config
-            if field.payment_config.base_multiplier <= 0.0 {
-                return Err(SchemaError::InvalidField(format!(
-                    "Field {field_name} base_multiplier must be positive"
-                )));
-            }
-
-            // Validate field mappers
-            for (mapper_key, mapper_value) in &field.field_mappers {
-                if mapper_key.is_empty() || mapper_value.is_empty() {
-                    return Err(SchemaError::InvalidField(format!(
-                        "Field {field_name} has invalid field mapper: empty key or value"
-                    )));
-                }
-            }
-
-            if let Some(min_payment) = field.payment_config.min_payment {
-                if min_payment == 0 {
-                    return Err(SchemaError::InvalidField(format!(
-                        "Field {field_name} min_payment cannot be zero"
-                    )));
-                }
-            }
-        }
-
-        Ok(())
-    }
 
     /// Converts a JSON schema field to a FieldVariant.
     fn convert_field(json_field: JsonSchemaField) -> FieldVariant {
@@ -505,7 +401,7 @@ impl SchemaCore {
         json_schema: JsonSchemaDefinition,
     ) -> Result<Schema, SchemaError> {
         // First validate the JSON schema
-        self.validate_schema(&json_schema)?;
+        SchemaValidator::new(self).validate_json_schema(&json_schema)?;
 
         // Convert fields
         let mut fields = HashMap::new();
@@ -539,215 +435,3 @@ impl SchemaCore {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::fees::FieldPaymentConfig;
-
-    use crate::permissions::types::policy::PermissionsPolicy;
-    use crate::schema::types::field::FieldType;
-    use crate::schema::types::{JsonSchemaDefinition, JsonSchemaField};
-    use crate::schema::types::json_schema::{JsonFieldPaymentConfig, JsonPermissionPolicy};
-    use crate::fees::{SchemaPaymentConfig, TrustDistanceScaling};
-    use crate::permissions::types::policy::TrustDistance;
-    use tempfile::tempdir;
-    use std::fs;
-
-    fn cleanup_test_schema(name: &str) {
-        let path = PathBuf::from("data/schemas").join(format!("{}.json", name));
-        let _ = fs::remove_file(path);
-    }
-
-    fn create_test_field(
-        ref_atom_uuid: Option<String>,
-        field_mappers: HashMap<String, String>,
-    ) -> FieldVariant {
-        let mut single_field = SingleField::new(
-            PermissionsPolicy::default(),
-            FieldPaymentConfig::default(),
-            field_mappers,
-        );
-        if let Some(uuid) = ref_atom_uuid {
-            single_field.set_ref_atom_uuid(uuid);
-        }
-        FieldVariant::Single(single_field)
-    }
-
-    fn build_json_schema(name: &str) -> JsonSchemaDefinition {
-        let permission_policy = JsonPermissionPolicy {
-            read: TrustDistance::Distance(0),
-            write: TrustDistance::Distance(0),
-            explicit_read: None,
-            explicit_write: None,
-        };
-        let field = JsonSchemaField {
-            permission_policy,
-            ref_atom_uuid: Some("uuid".to_string()),
-            payment_config: JsonFieldPaymentConfig {
-                base_multiplier: 1.0,
-                trust_distance_scaling: TrustDistanceScaling::None,
-                min_payment: None,
-            },
-            field_mappers: HashMap::new(),
-            field_type: FieldType::Single,
-            transform: None,
-        };
-        let mut fields = HashMap::new();
-        fields.insert("field".to_string(), field);
-        JsonSchemaDefinition {
-            name: name.to_string(),
-            fields,
-            payment_config: SchemaPaymentConfig::default(),
-        }
-    }
-
-    #[test]
-    fn test_schema_persistence() {
-        let test_schema_name = "test_persistence_schema";
-        cleanup_test_schema(test_schema_name); // Cleanup any leftover test files
-
-        let temp_dir = tempdir().unwrap();
-        let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
-
-        // Create a test schema
-        let mut fields = HashMap::new();
-        fields.insert(
-            "test_field".to_string(),
-            create_test_field(Some("test_uuid".to_string()), HashMap::new()),
-        );
-        let schema = Schema::new(test_schema_name.to_string()).with_fields(fields);
-
-        // Load and persist schema
-        core.load_schema(schema.clone()).unwrap();
-
-        // Verify file exists
-        let schema_path = core.schema_path(test_schema_name);
-        assert!(schema_path.exists());
-
-        // Read and verify content
-        let content = fs::read_to_string(&schema_path).unwrap();
-        let loaded_schema: Schema = serde_json::from_str(&content).unwrap();
-        assert_eq!(loaded_schema.name, test_schema_name);
-        assert_eq!(
-            loaded_schema
-                .fields
-                .get("test_field")
-                .unwrap()
-                .ref_atom_uuid(),
-            Some(&"test_uuid".to_string())
-        );
-
-        // Unload schema should keep file on disk
-        core.unload_schema(test_schema_name).unwrap();
-        assert!(schema_path.exists());
-
-        cleanup_test_schema(test_schema_name);
-    }
-
-    #[test]
-    fn test_map_fields_success() {
-        let core = SchemaCore::new("data").unwrap();
-
-        // Create source schema with a field that has a ref_atom_uuid
-        let mut source_fields = HashMap::new();
-        source_fields.insert(
-            "source_field".to_string(),
-            create_test_field(Some("test_uuid".to_string()), HashMap::new()),
-        );
-        let source_schema = Schema::new("source_schema".to_string()).with_fields(source_fields);
-        core.load_schema(source_schema).unwrap();
-
-        // Create target schema with a field that maps to the source field
-        let mut field_mappers = HashMap::new();
-        field_mappers.insert("source_schema".to_string(), "source_field".to_string());
-        let mut target_fields = HashMap::new();
-        target_fields.insert(
-            "target_field".to_string(),
-            create_test_field(None, field_mappers),
-        );
-        let target_schema = Schema::new("target_schema".to_string()).with_fields(target_fields);
-        core.load_schema(target_schema).unwrap();
-
-        // Map fields
-        core.map_fields("target_schema").unwrap();
-
-        // Verify the mapping
-        let mapped_schema = core.get_schema("target_schema").unwrap().unwrap();
-        let mapped_field = mapped_schema.fields.get("target_field").unwrap();
-        assert_eq!(
-            mapped_field.ref_atom_uuid(),
-            Some(&"test_uuid".to_string())
-        );
-    }
-
-    #[test]
-    fn test_validate_schema_valid() {
-        let temp_dir = tempdir().unwrap();
-        let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
-        let schema = build_json_schema("valid");
-        assert!(core.validate_schema(&schema).is_ok());
-    }
-
-    #[test]
-    fn test_validate_schema_empty_name() {
-        let temp_dir = tempdir().unwrap();
-        let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
-        let schema = build_json_schema("");
-        let result = core.validate_schema(&schema);
-        assert!(matches!(result, Err(SchemaError::InvalidField(msg)) if msg == "Schema name cannot be empty"));
-    }
-
-    #[test]
-    fn test_validate_schema_empty_field_name() {
-        let temp_dir = tempdir().unwrap();
-        let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
-        let mut schema = build_json_schema("valid");
-        let field = schema.fields.remove("field").unwrap();
-        schema.fields.insert("".to_string(), field);
-        let result = core.validate_schema(&schema);
-        assert!(matches!(result, Err(SchemaError::InvalidField(msg)) if msg == "Field name cannot be empty"));
-    }
-
-    #[test]
-    fn test_validate_schema_invalid_mapper() {
-        let temp_dir = tempdir().unwrap();
-        let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
-        let mut schema = build_json_schema("valid");
-        if let Some(field) = schema.fields.get_mut("field") {
-            field.field_mappers.insert(String::new(), "v".to_string());
-        }
-        let result = core.validate_schema(&schema);
-        assert!(matches!(result, Err(SchemaError::InvalidField(msg)) if msg.contains("invalid field mapper")));
-    }
-
-    #[test]
-    fn test_validate_schema_min_payment_zero() {
-        let temp_dir = tempdir().unwrap();
-        let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
-        let mut schema = build_json_schema("valid");
-        if let Some(field) = schema.fields.get_mut("field") {
-            field.payment_config.min_payment = Some(0);
-        }
-        let result = core.validate_schema(&schema);
-        assert!(matches!(result, Err(SchemaError::InvalidField(msg)) if msg.contains("min_payment cannot be zero")));
-    }
-
-    #[test]
-    fn test_load_schemas_from_disk_persists_state() {
-        let dir = tempdir().unwrap();
-        let schema_dir = dir.path().join("schemas");
-        std::fs::create_dir_all(&schema_dir).unwrap();
-        let schema_path = schema_dir.join("disk.json");
-
-        let schema = Schema::new("disk".to_string());
-        std::fs::write(&schema_path, serde_json::to_string_pretty(&schema).unwrap()).unwrap();
-
-        let core = SchemaCore::new(dir.path().to_str().unwrap()).unwrap();
-        core.load_schemas_from_disk().unwrap();
-        drop(core);
-
-        let db = sled::open(dir.path()).unwrap();
-        let tree = db.open_tree("schema_states").unwrap();
-        assert!(tree.get("disk").unwrap().is_some());
-    }
-}

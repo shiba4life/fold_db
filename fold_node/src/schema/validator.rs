@@ -1,4 +1,4 @@
-use super::{core::SchemaCore, types::{Field, Schema, SchemaError}};
+use super::{core::SchemaCore, types::{Field, Schema, SchemaError, JsonSchemaDefinition}};
 use crate::transform::TransformExecutor;
 
 /// Validates a [`Schema`] before it is loaded into the database.
@@ -111,6 +111,47 @@ impl<'a> SchemaValidator<'a> {
                             out_field, out_schema
                         )));
                     }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Validate a [`JsonSchemaDefinition`] before interpretation
+    pub fn validate_json_schema(&self, schema: &JsonSchemaDefinition) -> Result<(), SchemaError> {
+        if schema.name.is_empty() {
+            return Err(SchemaError::InvalidField(
+                "Schema name cannot be empty".to_string(),
+            ));
+        }
+
+        for (field_name, field) in &schema.fields {
+            if field_name.is_empty() {
+                return Err(SchemaError::InvalidField(
+                    "Field name cannot be empty".to_string(),
+                ));
+            }
+
+            if field.payment_config.base_multiplier <= 0.0 {
+                return Err(SchemaError::InvalidField(format!(
+                    "Field {field_name} base_multiplier must be positive",
+                )));
+            }
+
+            for (mapper_key, mapper_value) in &field.field_mappers {
+                if mapper_key.is_empty() || mapper_value.is_empty() {
+                    return Err(SchemaError::InvalidField(format!(
+                        "Field {field_name} has invalid field mapper: empty key or value",
+                    )));
+                }
+            }
+
+            if let Some(min_payment) = field.payment_config.min_payment {
+                if min_payment == 0 {
+                    return Err(SchemaError::InvalidField(format!(
+                        "Field {field_name} min_payment cannot be zero",
+                    )));
                 }
             }
         }
