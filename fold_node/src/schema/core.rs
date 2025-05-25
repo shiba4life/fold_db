@@ -262,7 +262,10 @@ impl SchemaCore {
                         if let Some(mut schema) = schema_opt {
                             self.fix_transform_outputs(&mut schema);
                             let name = schema.name.clone();
-                            let state = states.get(&name).copied().unwrap_or(SchemaState::Loaded);
+                            let state = states
+                                .get(&name)
+                                .copied()
+                                .unwrap_or(SchemaState::Unloaded);
                             {
                                 let mut available = self.available.lock().map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
                                 available.insert(name.clone(), (schema.clone(), state));
