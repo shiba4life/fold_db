@@ -152,8 +152,8 @@ describe('App Integration Tests', () => {
       expect(screen.getByText('UserProfile')).toBeInTheDocument()
     })
     
-    // Find and click remove button for UserProfile
-    const removeButtons = screen.getAllByText('Remove')
+    // Find and click unload button for UserProfile
+    const removeButtons = screen.getAllByText('Unload')
     await user.click(removeButtons[0])
     
     // Verify delete API call was made

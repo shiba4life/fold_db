@@ -34,13 +34,13 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     try {
       const resp = await fetch(`/api/schema/${schemaName}`, { method: 'DELETE' })
       if (!resp.ok) {
-        throw new Error(`Failed to remove schema: ${resp.status}`)
+        throw new Error(`Failed to unload schema: ${resp.status}`)
       }
       if (onSchemaUpdated) {
         onSchemaUpdated()
       }
     } catch (err) {
-      console.error('Failed to remove schema:', err)
+      console.error('Failed to unload schema:', err)
     }
   }
 
@@ -154,7 +154,7 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
                 removeSchema(schema.name)
               }}
             >
-              Remove
+              Unload
             </button>
           </div>
         </div>
