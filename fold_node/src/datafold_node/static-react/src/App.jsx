@@ -9,6 +9,7 @@ import MutationTab from './components/tabs/MutationTab'
 import TransformsTab from './components/tabs/TransformsTab'
 import SchemaDependenciesTab from './components/tabs/SchemaDependenciesTab'
 import LogSidebar from './components/LogSidebar'
+import TabButton from './components/TabButton'
 
 function App() {
   const [activeTab, setActiveTab] = useState('schemas')
@@ -74,56 +75,36 @@ function App() {
 
           <div className="mt-6">
             <div className="flex border-b border-gray-200">
-              <button
-              className={`px-4 py-2 text-sm font-medium ${
-                activeTab === 'schemas'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => handleTabChange('schemas')}
-            >
-              Schemas
-            </button>
-            <button
-              className={`px-4 py-2 text-sm font-medium ${
-                activeTab === 'query'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => handleTabChange('query')}
-            >
-              Query
-            </button>
-            <button
-              className={`px-4 py-2 text-sm font-medium ${
-                activeTab === 'mutation'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => handleTabChange('mutation')}
-            >
-              Mutation
-            </button>
-            <button
-              className={`px-4 py-2 text-sm font-medium ${
-                activeTab === 'transforms'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => handleTabChange('transforms')}
-            >
-              Transforms
-            </button>
-            <button
-              className={`px-4 py-2 text-sm font-medium ${
-                activeTab === 'dependencies'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => handleTabChange('dependencies')}
-            >
-              Dependencies
-            </button>
+              <TabButton
+                label="Schemas"
+                tabKey="schemas"
+                activeTab={activeTab}
+                onChange={handleTabChange}
+              />
+              <TabButton
+                label="Query"
+                tabKey="query"
+                activeTab={activeTab}
+                onChange={handleTabChange}
+              />
+              <TabButton
+                label="Mutation"
+                tabKey="mutation"
+                activeTab={activeTab}
+                onChange={handleTabChange}
+              />
+              <TabButton
+                label="Transforms"
+                tabKey="transforms"
+                activeTab={activeTab}
+                onChange={handleTabChange}
+              />
+              <TabButton
+                label="Dependencies"
+                tabKey="dependencies"
+                activeTab={activeTab}
+                onChange={handleTabChange}
+              />
             </div>
 
             <div className="mt-4">
