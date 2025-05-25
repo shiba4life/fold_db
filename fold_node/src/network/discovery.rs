@@ -46,12 +46,6 @@ impl NetworkCore {
         peer_id: PeerId,
         schema_names: Vec<String>,
     ) -> NetworkResult<Vec<String>> {
-        #[cfg(test)]
-        {
-            if let Some(peer_service) = self.mock_peers.get(&peer_id) {
-                return Ok(peer_service.check_schemas(&schema_names));
-            }
-        }
 
         if !self.known_peers.contains(&peer_id) {
             return Err(NetworkError::ConnectionError(format!(
