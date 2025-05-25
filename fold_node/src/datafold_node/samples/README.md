@@ -27,12 +27,12 @@ Use the web API to load the schemas:
 # Load UserProfile schema
 curl -X POST http://localhost:3000/api/schema \
   -H "Content-Type: application/json" \
-  -d @src/datafold_node/examples/user_profile_schema.json
+  -d @src/datafold_node/samples/data/user_profile_schema.json
 
 # Load UserProfile2 schema (after loading UserProfile)
 curl -X POST http://localhost:3000/api/schema \
   -H "Content-Type: application/json" \
-  -d @src/datafold_node/examples/user_profile2_schema.json
+  -d @src/datafold_node/samples/data/user_profile2_schema.json
 ```
 
 ### 3. Execute Mutations

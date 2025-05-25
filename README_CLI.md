@@ -55,7 +55,7 @@ datafold_cli load-schema <PATH>
 Example:
 
 ```bash
-datafold_cli load-schema src/datafold_node/examples/schema1.json
+datafold_cli load-schema src/datafold_node/samples/data/schema1.json
 ```
 
 #### List Schemas
@@ -161,7 +161,7 @@ datafold_cli execute <PATH>
 Example:
 
 ```bash
-datafold_cli execute src/datafold_node/examples/query1.json
+datafold_cli execute src/datafold_node/samples/data/query1.json
 ```
 
 ## Example Operations
