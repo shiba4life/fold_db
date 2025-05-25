@@ -1,5 +1,6 @@
 use serde_json::Value;
 use std::collections::HashMap;
+use serde::Serialize;
 
 use crate::error::{FoldDbError, FoldDbResult};
 use crate::schema::types::{Field, Mutation, Operation, Query, Transform};
@@ -7,6 +8,13 @@ use crate::schema::{Schema, SchemaError, SchemaValidator};
 use crate::schema::core::SchemaState;
 
 use super::DataFoldNode;
+
+#[derive(Clone, Serialize)]
+pub struct SchemaWithState {
+    #[serde(flatten)]
+    pub schema: Schema,
+    pub state: SchemaState,
+}
 
 impl DataFoldNode {
     /// Ensure a schema is loaded into memory if its state is `Loaded` on disk.
@@ -119,6 +127,26 @@ impl DataFoldNode {
         for name in schema_names {
             if let Some(schema) = db.schema_manager.get_schema(&name)? {
                 schemas.push(schema);
+            }
+        }
+        Ok(schemas)
+    }
+
+    /// Lists all loaded schemas along with their load state.
+    pub fn list_schemas_with_state(&self) -> FoldDbResult<Vec<SchemaWithState>> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        let schema_names = db.schema_manager.list_loaded_schemas()?;
+        let mut schemas = Vec::new();
+        for name in schema_names {
+            if let Some(schema) = db.schema_manager.get_schema(&name)? {
+                let state = db
+                    .schema_manager
+                    .get_schema_state(&name)
+                    .unwrap_or(SchemaState::Loaded);
+                schemas.push(SchemaWithState { schema, state });
             }
         }
         Ok(schemas)
