@@ -87,7 +87,7 @@ fn load_and_list_schemas() {
     assert!(status.success());
 
     let output = Command::new(&exe)
-        .args(["-c", config.to_str().unwrap(), "list-schemas"])
+        .args(["-c", config.to_str().unwrap(), "list-available-schemas"])
         .output()
         .expect("list-schemas command failed");
     assert!(output.status.success());

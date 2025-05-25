@@ -222,6 +222,12 @@ impl SchemaCore {
         Ok(available.keys().cloned().collect())
     }
 
+    /// Retrieve the persisted state for a schema if known.
+    pub fn get_schema_state(&self, schema_name: &str) -> Option<SchemaState> {
+        let available = self.available.lock().ok()?;
+        available.get(schema_name).map(|(_, s)| *s)
+    }
+
     /// Backwards compatible method for listing loaded schemas.
     pub fn list_schemas(&self) -> Result<Vec<String>, SchemaError> {
         self.list_loaded_schemas()
@@ -263,7 +269,8 @@ impl SchemaCore {
         self.set_unloaded(schema_name)
     }
 
-    /// Loads all schema files from the schemas directory.
+    /// Loads all schema files from the schemas directory and marks them as loaded
+    /// if their persisted state is `Loaded`.
     pub fn load_schemas_from_disk(&self) -> Result<(), SchemaError> {
         let states = self.load_states();
         if let Ok(entries) = std::fs::read_dir(&self.schemas_dir) {
@@ -298,6 +305,19 @@ impl SchemaCore {
                     }
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Loads only schema states from disk without populating the loaded schema map.
+    pub fn load_schema_states_from_disk(&self) -> Result<(), SchemaError> {
+        let states = self.load_states();
+        let mut available = self
+            .available
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+        for (name, state) in states {
+            available.insert(name.clone(), (Schema::new(name), state));
         }
         Ok(())
     }
