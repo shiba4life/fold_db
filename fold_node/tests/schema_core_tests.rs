@@ -199,3 +199,24 @@ fn test_load_schemas_from_disk_persists_state() {
     assert!(tree.get("disk").unwrap().is_some());
 }
 
+#[test]
+fn test_new_schema_default_unloaded() {
+    let dir = tempdir().unwrap();
+    let schema_dir = dir.path().join("schemas");
+    std::fs::create_dir_all(&schema_dir).unwrap();
+    let schema_path = schema_dir.join("fresh.json");
+
+    let schema = Schema::new("fresh".to_string());
+    std::fs::write(&schema_path, serde_json::to_string_pretty(&schema).unwrap()).unwrap();
+
+    let core = SchemaCore::new(dir.path().to_str().unwrap()).unwrap();
+    core.load_schemas_from_disk().unwrap();
+    assert!(!core.list_loaded_schemas().unwrap().contains(&"fresh".to_string()));
+    drop(core);
+    let db = sled::open(dir.path()).unwrap();
+    let tree = db.open_tree("schema_states").unwrap();
+    let value = tree.get("fresh").unwrap().unwrap();
+    let state: String = serde_json::from_slice(&value).unwrap();
+    assert_eq!(state, "Unloaded");
+}
+

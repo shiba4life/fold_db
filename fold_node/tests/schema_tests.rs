@@ -200,6 +200,9 @@ fn test_transform_placeholder_output_on_disk_load() {
     // Load the schema from disk
     let manager = SchemaCore::new(test_dir.path().to_str().unwrap()).unwrap();
     manager.load_schemas_from_disk().unwrap();
+    manager
+        .load_schema_from_file(schema_path.to_str().unwrap())
+        .unwrap();
 
     // Verify the transform output was updated
     let schema = manager
