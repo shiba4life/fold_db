@@ -31,7 +31,6 @@ pub struct DataFoldHttpServer {
     /// The HTTP server bind address
     bind_address: String,
     /// The sample data manager
-    #[allow(dead_code)]
     sample_manager: SampleManager,
 }
 
