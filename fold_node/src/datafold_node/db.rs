@@ -66,6 +66,15 @@ impl DataFoldNode {
         Ok(())
     }
 
+    /// Persist a schema without loading it into memory.
+    pub fn add_schema_unloaded(&mut self, schema: Schema) -> FoldDbResult<()> {
+        let mut db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.add_schema_unloaded(schema).map_err(|e| e.into())
+    }
+
     /// Executes an operation (query or mutation) on the database.
     pub fn execute_operation(&mut self, operation: Operation) -> FoldDbResult<Value> {
         match operation {
