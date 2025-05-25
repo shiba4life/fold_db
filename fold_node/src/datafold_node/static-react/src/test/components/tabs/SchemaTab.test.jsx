@@ -173,8 +173,8 @@ describe('SchemaTab Component', () => {
       expect(screen.getByText('UserProfile')).toBeInTheDocument()
     })
     
-    // Find and click the first remove button
-    const removeButtons = screen.getAllByText('Remove')
+    // Find and click the first unload button
+    const removeButtons = screen.getAllByText('Unload')
     fireEvent.click(removeButtons[0])
     
     await waitFor(() => {
@@ -217,8 +217,8 @@ describe('SchemaTab Component', () => {
     // Schema should be collapsed initially
     expect(screen.queryByText('id')).not.toBeInTheDocument()
     
-    // Click remove button (should not expand schema)
-    const removeButtons = screen.getAllByText('Remove')
+    // Click unload button (should not expand schema)
+    const removeButtons = screen.getAllByText('Unload')
     fireEvent.click(removeButtons[0])
     
     // Schema should still be collapsed

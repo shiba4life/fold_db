@@ -63,12 +63,12 @@ function SchemasTab() {
         method: 'DELETE'
       })
       if (!resp.ok) {
-        throw new Error(`Failed to remove schema: ${resp.status}`)
+        throw new Error(`Failed to unload schema: ${resp.status}`)
       }
       await loadSchemas()
     } catch (err) {
-      console.error('Failed to remove schema:', err)
-      setError('Failed to remove schema. Please try again.')
+      console.error('Failed to unload schema:', err)
+      setError('Failed to unload schema. Please try again.')
     }
   }
 
@@ -138,7 +138,7 @@ function SchemasTab() {
                   }}
                 >
                   <TrashIcon className="icon icon-xs mr-1.5 text-white" />
-                  Remove
+                  Unload
                 </button>
               </div>
             </div>
