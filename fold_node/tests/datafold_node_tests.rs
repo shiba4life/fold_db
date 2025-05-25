@@ -1,4 +1,4 @@
-use super::*;
+use fold_node::datafold_node::{DataFoldNode, config::NodeConfig};
 use tempfile::tempdir;
 
 #[allow(dead_code)]
@@ -41,7 +41,7 @@ fn test_node_config_default() {
 async fn test_tcp_protocol_roundtrip() {
     use tokio::net::{TcpListener, TcpStream};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use crate::datafold_node::tcp_protocol::{read_request, send_response};
+    use fold_node::datafold_node::tcp_protocol::{read_request, send_response};
     use serde_json::json;
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
