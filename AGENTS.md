@@ -12,6 +12,7 @@ Find simplifications if you can.
 
 No silent failures.
 
-run cargo test --workspace
-run cargo clippy
-run npm tests in fold_node/src/datafold_node/static-react
+validation:
+1. run cargo test --workspace
+2. run cargo clippy   // fix any linting issues
+3. run npm tests in fold_node/src/datafold_node/static-react
