@@ -166,6 +166,20 @@ impl DataFoldNode {
         db.unload_schema(schema_name).map_err(|e| e.into())
     }
 
+    /// Load an available schema by name.
+    pub fn load_available_schema(&mut self, schema_name: &str) -> FoldDbResult<()> {
+        let mut db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.schema_manager
+            .load_available_schema(schema_name)
+            .map_err(FoldDbError::from)?;
+        drop(db);
+        self.grant_schema_permission(schema_name)?;
+        Ok(())
+    }
+
 
     /// List all registered transforms.
     pub fn list_transforms(&self) -> FoldDbResult<HashMap<String, Transform>> {
