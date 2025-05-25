@@ -8,6 +8,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use log::{info, debug};
+use uuid::Uuid;
 
 /// State of a schema within the system
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -15,7 +17,6 @@ pub enum SchemaState {
     Loaded,
     Unloaded,
 }
-use uuid::Uuid;
 
 /// Core schema management system that combines schema interpretation, validation, and management.
 ///
@@ -81,6 +82,7 @@ impl SchemaCore {
 
     /// Persist all schema load states to disk
     fn persist_states(&self) -> Result<(), SchemaError> {
+        info!("Persisting schema states to disk");
         let available = self
             .available
             .lock()
@@ -93,15 +95,18 @@ impl SchemaCore {
             .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize states: {}", e)))?;
         std::fs::write(self.states_path(), json)
             .map_err(|e| SchemaError::InvalidData(format!("Failed to write states file: {}", e)))?;
+        info!("Schema states persisted successfully");
         Ok(())
     }
 
     /// Load schema states from disk
     fn load_states(&self) -> HashMap<String, SchemaState> {
         let path = self.states_path();
-        if let Ok(contents) = std::fs::read_to_string(path) {
+        if let Ok(contents) = std::fs::read_to_string(&path) {
+            info!("Loaded schema states from {}", path.display());
             serde_json::from_str(&contents).unwrap_or_default()
         } else {
+            debug!("No schema states file found at {}", path.display());
             HashMap::new()
         }
     }
@@ -109,6 +114,8 @@ impl SchemaCore {
     /// Persists a schema to disk.
     fn persist_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
         let path = self.schema_path(&schema.name);
+
+        info!("Persisting schema '{}' to {}", schema.name, path.display());
 
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
@@ -128,6 +135,8 @@ impl SchemaCore {
             ))
         })?;
 
+        info!("Schema '{}' persisted to disk", schema.name);
+
         Ok(())
     }
 
@@ -146,6 +155,8 @@ impl SchemaCore {
 
     /// Loads a schema into the manager and persists it to disk.
     pub fn load_schema(&self, mut schema: Schema) -> Result<(), SchemaError> {
+        info!("Loading schema '{}'", schema.name);
+
         // Ensure any transforms on fields have the correct output schema
         self.fix_transform_outputs(&mut schema);
 
@@ -166,11 +177,12 @@ impl SchemaCore {
                 .available
                 .lock()
                 .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-            all.insert(name, (schema, SchemaState::Loaded));
+            all.insert(name.clone(), (schema, SchemaState::Loaded));
         }
 
         // Persist state changes
         self.persist_states()?;
+        info!("Schema '{}' loaded and state persisted", name);
 
         Ok(())
     }
@@ -238,6 +250,7 @@ impl SchemaCore {
 
     /// Mark a schema as unloaded but keep it available in memory
     pub fn set_unloaded(&self, schema_name: &str) -> Result<(), SchemaError> {
+        info!("Unloading schema '{}'", schema_name);
         let mut schemas = self
             .schemas
             .lock()
@@ -252,6 +265,7 @@ impl SchemaCore {
             // persist state change
             drop(available);
             self.persist_states()?;
+            info!("Schema '{}' marked as unloaded", schema_name);
             Ok(())
         } else {
             Err(SchemaError::NotFound(format!("Schema {schema_name} not found")))
@@ -266,6 +280,7 @@ impl SchemaCore {
     /// Loads all schema files from the schemas directory.
     pub fn load_schemas_from_disk(&self) -> Result<(), SchemaError> {
         let states = self.load_states();
+        info!("Loading schemas from {}", self.schemas_dir.display());
         if let Ok(entries) = std::fs::read_dir(&self.schemas_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -292,8 +307,9 @@ impl SchemaCore {
                             }
                             if state == SchemaState::Loaded {
                                 let mut loaded = self.schemas.lock().map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-                                loaded.insert(name, schema);
+                                loaded.insert(name.clone(), schema);
                             }
+                            info!("Loaded schema '{}' from disk", name);
                         }
                     }
                 }
