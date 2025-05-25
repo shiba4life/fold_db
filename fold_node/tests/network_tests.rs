@@ -20,7 +20,6 @@ fn create_test_network_config() -> NetworkConfig {
 
     NetworkConfig {
         listen_address: format!("127.0.0.1:{}", tcp_port).parse().unwrap(),
-        request_timeout: 1,
         enable_mdns: false,
         max_connections: 10,
         keep_alive_interval: 1,

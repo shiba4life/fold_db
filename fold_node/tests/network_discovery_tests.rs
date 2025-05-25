@@ -20,7 +20,6 @@ fn create_test_network_config(enable_discovery: bool) -> NetworkConfig {
 
     NetworkConfig {
         listen_address: format!("/ip4/127.0.0.1/tcp/{}", tcp_port),
-        request_timeout: 30,
         enable_mdns: enable_discovery,
         max_connections: 10,
         keep_alive_interval: 20,

@@ -49,9 +49,6 @@ pub struct FoldDB {
     metadata_tree: sled::Tree,
     /// Tree for storing per-node schema permissions
     permissions_tree: sled::Tree,
-    /// Tree storing schema states
-    #[allow(dead_code)]
-    schema_states_tree: sled::Tree,
 }
 
 impl FoldDB {
@@ -110,7 +107,7 @@ impl FoldDB {
         let field_manager = FieldManager::new(atom_manager.clone());
         let collection_manager = CollectionManager::new(field_manager.clone());
         let schema_manager = Arc::new(
-            SchemaCore::new_with_tree(path, schema_states_tree.clone())
+            SchemaCore::new_with_tree(path, schema_states_tree)
                 .map_err(|e| sled::Error::Unsupported(e.to_string()))?,
         );
         let atom_manager_clone = atom_manager.clone();
@@ -169,7 +166,6 @@ impl FoldDB {
             permission_wrapper: PermissionWrapper::new(),
             metadata_tree,
             permissions_tree,
-            schema_states_tree,
         })
     }
 
