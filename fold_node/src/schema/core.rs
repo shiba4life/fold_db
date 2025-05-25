@@ -271,16 +271,21 @@ impl SchemaCore {
     /// Maps fields between schemas based on their defined relationships.
     /// Returns a list of AtomRefs that need to be persisted in FoldDB.
     pub fn map_fields(&self, schema_name: &str) -> Result<Vec<AtomRef>, SchemaError> {
-        // First collect all the source field ref_atom_uuids we need
-        let field_mappings = self.with_schemas(|schemas| {
+        let mappings = self.collect_field_mappings(schema_name)?;
+        self.apply_field_mappings(schema_name, mappings)
+    }
+
+    /// Collect all ref_atom_uuid mappings for a schema's fields.
+    fn collect_field_mappings(&self, schema_name: &str) -> Result<Vec<(String, String)>, SchemaError> {
+        self.with_schemas(|schemas| {
             let mut mappings = Vec::new();
             if let Some(schema) = schemas.get(schema_name) {
                 for (field_name, field) in &schema.fields {
-                    for (source_schema_name, source_field_name) in &field.field_mappers {
-                        if let Some(source_schema) = schemas.get(source_schema_name) {
-                            if let Some(source_field) = source_schema.fields.get(source_field_name) {
-                                if let Some(ref_atom_uuid) = source_field.get_ref_atom_uuid() {
-                                    mappings.push((field_name.clone(), ref_atom_uuid.clone()));
+                    for (source_schema, source_field) in &field.field_mappers {
+                        if let Some(src_schema) = schemas.get(source_schema) {
+                            if let Some(src_field) = src_schema.fields.get(source_field) {
+                                if let Some(ref_uuid) = src_field.get_ref_atom_uuid() {
+                                    mappings.push((field_name.clone(), ref_uuid.clone()));
                                 }
                             }
                         }
@@ -288,46 +293,39 @@ impl SchemaCore {
                 }
             }
             Ok(mappings)
-        })?;
+        })
+    }
 
+    /// Apply collected ref_atom_uuid mappings and create new AtomRefs for unmapped fields.
+    fn apply_field_mappings(&self, schema_name: &str, mappings: Vec<(String, String)>) -> Result<Vec<AtomRef>, SchemaError> {
         self.with_schemas_mut(|schemas| {
             let schema = schemas
                 .get_mut(schema_name)
                 .ok_or_else(|| SchemaError::InvalidData(format!("Schema {schema_name} not found")))?;
 
-            // Apply the collected mappings
-            for (field_name, ref_atom_uuid) in field_mappings {
+            for (field_name, ref_uuid) in mappings {
                 if let Some(field) = schema.fields.get_mut(&field_name) {
-                    field.set_ref_atom_uuid(ref_atom_uuid);
+                    field.set_ref_atom_uuid(ref_uuid);
                 }
             }
 
             let mut atom_refs = Vec::new();
 
-            // For unmapped fields, create a new ref_atom_uuid and AtomRef
             for field in schema.fields.values_mut() {
                 if field.get_ref_atom_uuid().is_none() {
-                    let ref_atom_uuid = Uuid::new_v4().to_string();
+                    let ref_uuid = Uuid::new_v4().to_string();
 
-                    // Create a new AtomRef for this field
                     let atom_ref = if field.field_type() == &FieldType::Collection {
-                        // For collection fields, we'll create a placeholder AtomRef
-                        // The actual collection will be created when data is added
                         AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
                     } else {
-                        // For single fields, create a normal AtomRef
                         AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
                     };
 
-                    // Add the AtomRef to the list to be persisted
                     atom_refs.push(atom_ref);
-
-                    // Set the ref_atom_uuid in the field
-                    field.set_ref_atom_uuid(ref_atom_uuid);
+                    field.set_ref_atom_uuid(ref_uuid);
                 }
             }
 
-            // Persist the updated schema
             self.persist_schema(schema)?;
 
             Ok(atom_refs)
