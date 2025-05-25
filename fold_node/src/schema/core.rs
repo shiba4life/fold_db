@@ -9,6 +9,9 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+/// Error returned when a schema mutex cannot be acquired
+const SCHEMA_LOCK_ERR: &str = "Failed to acquire schema lock";
+
 /// State of a schema within the system
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SchemaState {
@@ -99,6 +102,50 @@ impl SchemaCore {
         Ok(())
     }
 
+    fn with_schemas<F, R>(&self, f: F) -> Result<R, SchemaError>
+    where
+        F: FnOnce(&HashMap<String, Schema>) -> Result<R, SchemaError>,
+    {
+        let schemas = self
+            .schemas
+            .lock()
+            .map_err(|_| SchemaError::InvalidData(SCHEMA_LOCK_ERR.into()))?;
+        f(&schemas)
+    }
+
+    fn with_schemas_mut<F, R>(&self, f: F) -> Result<R, SchemaError>
+    where
+        F: FnOnce(&mut HashMap<String, Schema>) -> Result<R, SchemaError>,
+    {
+        let mut schemas = self
+            .schemas
+            .lock()
+            .map_err(|_| SchemaError::InvalidData(SCHEMA_LOCK_ERR.into()))?;
+        f(&mut schemas)
+    }
+
+    fn with_available<F, R>(&self, f: F) -> Result<R, SchemaError>
+    where
+        F: FnOnce(&HashMap<String, (Schema, SchemaState)>) -> Result<R, SchemaError>,
+    {
+        let available = self
+            .available
+            .lock()
+            .map_err(|_| SchemaError::InvalidData(SCHEMA_LOCK_ERR.into()))?;
+        f(&available)
+    }
+
+    fn with_available_mut<F, R>(&self, f: F) -> Result<R, SchemaError>
+    where
+        F: FnOnce(&mut HashMap<String, (Schema, SchemaState)>) -> Result<R, SchemaError>,
+    {
+        let mut available = self
+            .available
+            .lock()
+            .map_err(|_| SchemaError::InvalidData(SCHEMA_LOCK_ERR.into()))?;
+        f(&mut available)
+    }
+
     /// Loads a schema into the manager and persists it to disk.
     pub fn load_schema(&self, mut schema: Schema) -> Result<(), SchemaError> {
         // Ensure any transforms on fields have the correct output schema
@@ -116,20 +163,14 @@ impl SchemaCore {
 
         // Then add it to memory
         let name = schema.name.clone();
-        {
-            let mut loaded = self
-                .schemas
-                .lock()
-                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+        self.with_schemas_mut(|loaded| {
             loaded.insert(name.clone(), schema.clone());
-        }
-        {
-            let mut all = self
-                .available
-                .lock()
-                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            Ok(())
+        })?;
+        self.with_available_mut(|all| {
             all.insert(name, (schema, SchemaState::Loaded));
-        }
+            Ok(())
+        })?;
 
         Ok(())
     }
@@ -137,29 +178,17 @@ impl SchemaCore {
 
     /// Retrieves a schema by name.
     pub fn get_schema(&self, schema_name: &str) -> Result<Option<Schema>, SchemaError> {
-        let schemas = self
-            .schemas
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-        Ok(schemas.get(schema_name).cloned())
+        self.with_schemas(|schemas| Ok(schemas.get(schema_name).cloned()))
     }
 
     /// Lists all schema names currently loaded.
     pub fn list_loaded_schemas(&self) -> Result<Vec<String>, SchemaError> {
-        let schemas = self
-            .schemas
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-        Ok(schemas.keys().cloned().collect())
+        self.with_schemas(|schemas| Ok(schemas.keys().cloned().collect()))
     }
 
     /// Lists all schemas available on disk and their state.
     pub fn list_available_schemas(&self) -> Result<Vec<String>, SchemaError> {
-        let available = self
-            .available
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-        Ok(available.keys().cloned().collect())
+        self.with_available(|available| Ok(available.keys().cloned().collect()))
     }
 
     /// Backwards compatible method for listing loaded schemas.
@@ -169,30 +198,23 @@ impl SchemaCore {
 
     /// Checks if a schema exists in the manager.
     pub fn schema_exists(&self, schema_name: &str) -> Result<bool, SchemaError> {
-        let schemas = self
-            .schemas
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-        Ok(schemas.contains_key(schema_name))
+        self.with_schemas(|schemas| Ok(schemas.contains_key(schema_name)))
     }
 
     /// Mark a schema as unloaded but keep it available in memory
     pub fn set_unloaded(&self, schema_name: &str) -> Result<(), SchemaError> {
-        let mut schemas = self
-            .schemas
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-        schemas.remove(schema_name);
-        let mut available = self
-            .available
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-        if let Some((_, state)) = available.get_mut(schema_name) {
-            *state = SchemaState::Unloaded;
+        self.with_schemas_mut(|schemas| {
+            schemas.remove(schema_name);
             Ok(())
-        } else {
-            Err(SchemaError::NotFound(format!("Schema {schema_name} not found")))
-        }
+        })?;
+        self.with_available_mut(|available| {
+            if let Some((_, state)) = available.get_mut(schema_name) {
+                *state = SchemaState::Unloaded;
+                Ok(())
+            } else {
+                Err(SchemaError::NotFound(format!("Schema {schema_name} not found")))
+            }
+        })
     }
 
     /// Unload a schema from memory without deleting its persisted file.
@@ -249,74 +271,67 @@ impl SchemaCore {
     /// Maps fields between schemas based on their defined relationships.
     /// Returns a list of AtomRefs that need to be persisted in FoldDB.
     pub fn map_fields(&self, schema_name: &str) -> Result<Vec<AtomRef>, SchemaError> {
-        let schemas = self
-            .schemas
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-
         // First collect all the source field ref_atom_uuids we need
-        let mut field_mappings = Vec::new();
-        if let Some(schema) = schemas.get(schema_name) {
-            for (field_name, field) in &schema.fields {
-                for (source_schema_name, source_field_name) in &field.field_mappers {
-                    if let Some(source_schema) = schemas.get(source_schema_name) {
-                        if let Some(source_field) = source_schema.fields.get(source_field_name) {
-                            if let Some(ref_atom_uuid) = source_field.get_ref_atom_uuid() {
-                                field_mappings.push((field_name.clone(), ref_atom_uuid.clone()));
+        let field_mappings = self.with_schemas(|schemas| {
+            let mut mappings = Vec::new();
+            if let Some(schema) = schemas.get(schema_name) {
+                for (field_name, field) in &schema.fields {
+                    for (source_schema_name, source_field_name) in &field.field_mappers {
+                        if let Some(source_schema) = schemas.get(source_schema_name) {
+                            if let Some(source_field) = source_schema.fields.get(source_field_name) {
+                                if let Some(ref_atom_uuid) = source_field.get_ref_atom_uuid() {
+                                    mappings.push((field_name.clone(), ref_atom_uuid.clone()));
+                                }
                             }
                         }
                     }
                 }
             }
-        }
-        drop(schemas); // Release the immutable lock
+            Ok(mappings)
+        })?;
 
-        // Now get a mutable lock to update the fields
-        let mut schemas = self
-            .schemas
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+        self.with_schemas_mut(|schemas| {
+            let schema = schemas
+                .get_mut(schema_name)
+                .ok_or_else(|| SchemaError::InvalidData(format!("Schema {schema_name} not found")))?;
 
-        let schema = schemas
-            .get_mut(schema_name)
-            .ok_or_else(|| SchemaError::InvalidData(format!("Schema {schema_name} not found")))?;
-
-        // Apply the collected mappings
-        for (field_name, ref_atom_uuid) in field_mappings {
-            if let Some(field) = schema.fields.get_mut(&field_name) {
-                field.set_ref_atom_uuid(ref_atom_uuid);
+            // Apply the collected mappings
+            for (field_name, ref_atom_uuid) in field_mappings {
+                if let Some(field) = schema.fields.get_mut(&field_name) {
+                    field.set_ref_atom_uuid(ref_atom_uuid);
+                }
             }
-        }
 
-        let mut atom_refs = Vec::new();
+            let mut atom_refs = Vec::new();
 
-        // For unmapped fields, create a new ref_atom_uuid and AtomRef
-        for field in schema.fields.values_mut() {
-            if field.get_ref_atom_uuid().is_none() {
-                let ref_atom_uuid = Uuid::new_v4().to_string();
+            // For unmapped fields, create a new ref_atom_uuid and AtomRef
+            for field in schema.fields.values_mut() {
+                if field.get_ref_atom_uuid().is_none() {
+                    let ref_atom_uuid = Uuid::new_v4().to_string();
 
-                // Create a new AtomRef for this field
-                let atom_ref = if field.field_type() == &FieldType::Collection {
-                    // For collection fields, we'll create a placeholder AtomRef
-                    // The actual collection will be created when data is added
-                    AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
-                } else {
-                    // For single fields, create a normal AtomRef
-                    AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
-                };
+                    // Create a new AtomRef for this field
+                    let atom_ref = if field.field_type() == &FieldType::Collection {
+                        // For collection fields, we'll create a placeholder AtomRef
+                        // The actual collection will be created when data is added
+                        AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
+                    } else {
+                        // For single fields, create a normal AtomRef
+                        AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
+                    };
 
-                // Add the AtomRef to the list to be persisted
-                atom_refs.push(atom_ref);
+                    // Add the AtomRef to the list to be persisted
+                    atom_refs.push(atom_ref);
 
-                // Set the ref_atom_uuid in the field
-                field.set_ref_atom_uuid(ref_atom_uuid);
+                    // Set the ref_atom_uuid in the field
+                    field.set_ref_atom_uuid(ref_atom_uuid);
+                }
             }
-        }
 
-        // Persist the updated schema
-        self.persist_schema(schema)?;
+            // Persist the updated schema
+            self.persist_schema(schema)?;
 
-        Ok(atom_refs)
+            Ok(atom_refs)
+        })
     }
 
     /// Validates a JSON schema definition.
