@@ -18,6 +18,7 @@ describe('App Integration Tests', () => {
             data: [
               {
                 name: 'UserProfile',
+                state: 'Loaded',
                 fields: {
                   id: { field_type: 'string', writable: false },
                   name: { field_type: 'string', writable: true },
@@ -26,6 +27,7 @@ describe('App Integration Tests', () => {
               },
               {
                 name: 'BlogPost',
+                state: 'Loaded',
                 fields: {
                   title: { field_type: 'string', writable: true },
                   content: { field_type: 'text', writable: true }

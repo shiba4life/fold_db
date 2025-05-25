@@ -79,8 +79,8 @@ describe('App Component', () => {
       ok: true,
       json: async () => ({
         data: [
-          { name: 'TestSchema1', fields: {} },
-          { name: 'TestSchema2', fields: {} }
+          { name: 'TestSchema1', state: 'Loaded', fields: {} },
+          { name: 'TestSchema2', state: 'Loaded', fields: {} }
         ]
       })
     })
@@ -304,5 +304,23 @@ describe('App Component', () => {
     
     fireEvent.click(screen.getByText('Execute Transform'))
     expect(screen.getByText('Results: {"transform":"test"}')).toBeInTheDocument()
+  })
+
+  it('filters schemas by loaded state', async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: [
+          { name: 'LoadedSchema', state: 'Loaded', fields: {} },
+          { name: 'OtherSchema', state: 'Unloaded', fields: {} }
+        ]
+      })
+    })
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Schema Tab - 1 schemas')).toBeInTheDocument()
+    })
   })
 })
