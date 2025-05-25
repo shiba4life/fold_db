@@ -161,7 +161,7 @@ impl Transform {
         
         // Split by dots to handle schema.field format
         for part in self.logic.split(|c: char| !c.is_alphanumeric() && c != '.') {
-            if part.is_empty() || part.chars().next().unwrap().is_numeric() {
+            if part.is_empty() || part.chars().next().map_or(false, |c| c.is_numeric()) {
                 continue;
             }
             
