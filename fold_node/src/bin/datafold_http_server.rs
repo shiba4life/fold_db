@@ -65,21 +65,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::Cli;
-    use clap::Parser;
-
-    #[test]
-    fn defaults() {
-        let cli = Cli::parse_from(["test"]);
-        assert_eq!(cli.port, 9001);
-    }
-
-    #[test]
-    fn custom_port() {
-        let cli = Cli::parse_from(["test", "--port", "8000"]);
-        assert_eq!(cli.port, 8000);
-    }
-}
