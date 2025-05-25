@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use fold_node::testing::{Mutation, MutationType, Query, Schema};
 use fold_node::{DataFoldNode, FoldDbResult};
 use serde_json::Value;

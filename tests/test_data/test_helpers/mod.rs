@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 pub mod operation_builder;
 pub mod schema_builder;
 pub mod node_operations;

@@ -75,8 +75,8 @@ impl SchemaService {
     /// # Arguments
     ///
     /// * `callback` - A function that takes a slice of schema names and returns a vector
-    ///                containing the subset of those names that are available on this node.
-    ///                The function must be `Send` and `Sync` to be safely shared across threads.
+    ///   containing the subset of those names that are available on this node.
+    ///   The function must be `Send` and `Sync` to be safely shared across threads.
     ///
     /// # Examples
     ///
