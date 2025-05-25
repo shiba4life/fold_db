@@ -214,9 +214,6 @@ fn test_transform(id: usize, name: &str, transform_str: &str, parser: &Transform
                 _ => {}
             }
             
-            // This is needed to ensure the main function is properly recognized
-            #[allow(dead_code)]
-            fn dummy() {}
             
             variables.insert("input".to_string(), Value::Object(input));
             

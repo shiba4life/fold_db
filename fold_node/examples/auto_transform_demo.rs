@@ -5,9 +5,6 @@
 use fold_node::transform::{TransformParser, Interpreter, Value};
 use std::collections::HashMap;
 
-// This is needed to ensure the main function is properly recognized
-#[allow(dead_code)]
-fn dummy() {}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("Automatic Transform Generation Demo");
