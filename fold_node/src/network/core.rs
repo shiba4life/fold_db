@@ -58,9 +58,6 @@ pub struct NetworkCore {
     pub(crate) peer_to_node_map: HashMap<PeerId, String>,
     /// Mapping from node IDs to their listening addresses
     pub(crate) node_to_address_map: HashMap<String, String>,
-    /// Mock for testing - maps peer IDs to schema services
-    #[cfg(test)]
-    pub(crate) mock_peers: HashMap<PeerId, SchemaService>,
     /// Handle for the background networking task
     pub(crate) mdns_handle: Option<tokio::task::JoinHandle<()>>,
 }
@@ -80,8 +77,6 @@ impl NetworkCore {
             node_to_peer_map: HashMap::new(),
             peer_to_node_map: HashMap::new(),
             node_to_address_map: HashMap::new(),
-            #[cfg(test)]
-            mock_peers: HashMap::new(),
             mdns_handle: None,
         })
     }
