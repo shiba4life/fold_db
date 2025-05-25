@@ -75,8 +75,8 @@ impl DataFoldHttpServer {
         for schema_value in sample_schemas {
             let schema: Schema = serde_json::from_value(schema_value)
                 .map_err(|e| FoldDbError::Config(format!("Failed to deserialize sample schema: {}", e)))?;
-            info!("Loading sample schema into node: {}", schema.name);
-            node.load_schema(schema)?;
+            info!("Adding sample schema to node as unloaded: {}", schema.name);
+            node.add_schema_unloaded(schema)?;
         }
 
         Ok(Self {
@@ -279,6 +279,29 @@ mod tests {
 
         handle.abort();
         let _ = handle.await;
+    }
+
+    /// Ensure sample schemas start unloaded
+    #[tokio::test]
+    async fn samples_start_unloaded() {
+        let temp_dir = tempdir().unwrap();
+        let config = NodeConfig::new(temp_dir.path().to_path_buf());
+        let node = DataFoldNode::new(config).unwrap();
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+        let bind_addr = format!("127.0.0.1:{}", addr.port());
+
+        let server = DataFoldHttpServer::new(node, &bind_addr)
+            .await
+            .expect("server init");
+
+        let node_guard = server.node.lock().await;
+        let loaded = node_guard.list_schemas().unwrap();
+        assert!(!loaded.iter().any(|s| s.name == "BlogPost"));
+        let available = node_guard.list_available_schemas().unwrap();
+        assert!(available.iter().any(|n| n == "BlogPost"));
     }
 }
 

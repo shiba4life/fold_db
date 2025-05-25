@@ -1,4 +1,6 @@
 use fold_node::{datafold_node::DataFoldHttpServer, schema::types::Operation};
+use fold_node::schema::Schema;
+use fold_node::datafold_node::sample_manager::SampleManager;
 use crate::test_data::test_helpers::create_test_node;
 use reqwest::Client;
 use serde_json::Value;
@@ -12,10 +14,27 @@ async fn start_server() -> (JoinHandle<()>, String) {
     let node = create_test_node();
     let bind_address = format!("127.0.0.1:{}", port);
     let server = DataFoldHttpServer::new(node, &bind_address).await.unwrap();
-    let handle = tokio::spawn(async move {
-        let _ = server.run().await;
-    });
+    let handle = tokio::spawn(async move { let _ = server.run().await; });
     tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Load sample schemas via HTTP
+    let client = Client::new();
+    let sample_manager = SampleManager::new().await.unwrap();
+    let mut names = sample_manager.list_schema_samples();
+    names.sort();
+    for name in names {
+        let value = sample_manager.get_schema_sample(&name).unwrap().clone();
+        let schema: Schema = serde_json::from_value(value).unwrap();
+        client
+            .post(format!("http://{}/api/schema", bind_address))
+            .json(&schema)
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+    }
+
     (handle, bind_address)
 }
 

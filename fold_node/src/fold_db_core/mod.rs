@@ -185,6 +185,11 @@ impl FoldDB {
         Ok(())
     }
 
+    /// Persist a schema but keep it unloaded.
+    pub fn add_schema_unloaded(&mut self, schema: Schema) -> Result<(), SchemaError> {
+        self.schema_manager.add_schema_unloaded(schema)
+    }
+
     pub fn allow_schema(&mut self, schema_name: &str) -> Result<(), SchemaError> {
         let exists = self.schema_manager.schema_exists(schema_name)?;
         if !exists {

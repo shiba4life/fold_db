@@ -145,6 +145,32 @@ impl SchemaCore {
         Ok(())
     }
 
+    /// Persist a schema to disk but keep it unloaded in memory.
+    pub fn add_schema_unloaded(&self, mut schema: Schema) -> Result<(), SchemaError> {
+        info!("Adding schema '{}' as unloaded", schema.name);
+
+        // Ensure any transforms on fields have the correct output schema
+        self.fix_transform_outputs(&mut schema);
+
+        // Persist the updated schema
+        self.persist_schema(&schema)?;
+
+        let name = schema.name.clone();
+        {
+            let mut available = self
+                .available
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            available.insert(name.clone(), (schema, SchemaState::Unloaded));
+        }
+
+        // Persist state changes
+        self.persist_states()?;
+        info!("Schema '{}' added as unloaded", name);
+
+        Ok(())
+    }
+
 
     /// Retrieves a schema by name.
     pub fn get_schema(&self, schema_name: &str) -> Result<Option<Schema>, SchemaError> {
