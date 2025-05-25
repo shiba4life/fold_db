@@ -2,6 +2,8 @@ use serde_json::Value;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::future::Future;
+use std::pin::Pin;
 use log::info;
 
 use crate::datafold_node::config::NodeConfig;
@@ -77,6 +79,22 @@ pub struct NetworkStatus {
 }
 
 impl DataFoldNode {
+    async fn with_network<F, R>(&self, f: F) -> FoldDbResult<R>
+    where
+        F: for<'a> FnOnce(
+            &'a mut NetworkCore,
+        ) -> Pin<Box<dyn Future<Output = FoldDbResult<R>> + Send + 'a>>,
+    {
+        match &self.network {
+            Some(net) => {
+                let mut guard = net.lock().await;
+                f(&mut guard).await
+            }
+            None => Err(FoldDbError::Network(
+                NetworkErrorKind::Protocol("Network not initialized".into()),
+            )),
+        }
+    }
     /// Creates a new DataFoldNode with the specified configuration.
     pub fn new(config: NodeConfig) -> FoldDbResult<Self> {
         let db = Arc::new(Mutex::new(FoldDB::new(
@@ -156,52 +174,39 @@ impl DataFoldNode {
 
     /// Start the network service
     pub async fn start_network(&self) -> FoldDbResult<()> {
-        if let Some(network) = &self.network {
-            let mut network = network.lock().await;
-            // Use the address from the config
-            let address = &self.config.network_listen_address;
-            network
-                .run(address)
-                .await
-                .map_err(|e| FoldDbError::Network(e.into()))?;
-
-            Ok(())
-        } else {
-            Err(FoldDbError::Network(NetworkErrorKind::Protocol(
-                "Network not initialized".to_string(),
-            )))
-        }
+        let address = self.config.network_listen_address.clone();
+        self
+            .with_network(|network| Box::pin(async move {
+                network
+                    .run(&address)
+                    .await
+                    .map_err(|e| FoldDbError::Network(e.into()))
+            }) as Pin<Box<dyn Future<Output = FoldDbResult<()>> + Send + '_>>)
+            .await
     }
 
     /// Start the network service with a specific listen address
     pub async fn start_network_with_address(&self, listen_address: &str) -> FoldDbResult<()> {
-        if let Some(network) = &self.network {
-            let mut network = network.lock().await;
-            network
-                .run(listen_address)
-                .await
-                .map_err(|e| FoldDbError::Network(e.into()))?;
-
-            Ok(())
-        } else {
-            Err(FoldDbError::Network(NetworkErrorKind::Protocol(
-                "Network not initialized".to_string(),
-            )))
-        }
+        let addr = listen_address.to_string();
+        self
+            .with_network(|network| Box::pin(async move {
+                network
+                    .run(&addr)
+                    .await
+                    .map_err(|e| FoldDbError::Network(e.into()))
+            }) as Pin<Box<dyn Future<Output = FoldDbResult<()>> + Send + '_>>)
+            .await
     }
 
     /// Stop the network service
     pub async fn stop_network(&self) -> FoldDbResult<()> {
-        if let Some(network) = &self.network {
-            let mut network_guard = network.lock().await;
-            info!("Stopping network service");
-            network_guard.stop();
-            Ok(())
-        } else {
-            Err(FoldDbError::Network(NetworkErrorKind::Protocol(
-                "Network not initialized".to_string(),
-            )))
-        }
+        self
+            .with_network(|network| Box::pin(async move {
+                info!("Stopping network service");
+                network.stop();
+                Ok(())
+            }) as Pin<Box<dyn Future<Output = FoldDbResult<()>> + Send + '_>>)
+            .await
     }
 
     /// Get a mutable reference to the network core
@@ -217,56 +222,44 @@ impl DataFoldNode {
 
     /// Discover nodes on the local network using mDNS
     pub async fn discover_nodes(&self) -> FoldDbResult<Vec<PeerId>> {
-        if let Some(network) = &self.network {
-            let network_guard = network.lock().await;
+        self
+            .with_network(|network| Box::pin(async move {
+                // Trigger mDNS discovery
+                // This will update the known_peers list in the NetworkCore
+                info!("Triggering mDNS discovery...");
 
-            // Trigger mDNS discovery
-            // This will update the known_peers list in the NetworkCore
-            info!("Triggering mDNS discovery...");
-
-            // In a real implementation, this would actively scan for peers
-            // For now, we'll just return the current known peers
-            let known_peers: Vec<PeerId> = network_guard.known_peers().iter().cloned().collect();
-
-            Ok(known_peers)
-        } else {
-            Err(FoldDbError::Network(NetworkErrorKind::Protocol(
-                "Network not initialized".to_string(),
-            )))
-        }
+                // In a real implementation, this would actively scan for peers
+                // For now, we'll just return the current known peers
+                let known_peers: Vec<PeerId> = network.known_peers().iter().cloned().collect();
+                Ok(known_peers)
+            }) as Pin<Box<dyn Future<Output = FoldDbResult<Vec<PeerId>>> + Send + '_>>)
+            .await
     }
 
     /// Get the list of known nodes
     pub async fn get_known_nodes(&self) -> FoldDbResult<HashMap<String, NodeInfo>> {
-        if let Some(network) = &self.network {
-            let network_guard = network.lock().await;
-
-            // Convert the PeerId set to a HashMap of NodeInfo
-            let mut result = HashMap::new();
-            for peer_id in network_guard.known_peers() {
-                let peer_id_str = peer_id.to_string();
-
-                // If the peer is already in trusted_nodes, use that info
-                if let Some(info) = self.trusted_nodes.get(&peer_id_str) {
-                    result.insert(peer_id_str, info.clone());
-                } else {
-                    // Otherwise, create a new NodeInfo with default trust distance
-                    result.insert(
-                        peer_id_str.clone(),
-                        NodeInfo {
-                            id: peer_id_str,
-                            trust_distance: self.config.default_trust_distance,
-                        },
-                    );
+        let trusted_nodes = self.trusted_nodes.clone();
+        let default_distance = self.config.default_trust_distance;
+        self
+            .with_network(|network| Box::pin(async move {
+                let mut result = HashMap::new();
+                for peer_id in network.known_peers() {
+                    let peer_id_str = peer_id.to_string();
+                    if let Some(info) = trusted_nodes.get(&peer_id_str) {
+                        result.insert(peer_id_str, info.clone());
+                    } else {
+                        result.insert(
+                            peer_id_str.clone(),
+                            NodeInfo {
+                                id: peer_id_str,
+                                trust_distance: default_distance,
+                            },
+                        );
+                    }
                 }
-            }
-
-            Ok(result)
-        } else {
-            Err(FoldDbError::Network(NetworkErrorKind::Protocol(
-                "Network not initialized".to_string(),
-            )))
-        }
+                Ok(result)
+            }) as Pin<Box<dyn Future<Output = FoldDbResult<HashMap<String, NodeInfo>>> + Send + '_>>)
+            .await
     }
 
     /// Check which schemas are available on a remote peer
@@ -275,56 +268,45 @@ impl DataFoldNode {
         peer_id_str: &str,
         schema_names: Vec<String>,
     ) -> FoldDbResult<Vec<String>> {
-        if let Some(network) = &self.network {
-            // Parse the peer ID
-            let peer_id = peer_id_str.parse::<PeerId>().map_err(|e| {
-                FoldDbError::Network(NetworkErrorKind::Connection(format!(
-                    "Invalid peer ID: {}",
-                    e
-                )))
-            })?;
-
-            // Check schemas
-            let mut network = network.lock().await;
-            let result = network
-                .check_schemas(peer_id, schema_names)
-                .await
-                .map_err(|e| FoldDbError::Network(e.into()))?;
-
-            Ok(result)
-        } else {
-            Err(FoldDbError::Network(NetworkErrorKind::Protocol(
-                "Network not initialized".to_string(),
+        let peer_id = peer_id_str.parse::<PeerId>().map_err(|e| {
+            FoldDbError::Network(NetworkErrorKind::Connection(format!(
+                "Invalid peer ID: {}",
+                e
             )))
-        }
+        })?;
+
+        self
+            .with_network(|network| Box::pin(async move {
+                network
+                    .check_schemas(peer_id, schema_names)
+                    .await
+                    .map_err(|e| FoldDbError::Network(e.into()))
+            }) as Pin<Box<dyn Future<Output = FoldDbResult<Vec<String>>> + Send + '_>>)
+            .await
     }
 
     /// Forward a request to another node
     pub async fn forward_request(&self, peer_id: PeerId, request: Value) -> FoldDbResult<Value> {
-        if let Some(network) = &self.network {
-            let mut network = network.lock().await;
+        self
+            .with_network(|network| Box::pin(async move {
+                // Get the node ID for this peer if available
+                let node_id = network
+                    .get_node_id_for_peer(&peer_id)
+                    .unwrap_or_else(|| peer_id.to_string());
 
-            // Get the node ID for this peer if available
-            let node_id = network
-                .get_node_id_for_peer(&peer_id)
-                .unwrap_or_else(|| peer_id.to_string());
+                info!("Forwarding request to node {} (peer {})", node_id, peer_id);
 
-            info!("Forwarding request to node {} (peer {})", node_id, peer_id);
+                // Use the network layer to forward the request
+                let response = network
+                    .forward_request(peer_id, request)
+                    .await
+                    .map_err(|e| FoldDbError::Network(e.into()))?;
 
-            // Use the network layer to forward the request
-            let response = network
-                .forward_request(peer_id, request)
-                .await
-                .map_err(|e| FoldDbError::Network(e.into()))?;
+                info!("Received response from node {} (peer {})", node_id, peer_id);
 
-            info!("Received response from node {} (peer {})", node_id, peer_id);
-
-            Ok(response)
-        } else {
-            Err(FoldDbError::Network(NetworkErrorKind::Protocol(
-                "Network not initialized".to_string(),
-            )))
-        }
+                Ok(response)
+            }) as Pin<Box<dyn Future<Output = FoldDbResult<Value>> + Send + '_>>)
+            .await
     }
 
     /// Simple method to connect to another node
