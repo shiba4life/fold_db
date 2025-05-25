@@ -1,7 +1,6 @@
 use super::*;
 use tempfile::tempdir;
 
-#[allow(dead_code)]
 fn create_test_config() -> NodeConfig {
     let dir = tempdir().unwrap();
     NodeConfig {

@@ -13,10 +13,8 @@ use std::thread;
 use std::time::Duration;
 use uuid::Uuid;
 
-#[allow(dead_code)]
 static CLEANUP_LOCK: Mutex<()> = Mutex::new(());
 
-#[allow(dead_code)]
 fn retry_with_backoff<F, T, E>(mut f: F, retries: u32) -> Result<T, E>
 where
     F: FnMut() -> Result<T, E>,
@@ -35,7 +33,6 @@ where
     }
 }
 
-#[allow(dead_code)]
 pub fn get_test_db_path() -> String {
     let current_dir = std::env::current_dir().expect("Failed to get current directory");
     let tmp_dir = current_dir.join("tmp");
@@ -66,7 +63,6 @@ pub fn get_test_db_path() -> String {
     db_path.to_string_lossy().into_owned()
 }
 
-#[allow(dead_code)]
 pub fn cleanup_test_db(path: &str) {
     let _lock = CLEANUP_LOCK.lock().unwrap();
     let path = Path::new(path);
@@ -81,7 +77,6 @@ pub fn cleanup_test_db(path: &str) {
     }
 }
 
-#[allow(dead_code)]
 pub fn cleanup_tmp_dir() {
     let _lock = CLEANUP_LOCK.lock().unwrap();
     let current_dir = std::env::current_dir().expect("Failed to get current directory");
@@ -125,14 +120,12 @@ pub fn cleanup_tmp_dir() {
     }
 }
 
-#[allow(dead_code)]
 pub fn setup_test_db() -> (FoldDB, String) {
     let db_path = get_test_db_path();
     let db = FoldDB::new(&db_path).expect("Failed to create test database");
     (db, db_path)
 }
 
-#[allow(dead_code)]
 pub fn setup_and_allow_schema(
     db: &mut FoldDB,
     schema_name: &str,
@@ -140,7 +133,6 @@ pub fn setup_and_allow_schema(
     db.allow_schema(schema_name)
 }
 
-#[allow(dead_code)]
 pub fn create_test_node() -> DataFoldNode {
     let dir = tempdir().expect("temp dir");
     let config = NodeConfig {
