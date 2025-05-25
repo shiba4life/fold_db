@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use fold_node::testing::{
     ExplicitCounts, FieldPaymentConfig, FieldVariant, PermissionsPolicy, Schema, SingleField,
     SchemaPaymentConfig, TrustDistance,

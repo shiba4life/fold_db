@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use fold_node::testing::{Mutation, MutationType, Query};
 use serde_json::Value;
 use std::collections::HashMap;

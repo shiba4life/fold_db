@@ -4,31 +4,19 @@ pub mod context;
 pub mod field_manager;
 pub mod transform_manager;
 pub mod transform_orchestrator;
+mod query;
+mod mutation;
+mod transform_management;
 
 use std::sync::Arc;
-use std::collections::HashMap;
 use crate::atom::{Atom, AtomRefBehavior};
 use crate::db_operations::DbOperations;
 use crate::permissions::PermissionWrapper;
-use crate::schema::types::{Field, Mutation, MutationType, Query, Transform, TransformRegistration};
 use crate::schema::SchemaCore;
 use crate::schema::{Schema, SchemaError};
 use serde_json;
 use serde_json::Value;
 use uuid::Uuid;
-use regex::Regex;
-use log::info;
-
-// Type alias to reduce complexity
-type TransformInputResult = Result<(Vec<(String, String)>, Vec<String>), SchemaError>;
-
-// Struct to group transform registration parameters
-struct TransformRegistrationParams {
-    input_arefs: Vec<String>,
-    input_names: Vec<String>,
-    trigger_fields: Vec<String>,
-    output_aref: String,
-}
 
 use self::atom_manager::AtomManager;
 use self::collection_manager::CollectionManager;
@@ -169,167 +157,6 @@ impl FoldDB {
         })
     }
 
-    /// Registers a transform with its input and output atom references
-    pub fn register_transform(&mut self, registration: TransformRegistration) -> Result<(), SchemaError> {
-        self.transform_manager.register_transform(registration)
-    }
-
-    fn parse_output_field(
-        &self,
-        schema: &Schema,
-        field_name: &str,
-        field: &crate::schema::types::FieldVariant,
-        transform: &Transform,
-    ) -> Result<String, SchemaError> {
-        let (out_schema_name, out_field_name) = match transform.get_output().split_once('.') {
-            Some((s, f)) => (s.to_string(), f.to_string()),
-            None => (schema.name.clone(), field_name.to_string()),
-        };
-
-        if out_schema_name == schema.name && out_field_name == field_name {
-            field.ref_atom_uuid().ok_or_else(|| {
-                SchemaError::InvalidData(format!("Field {} missing atom reference", field_name))
-            }).cloned()
-        } else {
-            match self
-                .schema_manager
-                .get_schema(&out_schema_name)?
-                .and_then(|s| s.fields.get(&out_field_name).cloned())
-            {
-                Some(of) => of.ref_atom_uuid().ok_or_else(|| {
-                    SchemaError::InvalidData(format!(
-                        "Field {}.{} missing atom reference",
-                        out_schema_name, out_field_name
-                    ))
-                }).cloned(),
-                None => field.ref_atom_uuid().ok_or_else(|| {
-                    SchemaError::InvalidData(format!("Field {} missing atom reference", field_name))
-                }).cloned(),
-            }
-        }
-    }
-
-    fn collect_input_arefs(
-        &self,
-        schema: &Schema,
-        transform: &Transform,
-        cross_re: &Regex,
-    ) -> TransformInputResult {
-        let mut input_pairs = Vec::new();
-        let mut input_arefs = Vec::new();
-        let mut trigger_fields = Vec::new();
-        let mut seen_cross = std::collections::HashSet::new();
-
-        let inputs = transform.get_inputs();
-        if !inputs.is_empty() {
-            for input in inputs {
-                if let Some((schema_name, field_dep)) = input.split_once('.') {
-                    seen_cross.insert(field_dep.to_string());
-                    trigger_fields.push(format!("{}.{}", schema_name, field_dep));
-                    if let Some(dep_schema) = self.schema_manager.get_schema(schema_name)? {
-                        if let Some(dep_field) = dep_schema.fields.get(field_dep) {
-                            if let Some(dep_aref) = dep_field.ref_atom_uuid() {
-                                input_arefs.push(dep_aref.clone());
-                                input_pairs.push((dep_aref.clone(), format!("{}.{}", schema_name, field_dep)));
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            for cap in cross_re.captures_iter(&transform.logic) {
-                let schema_name = cap[1].to_string();
-                let field_dep = cap[2].to_string();
-                seen_cross.insert(field_dep.clone());
-                trigger_fields.push(format!("{}.{}", schema_name, field_dep));
-                if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
-                    if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
-                        if let Some(dep_aref) = dep_field.ref_atom_uuid() {
-                            input_arefs.push(dep_aref.clone());
-                            input_pairs.push((dep_aref.clone(), format!("{}.{}", schema_name, field_dep)));
-                        }
-                    }
-                }
-            }
-        }
-
-        for dep in transform.analyze_dependencies() {
-            if seen_cross.contains(&dep) {
-                continue;
-            }
-            let schema_name = schema.name.clone();
-            let field_dep = dep;
-
-            trigger_fields.push(format!("{}.{}", schema_name, field_dep));
-
-            if let Some(dep_schema) = self.schema_manager.get_schema(&schema_name)? {
-                if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
-                    if let Some(dep_aref) = dep_field.ref_atom_uuid() {
-                        input_arefs.push(dep_aref.clone());
-                        input_pairs.push((dep_aref.clone(), format!("{}.{}", schema_name, field_dep)));
-                    }
-                }
-            }
-        }
-
-        Ok((input_pairs, trigger_fields))
-    }
-
-    fn register_transform_internal(
-        &self,
-        schema: &Schema,
-        field_name: &str,
-        transform: &Transform,
-        params: TransformRegistrationParams,
-    ) -> Result<(), SchemaError> {
-        let transform_id = format!("{}.{}", schema.name, field_name);
-        let mut trigger_fields = params.trigger_fields;
-        trigger_fields.push(transform_id.clone());
-        let registration = TransformRegistration {
-            transform_id: transform_id.clone(),
-            transform: transform.clone(),
-            input_arefs: params.input_arefs,
-            input_names: params.input_names,
-            trigger_fields,
-            output_aref: params.output_aref,
-            schema_name: schema.name.clone(),
-            field_name: field_name.to_string(),
-        };
-        self.transform_manager.register_transform(registration)?;
-        let _ = self.transform_manager.execute_transform_now(&transform_id);
-        Ok(())
-    }
-
-    fn register_transforms_for_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
-        let cross_re = Regex::new(r"([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)").unwrap();
-
-        for (field_name, field) in &schema.fields {
-            if let Some(transform) = field.transform() {
-                let output_aref = self.parse_output_field(schema, field_name, field, transform)?;
-                let (pairs, trigger_fields) =
-                    self.collect_input_arefs(schema, transform, &cross_re)?;
-                let mut input_arefs = Vec::new();
-                let mut input_names = Vec::new();
-                for (a, n) in pairs {
-                    input_arefs.push(a);
-                    input_names.push(n);
-                }
-                self.register_transform_internal(
-                    schema,
-                    field_name,
-                    transform,
-                    TransformRegistrationParams {
-                        input_arefs,
-                        input_names,
-                        trigger_fields,
-                        output_aref,
-                    },
-                )?;
-            }
-        }
-
-        Ok(())
-    }
 
     pub fn load_schema(&mut self, schema: Schema) -> Result<(), SchemaError> {
         let name = schema.name.clone();
@@ -369,178 +196,12 @@ impl FoldDB {
         Ok(())
     }
 
-    pub fn query_schema(&self, query: Query) -> Vec<Result<Value, SchemaError>> {
-        query
-            .fields
-            .iter()
-            .map(|field_name| {
-                info!("Processing field: {}", field_name);
-                // Trust distance 0 bypasses permission checks
-                let perm_allowed = if query.trust_distance == 0 {
-                    true
-                } else {
-                    let perm = self.permission_wrapper.check_query_field_permission(
-                        &query,
-                        field_name,
-                        &self.schema_manager,
-                    );
-                    perm.allowed
-                };
-
-                if !perm_allowed {
-                    let err = self
-                        .permission_wrapper
-                        .check_query_field_permission(&query, field_name, &self.schema_manager)
-                        .error
-                        .unwrap_or(SchemaError::InvalidPermission(
-                            "Unknown permission error".to_string(),
-                        ));
-                    return Err(err);
-                }
-
-                let schema = match self.schema_manager.get_schema(&query.schema_name) {
-                    Ok(Some(schema)) => schema,
-                    Ok(None) => {
-                        return Err(SchemaError::NotFound(format!(
-                            "Schema {} not found",
-                            query.schema_name
-                        )))
-                    }
-                    Err(e) => return Err(e),
-                };
-
-                // Check if there's a filter and if this field supports filtering
-                if let Some(ref filter_value) = query.filter {
-                    info!("Query processing - field: {}, has filter: true, filter: {:?}", field_name, filter_value);
-                    self.field_manager.get_filtered_field_value(&schema, field_name, filter_value)
-                } else {
-                    info!("Query processing - field: {}, has filter: false", field_name);
-                    self.field_manager.get_field_value(&schema, field_name)
-                }
-            })
-            .collect::<Vec<Result<Value, SchemaError>>>()
-    }
-
-    pub fn write_schema(&mut self, mutation: Mutation) -> Result<(), SchemaError> {
-        if mutation.fields_and_values.is_empty() {
-            return Err(SchemaError::InvalidData("No fields to write".to_string()));
-        }
-
-        let mutation_bytes = serde_json::to_vec(&mutation)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize mutation: {}", e)))?;
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(mutation_bytes);
-        let mutation_hash = format!("{:x}", hasher.finalize());
-
-        let schema = self
-            .schema_manager
-            .get_schema(&mutation.schema_name)?
-            .ok_or_else(|| {
-                SchemaError::NotFound(format!("Schema {} not found", mutation.schema_name))
-            })?;
-
-        for (field_name, value) in mutation.fields_and_values.iter() {
-            let perm = self.permission_wrapper.check_mutation_field_permission(
-                &mutation,
-                field_name,
-                &self.schema_manager,
-            );
-            // Bypass permission checks when trust distance is zero
-            if mutation.trust_distance != 0 && !perm.allowed {
-                return Err(perm.error.unwrap_or(SchemaError::InvalidPermission(
-                    "Unknown permission error".to_string(),
-                )));
-            }
-
-            match mutation.mutation_type {
-                MutationType::Create => {
-                    let mut schema_clone = schema.clone();
-                    self.field_manager.set_field_value(
-                        &mut schema_clone,
-                        field_name,
-                        value.clone(),
-                        mutation.pub_key.clone(),
-                    )?;
-                    
-                    // For Range fields, we need to update the original schema with the ref_atom_uuid
-                    if let Some(field_def) = schema_clone.fields.get(field_name) {
-                        if let Some(ref_atom_uuid) = field_def.ref_atom_uuid() {
-                            // Update the original schema in the schema manager
-                            self.schema_manager.update_field_ref_atom_uuid(&mutation.schema_name, field_name, ref_atom_uuid.clone())?;
-                        }
-                    }
-                }
-                MutationType::Update => {
-                    self.field_manager.update_field(
-                        &schema,
-                        field_name,
-                        value.clone(),
-                        mutation.pub_key.clone(),
-                    )?;
-                }
-                MutationType::Delete => {
-                    self.field_manager.delete_field(
-                        &schema,
-                        field_name,
-                        mutation.pub_key.clone(),
-                    )?;
-                }
-                MutationType::AddToCollection(ref id) => {
-                    self.collection_manager.add_collection_field_value(
-                        &schema,
-                        field_name,
-                        value.clone(),
-                        mutation.pub_key.clone(),
-                        id.clone(),
-                    )?;
-                }
-                MutationType::UpdateToCollection(ref id) => {
-                    self.collection_manager.update_collection_field_value(
-                        &schema,
-                        field_name,
-                        value.clone(),
-                        mutation.pub_key.clone(),
-                        id.clone(),
-                    )?;
-                }
-                MutationType::DeleteFromCollection(ref id) => {
-                    self.collection_manager.delete_collection_field_value(
-                        &schema,
-                        field_name,
-                        mutation.pub_key.clone(),
-                        id.clone(),
-                    )?;
-                }
-            }
-
-            let _ = self
-                .transform_orchestrator
-                .add_task(&schema.name, field_name, &mutation_hash);
-        }
-        Ok(())
-    }
 
     pub fn get_atom_history(
         &self,
         aref_uuid: &str,
     ) -> Result<Vec<Atom>, Box<dyn std::error::Error>> {
         self.atom_manager.get_atom_history(aref_uuid)
-    }
-
-    /// Returns the number of queued transform tasks.
-    pub fn orchestrator_len(&self) -> Result<usize, SchemaError> {
-        self.transform_orchestrator.len()
-    }
-
-    /// List all registered transforms.
-    pub fn list_transforms(&self) -> Result<HashMap<String, Transform>, SchemaError> {
-        self.transform_manager.list_transforms()
-    }
-
-    /// Execute a transform immediately and return the result.
-    pub fn run_transform(&self, transform_id: &str) -> Result<Value, SchemaError> {
-        self.transform_manager.execute_transform_now(transform_id)
     }
 
     /// Mark a schema as unloaded without removing transforms.
