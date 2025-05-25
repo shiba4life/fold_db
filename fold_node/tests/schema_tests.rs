@@ -105,6 +105,9 @@ fn test_schema_persistence() {
         Some(&"test-uuid".to_string())
     );
 
+    // Drop the first manager to release the database lock
+    drop(manager);
+    
     // Create a new manager instance to verify disk persistence
     let new_manager = SchemaCore::new(test_dir.path().to_str().unwrap()).unwrap();
     new_manager.load_schemas_from_disk().unwrap();
@@ -112,10 +115,10 @@ fn test_schema_persistence() {
     assert_eq!(reloaded_schema.name, "test_persistence");
 
     // Unload the schema
-    assert!(manager.unload_schema("test_persistence").is_ok());
+    assert!(new_manager.unload_schema("test_persistence").is_ok());
 
     // Verify schema was removed
-    let removed_schema = manager.get_schema("test_persistence").unwrap();
+    let removed_schema = new_manager.get_schema("test_persistence").unwrap();
     assert!(removed_schema.is_none());
 }
 
@@ -137,6 +140,9 @@ fn test_schema_disk_loading() {
         manager.load_schema(schema).unwrap();
     }
 
+    // Drop the first manager to release the database lock
+    drop(manager);
+    
     // Create a new manager instance and load schemas from disk
     let new_manager = SchemaCore::new(test_dir.path().to_str().unwrap()).unwrap();
     new_manager.load_schemas_from_disk().unwrap();

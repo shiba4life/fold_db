@@ -50,6 +50,7 @@ pub struct FoldDB {
     /// Tree for storing per-node schema permissions
     permissions_tree: sled::Tree,
     /// Tree storing schema states
+    #[allow(dead_code)]
     schema_states_tree: sled::Tree,
 }
 

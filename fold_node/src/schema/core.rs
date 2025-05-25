@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use log::{info, debug};
+use log::info;
 use uuid::Uuid;
 
 /// State of a schema within the system
@@ -606,7 +606,8 @@ mod tests {
         let test_schema_name = "test_persistence_schema";
         cleanup_test_schema(test_schema_name); // Cleanup any leftover test files
 
-        let core = SchemaCore::new("data").unwrap();
+        let temp_dir = tempdir().unwrap();
+        let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
 
         // Create a test schema
         let mut fields = HashMap::new();
@@ -681,14 +682,16 @@ mod tests {
 
     #[test]
     fn test_validate_schema_valid() {
-        let core = SchemaCore::new("data").unwrap();
+        let temp_dir = tempdir().unwrap();
+        let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
         let schema = build_json_schema("valid");
         assert!(core.validate_schema(&schema).is_ok());
     }
 
     #[test]
     fn test_validate_schema_empty_name() {
-        let core = SchemaCore::new("data").unwrap();
+        let temp_dir = tempdir().unwrap();
+        let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
         let schema = build_json_schema("");
         let result = core.validate_schema(&schema);
         assert!(matches!(result, Err(SchemaError::InvalidField(msg)) if msg == "Schema name cannot be empty"));
@@ -696,7 +699,8 @@ mod tests {
 
     #[test]
     fn test_validate_schema_empty_field_name() {
-        let core = SchemaCore::new("data").unwrap();
+        let temp_dir = tempdir().unwrap();
+        let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
         let mut schema = build_json_schema("valid");
         let field = schema.fields.remove("field").unwrap();
         schema.fields.insert("".to_string(), field);
@@ -706,7 +710,8 @@ mod tests {
 
     #[test]
     fn test_validate_schema_invalid_mapper() {
-        let core = SchemaCore::new("data").unwrap();
+        let temp_dir = tempdir().unwrap();
+        let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
         let mut schema = build_json_schema("valid");
         if let Some(field) = schema.fields.get_mut("field") {
             field.field_mappers.insert(String::new(), "v".to_string());
@@ -717,7 +722,8 @@ mod tests {
 
     #[test]
     fn test_validate_schema_min_payment_zero() {
-        let core = SchemaCore::new("data").unwrap();
+        let temp_dir = tempdir().unwrap();
+        let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
         let mut schema = build_json_schema("valid");
         if let Some(field) = schema.fields.get_mut("field") {
             field.payment_config.min_payment = Some(0);

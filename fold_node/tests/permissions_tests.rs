@@ -6,6 +6,7 @@ use fold_node::testing::{
 use fold_node::schema::types::Transform;
 use serde_json::Value;
 use std::collections::HashMap;
+use tempfile::tempdir;
 
 fn create_default_payment_config() -> FieldPaymentConfig {
     FieldPaymentConfig::new(1.0, TrustDistanceScaling::None, None).unwrap()
@@ -15,7 +16,8 @@ fn create_default_payment_config() -> FieldPaymentConfig {
 fn test_non_reversible_transform_not_writable() {
     let _ = env_logger::builder().is_test(true).try_init();
     let wrapper = PermissionWrapper::new();
-    let schema_manager = SchemaCore::new("data").unwrap();
+    let temp_dir = tempdir().unwrap();
+    let schema_manager = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
 
     let transform = Transform::new(
         "1 + 1".to_string(),
@@ -61,7 +63,8 @@ fn test_permission_wrapper_query() {
     let _ = env_logger::builder().is_test(true).try_init();
     // Setup
     let wrapper = PermissionWrapper::new();
-    let schema_manager = SchemaCore::new("data").unwrap();
+    let temp_dir = tempdir().unwrap();
+    let schema_manager = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
 
     // Create a test schema
     let mut fields = HashMap::new();
@@ -122,7 +125,8 @@ fn test_permission_wrapper_no_requirement() {
     let _ = env_logger::builder().is_test(true).try_init();
     // Setup
     let wrapper = PermissionWrapper::new();
-    let schema_manager = SchemaCore::new("data").unwrap();
+    let temp_dir = tempdir().unwrap();
+    let schema_manager = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
 
     // Create a test schema with no distance requirement
     let mut fields = HashMap::new();
@@ -172,7 +176,8 @@ fn test_permission_wrapper_mutation() {
     let _ = env_logger::builder().is_test(true).try_init();
     // Setup
     let wrapper = PermissionWrapper::new();
-    let schema_manager = SchemaCore::new("data").unwrap();
+    let temp_dir = tempdir().unwrap();
+    let schema_manager = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
 
     // Create a test schema with both explicit write permissions and trust distance
     let mut fields = HashMap::new();

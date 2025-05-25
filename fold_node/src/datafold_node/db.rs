@@ -11,7 +11,7 @@ use super::DataFoldNode;
 impl DataFoldNode {
     /// Ensure a schema is loaded into memory if its state is `Loaded` on disk.
     fn ensure_schema_loaded(&mut self, schema_name: &str) -> FoldDbResult<()> {
-        let mut db = self
+        let db = self
             .db
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;

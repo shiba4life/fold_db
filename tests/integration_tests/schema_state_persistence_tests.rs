@@ -31,7 +31,7 @@ fn unload_state_persists_on_disk() {
 
     drop(node);
 
-    let mut node2 = DataFoldNode::new(config).unwrap();
+    let node2 = DataFoldNode::new(config).unwrap();
 
     assert!(node2.list_available_schemas().unwrap().contains(&"PersistUnload".to_string()));
     let loaded_names: Vec<String> = node2.list_schemas().unwrap().into_iter().map(|s| s.name).collect();
