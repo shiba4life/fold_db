@@ -1,9 +1,7 @@
 mod client;
 mod types;
+pub mod mock;
 
-#[cfg(test)]
-mod mock;
 
 pub use client::LightningClient;
-#[cfg(test)]
 pub use mock::MockLightningClient;
