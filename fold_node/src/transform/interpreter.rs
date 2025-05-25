@@ -42,11 +42,6 @@ impl Interpreter {
         interpreter
     }
     
-    /// Registers built-in functions.
-    #[allow(dead_code)]
-    fn register_builtin_functions(&mut self) {
-        self.functions.extend(builtin_functions());
-    }
     
     /// Evaluates an expression.
     pub fn evaluate(&mut self, expr: &Expression) -> Result<Value, SchemaError> {
