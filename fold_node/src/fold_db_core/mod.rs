@@ -152,7 +152,8 @@ impl FoldDB {
         field_manager
             .set_orchestrator(Arc::clone(&orchestrator))
             .map_err(|e| sled::Error::Unsupported(e.to_string()))?;
-        let _ = schema_manager.load_schemas_from_disk();
+
+        let _ = schema_manager.load_schema_states_from_disk();
 
         Ok(Self {
             atom_manager,
