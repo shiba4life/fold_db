@@ -230,11 +230,9 @@ impl FieldManager {
                             // Filter by key pattern (simple glob matching)
                             for (key, value) in data_map {
                                 // Simple glob pattern matching
-                                let is_match = if pattern.ends_with('*') {
-                                    let prefix = &pattern[..pattern.len() - 1];
+                                let is_match = if let Some(prefix) = pattern.strip_suffix('*') {
                                     key.starts_with(prefix)
-                                } else if pattern.starts_with('*') {
-                                    let suffix = &pattern[1..];
+                                } else if let Some(suffix) = pattern.strip_prefix('*') {
                                     key.ends_with(suffix)
                                 } else {
                                     key == pattern
