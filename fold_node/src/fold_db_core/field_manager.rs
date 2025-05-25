@@ -26,6 +26,24 @@ impl FieldManager {
         }
     }
 
+    fn parse_range_content(value: &Value) -> Result<(String, Value), SchemaError> {
+        if let Value::Object(map) = value {
+            let key = map
+                .get("key")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| SchemaError::InvalidData("Missing range key".to_string()))?
+                .to_string();
+            let val = map
+                .get("value")
+                .cloned()
+                .ok_or_else(|| SchemaError::InvalidData("Missing range value".to_string()))?;
+            Ok((key, val))
+        } else {
+            Err(SchemaError::InvalidData("Range field requires object with key and value".to_string()))
+        }
+    }
+
+
     pub fn set_transform_manager(&self, manager: Arc<TransformManager>) -> Result<(), SchemaError> {
         let mut guard = self
             .transform_manager
@@ -84,6 +102,7 @@ impl FieldManager {
         let result = if let Some(ref_atom_uuid) = field_def.ref_atom_uuid() {
             // Try to get the atom reference
             let ref_atoms = self.atom_manager.get_ref_atoms();
+            let ref_ranges = self.atom_manager.get_ref_ranges();
             let atoms = self.atom_manager.get_atoms();
 
             let atom_uuid = {
@@ -107,6 +126,24 @@ impl FieldManager {
                         .get_latest_atom(ref_atom_uuid)
                         .map(|a| a.content().clone())
                         .unwrap_or_else(|_| Self::default_value(field))
+                }
+            } else if matches!(field_def, crate::schema::types::FieldVariant::Range(_)) {
+                let guard = ref_ranges
+                    .lock()
+                    .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_ranges lock".to_string()))?;
+                if let Some(range) = guard.get(ref_atom_uuid) {
+                    let atom_guard = atoms
+                        .lock()
+                        .map_err(|_| SchemaError::InvalidData("Failed to acquire atoms lock".to_string()))?;
+                    let mut map = serde_json::Map::new();
+                    for (k, v) in &range.atom_uuids {
+                        if let Some(atom) = atom_guard.get(v) {
+                            map.insert(k.clone(), atom.content().clone());
+                        }
+                    }
+                    Value::Object(map)
+                } else {
+                    Value::Object(serde_json::Map::new())
                 }
             } else {
                 self.atom_manager
@@ -146,17 +183,23 @@ impl FieldManager {
         }
 
         let aref_uuid = ctx.get_or_create_atom_ref()?;
-        let prev_atom_uuid = {
-            let ref_atoms = ctx.atom_manager.get_ref_atoms();
-            let guard = ref_atoms
-                .lock()
-                .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
-            guard
-                .get(&aref_uuid)
-                .map(|aref| aref.get_atom_uuid().to_string())
-        };
 
-        ctx.create_and_update_atom(prev_atom_uuid, content.clone(), None)?;
+        if matches!(field_def, crate::schema::types::FieldVariant::Range(_)) {
+            let (key, value) = Self::parse_range_content(&content)?;
+            ctx.create_and_update_range_atom(None, value, None, key)?;
+        } else {
+            let prev_atom_uuid = {
+                let ref_atoms = ctx.atom_manager.get_ref_atoms();
+                let guard = ref_atoms
+                    .lock()
+                    .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
+                guard
+                    .get(&aref_uuid)
+                    .map(|aref| aref.get_atom_uuid().to_string())
+            };
+
+            ctx.create_and_update_atom(prev_atom_uuid, content.clone(), None)?;
+        }
 
         info!(
             "set_field_value - schema: {}, field: {}, aref_uuid: {}, result: success",
@@ -185,9 +228,15 @@ impl FieldManager {
         }
 
         let aref_uuid = ctx.get_or_create_atom_ref()?;
-        let prev_atom_uuid = ctx.get_prev_atom_uuid(&aref_uuid)?;
 
-        ctx.create_and_update_atom(Some(prev_atom_uuid), content.clone(), None)?;
+        if matches!(field_def, crate::schema::types::FieldVariant::Range(_)) {
+            let (key, value) = Self::parse_range_content(&content)?;
+            let prev_atom_uuid = ctx.get_prev_range_atom_uuid(&aref_uuid, &key)?;
+            ctx.create_and_update_range_atom(Some(prev_atom_uuid), value, None, key)?;
+        } else {
+            let prev_atom_uuid = ctx.get_prev_atom_uuid(&aref_uuid)?;
+            ctx.create_and_update_atom(Some(prev_atom_uuid), content.clone(), None)?;
+        }
 
         info!(
             "update_field - schema: {}, field: {}, aref_uuid: {}, result: success",

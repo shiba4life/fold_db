@@ -10,3 +10,4 @@ pub mod schema_set_unloaded_tests;
 pub mod transform_output_schema_tests;
 pub mod transform_sample_execution_tests;
 pub mod transform_manager_persistence_tests;
+pub mod range_field_node_tests;

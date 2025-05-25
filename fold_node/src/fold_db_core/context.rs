@@ -192,6 +192,56 @@ impl<'a> AtomContext<'a> {
         Ok(())
     }
 
+    pub fn get_prev_range_atom_uuid(
+        &self,
+        aref_uuid: &str,
+        key: &str,
+    ) -> Result<String, SchemaError> {
+        let ref_ranges = self.atom_manager.get_ref_ranges();
+        let guard = ref_ranges
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_ranges lock".to_string()))?;
+        let aref = guard
+            .get(aref_uuid)
+            .ok_or_else(|| SchemaError::InvalidData("AtomRefRange not found".to_string()))?;
+        aref
+            .get_atom_uuid(key)
+            .cloned()
+            .ok_or_else(|| SchemaError::InvalidData("Atom not found".to_string()))
+    }
+
+    pub fn create_and_update_range_atom(
+        &mut self,
+        prev_atom_uuid: Option<String>,
+        content: Value,
+        status: Option<AtomStatus>,
+        key: String,
+    ) -> Result<(), SchemaError> {
+        let atom = self
+            .atom_manager
+            .create_atom(
+                &self.schema.name,
+                self.source_pub_key.clone(),
+                prev_atom_uuid,
+                content,
+                status,
+            )
+            .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+
+        let aref_uuid = self.get_or_create_atom_ref()?;
+
+        self.atom_manager
+            .update_atom_ref_range(
+                &aref_uuid,
+                atom.uuid().to_string(),
+                key,
+                self.source_pub_key.clone(),
+            )
+            .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+
+        Ok(())
+    }
+
     pub fn validate_field_type(&self, expected_type: FieldType) -> Result<(), SchemaError> {
         let field_def = self.get_field_def()?;
         let matches = matches!((field_def, &expected_type),
