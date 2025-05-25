@@ -353,4 +353,26 @@ impl DataFoldNode {
         &self.node_id
     }
 
+    pub(super) fn with_db<F, R>(&self, f: F) -> FoldDbResult<R>
+    where
+        F: FnOnce(&FoldDB) -> FoldDbResult<R>,
+    {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        f(&db)
+    }
+
+    pub(super) fn with_db_mut<F, R>(&self, f: F) -> FoldDbResult<R>
+    where
+        F: FnOnce(&mut FoldDB) -> FoldDbResult<R>,
+    {
+        let mut db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        f(&mut db)
+    }
+
 }

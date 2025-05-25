@@ -11,25 +11,21 @@ impl DataFoldNode {
     /// Loads a schema into the database and grants this node permission.
     pub fn load_schema(&mut self, schema: Schema) -> FoldDbResult<()> {
         let schema_name = schema.name.clone();
-        let mut db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-
-        // Apply transform output fix and validate before loading
-        let mut schema = schema;
-        for (fname, field) in schema.fields.iter_mut() {
-            if let Some(transform) = field.transform.as_mut() {
-                if transform.get_output().starts_with("test.") {
-                    transform.set_output(format!("{}.{}", schema_name, fname));
+        self.with_db_mut(|db| {
+            let mut schema = schema;
+            for (fname, field) in schema.fields.iter_mut() {
+                if let Some(transform) = field.transform.as_mut() {
+                    if transform.get_output().starts_with("test.") {
+                        transform.set_output(format!("{}.{}", schema_name, fname));
+                    }
                 }
             }
-        }
 
-        let validator = SchemaValidator::new(&db.schema_manager);
-        validator.validate(&schema)?;
-        db.load_schema(schema)?;
-        drop(db);
+            let validator = SchemaValidator::new(&db.schema_manager);
+            validator.validate(&schema)?;
+            db.load_schema(schema)?;
+            Ok(())
+        })?;
         self.grant_schema_permission(&schema_name)?;
         Ok(())
     }
@@ -76,36 +72,26 @@ impl DataFoldNode {
 
     /// Retrieves a schema by its ID.
     pub fn get_schema(&self, schema_id: &str) -> FoldDbResult<Option<Schema>> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        Ok(db.schema_manager.get_schema(schema_id)?)
+        self.with_db(|db| Ok(db.schema_manager.get_schema(schema_id)?))
     }
 
     /// Lists all loaded schemas in the database.
     pub fn list_schemas(&self) -> FoldDbResult<Vec<Schema>> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        let schema_names = db.schema_manager.list_loaded_schemas()?;
-        let mut schemas = Vec::new();
-        for name in schema_names {
-            if let Some(schema) = db.schema_manager.get_schema(&name)? {
-                schemas.push(schema);
+        self.with_db(|db| {
+            let schema_names = db.schema_manager.list_loaded_schemas()?;
+            let mut schemas = Vec::new();
+            for name in schema_names {
+                if let Some(schema) = db.schema_manager.get_schema(&name)? {
+                    schemas.push(schema);
+                }
             }
-        }
-        Ok(schemas)
+            Ok(schemas)
+        })
     }
 
     /// List the names of all schemas available on disk.
     pub fn list_available_schemas(&self) -> FoldDbResult<Vec<String>> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        Ok(db.schema_manager.list_available_schemas()?)
+        self.with_db(|db| Ok(db.schema_manager.list_available_schemas()?))
     }
 
     /// Executes a query against the database.
@@ -119,11 +105,7 @@ impl DataFoldNode {
         if query.trust_distance == 0 {
             query.trust_distance = self.config.default_trust_distance;
         }
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        Ok(db.query_schema(query))
+        self.with_db(|db| Ok(db.query_schema(query)))
     }
 
     /// Executes a mutation on the database.
@@ -134,107 +116,67 @@ impl DataFoldNode {
                 mutation.schema_name
             )));
         }
-        let mut db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.write_schema(mutation)?;
-        Ok(())
+        self.with_db_mut(|db| {
+            db.write_schema(mutation)?;
+            Ok(())
+        })
     }
 
     /// Retrieves the version history for a specific atom reference.
     pub fn get_history(&self, aref_uuid: &str) -> FoldDbResult<Vec<Value>> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        let history = db
-            .atom_manager
-            .get_atom_history(aref_uuid)
-            .map_err(|e| FoldDbError::Database(e.to_string()))?;
-        Ok(history.into_iter().map(|a| a.content().clone()).collect())
+        self.with_db(|db| {
+            let history = db
+                .atom_manager
+                .get_atom_history(aref_uuid)
+                .map_err(|e| FoldDbError::Database(e.to_string()))?;
+            Ok(history.into_iter().map(|a| a.content().clone()).collect())
+        })
     }
 
     /// Mark a schema as unloaded without removing it from disk.
     pub fn unload_schema(&mut self, schema_name: &str) -> FoldDbResult<()> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.unload_schema(schema_name).map_err(|e| e.into())
+        self.with_db(|db| db.unload_schema(schema_name).map_err(|e| e.into()))
     }
 
     /// Load a fold into the database.
     pub fn load_fold(&self, fold: Fold) -> FoldDbResult<()> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.load_fold(fold).map_err(|e| e.into())
+        self.with_db(|db| db.load_fold(fold).map_err(|e| e.into()))
     }
 
     /// Get a fold by name.
     pub fn get_fold(&self, name: &str) -> FoldDbResult<Option<Fold>> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        Ok(db.get_fold(name)?)
+        self.with_db(|db| Ok(db.get_fold(name)?))
     }
 
     /// List all loaded folds.
     pub fn list_folds(&self) -> FoldDbResult<Vec<String>> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        Ok(db.list_folds()?)
+        self.with_db(|db| Ok(db.list_folds()?))
     }
 
     /// List all loaded folds.
     pub fn list_loaded_folds(&self) -> FoldDbResult<Vec<String>> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        Ok(db.list_loaded_folds()?)
+        self.with_db(|db| Ok(db.list_loaded_folds()?))
     }
 
     /// List all folds available on disk.
     pub fn list_available_folds(&self) -> FoldDbResult<Vec<String>> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        Ok(db.list_available_folds()?)
+        self.with_db(|db| Ok(db.list_available_folds()?))
     }
 
     /// Unload a fold from memory.
     pub fn unload_fold(&self, name: &str) -> FoldDbResult<()> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.unload_fold(name).map_err(|e| e.into())
+        self.with_db(|db| db.unload_fold(name).map_err(|e| e.into()))
     }
 
 
     /// List all registered transforms.
     pub fn list_transforms(&self) -> FoldDbResult<HashMap<String, Transform>> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        Ok(db.list_transforms()?)
+        self.with_db(|db| Ok(db.list_transforms()?))
     }
 
     /// Execute a transform by id and return the result.
     pub fn run_transform(&mut self, transform_id: &str) -> FoldDbResult<Value> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        Ok(db.run_transform(transform_id)?)
+        self.with_db(|db| Ok(db.run_transform(transform_id)?))
     }
 }
 
