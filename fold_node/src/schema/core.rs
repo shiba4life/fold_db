@@ -145,6 +145,25 @@ impl SchemaCore {
         Ok(schemas.get(schema_name).cloned())
     }
 
+    /// Updates the ref_atom_uuid for a specific field in a schema.
+    pub fn update_field_ref_atom_uuid(&self, schema_name: &str, field_name: &str, ref_atom_uuid: String) -> Result<(), SchemaError> {
+        let mut schemas = self
+            .schemas
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+        
+        if let Some(schema) = schemas.get_mut(schema_name) {
+            if let Some(field) = schema.fields.get_mut(field_name) {
+                field.set_ref_atom_uuid(ref_atom_uuid);
+                Ok(())
+            } else {
+                Err(SchemaError::InvalidField(format!("Field {} not found in schema {}", field_name, schema_name)))
+            }
+        } else {
+            Err(SchemaError::NotFound(format!("Schema {} not found", schema_name)))
+        }
+    }
+
     /// Lists all schema names currently loaded.
     pub fn list_loaded_schemas(&self) -> Result<Vec<String>, SchemaError> {
         let schemas = self

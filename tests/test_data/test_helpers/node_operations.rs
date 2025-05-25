@@ -52,6 +52,7 @@ pub fn query_value(
         fields: vec![field.to_string()],
         pub_key: "test_key".to_string(),
         trust_distance: 1,
+        filter: None,
     };
     let mut results = node.query(query)?;
     results

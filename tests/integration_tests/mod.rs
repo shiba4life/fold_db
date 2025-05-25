@@ -3,6 +3,8 @@ pub mod schema_field_mapping_tests;
 pub mod versioning_tests;
 pub mod cross_schema_transform_tests;
 pub mod persistence_tests;
+pub mod range_filter_tests;
+pub mod product_catalog_range_tests;
 pub mod transform_orchestrator_tests;
 pub mod transform_enqueue_tests;
 pub mod http_server_tests;

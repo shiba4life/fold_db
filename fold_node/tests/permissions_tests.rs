@@ -94,6 +94,7 @@ fn test_permission_wrapper_query() {
                 fields: vec!["test_field".to_string()],
                 pub_key: "test_key".to_string(),
                 trust_distance: 1,
+                filter: None,
             },
             true,
         ),
@@ -104,6 +105,7 @@ fn test_permission_wrapper_query() {
                 fields: vec!["test_field".to_string()],
                 pub_key: "test_key".to_string(),
                 trust_distance: 3,
+                filter: None,
             },
             false,
         ),
@@ -153,6 +155,7 @@ fn test_permission_wrapper_no_requirement() {
             fields: vec!["test_field".to_string()],
             pub_key: "test_key".to_string(),
             trust_distance: distance,
+            filter: None,
         };
 
         let result = wrapper.check_query_field_permission(&query, "test_field", &schema_manager);

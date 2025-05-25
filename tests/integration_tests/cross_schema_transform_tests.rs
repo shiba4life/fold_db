@@ -59,6 +59,7 @@ fn test_cross_schema_transform_manual_execution() {
         pub_key: "test_key".to_string(),
         fields: vec!["a_test_field".to_string()],
         trust_distance: 1,
+        filter: None,
     };
     let results = node.query(query_a).unwrap();
     assert_eq!(results[0].as_ref().unwrap(), &json!(4));
@@ -216,6 +217,7 @@ fn test_transform_persists_to_output_field() {
         pub_key: "test_key".to_string(),
         fields: vec!["b_out".to_string()],
         trust_distance: 1,
+        filter: None,
     };
     let results = node.query(query).unwrap();
     assert_eq!(results[0].as_ref().unwrap(), &json!(5.0));

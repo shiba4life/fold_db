@@ -9,11 +9,12 @@ pub struct Query {
     pub fields: Vec<String>,
     pub pub_key: String,
     pub trust_distance: u32,
+    pub filter: Option<Value>,
 }
 
 impl Query {
     #[must_use]
-    pub const fn new(
+    pub fn new(
         schema_name: String,
         fields: Vec<String>,
         pub_key: String,
@@ -24,6 +25,24 @@ impl Query {
             fields,
             pub_key,
             trust_distance,
+            filter: None,
+        }
+    }
+
+    #[must_use]
+    pub fn new_with_filter(
+        schema_name: String,
+        fields: Vec<String>,
+        pub_key: String,
+        trust_distance: u32,
+        filter: Option<Value>,
+    ) -> Self {
+        Self {
+            schema_name,
+            fields,
+            pub_key,
+            trust_distance,
+            filter,
         }
     }
 }

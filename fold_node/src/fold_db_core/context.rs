@@ -78,14 +78,44 @@ impl<'a> AtomContext<'a> {
     }
 
     pub fn get_prev_atom_uuid(&self, aref_uuid: &str) -> Result<String, SchemaError> {
-        let ref_atoms = self.atom_manager.get_ref_atoms();
-        let guard = ref_atoms
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
-        let aref = guard
-            .get(aref_uuid)
-            .ok_or_else(|| SchemaError::InvalidData("AtomRef not found".to_string()))?;
-        Ok(aref.get_atom_uuid().to_string())
+        let field_def = self.get_field_def()?;
+        
+        match field_def {
+            crate::schema::types::FieldVariant::Single(_) => {
+                let ref_atoms = self.atom_manager.get_ref_atoms();
+                let guard = ref_atoms
+                    .lock()
+                    .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
+                let aref = guard
+                    .get(aref_uuid)
+                    .ok_or_else(|| SchemaError::InvalidData("AtomRef not found".to_string()))?;
+                Ok(aref.get_atom_uuid().to_string())
+            }
+            crate::schema::types::FieldVariant::Collection(_) => {
+                let ref_collections = self.atom_manager.get_ref_collections();
+                let guard = ref_collections
+                    .lock()
+                    .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string()))?;
+                let _collection = guard
+                    .get(aref_uuid)
+                    .ok_or_else(|| SchemaError::InvalidData("AtomRefCollection not found".to_string()))?;
+                // For collections, we need to get the latest atom UUID - this might need adjustment
+                // For now, return empty string to indicate no previous atom
+                Ok(String::new())
+            }
+            crate::schema::types::FieldVariant::Range(_) => {
+                let ref_ranges = self.atom_manager.get_ref_ranges();
+                let guard = ref_ranges
+                    .lock()
+                    .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_ranges lock".to_string()))?;
+                let _range = guard
+                    .get(aref_uuid)
+                    .ok_or_else(|| SchemaError::InvalidData("AtomRefRange not found".to_string()))?;
+                // For ranges, we need to get the latest atom UUID - this might need adjustment
+                // For now, return empty string to indicate no previous atom
+                Ok(String::new())
+            }
+        }
     }
 
     pub fn get_prev_collection_atom_uuid(
@@ -111,6 +141,9 @@ impl<'a> AtomContext<'a> {
         content: Value,
         status: Option<AtomStatus>,
     ) -> Result<(), SchemaError> {
+        // Clone content for Range field processing before moving it to create_atom
+        let content_for_range = content.clone();
+        
         let atom = self
             .atom_manager
             .create_atom(
@@ -146,14 +179,23 @@ impl<'a> AtomContext<'a> {
                     .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
             }
             crate::schema::types::FieldVariant::Range(_) => {
-                self.atom_manager
-                    .update_atom_ref_range(
-                        &aref_uuid,
-                        atom.uuid().to_string(),
-                        "0".to_string(),
-                        self.source_pub_key.clone(),
-                    )
-                    .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+                // For Range fields, the content should be a JSON object with key-value pairs
+                if let Some(obj) = content_for_range.as_object() {
+                    for (key, _value) in obj {
+                        self.atom_manager
+                            .update_atom_ref_range(
+                                &aref_uuid,
+                                atom.uuid().to_string(),
+                                key.clone(),
+                                self.source_pub_key.clone(),
+                            )
+                            .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+                    }
+                } else {
+                    return Err(SchemaError::InvalidData(
+                        "Range field data must be a JSON object with key-value pairs".to_string()
+                    ));
+                }
             }
         }
 

@@ -14,6 +14,7 @@ pub fn create_query(
         fields,
         pub_key,
         trust_distance,
+        filter: None,
     }
 }
 

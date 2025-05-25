@@ -3,8 +3,8 @@
   "schema": "ProductCatalog",
   "mutation_type": "update",
   "data": {
-    "product_id": "PROD-12345",
-    "price": 129.99,
-    "inventory_count": 45
+    "name": "Wireless Headphones",
+    "price": "199.99",
+    "inventory_count": 75
   }
 }

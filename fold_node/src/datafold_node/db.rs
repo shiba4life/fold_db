@@ -39,12 +39,13 @@ impl DataFoldNode {
     /// Executes an operation (query or mutation) on the database.
     pub fn execute_operation(&mut self, operation: Operation) -> FoldDbResult<Value> {
         match operation {
-            Operation::Query { schema, fields, filter: _ } => {
+            Operation::Query { schema, fields, filter } => {
                 let query = Query {
                     schema_name: schema,
                     fields,
                     pub_key: String::new(),
                     trust_distance: 0,
+                    filter,
                 };
                 let results = self.query(query)?;
                 let unwrapped: Vec<Value> = results

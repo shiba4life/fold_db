@@ -79,6 +79,7 @@ fn test_db_and_transform_persistence() {
         pub_key: "test_key".to_string(),
         fields: vec!["input_field".to_string()],
         trust_distance: 1,
+        filter: None,
     };
     let results2 = node2.query(query2).unwrap();
     assert_eq!(results2[0].as_ref().unwrap(), &json!(42));

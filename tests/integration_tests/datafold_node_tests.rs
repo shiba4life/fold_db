@@ -58,6 +58,7 @@ fn test_trust_distance_handling() {
         pub_key: "test_key".to_string(),
         fields: vec!["name".to_string()],
         trust_distance: 0, // Should be replaced with default
+        filter: None,
     };
 
     let results = node.query(query).unwrap();

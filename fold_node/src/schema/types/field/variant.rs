@@ -148,10 +148,18 @@ impl<'de> Deserialize<'de> for FieldVariant {
         Ok(match helper.field_type.unwrap_or(FieldType::Single) {
             FieldType::Single => Self::Single(SingleField { inner: helper.inner }),
             FieldType::Collection => Self::Collection(CollectionField { inner: helper.inner }),
-            FieldType::Range => Self::Range(RangeField {
-                inner: helper.inner,
-                atom_ref_range: None,
-            }),
+            FieldType::Range => {
+                let mut range_field = RangeField {
+                    inner: helper.inner,
+                    atom_ref_range: None,
+                };
+                // If there's a ref_atom_uuid, we need to initialize the atom_ref_range
+                if let Some(_ref_atom_uuid) = range_field.inner.ref_atom_uuid.as_ref() {
+                    // We'll initialize it with an empty pub key for now - it will be populated when data is loaded
+                    range_field.atom_ref_range = Some(crate::atom::AtomRefRange::new(String::new()));
+                }
+                Self::Range(range_field)
+            }
         })
     }
 }

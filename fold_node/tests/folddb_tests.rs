@@ -117,6 +117,7 @@ fn test_write_and_query() {
         fields: vec!["test_field".to_string()],
         pub_key: "test_key".to_string(),
         trust_distance: 1,
+        filter: None,
     };
 
     let results = db.query_schema(query);
@@ -190,6 +191,7 @@ fn test_atom_history() {
         fields: vec!["version_field".to_string()],
         pub_key: "test_key".to_string(),
         trust_distance: 1,
+        filter: None,
     };
 
     let results = db.query_schema(query);

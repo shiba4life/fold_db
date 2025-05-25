@@ -17,6 +17,7 @@ use serde_json;
 use serde_json::Value;
 use uuid::Uuid;
 use regex::Regex;
+use log::info;
 
 // Type alias to reduce complexity
 type TransformInputResult = Result<(Vec<(String, String)>, Vec<String>), SchemaError>;
@@ -371,6 +372,7 @@ impl FoldDB {
             .fields
             .iter()
             .map(|field_name| {
+                info!("Processing field: {}", field_name);
                 // Trust distance 0 bypasses permission checks
                 let perm_allowed = if query.trust_distance == 0 {
                     true
@@ -405,9 +407,16 @@ impl FoldDB {
                     Err(e) => return Err(e),
                 };
 
-                self.field_manager.get_field_value(&schema, field_name)
+                // Check if there's a filter and if this field supports filtering
+                if let Some(ref filter_value) = query.filter {
+                    info!("Query processing - field: {}, has filter: true, filter: {:?}", field_name, filter_value);
+                    self.field_manager.get_filtered_field_value(&schema, field_name, filter_value)
+                } else {
+                    info!("Query processing - field: {}, has filter: false", field_name);
+                    self.field_manager.get_field_value(&schema, field_name)
+                }
             })
-            .collect()
+            .collect::<Vec<Result<Value, SchemaError>>>()
     }
 
     pub fn write_schema(&mut self, mutation: Mutation) -> Result<(), SchemaError> {
@@ -451,6 +460,14 @@ impl FoldDB {
                         value.clone(),
                         mutation.pub_key.clone(),
                     )?;
+                    
+                    // For Range fields, we need to update the original schema with the ref_atom_uuid
+                    if let Some(field_def) = schema_clone.fields.get(field_name) {
+                        if let Some(ref_atom_uuid) = field_def.ref_atom_uuid() {
+                            // Update the original schema in the schema manager
+                            self.schema_manager.update_field_ref_atom_uuid(&mutation.schema_name, field_name, ref_atom_uuid.clone())?;
+                        }
+                    }
                 }
                 MutationType::Update => {
                     self.field_manager.update_field(
