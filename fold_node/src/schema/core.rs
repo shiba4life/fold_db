@@ -3,13 +3,14 @@ use crate::schema::types::{
     JsonSchemaDefinition, JsonSchemaField, Schema, SchemaError, Field, FieldVariant, SingleField,
 };
 use serde_json;
+use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
 /// State of a schema within the system
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SchemaState {
     Loaded,
     Unloaded,
@@ -73,6 +74,38 @@ impl SchemaCore {
         self.schemas_dir.join(format!("{}.json", schema_name))
     }
 
+    /// Path to the schema states file
+    fn states_path(&self) -> PathBuf {
+        self.schemas_dir.join("schema_states.json")
+    }
+
+    /// Persist all schema load states to disk
+    fn persist_states(&self) -> Result<(), SchemaError> {
+        let available = self
+            .available
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+        let states: HashMap<String, SchemaState> = available
+            .iter()
+            .map(|(n, (_, s))| (n.clone(), *s))
+            .collect();
+        let json = serde_json::to_string_pretty(&states)
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize states: {}", e)))?;
+        std::fs::write(self.states_path(), json)
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to write states file: {}", e)))?;
+        Ok(())
+    }
+
+    /// Load schema states from disk
+    fn load_states(&self) -> HashMap<String, SchemaState> {
+        let path = self.states_path();
+        if let Ok(contents) = std::fs::read_to_string(path) {
+            serde_json::from_str(&contents).unwrap_or_default()
+        } else {
+            HashMap::new()
+        }
+    }
+
     /// Persists a schema to disk.
     fn persist_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
         let path = self.schema_path(&schema.name);
@@ -98,9 +131,7 @@ impl SchemaCore {
         Ok(())
     }
 
-    /// Loads a schema into the manager and persists it to disk.
-    pub fn load_schema(&self, mut schema: Schema) -> Result<(), SchemaError> {
-        // Ensure any transforms on fields have the correct output schema
+    fn fix_transform_outputs(&self, schema: &mut Schema) {
         for (field_name, field) in schema.fields.iter_mut() {
             if let Some(transform) = field.transform() {
                 let out_schema = transform.get_output();
@@ -111,6 +142,12 @@ impl SchemaCore {
                 }
             }
         }
+    }
+
+    /// Loads a schema into the manager and persists it to disk.
+    pub fn load_schema(&self, mut schema: Schema) -> Result<(), SchemaError> {
+        // Ensure any transforms on fields have the correct output schema
+        self.fix_transform_outputs(&mut schema);
 
         // Persist the updated schema
         self.persist_schema(&schema)?;
@@ -131,6 +168,9 @@ impl SchemaCore {
                 .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
             all.insert(name, (schema, SchemaState::Loaded));
         }
+
+        // Persist state changes
+        self.persist_states()?;
 
         Ok(())
     }
@@ -209,6 +249,9 @@ impl SchemaCore {
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
         if let Some((_, state)) = available.get_mut(schema_name) {
             *state = SchemaState::Unloaded;
+            // persist state change
+            drop(available);
+            self.persist_states()?;
             Ok(())
         } else {
             Err(SchemaError::NotFound(format!("Schema {schema_name} not found")))
@@ -222,17 +265,34 @@ impl SchemaCore {
 
     /// Loads all schema files from the schemas directory.
     pub fn load_schemas_from_disk(&self) -> Result<(), SchemaError> {
+        let states = self.load_states();
         if let Ok(entries) = std::fs::read_dir(&self.schemas_dir) {
             for entry in entries.flatten() {
-                if let Some(ext) = entry.path().extension() {
-                    if ext == "json" {
-                        if let Ok(contents) = std::fs::read_to_string(entry.path()) {
-                            if let Ok(schema) = serde_json::from_str::<Schema>(&contents) {
-                                let _ = self.load_schema(schema);
-                            } else if let Ok(json_schema) = serde_json::from_str::<JsonSchemaDefinition>(&contents) {
+                let path = entry.path();
+                if path.file_name() == Some(std::ffi::OsStr::new("schema_states.json")) {
+                    continue;
+                }
+                if path.extension().map(|e| e == "json").unwrap_or(false) {
+                    if let Ok(contents) = std::fs::read_to_string(&path) {
+                        let mut schema_opt = serde_json::from_str::<Schema>(&contents).ok();
+                        if schema_opt.is_none() {
+                            if let Ok(json_schema) = serde_json::from_str::<JsonSchemaDefinition>(&contents) {
                                 if let Ok(schema) = self.interpret_schema(json_schema) {
-                                    let _ = self.load_schema(schema);
+                                    schema_opt = Some(schema);
                                 }
+                            }
+                        }
+                        if let Some(mut schema) = schema_opt {
+                            self.fix_transform_outputs(&mut schema);
+                            let name = schema.name.clone();
+                            let state = states.get(&name).copied().unwrap_or(SchemaState::Loaded);
+                            {
+                                let mut available = self.available.lock().map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+                                available.insert(name.clone(), (schema.clone(), state));
+                            }
+                            if state == SchemaState::Loaded {
+                                let mut loaded = self.schemas.lock().map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+                                loaded.insert(name, schema);
                             }
                         }
                     }
