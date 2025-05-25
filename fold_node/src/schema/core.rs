@@ -177,6 +177,23 @@ impl SchemaCore {
         Ok(schemas.contains_key(schema_name))
     }
 
+    /// Load a schema from the available list by name.
+    pub fn load_available_schema(&self, schema_name: &str) -> Result<(), SchemaError> {
+        let schema = {
+            let available = self
+                .available
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            if let Some((schema, _)) = available.get(schema_name) {
+                schema.clone()
+            } else {
+                return Err(SchemaError::NotFound(format!("Schema {schema_name} not found")));
+            }
+        };
+
+        self.load_schema(schema)
+    }
+
     /// Mark a schema as unloaded but keep it available in memory
     pub fn set_unloaded(&self, schema_name: &str) -> Result<(), SchemaError> {
         let mut schemas = self

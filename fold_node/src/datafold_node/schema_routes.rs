@@ -20,6 +20,20 @@ pub async fn list_schemas(state: web::Data<AppState>) -> impl Responder {
     }
 }
 
+/// List schemas available on disk.
+pub async fn list_available_schemas_route(state: web::Data<AppState>) -> impl Responder {
+    info!("Received request to list available schemas");
+    let node_guard = state.node.lock().await;
+
+    match node_guard.list_available_schemas() {
+        Ok(names) => HttpResponse::Ok().json(json!({"data": names})),
+        Err(e) => {
+            error!("Failed to list available schemas: {}", e);
+            HttpResponse::InternalServerError().json(json!({"error": format!("Failed to list available schemas: {}", e)}))
+        }
+    }
+}
+
 /// Get a schema by name.
 pub async fn get_schema(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
     let name = path.into_inner();
@@ -69,6 +83,17 @@ pub async fn unload_schema_route(path: web::Path<String>, state: web::Data<AppSt
     match node_guard.unload_schema(&name) {
         Ok(_) => HttpResponse::Ok().json(json!({"success": true})),
         Err(e) => HttpResponse::InternalServerError().json(json!({"error": format!("Failed to unload schema: {}", e)})),
+    }
+}
+
+/// Load a schema from disk by name.
+pub async fn load_available_schema_route(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
+    let name = path.into_inner();
+    let mut node_guard = state.node.lock().await;
+
+    match node_guard.load_available_schema(&name) {
+        Ok(_) => HttpResponse::Ok().json(json!({"success": true})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({"error": format!("Failed to load schema: {}", e)})),
     }
 }
 

@@ -127,10 +127,12 @@ impl DataFoldHttpServer {
                     web::scope("/api")
                         // Schema endpoints
                         .route("/schemas", web::get().to(schema_routes::list_schemas))
+                        .route("/schemas/available", web::get().to(schema_routes::list_available_schemas_route))
                         .route("/schema/{name}", web::get().to(schema_routes::get_schema))
                         .route("/schema", web::post().to(schema_routes::create_schema))
                         .route("/schema/{name}", web::put().to(schema_routes::update_schema))
                         .route("/schema/{name}", web::delete().to(schema_routes::unload_schema_route))
+                        .route("/schema/load/{name}", web::post().to(schema_routes::load_available_schema_route))
                         // Operation endpoints
                         .route("/execute", web::post().to(query_routes::execute_operation))
                         .route("/query", web::post().to(query_routes::execute_query))

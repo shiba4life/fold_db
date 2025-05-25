@@ -26,12 +26,15 @@ const TrashIcon = ({ className }) => (
 
 function SchemasTab() {
   const [schemas, setSchemas] = useState([])
+  const [availableSchemas, setAvailableSchemas] = useState([])
+  const [selectedToLoad, setSelectedToLoad] = useState('')
   const [expandedSchema, setExpandedSchema] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     loadSchemas()
+    loadAvailable()
   }, [])
 
   const loadSchemas = async () => {
@@ -53,11 +56,24 @@ function SchemasTab() {
     }
   }
 
+  const loadAvailable = async () => {
+    try {
+      const resp = await fetch('/api/schemas/available')
+      if (!resp.ok) {
+        throw new Error(`HTTP error! status: ${resp.status}`)
+      }
+      const result = await resp.json()
+      setAvailableSchemas(result.data || [])
+    } catch (err) {
+      console.error('Failed to load available schemas:', err)
+    }
+  }
+
   const toggleSchema = (schemaId) => {
     setExpandedSchema(expandedSchema === schemaId ? null : schemaId)
   }
 
-  const removeSchema = async (schemaName) => {
+  const unloadSchema = async (schemaName) => {
     try {
       const resp = await fetch(`/api/schema/${schemaName}`, {
         method: 'DELETE'
@@ -66,9 +82,26 @@ function SchemasTab() {
         throw new Error(`Failed to remove schema: ${resp.status}`)
       }
       await loadSchemas()
+      await loadAvailable()
     } catch (err) {
       console.error('Failed to remove schema:', err)
       setError('Failed to remove schema. Please try again.')
+    }
+  }
+
+  const loadSchemaByName = async () => {
+    if (!selectedToLoad) return
+    try {
+      const resp = await fetch(`/api/schema/load/${selectedToLoad}`, { method: 'POST' })
+      if (!resp.ok) {
+        throw new Error(`Failed to load schema: ${resp.status}`)
+      }
+      setSelectedToLoad('')
+      await loadSchemas()
+      await loadAvailable()
+    } catch (err) {
+      console.error('Failed to load schema:', err)
+      setError('Failed to load schema. Please try again.')
     }
   }
 
@@ -102,6 +135,29 @@ function SchemasTab() {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center space-x-2">
+        <select
+          className="border-gray-300 rounded-md px-3 py-2"
+          value={selectedToLoad}
+          onChange={(e) => setSelectedToLoad(e.target.value)}
+        >
+          <option value="">Select schema...</option>
+          {availableSchemas
+            .filter(name => !schemas.find(s => s.name === name))
+            .map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+        </select>
+        <button
+          onClick={loadSchemaByName}
+          disabled={!selectedToLoad}
+          className={`px-4 py-2 text-sm font-medium rounded-md text-white ${
+            selectedToLoad ? 'bg-primary hover:bg-primary/90' : 'bg-gray-300 cursor-not-allowed'
+          }`}
+        >
+          Load
+        </button>
+      </div>
       {schemas.map(schema => (
         <div
           key={schema.name}
@@ -126,19 +182,15 @@ function SchemasTab() {
                   <ViewListIcon className="icon icon-xs mr-1.5 text-gray-600 group-hover:text-gray-700" />
                   View
                 </button>
-                <button className="group inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
-                  <UploadIcon className="icon icon-xs mr-1.5 text-white" />
-                  Load
-                </button>
                 <button
                   className="group inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                   onClick={(e) => {
                     e.stopPropagation()
-                    removeSchema(schema.name)
+                    unloadSchema(schema.name)
                   }}
                 >
                   <TrashIcon className="icon icon-xs mr-1.5 text-white" />
-                  Remove
+                  Unload
                 </button>
               </div>
             </div>
