@@ -5,11 +5,11 @@ use fold_node::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 use fold_node::fees::types::config::FieldPaymentConfig;
 use serde_json::json;
 use std::collections::HashMap;
-use crate::test_data::test_helpers::create_test_node;
+use crate::test_data::test_helpers::create_test_node_with_schema_permissions;
 
 #[test]
 fn test_range_field_with_filter() {
-    let mut node = create_test_node();
+    let mut node = create_test_node_with_schema_permissions(&["UserProfile", "BlogPost", "ProductCatalog", "SocialPost", "TransactionHistory", "TestSchema", "SchemaA", "SchemaB", "TransformBase", "TransformSchema", "TestRangeSchema"]);
     
     // Create a schema with a range field
     let mut schema = Schema::new("TestRangeSchema".to_string());
@@ -25,7 +25,8 @@ fn test_range_field_with_filter() {
     schema.fields.insert("test_range".to_string(), FieldVariant::Range(range_field));
     
     // Load the schema
-    node.load_schema(schema).unwrap();
+    node.add_schema_available(schema).unwrap();
+    node.approve_schema("TestRangeSchema").unwrap();
     
     // Create a mutation to set a value
     let mut fields_and_values = HashMap::new();
@@ -90,7 +91,7 @@ fn test_range_field_with_filter() {
 
 #[test]
 fn test_range_field_filter_integration() {
-    let mut node = create_test_node();
+    let mut node = create_test_node_with_schema_permissions(&["UserProfile", "BlogPost", "ProductCatalog", "SocialPost", "TransactionHistory", "TestSchema", "SchemaA", "SchemaB", "TransformBase", "TransformSchema", "FilterTestSchema"]);
     
     // Create a schema with a range field
     let mut schema = Schema::new("FilterTestSchema".to_string());
@@ -105,7 +106,8 @@ fn test_range_field_filter_integration() {
     );
     schema.fields.insert("temperature".to_string(), FieldVariant::Range(range_field));
     
-    node.load_schema(schema).unwrap();
+    node.add_schema_available(schema).unwrap();
+    node.approve_schema("FilterTestSchema").unwrap();
     
     // Test query with invalid filter format (should handle gracefully)
     let invalid_filter = json!({

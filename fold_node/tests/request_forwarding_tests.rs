@@ -152,7 +152,8 @@ async fn test_request_forwarding() {
 
     // Load the schema into node2
     let schema: fold_node::schema::Schema = serde_json::from_value(test_schema).unwrap();
-    node2.load_schema(schema).unwrap();
+    node2.add_schema_available(schema).unwrap();
+    node2.approve_schema("test_schema").unwrap();
 
     // Start the TCP servers
     let tcp_server1 = TcpServer::new(node1.clone(), 8001).await.unwrap();
@@ -314,7 +315,8 @@ async fn test_request_forwarding_address_resolution() {
         "fields": {}
     });
     let schema: fold_node::schema::Schema = serde_json::from_value(test_schema).unwrap();
-    node2.load_schema(schema).unwrap();
+    node2.add_schema_available(schema).unwrap();
+    node2.approve_schema("test_schema").unwrap();
 
     let tcp_server1 = TcpServer::new(node1.clone(), 8201).await.unwrap();
     let tcp_server1_handle = tokio::spawn(async move {

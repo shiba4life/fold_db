@@ -33,28 +33,29 @@ impl DataFoldNode {
     /// If the schema exists on disk but is not loaded, it will be loaded.
     pub fn allow_schema(&mut self, schema_name: &str) -> FoldDbResult<()> {
         // Check if schema is already loaded
-        if self.is_schema_loaded(schema_name)? {
-            return Ok(());
+        if !self.is_schema_loaded(schema_name)? {
+            // Try to load the schema from disk
+            let schema_path = {
+                let db = self
+                    .db
+                    .lock()
+                    .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+                db.schema_manager.get_schema_path(schema_name)
+            };
+
+            if schema_path.exists() {
+                self.load_schema_from_file(schema_path.to_str().unwrap())
+                    .map_err(|e| FoldDbError::Config(format!("Failed to load schema from disk: {}", e)))?;
+            } else {
+                return Err(FoldDbError::Config(format!(
+                    "Schema {} not found on disk",
+                    schema_name
+                )));
+            }
         }
 
-        // Try to load the schema from disk
-        let schema_path = {
-            let db = self
-                .db
-                .lock()
-                .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-            db.schema_manager.get_schema_path(schema_name)
-        };
-
-        if schema_path.exists() {
-            crate::datafold_node::loader::load_schema_from_file(&schema_path, self)
-                .map_err(|e| FoldDbError::Config(format!("Failed to load schema from disk: {}", e)))?;
-        } else {
-            return Err(FoldDbError::Config(format!(
-                "Schema {} not found on disk",
-                schema_name
-            )));
-        }
+        // Grant permission for this schema to this node
+        self.grant_schema_permission(schema_name)?;
 
         Ok(())
     }

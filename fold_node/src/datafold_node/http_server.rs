@@ -75,8 +75,8 @@ impl DataFoldHttpServer {
         for schema_value in sample_schemas {
             let schema: Schema = serde_json::from_value(schema_value)
                 .map_err(|e| FoldDbError::Config(format!("Failed to deserialize sample schema: {}", e)))?;
-            info!("Adding sample schema to node as unloaded: {}", schema.name);
-            node.add_schema_unloaded(schema)?;
+            info!("Adding sample schema to node as available: {}", schema.name);
+            node.add_schema_available(schema)?;
         }
 
         Ok(Self {
@@ -126,11 +126,16 @@ impl DataFoldHttpServer {
                     web::scope("/api")
                         // Schema endpoints
                         .route("/schemas", web::get().to(schema_routes::list_schemas))
+                        .route("/schemas/available", web::get().to(schema_routes::list_available_schemas))
+                        .route("/schemas/by-state/{state}", web::get().to(schema_routes::list_schemas_by_state))
                         .route("/schema/{name}", web::get().to(schema_routes::get_schema))
                         .route("/schema", web::post().to(schema_routes::create_schema))
                         .route("/schema/{name}", web::put().to(schema_routes::update_schema))
                         .route("/schema/{name}", web::delete().to(schema_routes::unload_schema_route))
                         .route("/schema/{name}/load", web::post().to(schema_routes::load_schema_route))
+                        .route("/schema/{name}/approve", web::post().to(schema_routes::approve_schema))
+                        .route("/schema/{name}/block", web::post().to(schema_routes::block_schema))
+                        .route("/schema/{name}/state", web::get().to(schema_routes::get_schema_state))
                         // Operation endpoints
                         .route("/execute", web::post().to(query_routes::execute_operation))
                         .route("/query", web::post().to(query_routes::execute_query))
@@ -304,7 +309,7 @@ mod tests {
 
         let node_guard = server.node.lock().await;
         let loaded = node_guard.list_schemas().unwrap();
-        assert!(!loaded.iter().any(|s| s.name == "BlogPost"));
+        assert!(!loaded.iter().any(|s| s == "BlogPost"));
         let available = node_guard.list_available_schemas().unwrap();
         assert!(available.iter().any(|n| n == "BlogPost"));
     }

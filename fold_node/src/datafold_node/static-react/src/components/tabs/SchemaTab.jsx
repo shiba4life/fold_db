@@ -29,7 +29,13 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     try {
       const resp = await fetch('/api/schemas')
       const data = await resp.json()
-      setAllSchemas(data.data || [])
+      // Convert the state map to an array of schema objects with states
+      const schemasWithStates = Object.entries(data.data || {}).map(([name, state]) => ({
+        name,
+        state,
+        fields: {} // Will be populated when expanded
+      }))
+      setAllSchemas(schemasWithStates)
     } catch (err) {
       console.error('Failed to fetch all schemas:', err)
     }
@@ -163,9 +169,97 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     )
   }
 
+  const getStateColor = (state) => {
+    switch (state?.toLowerCase()) {
+      case 'approved':
+        return 'bg-green-100 text-green-800'
+      case 'available':
+        return 'bg-blue-100 text-blue-800'
+      case 'blocked':
+        return 'bg-red-100 text-red-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const approveSchema = async (schemaName) => {
+    try {
+      const resp = await fetch(`/api/schema/${schemaName}/approve`, { method: 'POST' })
+      const data = await resp.json()
+      
+      if (!resp.ok) {
+        throw new Error(data.error || `Failed to approve schema: ${resp.status}`)
+      }
+      
+      if (onResult) {
+        onResult(data)
+      }
+      if (onSchemaUpdated) {
+        onSchemaUpdated()
+      }
+      // Refresh the schema list
+      fetchAllSchemas()
+    } catch (err) {
+      console.error('Failed to approve schema:', err)
+      if (onResult) {
+        onResult({ error: `Failed to approve schema: ${err.message}` })
+      }
+    }
+  }
+
+  const blockSchema = async (schemaName) => {
+    try {
+      const resp = await fetch(`/api/schema/${schemaName}/block`, { method: 'POST' })
+      const data = await resp.json()
+      
+      if (!resp.ok) {
+        throw new Error(data.error || `Failed to block schema: ${resp.status}`)
+      }
+      
+      if (onResult) {
+        onResult(data)
+      }
+      if (onSchemaUpdated) {
+        onSchemaUpdated()
+      }
+      // Refresh the schema list
+      fetchAllSchemas()
+    } catch (err) {
+      console.error('Failed to block schema:', err)
+      if (onResult) {
+        onResult({ error: `Failed to block schema: ${err.message}` })
+      }
+    }
+  }
+
+  const unloadSchema = async (schemaName) => {
+    try {
+      const resp = await fetch(`/api/schema/${schemaName}`, { method: 'DELETE' })
+      const data = await resp.json()
+      
+      if (!resp.ok) {
+        throw new Error(data.error || `Failed to unload schema: ${resp.status}`)
+      }
+      
+      if (onResult) {
+        onResult(data)
+      }
+      if (onSchemaUpdated) {
+        onSchemaUpdated()
+      }
+      // Refresh the schema list
+      fetchAllSchemas()
+    } catch (err) {
+      console.error('Failed to unload schema:', err)
+      if (onResult) {
+        onResult({ error: `Failed to unload schema: ${err.message}` })
+      }
+    }
+  }
+
   const renderSchema = (schema) => {
     const isExpanded = expandedSchemas[schema.name]
-    const isLoaded = schema.state && schema.state.toLowerCase() === 'loaded'
+    const state = schema.state || 'Unknown'
 
     return (
       <div key={schema.name} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md">
@@ -184,35 +278,45 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
               <span className="text-xs text-gray-500">
                 ({Object.keys(schema.fields || {}).length} fields)
               </span>
-              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                isLoaded
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {isLoaded ? 'Loaded' : 'Unloaded'}
+              <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStateColor(state)}`}>
+                {state}
               </span>
             </div>
-            {isLoaded ? (
-              <button
-                className="group inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  removeSchema(schema.name)
-                }}
-              >
-                Unload
-              </button>
-            ) : (
-              <button
-                className="group inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  loadSchema(schema.name)
-                }}
-              >
-                Load
-              </button>
-            )}
+            <div className="flex items-center space-x-2">
+              {state.toLowerCase() === 'available' && (
+                <button
+                  className="group inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    approveSchema(schema.name)
+                  }}
+                >
+                  Approve
+                </button>
+              )}
+              {state.toLowerCase() === 'available' && (
+                <button
+                  className="group inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    blockSchema(schema.name)
+                  }}
+                >
+                  Block
+                </button>
+              )}
+              {(state.toLowerCase() === 'approved' || state.toLowerCase() === 'blocked') && (
+                <button
+                  className="group inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    unloadSchema(schema.name)
+                  }}
+                >
+                  Unload
+                </button>
+              )}
+            </div>
           </div>
         </div>
         
@@ -229,46 +333,84 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     )
   }
 
+  // Filter schemas by state
+  const availableSchemas = allSchemas.filter(schema => schema.state?.toLowerCase() === 'available')
+  const approvedSchemas = allSchemas.filter(schema => schema.state?.toLowerCase() === 'approved')
+  const blockedSchemas = allSchemas.filter(schema => schema.state?.toLowerCase() === 'blocked')
+
   return (
     <div className="p-6 space-y-6">
+      {/* Available Schemas Dropdown */}
       <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Load Sample Schema</h3>
-        <div className="flex items-center space-x-2">
-          <select
-            className="border-gray-300 rounded-md px-3 py-2"
-            value={selectedSample}
-            onChange={(e) => setSelectedSample(e.target.value)}
-          >
-            <option value="">Select a sample...</option>
-            {sampleSchemas.map(name => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
-          <button
-            onClick={loadSampleSchema}
-            disabled={!selectedSample || loadingSample}
-            className={`px-4 py-2 text-sm font-medium rounded-md text-white ${
-              !selectedSample || loadingSample
-                ? 'bg-gray-300 cursor-not-allowed'
-                : 'bg-primary hover:bg-primary/90'
-            }`}
-          >
-            {loadingSample ? 'Loading...' : 'Load'}
-          </button>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Available Schemas</h3>
+        <div className="border rounded-lg bg-white shadow-sm">
+          <details className="group">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50">
+              <span className="font-medium text-gray-900">
+                Available Schemas ({availableSchemas.length})
+              </span>
+              <ChevronRightIcon className="h-5 w-5 text-gray-400 group-open:rotate-90 transition-transform" />
+            </summary>
+            <div className="border-t bg-gray-50">
+              {availableSchemas.length === 0 ? (
+                <div className="p-4 text-gray-500 text-center">No available schemas</div>
+              ) : (
+                <div className="space-y-2 p-4">
+                  {availableSchemas.map(schema => (
+                    <div key={schema.name} className="flex items-center justify-between p-3 bg-white rounded border">
+                      <div className="flex items-center space-x-3">
+                        <div>
+                          <h4 className="font-medium text-gray-900">{schema.name}</h4>
+                          <p className="text-sm text-gray-500">({Object.keys(schema.fields || {}).length} fields)</p>
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStateColor(schema.state)}`}>
+                          {schema.state}
+                        </span>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => approveSchema(schema.name)}
+                          className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => blockSchema(schema.name)}
+                          className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                        >
+                          Block
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
         </div>
-        {samplesError && (
-          <p className="mt-2 text-sm text-red-600">{samplesError}</p>
+        
+      </div>
+
+      {/* Approved Schemas List */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium text-gray-900">Approved Schemas</h3>
+        {approvedSchemas.length > 0 ? (
+          approvedSchemas.map(renderSchema)
+        ) : (
+          <div className="border rounded-lg p-8 bg-white shadow-sm text-center text-gray-500">
+            No approved schemas. Approve schemas from the available list above to see them here.
+          </div>
         )}
       </div>
 
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900">All Schemas</h3>
-        {allSchemas.length > 0 ? (
-          allSchemas.map(renderSchema)
-        ) : (
-          <p className="text-gray-500">No schemas available. Load a sample schema to get started.</p>
-        )}
-      </div>
+      {/* Blocked Schemas (if any) */}
+      {blockedSchemas.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium text-gray-900">Blocked Schemas</h3>
+          {blockedSchemas.map(renderSchema)}
+        </div>
+      )}
     </div>
   )
 }

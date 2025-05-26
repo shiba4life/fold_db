@@ -70,7 +70,8 @@ fn test_schema_persistence() {
     );
     let schema = Schema::new(test_schema_name.to_string()).with_fields(fields);
 
-    core.load_schema(schema.clone()).unwrap();
+    core.add_schema_available(schema.clone()).unwrap();
+    core.approve_schema(test_schema_name).unwrap();
     let schema_path = core.schema_path(test_schema_name);
     assert!(schema_path.exists());
 
@@ -103,7 +104,8 @@ fn test_map_fields_success() {
         create_test_field(Some("test_uuid".to_string()), HashMap::new()),
     );
     let source_schema = Schema::new("source_schema".to_string()).with_fields(source_fields);
-    core.load_schema(source_schema).unwrap();
+    core.add_schema_available(source_schema).unwrap();
+    core.approve_schema("source_schema").unwrap();
 
     let mut field_mappers = HashMap::new();
     field_mappers.insert("source_schema".to_string(), "source_field".to_string());
@@ -113,7 +115,8 @@ fn test_map_fields_success() {
         create_test_field(None, field_mappers),
     );
     let target_schema = Schema::new("target_schema".to_string()).with_fields(target_fields);
-    core.load_schema(target_schema).unwrap();
+    core.add_schema_available(target_schema).unwrap();
+    core.approve_schema("target_schema").unwrap();
 
     core.map_fields("target_schema").unwrap();
     let mapped_schema = core.get_schema("target_schema").unwrap().unwrap();
@@ -218,6 +221,6 @@ fn test_new_schema_default_unloaded() {
     let tree = db.open_tree("schema_states").unwrap();
     let value = tree.get("fresh").unwrap().unwrap();
     let state: String = serde_json::from_slice(&value).unwrap();
-    assert_eq!(state, "Unloaded");
+    assert_eq!(state, "Available");
 }
 

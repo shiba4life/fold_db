@@ -1,12 +1,12 @@
 use fold_node::schema::Schema;
 use fold_node::testing::Field;
-use crate::test_data::test_helpers::create_test_node;
+use crate::test_data::test_helpers::create_test_node_with_schema_permissions;
 use serde_json::json;
 
 #[test]
 fn test_field_mappers_share_aref_uuid() {
     // Create a new DataFoldNode
-    let mut node = create_test_node();
+    let mut node = create_test_node_with_schema_permissions(&["UserProfile", "UserProfile2", "BlogPost", "ProductCatalog", "SocialPost", "TransactionHistory", "TestSchema", "SchemaA", "SchemaB", "TransformBase", "TransformSchema"]);
 
     // Create source schema (UserProfile)
     let source_schema_json = r#"{
@@ -36,7 +36,8 @@ fn test_field_mappers_share_aref_uuid() {
     }"#;
 
     let source_schema: Schema = serde_json::from_str(source_schema_json).unwrap();
-    node.load_schema(source_schema).unwrap();
+    node.add_schema_available(source_schema).unwrap();
+    node.approve_schema("UserProfile").unwrap();
 
     // Create target schema (UserProfile2) with field_mappers
     let target_schema_json = r#"{
@@ -67,7 +68,8 @@ fn test_field_mappers_share_aref_uuid() {
     }"#;
 
     let target_schema: Schema = serde_json::from_str(target_schema_json).unwrap();
-    node.load_schema(target_schema).unwrap();
+    node.add_schema_available(target_schema).unwrap();
+    node.approve_schema("UserProfile2").unwrap();
 
     // Get both schemas after loading
     let source_schema = node.get_schema("UserProfile").unwrap().unwrap();

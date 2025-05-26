@@ -22,7 +22,8 @@ fn test_aref_persistence_bug_reproduction() {
             .unwrap()
             .clone();
         
-        db.load_schema(schema).unwrap();
+        db.add_schema_available(schema).unwrap();
+        db.approve_schema("aref_bug_test").unwrap();
         
         // Verify the schema is loaded with the correct aref
         let loaded_schema = db.get_schema("aref_bug_test").unwrap().unwrap();
@@ -81,7 +82,8 @@ fn test_schema_core_restart_without_map_fields() {
             .unwrap()
             .clone();
         
-        manager.load_schema(schema).unwrap();
+        manager.add_schema_available(schema).unwrap();
+        manager.approve_schema("schema_core_bug_test").unwrap();
         original_ref_uuid
     }; // Drop the first SchemaCore instance
     

@@ -14,10 +14,15 @@ use super::storage::SchemaStorage;
 use super::validator::SchemaValidator;
 
 /// State of a schema within the system
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum SchemaState {
-    Loaded,
-    Unloaded,
+    /// Schema discovered from files but not yet approved by user
+    #[default]
+    Available,
+    /// Schema approved by user, can be queried, mutated, field-mapped and transforms run
+    Approved,
+    /// Schema blocked by user, cannot be queried or mutated but field-mapping and transforms still run
+    Blocked,
 }
 
 /// Core schema management system that combines schema interpretation, validation, and management.
@@ -89,7 +94,7 @@ impl SchemaCore {
     }
 
     /// Load schema states from the sled tree
-    fn load_states(&self) -> HashMap<String, SchemaState> {
+    pub fn load_states(&self) -> HashMap<String, SchemaState> {
         self.storage.load_states()
     }
 
@@ -111,49 +116,180 @@ impl SchemaCore {
         }
     }
 
-    /// Loads a schema into the manager and persists it to disk.
-    pub fn load_schema(&self, mut schema: Schema) -> Result<(), SchemaError> {
-        info!("Loading schema '{}'", schema.name);
+    /// Load a schema into memory and persist it to disk.
+    /// This creates the schema in Available state by default.
+    pub fn load_schema_internal(&self, mut schema: Schema) -> Result<(), SchemaError> {
+        info!("Loading schema '{}' as Available with {} fields: {:?}", schema.name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
 
         // Ensure any transforms on fields have the correct output schema
         self.fix_transform_outputs(&mut schema);
+        info!("After fix_transform_outputs, schema '{}' has {} fields: {:?}", schema.name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
 
         // Persist the updated schema
         self.persist_schema(&schema)?;
+        info!("After persist_schema, schema '{}' has {} fields: {:?}", schema.name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
 
-        // Then add it to memory
+        // Add to memory with Available state
         let name = schema.name.clone();
-        {
-            let mut loaded = self
-                .schemas
-                .lock()
-                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-            loaded.insert(name.clone(), schema.clone());
-        }
         {
             let mut all = self
                 .available
                 .lock()
                 .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-            all.insert(name.clone(), (schema, SchemaState::Loaded));
+            all.insert(name.clone(), (schema, SchemaState::Available));
         }
 
-        // Ensure fields have proper ARefs assigned
-        let _ = self.map_fields(&name);
-
         // Persist state changes
-        self.set_schema_state(&name, SchemaState::Loaded)?;
-        info!("Schema '{}' loaded and state persisted", name);
+        self.set_schema_state(&name, SchemaState::Available)?;
+        info!("Schema '{}' loaded and marked as Available", name);
 
         Ok(())
     }
 
-    /// Persist a schema to disk but keep it unloaded in memory.
-    pub fn add_schema_unloaded(&self, mut schema: Schema) -> Result<(), SchemaError> {
-        info!("Adding schema '{}' as unloaded", schema.name);
+    /// Approve a schema for queries and mutations
+    pub fn approve_schema(&self, schema_name: &str) -> Result<(), SchemaError> {
+        info!("Approving schema '{}'", schema_name);
+        
+        // Check if schema exists in available
+        let schema_to_approve = {
+            let available = self.available.lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            available.get(schema_name).map(|(schema, _)| schema.clone())
+        };
+        
+        let schema = schema_to_approve.ok_or_else(|| {
+            SchemaError::NotFound(format!("Schema '{}' not found", schema_name))
+        })?;
+
+        info!("Schema '{}' to approve has {} fields: {:?}", schema_name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
+
+        // Update both in-memory stores and persist immediately
+        {
+            let mut schemas = self.schemas.lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            let mut available = self.available.lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            
+            // Add to active schemas
+            schemas.insert(schema_name.to_string(), schema.clone());
+            // Update state in available
+            available.insert(schema_name.to_string(), (schema, SchemaState::Approved));
+        }
+        
+        // Persist the state change immediately
+        self.persist_states()?;
+        
+        // Ensure fields have proper ARefs assigned
+        let _ = self.map_fields(schema_name);
+
+        info!("Schema '{}' approved successfully", schema_name);
+        Ok(())
+    }
+
+    /// Block a schema from queries and mutations
+    pub fn block_schema(&self, schema_name: &str) -> Result<(), SchemaError> {
+        info!("Blocking schema '{}'", schema_name);
+        
+        // Remove from active schemas but keep in available
+        {
+            let mut schemas = self.schemas.lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            schemas.remove(schema_name);
+        }
+
+        self.set_schema_state(schema_name, SchemaState::Blocked)?;
+        info!("Schema '{}' blocked successfully", schema_name);
+        Ok(())
+    }
+
+    /// Get schemas by state
+    pub fn list_schemas_by_state(&self, state: SchemaState) -> Result<Vec<String>, SchemaError> {
+        let available = self.available.lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+        
+        let schemas: Vec<String> = available
+            .iter()
+            .filter(|(_, (_, s))| *s == state)
+            .map(|(name, _)| name.clone())
+            .collect();
+        
+        Ok(schemas)
+    }
+
+    /// Discover schemas from the schemas directory
+    pub fn discover_schemas_from_files(&self) -> Result<Vec<Schema>, SchemaError> {
+        let mut discovered_schemas = Vec::new();
+        
+        info!("Discovering schemas from {}", self.storage.schemas_dir.display());
+        if let Ok(entries) = std::fs::read_dir(&self.storage.schemas_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().map(|e| e == "json").unwrap_or(false) {
+                    if let Ok(contents) = std::fs::read_to_string(&path) {
+                        let mut schema_opt = serde_json::from_str::<Schema>(&contents).ok();
+                        if schema_opt.is_none() {
+                            if let Ok(json_schema) = serde_json::from_str::<JsonSchemaDefinition>(&contents) {
+                                if let Ok(schema) = self.interpret_schema(json_schema) {
+                                    schema_opt = Some(schema);
+                                }
+                            }
+                        }
+                        if let Some(mut schema) = schema_opt {
+                            self.fix_transform_outputs(&mut schema);
+                            let schema_name = schema.name.clone();
+                            discovered_schemas.push(schema);
+                            info!("Discovered schema '{}' from file", schema_name);
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(discovered_schemas)
+    }
+
+    // ========== CONSOLIDATED SCHEMA API ==========
+    
+    /// Fetch available schemas from files (example schemas directory)
+    pub fn fetch_available_schemas(&self) -> Result<Vec<String>, SchemaError> {
+        let discovered = self.discover_schemas_from_files()?;
+        Ok(discovered.into_iter().map(|s| s.name).collect())
+    }
+
+    /// Load schema state from sled
+    pub fn load_schema_state(&self) -> Result<HashMap<String, SchemaState>, SchemaError> {
+        let states = self.load_states();
+        Ok(states)
+    }
+
+    /// Load available schemas from sled and files
+    pub fn load_available_schemas(&self) -> Result<(), SchemaError> {
+        self.load_schemas_from_disk()
+    }
+
+    /// Check if a schema can be queried (must be Approved)
+    pub fn can_query_schema(&self, schema_name: &str) -> bool {
+        matches!(self.get_schema_state(schema_name), Some(SchemaState::Approved))
+    }
+
+    /// Check if a schema can be mutated (must be Approved)
+    pub fn can_mutate_schema(&self, schema_name: &str) -> bool {
+        matches!(self.get_schema_state(schema_name), Some(SchemaState::Approved))
+    }
+
+    /// Get all available schemas (any state)
+    pub fn list_all_schemas(&self) -> Result<Vec<String>, SchemaError> {
+        self.list_available_schemas()
+    }
+
+    /// Persist a schema to disk in Available state.
+    pub fn add_schema_available(&self, mut schema: Schema) -> Result<(), SchemaError> {
+        info!("Adding schema '{}' as Available with {} fields: {:?}", schema.name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
 
         // Ensure any transforms on fields have the correct output schema
         self.fix_transform_outputs(&mut schema);
+
+        info!("After fix_transform_outputs, schema '{}' has {} fields: {:?}", schema.name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
 
         // Persist the updated schema
         self.persist_schema(&schema)?;
@@ -167,12 +303,12 @@ impl SchemaCore {
             
             // Check if schema already exists and preserve its state
             let existing_state = available.get(&name).map(|(_, state)| *state);
-            let state_to_use = existing_state.unwrap_or(SchemaState::Unloaded);
+            let state_to_use = existing_state.unwrap_or(SchemaState::Available);
             
             available.insert(name.clone(), (schema, state_to_use));
             
-            // If the existing state was Loaded, also add to the loaded schemas
-            if state_to_use == SchemaState::Loaded {
+            // If the existing state was Approved, also add to the active schemas
+            if state_to_use == SchemaState::Approved {
                 let mut schemas = self
                     .schemas
                     .lock()
@@ -277,27 +413,27 @@ impl SchemaCore {
         Ok(schemas.contains_key(schema_name))
     }
 
-    /// Mark a schema as unloaded but keep it available in memory
-    pub fn set_unloaded(&self, schema_name: &str) -> Result<(), SchemaError> {
-        info!("Unloading schema '{}'", schema_name);
+    /// Mark a schema as Available (remove from active schemas but keep discoverable)
+    pub fn set_available(&self, schema_name: &str) -> Result<(), SchemaError> {
+        info!("Setting schema '{}' to Available", schema_name);
         let mut schemas = self
             .schemas
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
         schemas.remove(schema_name);
         drop(schemas);
-        self.set_schema_state(schema_name, SchemaState::Unloaded)?;
-        info!("Schema '{}' marked as unloaded", schema_name);
+        self.set_schema_state(schema_name, SchemaState::Available)?;
+        info!("Schema '{}' marked as Available", schema_name);
         Ok(())
     }
 
-    /// Unload a schema from memory without deleting its persisted file.
+    /// Legacy method - now sets schema to Available state
     pub fn unload_schema(&self, schema_name: &str) -> Result<(), SchemaError> {
-        self.set_unloaded(schema_name)
+        self.set_available(schema_name)
     }
 
-    /// Loads all schema files from the schemas directory and marks them as loaded
-    /// if their persisted state is `Loaded`.
+    /// Loads all schema files from the schemas directory and restores their states.
+    /// Schemas marked as Approved will be loaded into active memory.
     pub fn load_schemas_from_disk(&self) -> Result<(), SchemaError> {
         let states = self.load_states();
         info!("Loading schemas from {}", self.storage.schemas_dir.display());
@@ -320,12 +456,12 @@ impl SchemaCore {
                             let state = states
                                 .get(&name)
                                 .copied()
-                                .unwrap_or(SchemaState::Unloaded);
+                                .unwrap_or(SchemaState::Available);
                             {
                                 let mut available = self.available.lock().map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
                                 available.insert(name.clone(), (schema.clone(), state));
                             }
-                            if state == SchemaState::Loaded {
+                            if state == SchemaState::Approved {
                                 let mut loaded = self.schemas.lock().map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
                                 loaded.insert(name.clone(), schema);
                                 drop(loaded); // Release the lock before calling map_fields
@@ -333,7 +469,7 @@ impl SchemaCore {
                                 // Ensure fields have proper ARefs assigned
                                 let _ = self.map_fields(&name);
                             }
-                            info!("Loaded schema '{}' from disk", name);
+                            info!("Loaded schema '{}' from disk with state: {:?}", name, state);
                         }
                     }
                 }
@@ -345,10 +481,11 @@ impl SchemaCore {
         Ok(())
     }
 
-    /// Loads schema states from disk and loads schemas that are marked as Loaded.
+    /// Loads schema states from disk and loads schemas that are marked as Approved.
     pub fn load_schema_states_from_disk(&self) -> Result<(), SchemaError> {
         let states = self.load_states();
         info!("Loading schema states from disk: {:?}", states);
+        info!("DEBUG: load_schema_states_from_disk called with {} states", states.len());
         let mut available = self
             .available
             .lock()
@@ -359,35 +496,96 @@ impl SchemaCore {
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
             
         for (name, state) in states {
-            if state == SchemaState::Loaded {
-                // Load the actual schema from disk
+            info!("DEBUG: Processing schema '{}' with state {:?}", name, state);
+            if state == SchemaState::Approved {
+                // Load the actual schema from disk into active memory
                 let schema_path = self.storage.schema_path(&name);
                 if schema_path.exists() {
                     match std::fs::read_to_string(&schema_path) {
                         Ok(schema_content) => {
-                            match serde_json::from_str::<Schema>(&schema_content) {
-                                Ok(schema) => {
-                                    info!("Auto-loading schema '{}' from disk", name);
-                                    schemas.insert(name.clone(), schema.clone());
-                                    available.insert(name, (schema, state));
+                            let mut schema_opt = serde_json::from_str::<Schema>(&schema_content).ok();
+                            if schema_opt.is_none() {
+                                if let Ok(json_schema) = serde_json::from_str::<JsonSchemaDefinition>(&schema_content) {
+                                    if let Ok(schema) = self.interpret_schema(json_schema) {
+                                        schema_opt = Some(schema);
+                                    }
                                 }
-                                Err(e) => {
-                                    info!("Failed to parse schema '{}': {}", name, e);
-                                    available.insert(name.clone(), (Schema::new(name), SchemaState::Unloaded));
+                            }
+                            
+                            match schema_opt {
+                                Some(mut schema) => {
+                                    info!("Auto-loading approved schema '{}' from disk with {} fields: {:?}", name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
+                                    self.fix_transform_outputs(&mut schema);
+                                    info!("After fix_transform_outputs, auto-loaded schema '{}' has {} fields: {:?}", name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
+                                    schemas.insert(name.clone(), schema.clone());
+                                    available.insert(name.clone(), (schema, state));
+                                    drop(schemas); // Release the lock before calling map_fields
+                                    drop(available); // Release the lock before calling map_fields
+                                    
+                                    // Ensure fields have proper ARefs assigned
+                                    let _ = self.map_fields(&name);
+                                    
+                                    // Re-acquire locks for the next iteration
+                                    available = self
+                                        .available
+                                        .lock()
+                                        .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+                                    schemas = self
+                                        .schemas
+                                        .lock()
+                                        .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+                                }
+                                None => {
+                                    info!("Failed to parse schema '{}' from disk", name);
+                                    available.insert(name.clone(), (Schema::new(name), SchemaState::Available));
                                 }
                             }
                         }
                         Err(e) => {
                             info!("Failed to read schema file for '{}': {}", name, e);
-                            available.insert(name.clone(), (Schema::new(name), SchemaState::Unloaded));
+                            available.insert(name.clone(), (Schema::new(name), SchemaState::Available));
                         }
                     }
                 } else {
-                    info!("Schema file not found for '{}', marking as unloaded", name);
-                    available.insert(name.clone(), (Schema::new(name), SchemaState::Unloaded));
+                    info!("Schema file not found for '{}', marking as available", name);
+                    available.insert(name.clone(), (Schema::new(name), SchemaState::Available));
                 }
             } else {
-                available.insert(name.clone(), (Schema::new(name), state));
+                // Load the actual schema from disk for non-Approved states too
+                let schema_path = self.storage.schema_path(&name);
+                if schema_path.exists() {
+                    match std::fs::read_to_string(&schema_path) {
+                        Ok(schema_content) => {
+                            let mut schema_opt = serde_json::from_str::<Schema>(&schema_content).ok();
+                            if schema_opt.is_none() {
+                                if let Ok(json_schema) = serde_json::from_str::<JsonSchemaDefinition>(&schema_content) {
+                                    if let Ok(schema) = self.interpret_schema(json_schema) {
+                                        schema_opt = Some(schema);
+                                    }
+                                }
+                            }
+                            
+                            match schema_opt {
+                                Some(mut schema) => {
+                                    self.fix_transform_outputs(&mut schema);
+                                    info!("Loading schema '{}' from disk with state {:?} and {} fields: {:?}", name, state, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
+                                    available.insert(name.clone(), (schema, state));
+                                }
+                                None => {
+                                    info!("Failed to parse schema '{}' from disk, creating empty schema", name);
+                                    available.insert(name.clone(), (Schema::new(name), state));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            info!("Failed to read schema file for '{}': {}, creating empty schema", name, e);
+                            available.insert(name.clone(), (Schema::new(name), state));
+                        }
+                    }
+                } else {
+                    info!("Schema file not found for '{}', creating empty schema", name);
+                    available.insert(name.clone(), (Schema::new(name), state));
+                }
             }
         }
         Ok(())
@@ -534,20 +732,24 @@ impl SchemaCore {
         })
     }
 
-    /// Interprets a JSON schema from a string and loads it.
+    /// Interprets a JSON schema from a string and loads it as Available.
     pub fn load_schema_from_json(&self, json_str: &str) -> Result<(), SchemaError> {
+        info!("Parsing JSON schema from string, length: {}", json_str.len());
         let json_schema: JsonSchemaDefinition = serde_json::from_str(json_str)
             .map_err(|e| SchemaError::InvalidField(format!("Invalid JSON schema: {e}")))?;
 
+        info!("JSON schema parsed successfully, name: {}, fields: {:?}", json_schema.name, json_schema.fields.keys().collect::<Vec<_>>());
         let schema = self.interpret_schema(json_schema)?;
-        self.load_schema(schema)
+        info!("Schema interpreted successfully, name: {}, fields: {:?}", schema.name, schema.fields.keys().collect::<Vec<_>>());
+        self.load_schema_internal(schema)
     }
 
-    /// Interprets a JSON schema from a file and loads it.
+    /// Interprets a JSON schema from a file and loads it as Available.
     pub fn load_schema_from_file(&self, path: &str) -> Result<(), SchemaError> {
         let json_str = std::fs::read_to_string(path)
             .map_err(|e| SchemaError::InvalidField(format!("Failed to read schema file: {e}")))?;
 
+        info!("Loading schema from file: {}, content length: {}", path, json_str.len());
         self.load_schema_from_json(&json_str)
     }
 }

@@ -141,6 +141,25 @@ pub fn create_test_node() -> DataFoldNode {
     DataFoldNode::new(config).expect("Failed to create test node")
 }
 
+/// Helper function to set up a test node with proper schema permissions
+pub fn create_test_node_with_schema_permissions(schema_names: &[&str]) -> DataFoldNode {
+    let node = create_test_node();
+    let node_id = node.get_node_id().to_string();
+    let schema_strings: Vec<String> = schema_names.iter().map(|s| s.to_string()).collect();
+    
+    // Set schema permissions
+    node.set_schema_permissions(&node_id, &schema_strings).unwrap();
+    
+    node
+}
+
+/// Helper function to load and approve a schema for testing
+pub fn load_and_approve_schema(node: &mut DataFoldNode, schema_path: &str, schema_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    node.load_schema_from_file(schema_path)?;
+    node.approve_schema(schema_name)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,7 +174,8 @@ mod tests {
         assert_ne!(id1, id2, "nodes should have unique ids");
 
         let schema = Schema::new("helper_test".to_string());
-        assert!(node1.load_schema(schema).is_ok());
+        assert!(node1.add_schema_available(schema).is_ok());
+        assert!(node1.approve_schema("helper_test").is_ok());
         assert!(node1.get_schema("helper_test").unwrap().is_some());
     }
 }

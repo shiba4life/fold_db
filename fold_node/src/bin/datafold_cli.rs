@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use fold_node::{
-    load_schema_from_file, load_node_config, DataFoldNode, MutationType,
-    Operation,
+    load_node_config, DataFoldNode, MutationType,
+    Operation, SchemaState,
 };
 use serde_json::Value;
 use std::fs;
@@ -43,6 +43,30 @@ enum Commands {
         /// Schema name to allow
         #[arg(long, short, required = true)]
         name: String,
+    },
+    /// Approve a schema for queries and mutations
+    ApproveSchema {
+        /// Schema name to approve
+        #[arg(long, short, required = true)]
+        name: String,
+    },
+    /// Block a schema from queries and mutations
+    BlockSchema {
+        /// Schema name to block
+        #[arg(long, short, required = true)]
+        name: String,
+    },
+    /// Get the current state of a schema
+    GetSchemaState {
+        /// Schema name to check
+        #[arg(long, short, required = true)]
+        name: String,
+    },
+    /// List schemas by state
+    ListSchemasByState {
+        /// State to filter by (available, approved, blocked)
+        #[arg(long, short, required = true)]
+        state: String,
     },
     /// Execute a query operation
     Query {
@@ -86,7 +110,8 @@ enum Commands {
 
 fn handle_load_schema(path: PathBuf, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
     info!("Loading schema from: {}", path.display());
-    load_schema_from_file(path, node)?;
+    let path_str = path.to_str().ok_or("Invalid file path")?;
+    node.load_schema_from_file(path_str)?;
     info!("Schema loaded successfully");
     Ok(())
 }
@@ -95,7 +120,7 @@ fn handle_list_schemas(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error
     let schemas = node.list_schemas()?;
     info!("Loaded schemas:");
     for schema in schemas {
-        info!("  - {}", schema.name);
+        info!("  - {}", schema);
     }
     Ok(())
 }
@@ -118,6 +143,45 @@ fn handle_unload_schema(name: String, node: &mut DataFoldNode) -> Result<(), Box
 fn handle_allow_schema(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
     node.allow_schema(&name)?;
     info!("Schema '{}' allowed", name);
+    Ok(())
+}
+
+fn handle_approve_schema(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    node.approve_schema(&name)?;
+    info!("Schema '{}' approved successfully", name);
+    Ok(())
+}
+
+fn handle_block_schema(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    node.block_schema(&name)?;
+    info!("Schema '{}' blocked successfully", name);
+    Ok(())
+}
+
+fn handle_get_schema_state(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    let state = node.get_schema_state(&name)?;
+    let state_str = match state {
+        SchemaState::Available => "available",
+        SchemaState::Approved => "approved",
+        SchemaState::Blocked => "blocked",
+    };
+    info!("Schema '{}' state: {}", name, state_str);
+    Ok(())
+}
+
+fn handle_list_schemas_by_state(state: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    let schema_state = match state.as_str() {
+        "available" => SchemaState::Available,
+        "approved" => SchemaState::Approved,
+        "blocked" => SchemaState::Blocked,
+        _ => return Err(format!("Invalid state: {}. Use: available, approved, or blocked", state).into()),
+    };
+    
+    let schemas = node.list_schemas_by_state(schema_state)?;
+    info!("Schemas with state '{}':", state);
+    for schema in schemas {
+        info!("  - {}", schema);
+    }
     Ok(())
 }
 
@@ -251,6 +315,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             data,
         } => handle_mutate(&mut node, schema, mutation_type, data)?,
         Commands::UnloadSchema { name } => handle_unload_schema(name, &mut node)?,
+        Commands::ApproveSchema { name } => handle_approve_schema(name, &mut node)?,
+        Commands::BlockSchema { name } => handle_block_schema(name, &mut node)?,
+        Commands::GetSchemaState { name } => handle_get_schema_state(name, &mut node)?,
+        Commands::ListSchemasByState { state } => handle_list_schemas_by_state(state, &mut node)?,
         Commands::Execute { path } => handle_execute(path, &mut node)?,
     }
 

@@ -440,4 +440,141 @@ impl DataFoldNode {
         Ok(())
     }
 
+    /// Schema Management Methods - Delegate to FoldDB/SchemaCore
+    ///
+    /// Add a schema to the available schemas list
+    pub fn add_schema_available(&mut self, schema: crate::schema::Schema) -> crate::error::FoldDbResult<()> {
+        let mut db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.add_schema_available(schema)
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to add schema: {}", e)))
+    }
+
+    /// List all schemas with their states
+    pub fn list_schemas_with_state(&self) -> crate::error::FoldDbResult<std::collections::HashMap<String, crate::schema::core::SchemaState>> {
+        let db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        let states = db.load_schema_state()
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to load schema states: {}", e)))?;
+        Ok(states)
+    }
+
+    /// Get a schema by name
+    pub fn get_schema(&self, schema_name: &str) -> crate::error::FoldDbResult<Option<crate::schema::Schema>> {
+        let db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.get_schema(schema_name)
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to get schema: {}", e)))
+    }
+
+    /// Load a schema (approve it for use)
+    pub fn load_schema(&mut self, schema: crate::schema::Schema) -> crate::error::FoldDbResult<()> {
+        // First add as available
+        self.add_schema_available(schema.clone())?;
+        // Then approve it
+        self.approve_schema(&schema.name)
+    }
+
+    /// Approve a schema for queries and mutations
+    pub fn approve_schema(&mut self, schema_name: &str) -> crate::error::FoldDbResult<()> {
+        let mut db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.approve_schema(schema_name)
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to approve schema: {}", e)))
+    }
+
+    /// Unload a schema (set to available state)
+    pub fn unload_schema(&self, schema_name: &str) -> crate::error::FoldDbResult<()> {
+        let db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.unload_schema(schema_name)
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to unload schema: {}", e)))
+    }
+
+    /// List all loaded (approved) schemas
+    pub fn list_schemas(&self) -> crate::error::FoldDbResult<Vec<String>> {
+        let db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.schema_manager.list_loaded_schemas()
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to list schemas: {}", e)))
+    }
+
+    /// List all available schemas (any state)
+    pub fn list_available_schemas(&self) -> crate::error::FoldDbResult<Vec<String>> {
+        let db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.schema_manager.list_available_schemas()
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to list available schemas: {}", e)))
+    }
+
+    /// Load schema from file
+    pub fn load_schema_from_file(&mut self, path: &str) -> crate::error::FoldDbResult<()> {
+        let mut db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.load_schema_from_file(path)
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to load schema from file: {}", e)))
+    }
+
+    /// Check if a schema is loaded (approved)
+    pub fn is_schema_loaded(&self, schema_name: &str) -> crate::error::FoldDbResult<bool> {
+        let db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        let state = db.schema_manager.get_schema_state(schema_name);
+        Ok(matches!(state, Some(crate::schema::core::SchemaState::Approved)))
+    }
+
+    /// List schemas by specific state
+    pub fn list_schemas_by_state(&self, state: crate::schema::core::SchemaState) -> crate::error::FoldDbResult<Vec<String>> {
+        let db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.list_schemas_by_state(state)
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to list schemas by state: {}", e)))
+    }
+
+    /// Block a schema from queries and mutations
+    pub fn block_schema(&mut self, schema_name: &str) -> crate::error::FoldDbResult<()> {
+        // Check permissions first
+        if !self.check_schema_permission(schema_name)? {
+            return Err(crate::error::FoldDbError::Config(format!(
+                "Permission denied for schema {}",
+                schema_name
+            )));
+        }
+
+        let mut db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.block_schema(schema_name)
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to block schema: {}", e)))
+    }
+
+    /// Get the current state of a schema
+    pub fn get_schema_state(&self, schema_name: &str) -> crate::error::FoldDbResult<crate::schema::core::SchemaState> {
+        let db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        
+        // Check if schema exists
+        let exists = db.schema_manager.schema_exists(schema_name)
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to check schema existence: {}", e)))?;
+        
+        if !exists {
+            return Err(crate::error::FoldDbError::Config(format!("Schema '{}' not found", schema_name)));
+        }
+
+        // Get state from schema manager
+        let states = db.load_schema_state()
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to load schema states: {}", e)))?;
+        
+        Ok(states.get(schema_name)
+            .copied()
+            .unwrap_or(crate::schema::core::SchemaState::Available))
+    }
+
+    /// Set schema permissions for a node (for testing)
+    pub fn set_schema_permissions(&self, node_id: &str, schemas: &[String]) -> crate::error::FoldDbResult<()> {
+        let db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.set_schema_permissions(node_id, schemas)
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to set schema permissions: {}", e)))
+    }
+
 }

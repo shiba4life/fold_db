@@ -22,13 +22,13 @@
 //! queries and mutations against the database.
 
 // Internal modules
-pub(crate) mod core;
+pub mod core;
 pub(crate) mod storage;
 pub mod types;
 
 
 // Public re-exports
-pub use core::SchemaCore;
+pub use core::{SchemaCore, SchemaState};
 pub use storage::SchemaStorage;
 pub use types::{errors::SchemaError, schema::Schema, Transform};
 pub mod validator;

@@ -29,7 +29,8 @@ fn test_aref_generation_and_persistence_bug() {
         // Verify the schema doesn't have a ref_atom_uuid initially
         assert!(schema.fields.get("test_field").unwrap().ref_atom_uuid().is_none());
         
-        db.load_schema(schema).unwrap();
+        db.add_schema_available(schema).unwrap();
+        db.approve_schema("aref_gen_test").unwrap();
         
         // After loading, the schema should have a generated aref
         let loaded_schema = db.get_schema("aref_gen_test").unwrap().unwrap();
@@ -84,7 +85,8 @@ fn test_schema_core_aref_generation_bug() {
         // Verify the schema doesn't have a ref_atom_uuid initially
         assert!(schema.fields.get("test_field").unwrap().ref_atom_uuid().is_none());
         
-        manager.load_schema(schema).unwrap();
+        manager.add_schema_available(schema).unwrap();
+        manager.approve_schema("schema_core_gen_test").unwrap();
         
         // After loading, the schema should have a generated aref
         let loaded_schema = manager.get_schema("schema_core_gen_test").unwrap().unwrap();
@@ -137,7 +139,8 @@ fn test_map_fields_not_called_on_reload() {
         let manager = SchemaCore::new(test_path).unwrap();
         let schema = create_schema_without_aref("map_fields_test");
         
-        manager.load_schema(schema).unwrap();
+        manager.add_schema_available(schema).unwrap();
+        manager.approve_schema("map_fields_test").unwrap();
         
         // Get the generated aref
         let loaded_schema = manager.get_schema("map_fields_test").unwrap().unwrap();

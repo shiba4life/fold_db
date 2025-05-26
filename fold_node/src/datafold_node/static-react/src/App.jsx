@@ -23,11 +23,47 @@ function App() {
     try {
       const response = await fetch('/api/schemas')
       const data = await response.json()
-      const schemas = Array.isArray(data.data) ? data.data : []
-      const loadedSchemas = schemas.filter(
-        (s) => s.state && s.state.toLowerCase() === 'loaded'
+      console.log('Schemas API response:', data)
+      
+      // Convert the state map to an array of schema objects with states
+      const schemasWithStates = Object.entries(data.data || {}).map(([name, state]) => ({
+        name,
+        state,
+        fields: {} // Will be populated below for approved schemas
+      }))
+      
+      // Filter for approved schemas only (these are the ones available for mutations)
+      const approvedSchemas = schemasWithStates.filter(
+        (s) => s.state && s.state.toLowerCase() === 'approved'
       )
-      setSchemas(loadedSchemas)
+      console.log('Approved schemas:', approvedSchemas)
+      
+      // Fetch detailed schema information for approved schemas
+      const schemasWithDetails = await Promise.all(
+        approvedSchemas.map(async (schema) => {
+          try {
+            console.log(`Fetching details for schema: ${schema.name}`)
+            const schemaResponse = await fetch(`/api/schema/${schema.name}`)
+            console.log(`Schema ${schema.name} response status:`, schemaResponse.status)
+            if (schemaResponse.ok) {
+              const schemaData = await schemaResponse.json()
+              console.log(`Schema ${schema.name} data:`, schemaData)
+              return {
+                ...schema,
+                fields: schemaData.fields || {}
+              }
+            } else {
+              console.error(`Failed to fetch schema ${schema.name}: ${schemaResponse.status}`)
+            }
+          } catch (err) {
+            console.error(`Failed to fetch details for schema ${schema.name}:`, err)
+          }
+          return schema // Return original if fetch fails
+        })
+      )
+      
+      console.log('Final schemas with details:', schemasWithDetails)
+      setSchemas(schemasWithDetails)
     } catch (error) {
       console.error('Failed to fetch schemas:', error)
     }

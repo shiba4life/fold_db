@@ -91,7 +91,8 @@ fn test_schema_persistence() {
 
     // Create and load a test schema
     let schema = create_test_schema("test_persistence");
-    manager.load_schema(schema.clone()).unwrap();
+    manager.add_schema_available(schema.clone()).unwrap();
+    manager.approve_schema("test_persistence").unwrap();
 
     // Test schema retrieval
     let loaded_schema = manager.get_schema("test_persistence").unwrap().unwrap();
@@ -137,7 +138,8 @@ fn test_schema_disk_loading() {
 
     for (schema_name, _) in &schemas {
         let schema = create_test_schema(schema_name);
-        manager.load_schema(schema).unwrap();
+        manager.add_schema_available(schema).unwrap();
+        manager.approve_schema(schema_name).unwrap();
     }
 
     // Drop the first manager to release the database lock
@@ -203,6 +205,9 @@ fn test_transform_placeholder_output_on_disk_load() {
     manager
         .load_schema_from_file(schema_path.to_str().unwrap())
         .unwrap();
+    
+    // Approve the schema to make it accessible
+    manager.approve_schema("placeholder_schema").unwrap();
 
     // Verify the transform output was updated
     let schema = manager

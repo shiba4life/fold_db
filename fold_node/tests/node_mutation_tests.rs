@@ -37,8 +37,10 @@ fn setup_test_node() -> DataFoldNode {
     );
     test_schema.add_field(String::from("age"), FieldVariant::Single(age_field));
 
-    node.load_schema(test_schema)
+    node.add_schema_available(test_schema)
         .expect("Failed to load schema");
+    node.approve_schema("TestProfile")
+        .expect("Failed to approve schema");
     node.allow_schema("TestProfile")
         .expect("Failed to allow schema");
 

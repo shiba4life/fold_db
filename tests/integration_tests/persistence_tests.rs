@@ -66,7 +66,8 @@ fn test_db_and_transform_persistence() {
     let mut node2 = DataFoldNode::new(config.clone()).unwrap();
     let schema_path = dir.path().join("schemas").join("PersistSchema.json");
     assert!(schema_path.exists());
-    fold_node::datafold_node::loader::load_schema_from_file(&schema_path, &mut node2).unwrap();
+    node2.load_schema_from_file(schema_path.to_str().unwrap()).unwrap();
+    node2.approve_schema("PersistSchema").unwrap();
 
     // Verify schema exists and transform persisted
     let loaded_schema = node2.get_schema("PersistSchema").unwrap().unwrap();

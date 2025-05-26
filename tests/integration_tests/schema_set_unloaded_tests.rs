@@ -27,8 +27,8 @@ fn set_unloaded_keeps_transforms() {
     field.set_transform(transform);
     schema.add_field("calc".to_string(), FieldVariant::Single(field));
 
-    node.load_schema(schema).unwrap();
-    node.allow_schema("UnloadSchema").unwrap();
+    node.add_schema_available(schema).unwrap();
+    node.approve_schema("UnloadSchema").unwrap();
 
     assert!(node.list_transforms().unwrap().contains_key("UnloadSchema.calc"));
 

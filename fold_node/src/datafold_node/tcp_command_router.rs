@@ -40,8 +40,7 @@ impl TcpServer {
             "list_schemas" => {
                 let node_guard = node.lock().await;
                 let schemas = node_guard.list_schemas()?;
-                let names: Vec<String> = schemas.iter().map(|s| s.name.clone()).collect();
-                Ok(serde_json::to_value(names)?)
+                Ok(serde_json::to_value(schemas)?)
             }
             "list_available_schemas" => {
                 let node_guard = node.lock().await;
@@ -101,7 +100,7 @@ impl TcpServer {
                         crate::error::FoldDbError::Config("Missing schema_name parameter".to_string())
                     })?;
 
-                let mut node_guard = node.lock().await;
+                let node_guard = node.lock().await;
                 node_guard.unload_schema(schema_name)?;
 
                 Ok(serde_json::json!({ "success": true }))
@@ -206,6 +205,88 @@ impl TcpServer {
                     .collect::<Vec<_>>();
 
                 Ok(serde_json::to_value(node_infos)?)
+            }
+            "list_schemas_by_state" => {
+                let state_str = request
+                    .get("params")
+                    .and_then(|v| v.get("state"))
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        crate::error::FoldDbError::Config("Missing state parameter".to_string())
+                    })?;
+
+                let state = match state_str {
+                    "available" => crate::schema::core::SchemaState::Available,
+                    "approved" => crate::schema::core::SchemaState::Approved,
+                    "blocked" => crate::schema::core::SchemaState::Blocked,
+                    _ => {
+                        return Err(crate::error::FoldDbError::Config(format!(
+                            "Invalid state: {}. Use: available, approved, or blocked",
+                            state_str
+                        )));
+                    }
+                };
+
+                let node_guard = node.lock().await;
+                let schemas = node_guard.list_schemas_by_state(state)?;
+                Ok(serde_json::to_value(schemas)?)
+            }
+            "approve_schema" => {
+                let schema_name = request
+                    .get("params")
+                    .and_then(|v| v.get("schema_name"))
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        crate::error::FoldDbError::Config("Missing schema_name parameter".to_string())
+                    })?;
+
+                let mut node_guard = node.lock().await;
+                node_guard.approve_schema(schema_name)?;
+                Ok(serde_json::json!({
+                    "success": true,
+                    "message": format!("Schema '{}' approved successfully", schema_name),
+                    "schema": schema_name,
+                    "state": "approved"
+                }))
+            }
+            "block_schema" => {
+                let schema_name = request
+                    .get("params")
+                    .and_then(|v| v.get("schema_name"))
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        crate::error::FoldDbError::Config("Missing schema_name parameter".to_string())
+                    })?;
+
+                let mut node_guard = node.lock().await;
+                node_guard.block_schema(schema_name)?;
+                Ok(serde_json::json!({
+                    "success": true,
+                    "message": format!("Schema '{}' blocked successfully", schema_name),
+                    "schema": schema_name,
+                    "state": "blocked"
+                }))
+            }
+            "get_schema_state" => {
+                let schema_name = request
+                    .get("params")
+                    .and_then(|v| v.get("schema_name"))
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        crate::error::FoldDbError::Config("Missing schema_name parameter".to_string())
+                    })?;
+
+                let node_guard = node.lock().await;
+                let state = node_guard.get_schema_state(schema_name)?;
+                let state_str = match state {
+                    crate::schema::core::SchemaState::Available => "available",
+                    crate::schema::core::SchemaState::Approved => "approved",
+                    crate::schema::core::SchemaState::Blocked => "blocked",
+                };
+                Ok(serde_json::json!({
+                    "schema": schema_name,
+                    "state": state_str
+                }))
             }
             _ => Err(crate::error::FoldDbError::Config(format!(
                 "Unknown operation: {}",

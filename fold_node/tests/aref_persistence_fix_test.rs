@@ -29,7 +29,8 @@ fn test_aref_persistence_fix_verification() {
         // Verify the schema doesn't have a ref_atom_uuid initially
         assert!(schema.fields.get("test_field").unwrap().ref_atom_uuid().is_none());
         
-        db.load_schema(schema).unwrap();
+        db.add_schema_available(schema).unwrap();
+        db.approve_schema("persistence_fix_test").unwrap();
         
         // After loading, the schema should have a generated aref
         let loaded_schema = db.get_schema("persistence_fix_test").unwrap().unwrap();

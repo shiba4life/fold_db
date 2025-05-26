@@ -20,7 +20,8 @@ fn test_schema_aref_preservation_on_reload() {
         .unwrap()
         .clone();
     
-    manager.load_schema(original_schema.clone()).unwrap();
+    manager.add_schema_available(original_schema.clone()).unwrap();
+    manager.approve_schema("aref_preservation_test").unwrap();
 
     // Unload the schema
     manager.unload_schema("aref_preservation_test").unwrap();
@@ -36,7 +37,8 @@ fn test_schema_aref_preservation_on_reload() {
     assert!(reloaded_schema.is_none(), "Schema should remain unloaded after reload from disk");
     
     // Now explicitly load it again
-    manager.load_schema(original_schema.clone()).unwrap();
+    manager.add_schema_available(original_schema.clone()).unwrap();
+    manager.approve_schema("aref_preservation_test").unwrap();
     let loaded_schema = manager.get_schema("aref_preservation_test").unwrap().unwrap();
     
     // The ref_atom_uuid should be preserved
@@ -70,7 +72,8 @@ fn test_schema_state_preservation_on_reload() {
         .unwrap()
         .clone();
     
-    manager.load_schema(schema.clone()).unwrap();
+    manager.add_schema_available(schema.clone()).unwrap();
+    manager.approve_schema("state_preservation_test").unwrap();
     
     // Drop the manager to simulate a restart
     drop(manager);
@@ -114,7 +117,8 @@ fn test_folddb_aref_preservation_on_reload() {
         .clone();
     
     // Load the schema through FoldDB (this calls map_fields)
-    db.load_schema(original_schema.clone()).unwrap();
+    db.add_schema_available(original_schema.clone()).unwrap();
+    db.approve_schema("folddb_aref_test").unwrap();
     
     // Get the schema and check the ref_atom_uuid
     let loaded_schema = db.get_schema("folddb_aref_test").unwrap().unwrap();
@@ -135,7 +139,8 @@ fn test_folddb_aref_preservation_on_reload() {
     db.unload_schema("folddb_aref_test").unwrap();
     
     // Load it again - this is where the issue might occur
-    db.load_schema(original_schema.clone()).unwrap();
+    db.add_schema_available(original_schema.clone()).unwrap();
+    db.approve_schema("folddb_aref_test").unwrap();
     
     // Check if the ref_atom_uuid is still the same
     let reloaded_schema = db.get_schema("folddb_aref_test").unwrap().unwrap();
@@ -176,7 +181,8 @@ fn test_schema_without_ref_atom_uuid_gets_new_one() {
     assert!(new_schema.fields.get("test_field").unwrap().ref_atom_uuid().is_none());
     
     // Load the schema through SchemaCore (this should assign a ref_atom_uuid via map_fields)
-    manager.load_schema(new_schema).unwrap();
+    manager.add_schema_available(new_schema).unwrap();
+    manager.approve_schema("no_ref_uuid_test").unwrap();
     
     // Get the schema and check that it now has a ref_atom_uuid
     let loaded_schema = manager.get_schema("no_ref_uuid_test").unwrap().unwrap();

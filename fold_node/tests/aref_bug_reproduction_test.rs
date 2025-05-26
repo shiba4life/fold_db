@@ -33,7 +33,8 @@ fn test_aref_bug_reproduction_with_folddb_restart() {
         // Verify the schema doesn't have a ref_atom_uuid initially
         assert!(schema.fields.get("test_field").unwrap().ref_atom_uuid().is_none());
         
-        db.load_schema(schema).unwrap();
+        db.add_schema_available(schema).unwrap();
+        db.approve_schema("bug_reproduction_test").unwrap();
         
         // After loading, the schema should have a generated aref
         let loaded_schema = db.get_schema("bug_reproduction_test").unwrap().unwrap();
@@ -89,7 +90,8 @@ fn test_schema_core_direct_load_states_bug() {
         let manager = SchemaCore::new(test_path).unwrap();
         let schema = create_schema_without_aref("direct_load_states_test");
         
-        manager.load_schema(schema).unwrap();
+        manager.add_schema_available(schema).unwrap();
+        manager.approve_schema("direct_load_states_test").unwrap();
         
         // Get the generated aref
         let loaded_schema = manager.get_schema("direct_load_states_test").unwrap().unwrap();

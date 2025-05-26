@@ -24,8 +24,8 @@ fn unload_state_persists_on_disk() {
     let mut schema = Schema::new("PersistUnload".to_string());
     schema.add_field("id".to_string(), field);
 
-    node.load_schema(schema).unwrap();
-    node.allow_schema("PersistUnload").unwrap();
+    node.add_schema_available(schema).unwrap();
+    node.approve_schema("PersistUnload").unwrap();
 
     node.unload_schema("PersistUnload").unwrap();
 
@@ -34,6 +34,6 @@ fn unload_state_persists_on_disk() {
     let node2 = DataFoldNode::new(config).unwrap();
 
     assert!(node2.list_available_schemas().unwrap().contains(&"PersistUnload".to_string()));
-    let loaded_names: Vec<String> = node2.list_schemas().unwrap().into_iter().map(|s| s.name).collect();
+    let loaded_names: Vec<String> = node2.list_schemas().unwrap();
     assert!(!loaded_names.contains(&"PersistUnload".to_string()));
 }

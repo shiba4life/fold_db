@@ -1,7 +1,7 @@
 use fold_node::{datafold_node::DataFoldHttpServer, schema::types::Operation};
 use fold_node::schema::Schema;
 use fold_node::datafold_node::sample_manager::SampleManager;
-use crate::test_data::test_helpers::create_test_node;
+use crate::test_data::test_helpers::create_test_node_with_schema_permissions;
 use reqwest::Client;
 use serde_json::Value;
 use std::net::TcpListener;
@@ -11,16 +11,21 @@ async fn start_server() -> (JoinHandle<()>, String) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     drop(listener);
-    let node = create_test_node();
     let bind_address = format!("127.0.0.1:{}", port);
+    
+    // Get schema names for permission setup
+    let sample_manager = SampleManager::new().await.unwrap();
+    let schema_names_owned = sample_manager.list_schema_samples();
+    let schema_names: Vec<&str> = schema_names_owned.iter().map(|s| s.as_str()).collect();
+    let node = create_test_node_with_schema_permissions(&schema_names);
+    
     let server = DataFoldHttpServer::new(node, &bind_address).await.unwrap();
     let handle = tokio::spawn(async move { let _ = server.run().await; });
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Load sample schemas via HTTP
     let client = Client::new();
-    let sample_manager = SampleManager::new().await.unwrap();
-    let mut names = sample_manager.list_schema_samples();
+    let mut names = schema_names_owned.clone();
     names.sort();
     for name in names {
         let value = sample_manager.get_schema_sample(&name).unwrap().clone();
@@ -28,6 +33,15 @@ async fn start_server() -> (JoinHandle<()>, String) {
         client
             .post(format!("http://{}/api/schema", bind_address))
             .json(&schema)
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+        
+        // Approve the schema so it can be queried
+        client
+            .post(format!("http://{}/api/schema/{}/approve", bind_address, name))
             .send()
             .await
             .unwrap()
@@ -49,9 +63,11 @@ async fn test_list_schemas_route() {
         .unwrap();
     assert!(resp.status().is_success());
     let body: Value = resp.json().await.unwrap();
-    let arr = body["data"].as_array().expect("data array");
-    assert!(!arr.is_empty());
-    assert_eq!(arr[0]["state"], "Loaded");
+    let data = body["data"].as_object().expect("data object");
+    assert!(!data.is_empty());
+    // Check that we have schemas with Approved state (new schema state system)
+    let has_approved = data.values().any(|v| v.as_str() == Some("Approved"));
+    assert!(has_approved, "Expected at least one schema with Approved state");
     handle.abort();
 }
 
@@ -88,7 +104,13 @@ async fn test_execute_route() {
         .send()
         .await
         .unwrap();
-    assert!(resp.status().is_success());
+    
+    let status = resp.status();
+    if !status.is_success() {
+        let error_text = resp.text().await.unwrap();
+        panic!("Execute request failed with status {}: {}", status, error_text);
+    }
+    
     let body: Value = resp.json().await.unwrap();
     assert!(body.get("data").is_some());
     handle.abort();

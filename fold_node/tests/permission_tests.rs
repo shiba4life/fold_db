@@ -52,7 +52,8 @@ fn test_permission_based_access() {
     let schema = create_schema_with_fields("test_schema".to_string(), fields);
 
     // Load and allow schema
-    db.load_schema(schema).expect("Failed to load schema");
+    db.add_schema_available(schema).expect("Failed to load schema");
+    db.approve_schema("test_schema").expect("Failed to approve schema");
     setup_and_allow_schema(&mut db, "test_schema").expect("Failed to allow schema");
 
     // Test writing with owner key

@@ -5,7 +5,7 @@ use fold_node::testing::{
 use fold_node::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
 use fold_node::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 use fold_node::transform::TransformExecutor;
-use crate::test_data::test_helpers::create_test_node;
+use crate::test_data::test_helpers::create_test_node_with_schema_permissions;
 use serde_json::json;
 use std::collections::HashMap;
 
@@ -35,12 +35,12 @@ fn create_schema_b(transform: Transform) -> Schema {
 
 #[test]
 fn test_cross_schema_transform_manual_execution() {
-    let mut node = create_test_node();
+    let mut node = create_test_node_with_schema_permissions(&["SchemaA", "SchemaB"]);
 
     // Load Schema A and set value
     let schema_a = create_schema_a();
-    node.load_schema(schema_a).unwrap();
-    node.allow_schema("SchemaA").unwrap();
+    node.add_schema_available(schema_a).unwrap();
+    node.approve_schema("SchemaA").unwrap();
 
     let mutation = Mutation {
         mutation_type: MutationType::Create,
@@ -73,8 +73,8 @@ fn test_cross_schema_transform_manual_execution() {
         "SchemaB.b_test_field".to_string()
     );
     let schema_b = create_schema_b(transform.clone());
-    node.load_schema(schema_b).unwrap();
-    node.allow_schema("SchemaB").unwrap();
+    node.add_schema_available(schema_b).unwrap();
+    node.approve_schema("SchemaB").unwrap();
 
     // Manually execute transform using value from Schema A
     let mut inputs = HashMap::new();
@@ -85,11 +85,12 @@ fn test_cross_schema_transform_manual_execution() {
 
 #[test]
 fn test_cross_schema_transform_with_inputs() {
-    let mut node = create_test_node();
+    let mut node = create_test_node_with_schema_permissions(&["SchemaA", "SchemaB"]);
 
     // Load Schema A and set value
     let schema_a = create_schema_a();
-    node.load_schema(schema_a).unwrap();
+    node.add_schema_available(schema_a).unwrap();
+    node.approve_schema("SchemaA").unwrap();
 
     let mutation = Mutation {
         mutation_type: MutationType::Create,
@@ -112,7 +113,8 @@ fn test_cross_schema_transform_with_inputs() {
     );
     transform.set_inputs(vec!["SchemaA.a_test_field".to_string()]);
     let schema_b = create_schema_b(transform);
-    node.load_schema(schema_b).unwrap();
+    node.add_schema_available(schema_b).unwrap();
+    node.approve_schema("SchemaB").unwrap();
 
     // Execute transform through the node
     let result = node.run_transform("SchemaB.b_test_field").unwrap();
@@ -121,11 +123,12 @@ fn test_cross_schema_transform_with_inputs() {
 
 #[test]
 fn test_cross_schema_transform_auto_inputs() {
-    let mut node = create_test_node();
+    let mut node = create_test_node_with_schema_permissions(&["SchemaA", "SchemaB"]);
 
     // Load Schema A and set value
     let schema_a = create_schema_a();
-    node.load_schema(schema_a).unwrap();
+    node.add_schema_available(schema_a).unwrap();
+    node.approve_schema("SchemaA").unwrap();
 
     let mutation = Mutation {
         mutation_type: MutationType::Create,
@@ -147,7 +150,8 @@ fn test_cross_schema_transform_auto_inputs() {
         "SchemaB.b_test_field".to_string(),
     );
     let schema_b = create_schema_b(transform);
-    node.load_schema(schema_b).unwrap();
+    node.add_schema_available(schema_b).unwrap();
+    node.approve_schema("SchemaB").unwrap();
 
     // Execute transform through the node
     let result = node.run_transform("SchemaB.b_test_field").unwrap();
@@ -156,7 +160,7 @@ fn test_cross_schema_transform_auto_inputs() {
 
 #[test]
 fn test_transform_persists_to_output_field() {
-    let mut node = create_test_node();
+    let mut node = create_test_node_with_schema_permissions(&["SchemaA", "SchemaB"]);
 
     // Create Schema B with an output field
     let mut schema_b = Schema::new("SchemaB".to_string());
@@ -166,8 +170,8 @@ fn test_transform_persists_to_output_field() {
         HashMap::new(),
     ));
     schema_b.add_field("b_out".to_string(), output_field);
-    node.load_schema(schema_b).unwrap();
-    node.allow_schema("SchemaB").unwrap();
+    node.add_schema_available(schema_b).unwrap();
+    node.approve_schema("SchemaB").unwrap();
 
     // Create Schema A with input field and transform writing to SchemaB.b_out
     let mut schema_a = Schema::new("SchemaA".to_string());
@@ -194,8 +198,8 @@ fn test_transform_persists_to_output_field() {
     t_field.set_transform(transform);
     schema_a.add_field("calc".to_string(), FieldVariant::Single(t_field));
 
-    node.load_schema(schema_a).unwrap();
-    node.allow_schema("SchemaA").unwrap();
+    node.add_schema_available(schema_a).unwrap();
+    node.approve_schema("SchemaA").unwrap();
 
     // Set input value
     let mutation = Mutation {

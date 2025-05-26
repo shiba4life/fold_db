@@ -54,7 +54,8 @@ fn test_schema_operations() {
     };
 
     // Test schema loading
-    assert!(db.load_schema(schema.clone()).is_ok());
+    assert!(db.add_schema_available(schema.clone()).is_ok());
+    assert!(db.approve_schema("test_schema").is_ok());
     assert!(db.allow_schema("test_schema").is_ok());
 
     // Test non-existent schema
@@ -92,7 +93,8 @@ fn test_write_and_query() {
         payment_config: SchemaPaymentConfig::default(),
     };
 
-    db.load_schema(schema).expect("Failed to load schema");
+    db.add_schema_available(schema).expect("Failed to load schema");
+    db.approve_schema("test_schema").expect("Failed to approve schema");
     db.allow_schema("test_schema")
         .expect("Failed to allow schema");
 
@@ -161,7 +163,8 @@ fn test_atom_history() {
         payment_config: SchemaPaymentConfig::default(),
     };
 
-    db.load_schema(schema).expect("Failed to load schema");
+    db.add_schema_available(schema).expect("Failed to load schema");
+    db.approve_schema("test_schema").expect("Failed to approve schema");
     db.allow_schema("test_schema")
         .expect("Failed to allow schema");
 

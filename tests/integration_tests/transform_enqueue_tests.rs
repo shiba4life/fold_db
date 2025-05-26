@@ -29,8 +29,8 @@ fn mutation_enqueues_transform() {
     field.set_transform(transform);
     schema.add_field("calc".to_string(), FieldVariant::Single(field));
 
-    db.load_schema(schema).unwrap();
-    db.allow_schema("EnqueueSchema").unwrap();
+    db.add_schema_available(schema).unwrap();
+    db.approve_schema("EnqueueSchema").unwrap();
 
     let mutation = Mutation {
         mutation_type: MutationType::Create,

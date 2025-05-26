@@ -27,7 +27,8 @@ fn validator_accepts_valid_transform() {
     let core = create_core();
     let mut source = Schema::new("Src".to_string());
     source.add_field("value".to_string(), base_field());
-    core.load_schema(source).unwrap();
+    core.add_schema_available(source).unwrap();
+    core.approve_schema("Src").unwrap();
 
     let parser = TransformParser::new();
     let expr = parser.parse_expression("Src.value + 1").unwrap();

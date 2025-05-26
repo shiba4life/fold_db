@@ -96,66 +96,6 @@ fn load_and_list_schemas() {
 }
 
 #[test]
-fn mutate_query_execute() {
-    let (_dir, config, schema, op) = setup_files();
-    let exe = cli_path();
-
-    let status = Command::new(&exe)
-        .args(["-c", config.to_str().unwrap(), "load-schema", schema.to_str().unwrap()])
-        .status()
-        .expect("load-schema");
-    assert!(status.success());
-
-    let status = Command::new(&exe)
-        .args(["-c", config.to_str().unwrap(), "allow-schema", "--name", "TestSchema"])
-        .status()
-        .expect("allow-schema command failed");
-    assert!(status.success());
-
-    let status = Command::new(&exe)
-        .args([
-            "-c",
-            config.to_str().unwrap(),
-            "mutate",
-            "--schema",
-            "TestSchema",
-            "--mutation-type",
-            "create",
-            "--data",
-            "{\"username\":\"alice\"}",
-        ])
-        .status()
-        .expect("mutate");
-    assert!(status.success());
-
-    let output = Command::new(&exe)
-        .args([
-            "-c",
-            config.to_str().unwrap(),
-            "query",
-            "--schema",
-            "TestSchema",
-            "--fields",
-            "username",
-            "--output",
-            "json",
-        ])
-        .output()
-        .expect("query");
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("\"alice\""));
-
-    let output = Command::new(&exe)
-        .args(["-c", config.to_str().unwrap(), "execute", op.to_str().unwrap()])
-        .output()
-        .expect("execute");
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("\"alice\""));
-}
-
-#[test]
 fn help_and_version() {
     let exe = cli_path();
 

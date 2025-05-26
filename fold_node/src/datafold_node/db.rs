@@ -1,67 +1,13 @@
 use serde_json::Value;
 use std::collections::HashMap;
-use serde::Serialize;
 
 use crate::error::{FoldDbError, FoldDbResult};
-use crate::schema::types::{Field, Mutation, Operation, Query, Transform};
-use crate::schema::{Schema, SchemaError, SchemaValidator};
-use crate::schema::core::SchemaState;
+use crate::schema::types::{Mutation, Operation, Query, Transform};
+use crate::schema::SchemaError;
 
 use super::DataFoldNode;
 
-#[derive(Clone, Serialize)]
-pub struct SchemaWithState {
-    #[serde(flatten)]
-    pub schema: Schema,
-    pub state: SchemaState,
-}
-
 impl DataFoldNode {
-
-    pub fn is_schema_loaded(&self, schema_name: &str) -> FoldDbResult<bool> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        Ok(matches!(db.schema_manager.get_schema_state(schema_name), Some(SchemaState::Loaded)))
-    }
-    
-    /// Loads a schema into the database and grants this node permission.
-    pub fn load_schema(&mut self, schema: Schema) -> FoldDbResult<()> {
-        let schema_name = schema.name.clone();
-        let mut db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-
-        // Apply transform output fix and validate before loading
-        let mut schema = schema;
-        for (fname, field) in schema.fields.iter_mut() {
-            if let Some(transform) = field.transform() {
-                let mut transform = transform.clone();
-                if transform.get_output().starts_with("test.") {
-                    transform.set_output(format!("{}.{}", schema_name, fname));
-                    field.set_transform(transform);
-                }
-            }
-        }
-
-        let validator = SchemaValidator::new(&db.schema_manager);
-        validator.validate(&schema)?;
-        db.load_schema(schema)?;
-        drop(db);
-        self.grant_schema_permission(&schema_name)?;
-        Ok(())
-    }
-
-    /// Persist a schema without loading it into memory.
-    pub fn add_schema_unloaded(&mut self, schema: Schema) -> FoldDbResult<()> {
-        let mut db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.add_schema_unloaded(schema).map_err(|e| e.into())
-    }
 
     /// Executes an operation (query or mutation) on the database.
     pub fn execute_operation(&mut self, operation: Operation) -> FoldDbResult<Value> {
@@ -104,59 +50,6 @@ impl DataFoldNode {
         }
     }
 
-    /// Retrieves a schema by its ID.
-    pub fn get_schema(&self, schema_id: &str) -> FoldDbResult<Option<Schema>> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        Ok(db.schema_manager.get_schema(schema_id)?)
-    }
-
-    /// Lists all loaded schemas in the database.
-    pub fn list_schemas(&self) -> FoldDbResult<Vec<Schema>> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        let schema_names = db.schema_manager.list_loaded_schemas()?;
-        let mut schemas = Vec::new();
-        for name in schema_names {
-            if let Some(schema) = db.schema_manager.get_schema(&name)? {
-                schemas.push(schema);
-            }
-        }
-        Ok(schemas)
-    }
-
-    /// Lists all loaded schemas along with their load state.
-    pub fn list_schemas_with_state(&self) -> FoldDbResult<Vec<SchemaWithState>> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        let schema_names = db.schema_manager.list_loaded_schemas()?;
-        let mut schemas = Vec::new();
-        for name in schema_names {
-            if let Some(schema) = db.schema_manager.get_schema(&name)? {
-                let state = db
-                    .schema_manager
-                    .get_schema_state(&name)
-                    .unwrap_or(SchemaState::Loaded);
-                schemas.push(SchemaWithState { schema, state });
-            }
-        }
-        Ok(schemas)
-    }
-
-    /// List the names of all schemas available on disk.
-    pub fn list_available_schemas(&self) -> FoldDbResult<Vec<String>> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        Ok(db.schema_manager.list_available_schemas()?)
-    }
 
     /// Executes a query against the database.
     pub fn query(&mut self, mut query: Query) -> FoldDbResult<Vec<Result<Value, SchemaError>>> {
@@ -174,10 +67,16 @@ impl DataFoldNode {
             )));
         }
         
-        // if schema is not loaded, return an error with helpful message
-        if !self.is_schema_loaded(&query.schema_name)? {
+        // Check if schema is approved for queries
+        let can_query = {
+            let db = self.db.lock()
+                .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+            db.can_query_schema(&query.schema_name)
+        };
+        
+        if !can_query {
             return Err(FoldDbError::Config(format!(
-                "Schema '{}' exists but is not loaded. Please load the schema first using POST /api/schema/{}/load",
+                "Schema '{}' exists but is not approved for queries. Please approve the schema first using POST /api/schema/{}/approve",
                 query.schema_name, query.schema_name
             )));
         }
@@ -213,9 +112,16 @@ impl DataFoldNode {
             )));
         }
         
-        if !self.is_schema_loaded(&mutation.schema_name)? {
+        // Check if schema is approved for mutations
+        let can_mutate = {
+            let db = self.db.lock()
+                .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+            db.can_mutate_schema(&mutation.schema_name)
+        };
+        
+        if !can_mutate {
             return Err(FoldDbError::Config(format!(
-                "Schema '{}' exists but is not loaded. Please load the schema first using POST /api/schema/{}/load",
+                "Schema '{}' exists but is not approved for mutations. Please approve the schema first using POST /api/schema/{}/approve",
                 mutation.schema_name, mutation.schema_name
             )));
         }
@@ -246,15 +152,6 @@ impl DataFoldNode {
         Ok(history.into_iter().map(|a| a.content().clone()).collect())
     }
 
-    /// Mark a schema as unloaded without removing it from disk.
-    pub fn unload_schema(&mut self, schema_name: &str) -> FoldDbResult<()> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.unload_schema(schema_name).map_err(|e| e.into())
-    }
-
 
     /// List all registered transforms.
     pub fn list_transforms(&self) -> FoldDbResult<HashMap<String, Transform>> {
@@ -278,9 +175,7 @@ impl DataFoldNode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use crate::datafold_node::config::NodeConfig;
-    use crate::schema::Schema;
 
     fn create_node(path: &std::path::Path) -> DataFoldNode {
         let config = NodeConfig {
@@ -290,27 +185,4 @@ mod tests {
         };
         DataFoldNode::new(config).unwrap()
     }
-
-    #[test]
-    fn load_and_list_schema() {
-        let dir = tempdir().unwrap();
-        let mut node = create_node(dir.path());
-        let schema = Schema::new("Test".to_string());
-        node.load_schema(schema).unwrap();
-        let schemas = node.list_schemas().unwrap();
-        assert_eq!(schemas.len(), 1);
-    }
-
-    #[test]
-    fn load_schema_invalid_fails() {
-        let dir = tempdir().unwrap();
-        let mut node = create_node(dir.path());
-
-        let mut schema = Schema::new("Bad".to_string());
-        schema.payment_config.base_multiplier = 0.0;
-
-        let res = node.load_schema(schema);
-        assert!(res.is_err());
-    }
-
 }

@@ -9,12 +9,15 @@ mod mutation;
 mod transform_management;
 
 use std::sync::Arc;
+use std::path::Path;
+use std::collections::HashMap;
 use log::info;
 use crate::atom::{Atom, AtomRefBehavior};
 use crate::db_operations::DbOperations;
 use crate::permissions::PermissionWrapper;
 use crate::schema::SchemaCore;
 use crate::schema::{Schema, SchemaError};
+use crate::schema::core::SchemaState;
 use serde_json;
 use serde_json::Value;
 use uuid::Uuid;
@@ -148,9 +151,9 @@ impl FoldDB {
             info!("Failed to load schema states: {}", e);
         } else {
             // After loading schema states, we need to ensure AtomRefs are properly mapped and persisted
-            // for all loaded schemas
-            if let Ok(loaded_schemas) = schema_manager.list_loaded_schemas() {
-                for schema_name in loaded_schemas {
+            // for all approved schemas
+            if let Ok(approved_schemas) = schema_manager.list_schemas_by_state(SchemaState::Approved) {
+                for schema_name in approved_schemas {
                     if let Ok(atom_refs) = schema_manager.map_fields(&schema_name) {
                         // Persist each atom ref
                         for atom_ref in atom_refs {
@@ -181,12 +184,19 @@ impl FoldDB {
     }
 
 
-    pub fn load_schema(&mut self, schema: Schema) -> Result<(), SchemaError> {
-        let name = schema.name.clone();
-        self.schema_manager.load_schema(schema)?;
+    // ========== CONSOLIDATED SCHEMA API - DELEGATES TO SCHEMA_CORE ==========
+    
+    /// Fetch available schemas from files (example schemas directory)
+    pub fn fetch_available_schemas(&self) -> Result<Vec<String>, SchemaError> {
+        self.schema_manager.fetch_available_schemas()
+    }
+
+    /// Approve a schema for queries and mutations
+    pub fn approve_schema(&mut self, schema_name: &str) -> Result<(), SchemaError> {
+        self.schema_manager.approve_schema(schema_name)?;
 
         // Get the atom refs that need to be persisted
-        let atom_refs = self.schema_manager.map_fields(&name)?;
+        let atom_refs = self.schema_manager.map_fields(schema_name)?;
 
         // Persist each atom ref
         for atom_ref in atom_refs {
@@ -202,17 +212,64 @@ impl FoldDB {
         }
 
         // Get the updated schema with proper ARefs and register transforms
-        if let Some(loaded_schema) = self.schema_manager.get_schema(&name)? {
-            info!("Registering transforms for schema '{}' with {} fields", name, loaded_schema.fields.len());
+        if let Some(loaded_schema) = self.schema_manager.get_schema(schema_name)? {
+            info!("Registering transforms for approved schema '{}' with {} fields", schema_name, loaded_schema.fields.len());
             self.register_transforms_for_schema(&loaded_schema)?;
         }
 
         Ok(())
     }
 
-    /// Persist a schema but keep it unloaded.
-    pub fn add_schema_unloaded(&mut self, schema: Schema) -> Result<(), SchemaError> {
-        self.schema_manager.add_schema_unloaded(schema)
+    /// Block a schema from queries and mutations
+    pub fn block_schema(&mut self, schema_name: &str) -> Result<(), SchemaError> {
+        self.schema_manager.block_schema(schema_name)
+    }
+
+    /// Load schema state from sled
+    pub fn load_schema_state(&self) -> Result<HashMap<String, SchemaState>, SchemaError> {
+        self.schema_manager.load_schema_state()
+    }
+
+    /// Load available schemas from sled and files
+    pub fn load_available_schemas(&self) -> Result<(), SchemaError> {
+        self.schema_manager.load_available_schemas()
+    }
+
+    /// Load schema from JSON string (creates Available schema)
+    pub fn load_schema_from_json(&mut self, json_str: &str) -> Result<(), SchemaError> {
+        self.schema_manager.load_schema_from_json(json_str)
+    }
+
+    /// Load schema from file (creates Available schema)
+    pub fn load_schema_from_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), SchemaError> {
+        let path_str = path.as_ref().to_str()
+            .ok_or_else(|| SchemaError::InvalidData("Invalid file path".to_string()))?;
+        self.schema_manager.load_schema_from_file(path_str)
+    }
+
+    /// Check if a schema can be queried (must be Approved)
+    pub fn can_query_schema(&self, schema_name: &str) -> bool {
+        self.schema_manager.can_query_schema(schema_name)
+    }
+
+    /// Check if a schema can be mutated (must be Approved)
+    pub fn can_mutate_schema(&self, schema_name: &str) -> bool {
+        self.schema_manager.can_mutate_schema(schema_name)
+    }
+
+    /// Get schemas by state
+    pub fn list_schemas_by_state(&self, state: SchemaState) -> Result<Vec<String>, SchemaError> {
+        self.schema_manager.list_schemas_by_state(state)
+    }
+
+    /// Get all available schemas (any state)
+    pub fn list_all_schemas(&self) -> Result<Vec<String>, SchemaError> {
+        self.schema_manager.list_all_schemas()
+    }
+
+    /// Legacy method - now creates Available schema
+    pub fn add_schema_available(&mut self, schema: Schema) -> Result<(), SchemaError> {
+        self.schema_manager.add_schema_available(schema)
     }
 
     pub fn allow_schema(&mut self, schema_name: &str) -> Result<(), SchemaError> {

@@ -40,7 +40,8 @@ fn test_non_reversible_transform_not_writable() {
         payment_config: SchemaPaymentConfig::default(),
     };
 
-    schema_manager.load_schema(schema).unwrap();
+    schema_manager.add_schema_available(schema).unwrap();
+    schema_manager.approve_schema("test_schema").unwrap();
 
     let mutation = Mutation {
         mutation_type: MutationType::Create,
@@ -86,7 +87,8 @@ fn test_permission_wrapper_query() {
         payment_config: SchemaPaymentConfig::default(),
     };
 
-    schema_manager.load_schema(schema).unwrap();
+    schema_manager.add_schema_available(schema).unwrap();
+    schema_manager.approve_schema("test_schema").unwrap();
 
     // Test cases
     let test_cases = vec![
@@ -148,7 +150,8 @@ fn test_permission_wrapper_no_requirement() {
         payment_config: SchemaPaymentConfig::default(),
     };
 
-    schema_manager.load_schema(schema).unwrap();
+    schema_manager.add_schema_available(schema).unwrap();
+    schema_manager.approve_schema("test_schema").unwrap();
 
     // Test cases with varying trust distances - all should pass due to NoRequirement
     let test_distances = vec![0, 1, 5, 10, 100];
@@ -206,7 +209,8 @@ fn test_permission_wrapper_mutation() {
         payment_config: SchemaPaymentConfig::default(),
     };
 
-    schema_manager.load_schema(schema).unwrap();
+    schema_manager.add_schema_available(schema).unwrap();
+    schema_manager.approve_schema("test_schema").unwrap();
 
     // Test cases for both success and failure scenarios
     let test_cases = vec![

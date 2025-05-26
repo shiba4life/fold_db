@@ -31,7 +31,8 @@ fn create_schema_with_transform() -> Schema {
 fn transform_output_updated_on_load() {
     let mut node = create_test_node();
     let schema = create_schema_with_transform();
-    node.load_schema(schema).unwrap();
+    node.add_schema_available(schema).unwrap();
+    node.approve_schema("OutputSchemaTest").unwrap();
 
     let loaded_schema = node.get_schema("OutputSchemaTest").unwrap().unwrap();
     let field = loaded_schema.fields.get("calc").unwrap();
