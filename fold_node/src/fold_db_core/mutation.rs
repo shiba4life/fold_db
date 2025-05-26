@@ -124,6 +124,10 @@ impl FoldDB {
                 .transform_orchestrator
                 .add_task(&schema.name, field_name, &mutation_hash);
         }
+        
+        // Process any queued transforms immediately after mutation
+        self.transform_orchestrator.process_queue();
+        
         Ok(())
     }
 }

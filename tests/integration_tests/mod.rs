@@ -13,3 +13,4 @@ pub mod transform_output_schema_tests;
 pub mod transform_sample_execution_tests;
 pub mod transform_manager_persistence_tests;
 pub mod schema_state_persistence_tests;
+pub mod test_automatic_transform_trigger;

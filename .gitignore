@@ -36,9 +36,24 @@ data/db*
 *.env
 *.bak
 
+# Generated schema files
+data/schemas/*.json
+fold_node/data/schemas/*.json
+data/schemas/
+fold_node/data/schemas/
+
+# Database and state files
+data/db/
+data/schema_states/
+fold_node/data/db/
+fold_node/data/schema_states/
+*.sled
+
 # Test data directories
 /test_data/
 /fold_node/test_data/
+/fold_node/src/datafold_node/static-react/data/
+/fold_node/src/datafold_node/static-react/data_temp/
 /fold_node/tests/test_data/request_forwarding/
 /tests/test_data/
 
@@ -92,4 +107,18 @@ target/llvm-cov/
 *.profraw
 *.profdata
 vendor/
+
+# Runtime generated files
+*.pid
+*.lock
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Schema and transform related files
+transform_*.json
+mutation_*.json
+query_*.json
+sample_*.json
 
