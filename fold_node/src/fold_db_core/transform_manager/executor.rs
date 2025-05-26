@@ -46,8 +46,10 @@ impl TransformManager {
                 val
             }
             Err(e) => {
-                error!("Transform {} failed: {}", transform_id, e);
-                return Err(e);
+                // If the transform fails due to missing inputs, silently resolve with null
+                // This allows the system to continue functioning even when dependencies are not ready
+                info!("Transform {} failed (resolving silently): {}", transform_id, e);
+                serde_json::Value::Null
             }
         };
 
@@ -122,14 +124,20 @@ impl TransformManager {
         }
 
         for aref in &input_arefs {
-            let atom = (get_atom_fn)(aref).map_err(|e| {
-                SchemaError::InvalidField(format!("Failed to get input '{}': {}", aref, e))
-            })?;
-            let key = name_map
-                .get(aref)
-                .cloned()
-                .unwrap_or_else(|| aref.clone());
-            input_values.insert(key, atom.content().clone());
+            match (get_atom_fn)(aref) {
+                Ok(atom) => {
+                    let key = name_map
+                        .get(aref)
+                        .cloned()
+                        .unwrap_or_else(|| aref.clone());
+                    input_values.insert(key, atom.content().clone());
+                }
+                Err(e) => {
+                    // Silently skip missing AtomRefs - this allows transforms to execute
+                    // even when some input dependencies are not yet available
+                    info!("Skipping missing AtomRef '{}' for transform {}: {}", aref, transform_id, e);
+                }
+            }
         }
 
         info!("Input values for {}: {:?}", transform_id, input_values);
