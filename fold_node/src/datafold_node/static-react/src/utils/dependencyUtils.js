@@ -50,7 +50,9 @@ export function getDependencyGraph(schemas) {
   Object.entries(deps).forEach(([target, arr]) => {
     arr.forEach(dep => {
       dep.types.forEach(type => {
-        edges.push({ source: dep.schema, target, type })
+        if (nodes.includes(dep.schema) && nodes.includes(target)) {
+          edges.push({ source: dep.schema, target, type })
+        }
       })
     })
   })
