@@ -1,4 +1,5 @@
 use fold_node::testing::SchemaCore;
+use tempfile::tempdir;
 
 #[test]
 fn test_invalid_schema_validation() {
@@ -32,8 +33,9 @@ fn test_invalid_schema_validation() {
             "min_payment_threshold": 0
         }
     }"#;
-
-    let core = SchemaCore::new("data").unwrap();
+    
+    let temp_dir = tempdir().unwrap();
+    let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
     let result = core.load_schema_from_json(invalid_json_str);
     assert!(result.is_err());
 }

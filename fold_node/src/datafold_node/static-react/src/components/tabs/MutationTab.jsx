@@ -56,12 +56,29 @@ function MutationTab({ schemas, onResult }) {
         body: JSON.stringify(mutation)
       })
       const data = await response.json()
+      
+      // Check if the HTTP response was successful
+      if (!response.ok) {
+        console.error('Mutation failed with status:', response.status, data)
+        const errData = {
+          error: data.error || `Mutation failed with status ${response.status}`,
+          status: response.status,
+          details: data
+        }
+        setResult(errData)
+        onResult(errData)
+        return
+      }
+      
       setResult(data)
       onResult(data)
       if (data.success) setMutationData({})
     } catch (error) {
       console.error('Failed to execute mutation:', error)
-      const errData = { error: 'Failed to execute mutation' }
+      const errData = {
+        error: `Network error: ${error.message}`,
+        details: error
+      }
       setResult(errData)
       onResult(errData)
     }
@@ -82,6 +99,20 @@ function MutationTab({ schemas, onResult }) {
         body: JSON.stringify(mutation)
       })
       const data = await execResp.json()
+      
+      // Check if the HTTP response was successful
+      if (!execResp.ok) {
+        console.error('Sample mutation failed with status:', execResp.status, data)
+        const errData = {
+          error: data.error || `Sample mutation failed with status ${execResp.status}`,
+          status: execResp.status,
+          details: data
+        }
+        setResult(errData)
+        onResult(errData)
+        return
+      }
+      
       setResult(data)
       onResult(data)
       if (data.success) setMutationData({})

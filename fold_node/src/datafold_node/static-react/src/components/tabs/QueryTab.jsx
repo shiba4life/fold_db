@@ -61,10 +61,25 @@ function QueryTab({ schemas, onResult }) {
       })
 
       const data = await response.json()
+      
+      // Check if the HTTP response was successful
+      if (!response.ok) {
+        console.error('Query failed with status:', response.status, data)
+        onResult({
+          error: data.error || `Query failed with status ${response.status}`,
+          status: response.status,
+          details: data
+        })
+        return
+      }
+      
       onResult(data)
     } catch (error) {
       console.error('Failed to execute query:', error)
-      onResult({ error: 'Failed to execute query' })
+      onResult({
+        error: `Network error: ${error.message}`,
+        details: error
+      })
     }
   }
 
@@ -87,6 +102,18 @@ function QueryTab({ schemas, onResult }) {
         body: JSON.stringify(query)
       })
       const data = await execResp.json()
+      
+      // Check if the HTTP response was successful
+      if (!execResp.ok) {
+        console.error('Sample query failed with status:', execResp.status, data)
+        onResult({
+          error: data.error || `Sample query failed with status ${execResp.status}`,
+          status: execResp.status,
+          details: data
+        })
+        return
+      }
+      
       onResult(data)
       setSelectedSample('')
     } catch (err) {

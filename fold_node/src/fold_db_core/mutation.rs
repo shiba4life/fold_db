@@ -56,19 +56,41 @@ impl FoldDB {
                     }
                 }
                 MutationType::Update => {
+                    let mut schema_clone = schema.clone();
                     self.field_manager.update_field(
-                        &schema,
+                        &mut schema_clone,
                         field_name,
                         value.clone(),
                         mutation.pub_key.clone(),
                     )?;
+
+                    if let Some(field_def) = schema_clone.fields.get(field_name) {
+                        if let Some(ref_atom_uuid) = field_def.ref_atom_uuid() {
+                            self.schema_manager.update_field_ref_atom_uuid(
+                                &mutation.schema_name,
+                                field_name,
+                                ref_atom_uuid.clone(),
+                            )?;
+                        }
+                    }
                 }
                 MutationType::Delete => {
+                    let mut schema_clone = schema.clone();
                     self.field_manager.delete_field(
-                        &schema,
+                        &mut schema_clone,
                         field_name,
                         mutation.pub_key.clone(),
                     )?;
+
+                    if let Some(field_def) = schema_clone.fields.get(field_name) {
+                        if let Some(ref_atom_uuid) = field_def.ref_atom_uuid() {
+                            self.schema_manager.update_field_ref_atom_uuid(
+                                &mutation.schema_name,
+                                field_name,
+                                ref_atom_uuid.clone(),
+                            )?;
+                        }
+                    }
                 }
                 MutationType::AddToCollection(ref id) => {
                     self.collection_manager.add_collection_field_value(

@@ -33,7 +33,10 @@ pub async fn execute_operation(
 
 /// Execute a query.
 pub async fn execute_query(query: web::Json<Value>, state: web::Data<AppState>) -> impl Responder {
-    let operation = match serde_json::from_value::<Operation>(query.into_inner()) {
+    let query_value = query.into_inner();
+    log::info!("Received query request: {}", serde_json::to_string(&query_value).unwrap_or_else(|_| "Invalid JSON".to_string()));
+    
+    let operation = match serde_json::from_value::<Operation>(query_value) {
         Ok(op) => match op {
             Operation::Query { .. } => op,
             _ => return HttpResponse::BadRequest().json(json!({"error": "Expected a query operation"})),
@@ -44,14 +47,23 @@ pub async fn execute_query(query: web::Json<Value>, state: web::Data<AppState>) 
     let mut node_guard = state.node.lock().await;
 
     match node_guard.execute_operation(operation) {
-        Ok(result) => HttpResponse::Ok().json(json!({"data": result})),
-        Err(e) => HttpResponse::InternalServerError().json(json!({"error": format!("Failed to execute query: {}", e)})),
+        Ok(result) => {
+            log::info!("Query executed successfully");
+            HttpResponse::Ok().json(json!({"data": result}))
+        },
+        Err(e) => {
+            log::error!("Query execution failed: {}", e);
+            HttpResponse::InternalServerError().json(json!({"error": format!("Failed to execute query: {}", e)}))
+        },
     }
 }
 
 /// Execute a mutation.
 pub async fn execute_mutation(mutation: web::Json<Value>, state: web::Data<AppState>) -> impl Responder {
-    let operation = match serde_json::from_value::<Operation>(mutation.into_inner()) {
+    let mutation_value = mutation.into_inner();
+    log::info!("Received mutation request: {}", serde_json::to_string(&mutation_value).unwrap_or_else(|_| "Invalid JSON".to_string()));
+    
+    let operation = match serde_json::from_value::<Operation>(mutation_value) {
         Ok(op) => match op {
             Operation::Mutation { .. } => op,
             _ => return HttpResponse::BadRequest().json(json!({"error": "Expected a mutation operation"})),
@@ -62,8 +74,14 @@ pub async fn execute_mutation(mutation: web::Json<Value>, state: web::Data<AppSt
     let mut node_guard = state.node.lock().await;
 
     match node_guard.execute_operation(operation) {
-        Ok(_) => HttpResponse::Ok().json(json!({"success": true})),
-        Err(e) => HttpResponse::InternalServerError().json(json!({"error": format!("Failed to execute mutation: {}", e)})),
+        Ok(_) => {
+            log::info!("Mutation executed successfully");
+            HttpResponse::Ok().json(json!({"success": true}))
+        },
+        Err(e) => {
+            log::error!("Mutation execution failed: {}", e);
+            HttpResponse::InternalServerError().json(json!({"error": format!("Failed to execute mutation: {}", e)}))
+        },
     }
 }
 

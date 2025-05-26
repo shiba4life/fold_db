@@ -69,7 +69,9 @@ impl TransformManager {
                         "Failed to acquire transform_outputs lock".to_string(),
                     )
                 })?;
-            transform_outputs.insert(transform_id.clone(), output_aref);
+            info!("Registering transform output: {} -> {}", transform_id, output_aref);
+            transform_outputs.insert(transform_id.clone(), output_aref.clone());
+            info!("Transform outputs now contains {} entries", transform_outputs.len());
         }
         
         // Register the input atom references

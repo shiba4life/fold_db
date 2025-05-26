@@ -274,32 +274,43 @@ impl FieldManager {
         content: Value,
         source_pub_key: String,
     ) -> Result<(), SchemaError> {
-        let mut ctx = AtomContext::new(schema, field, source_pub_key.clone(), &mut self.atom_manager);
+        let aref_uuid = {
+            let mut ctx = AtomContext::new(schema, field, source_pub_key.clone(), &mut self.atom_manager);
 
-        let field_def = ctx.get_field_def()?;
-        if matches!(field_def, crate::schema::types::FieldVariant::Collection(_)) {
-            return Err(SchemaError::InvalidField(
-                "Collection fields cannot be updated without id".to_string(),
-            ));
+            let field_def = ctx.get_field_def()?;
+            if matches!(field_def, crate::schema::types::FieldVariant::Collection(_)) {
+                return Err(SchemaError::InvalidField(
+                    "Collection fields cannot be updated without id".to_string(),
+                ));
+            }
+
+            // Special handling for Range fields
+            if let crate::schema::types::FieldVariant::Range(_range_field) = field_def {
+                return self.set_range_field_value(schema, field, content, source_pub_key);
+            }
+
+            let aref_uuid = ctx.get_or_create_atom_ref()?;
+            let prev_atom_uuid = {
+                let ref_atoms = ctx.atom_manager.get_ref_atoms();
+                let guard = ref_atoms
+                    .lock()
+                    .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
+                guard
+                    .get(&aref_uuid)
+                    .map(|aref| aref.get_atom_uuid().to_string())
+            };
+
+            ctx.create_and_update_atom(prev_atom_uuid, content.clone(), None)?;
+            aref_uuid
+        }; // ctx is dropped here
+
+        // Update the field definition with the aref_uuid if it doesn't have one
+        // We do this after dropping the context to avoid borrow conflicts
+        if let Some(field_def) = schema.fields.get_mut(field) {
+            if field_def.ref_atom_uuid().is_none() {
+                field_def.set_ref_atom_uuid(aref_uuid.clone());
+            }
         }
-
-        // Special handling for Range fields
-        if let crate::schema::types::FieldVariant::Range(_range_field) = field_def {
-            return self.set_range_field_value(schema, field, content, source_pub_key);
-        }
-
-        let aref_uuid = ctx.get_or_create_atom_ref()?;
-        let prev_atom_uuid = {
-            let ref_atoms = ctx.atom_manager.get_ref_atoms();
-            let guard = ref_atoms
-                .lock()
-                .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
-            guard
-                .get(&aref_uuid)
-                .map(|aref| aref.get_atom_uuid().to_string())
-        };
-
-        ctx.create_and_update_atom(prev_atom_uuid, content.clone(), None)?;
 
         info!(
             "set_field_value - schema: {}, field: {}, aref_uuid: {}, result: success",
@@ -358,24 +369,35 @@ impl FieldManager {
 
     pub fn update_field(
         &mut self,
-        schema: &Schema,
+        schema: &mut Schema,
         field: &str,
         content: Value,
         source_pub_key: String,
     ) -> Result<(), SchemaError> {
-        let mut ctx = AtomContext::new(schema, field, source_pub_key, &mut self.atom_manager);
+        let aref_uuid = {
+            let mut ctx = AtomContext::new(schema, field, source_pub_key, &mut self.atom_manager);
 
-        let field_def = ctx.get_field_def()?;
-        if matches!(field_def, crate::schema::types::FieldVariant::Collection(_)) {
-            return Err(SchemaError::InvalidField(
-                "Collection fields cannot be updated".to_string(),
-            ));
+            let field_def = ctx.get_field_def()?;
+            if matches!(field_def, crate::schema::types::FieldVariant::Collection(_)) {
+                return Err(SchemaError::InvalidField(
+                    "Collection fields cannot be updated".to_string(),
+                ));
+            }
+
+            let aref_uuid = ctx.get_or_create_atom_ref()?;
+            let prev_atom_uuid = ctx.get_prev_atom_uuid(&aref_uuid)?;
+
+            ctx.create_and_update_atom(Some(prev_atom_uuid), content.clone(), None)?;
+            aref_uuid
+        }; // ctx is dropped here
+
+        // Update the field definition with the aref_uuid if it doesn't have one
+        // We do this after dropping the context to avoid borrow conflicts
+        if let Some(field_def) = schema.fields.get_mut(field) {
+            if field_def.ref_atom_uuid().is_none() {
+                field_def.set_ref_atom_uuid(aref_uuid.clone());
+            }
         }
-
-        let aref_uuid = ctx.get_or_create_atom_ref()?;
-        let prev_atom_uuid = ctx.get_prev_atom_uuid(&aref_uuid)?;
-
-        ctx.create_and_update_atom(Some(prev_atom_uuid), content.clone(), None)?;
 
         info!(
             "update_field - schema: {}, field: {}, aref_uuid: {}, result: success",
@@ -389,23 +411,34 @@ impl FieldManager {
 
     pub fn delete_field(
         &mut self,
-        schema: &Schema,
+        schema: &mut Schema,
         field: &str,
         source_pub_key: String,
     ) -> Result<(), SchemaError> {
-        let mut ctx = AtomContext::new(schema, field, source_pub_key, &mut self.atom_manager);
+        let aref_uuid = {
+            let mut ctx = AtomContext::new(schema, field, source_pub_key, &mut self.atom_manager);
 
-        let field_def = ctx.get_field_def()?;
-        if matches!(field_def, crate::schema::types::FieldVariant::Collection(_)) {
-            return Err(SchemaError::InvalidField(
-                "Collection fields cannot be deleted without id".to_string(),
-            ));
+            let field_def = ctx.get_field_def()?;
+            if matches!(field_def, crate::schema::types::FieldVariant::Collection(_)) {
+                return Err(SchemaError::InvalidField(
+                    "Collection fields cannot be deleted without id".to_string(),
+                ));
+            }
+
+            let aref_uuid = ctx.get_or_create_atom_ref()?;
+            let prev_atom_uuid = ctx.get_prev_atom_uuid(&aref_uuid)?;
+
+            ctx.create_and_update_atom(Some(prev_atom_uuid), Value::Null, Some(AtomStatus::Deleted))?;
+            aref_uuid
+        }; // ctx is dropped here
+
+        // Update the field definition with the aref_uuid if it doesn't have one
+        // We do this after dropping the context to avoid borrow conflicts
+        if let Some(field_def) = schema.fields.get_mut(field) {
+            if field_def.ref_atom_uuid().is_none() {
+                field_def.set_ref_atom_uuid(aref_uuid.clone());
+            }
         }
-
-        let aref_uuid = ctx.get_or_create_atom_ref()?;
-        let prev_atom_uuid = ctx.get_prev_atom_uuid(&aref_uuid)?;
-
-        ctx.create_and_update_atom(Some(prev_atom_uuid), Value::Null, Some(AtomStatus::Deleted))?;
 
         info!(
             "delete_field - schema: {}, field: {}, aref_uuid: {}, result: success",

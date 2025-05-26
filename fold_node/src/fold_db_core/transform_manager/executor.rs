@@ -150,6 +150,8 @@ impl TransformManager {
         transform_id: &str,
         result: JsonValue,
     ) -> Result<(), SchemaError> {
+        info!("persist_transform_result called for transform: {}", transform_id);
+        
         let output_aref = {
             let transform_outputs = self
                 .transform_outputs
@@ -160,9 +162,15 @@ impl TransformManager {
                     )
                 })?;
 
+            info!("Available transform outputs: {:?}", transform_outputs.keys().collect::<Vec<_>>());
+            
             match transform_outputs.get(transform_id) {
-                Some(aref_uuid) => aref_uuid.clone(),
+                Some(aref_uuid) => {
+                    info!("Found output ARef for {}: {}", transform_id, aref_uuid);
+                    aref_uuid.clone()
+                },
                 None => {
+                    error!("Transform output not found for: {}", transform_id);
                     return Err(SchemaError::InvalidField(format!(
                         "Transform output not found: {}",
                         transform_id
@@ -171,6 +179,7 @@ impl TransformManager {
             }
         };
 
+        info!("Creating atom for transform result: {:?}", result);
         let atom = match (self.create_atom_fn)(
             "transform_result",
             "transform_system".to_string(),
@@ -178,19 +187,27 @@ impl TransformManager {
             result.clone(),
             None,
         ) {
-            Ok(atom) => atom,
+            Ok(atom) => {
+                info!("Created atom with UUID: {}", atom.uuid());
+                atom
+            },
             Err(e) => {
+                error!("Failed to create atom: {}", e);
                 return Err(SchemaError::InvalidField(format!("Failed to create atom: {}", e)))
             }
         };
 
+        info!("Updating atom reference {} with atom {}", output_aref, atom.uuid());
         match (self.update_atom_ref_fn)(
             &output_aref,
             atom.uuid().to_string(),
             "transform_system".to_string(),
         ) {
-            Ok(_) => {}
+            Ok(_) => {
+                info!("Successfully updated atom reference {} with result", output_aref);
+            }
             Err(e) => {
+                error!("Failed to update atom reference {}: {}", output_aref, e);
                 return Err(SchemaError::InvalidField(format!(
                     "Failed to update atom reference: {}",
                     e
@@ -198,6 +215,7 @@ impl TransformManager {
             }
         }
 
+        info!("Transform result persisted successfully for {}", transform_id);
         Ok(())
     }
 

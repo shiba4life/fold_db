@@ -7,9 +7,11 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
   const [selectedSample, setSelectedSample] = useState('')
   const [loadingSample, setLoadingSample] = useState(false)
   const [samplesError, setSamplesError] = useState(null)
+  const [allSchemas, setAllSchemas] = useState([])
 
   useEffect(() => {
     fetchSampleSchemas()
+    fetchAllSchemas()
   }, [])
 
   const fetchSampleSchemas = async () => {
@@ -20,6 +22,41 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     } catch (err) {
       console.error('Failed to fetch sample schemas:', err)
       setSamplesError('Failed to load sample schemas')
+    }
+  }
+
+  const fetchAllSchemas = async () => {
+    try {
+      const resp = await fetch('/api/schemas')
+      const data = await resp.json()
+      setAllSchemas(data.data || [])
+    } catch (err) {
+      console.error('Failed to fetch all schemas:', err)
+    }
+  }
+
+  const loadSchema = async (schemaName) => {
+    try {
+      const resp = await fetch(`/api/schema/${schemaName}/load`, { method: 'POST' })
+      const data = await resp.json()
+      
+      if (!resp.ok) {
+        throw new Error(data.error || `Failed to load schema: ${resp.status}`)
+      }
+      
+      if (onResult) {
+        onResult(data)
+      }
+      if (onSchemaUpdated) {
+        onSchemaUpdated()
+      }
+      // Refresh the schema list
+      fetchAllSchemas()
+    } catch (err) {
+      console.error('Failed to load schema:', err)
+      if (onResult) {
+        onResult({ error: `Failed to load schema: ${err.message}` })
+      }
     }
   }
 
@@ -128,6 +165,7 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
 
   const renderSchema = (schema) => {
     const isExpanded = expandedSchemas[schema.name]
+    const isLoaded = schema.state && schema.state.toLowerCase() === 'loaded'
 
     return (
       <div key={schema.name} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md">
@@ -144,22 +182,41 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
               )}
               <h3 className="font-medium text-gray-900">{schema.name}</h3>
               <span className="text-xs text-gray-500">
-                ({Object.keys(schema.fields).length} fields)
+                ({Object.keys(schema.fields || {}).length} fields)
+              </span>
+              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                isLoaded
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-yellow-100 text-yellow-800'
+              }`}>
+                {isLoaded ? 'Loaded' : 'Unloaded'}
               </span>
             </div>
-            <button
-              className="group inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              onClick={(e) => {
-                e.stopPropagation()
-                removeSchema(schema.name)
-              }}
-            >
-              Unload
-            </button>
+            {isLoaded ? (
+              <button
+                className="group inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  removeSchema(schema.name)
+                }}
+              >
+                Unload
+              </button>
+            ) : (
+              <button
+                className="group inline-flex items-center px-2 py-1 text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  loadSchema(schema.name)
+                }}
+              >
+                Load
+              </button>
+            )}
           </div>
         </div>
         
-        {isExpanded && (
+        {isExpanded && schema.fields && (
           <div className="p-4 border-t border-gray-200">
             <div className="space-y-3">
               {Object.entries(schema.fields).map(([fieldName, field]) =>
@@ -205,7 +262,12 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
       </div>
 
       <div className="space-y-4">
-        {schemas.map(renderSchema)}
+        <h3 className="text-lg font-medium text-gray-900">All Schemas</h3>
+        {allSchemas.length > 0 ? (
+          allSchemas.map(renderSchema)
+        ) : (
+          <p className="text-gray-500">No schemas available. Load a sample schema to get started.</p>
+        )}
       </div>
     </div>
   )

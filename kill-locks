@@ -1,0 +1,3 @@
+#!/bin/bash
+# Quick script to kill database locks
+./cleanup_db_locks.sh

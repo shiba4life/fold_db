@@ -1,19 +1,59 @@
 function ResultsSection({ results }) {
   if (!results) return null
 
+  // Check if this is an error result
+  const isError = results.error || (results.status && results.status >= 400)
+  const hasData = results.data !== undefined
+
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 mt-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-        <span className="mr-2">Results</span>
+      <h3 className="text-lg font-semibold mb-4 flex items-center">
+        <span className={`mr-2 ${isError ? 'text-red-600' : 'text-gray-900'}`}>
+          {isError ? 'Error' : 'Results'}
+        </span>
         <span className="text-xs font-normal text-gray-500">
           ({typeof results === 'string' ? 'Text' : 'JSON'})
         </span>
+        {results.status && (
+          <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
+            results.status >= 400
+              ? 'bg-red-100 text-red-800'
+              : 'bg-green-100 text-green-800'
+          }`}>
+            Status: {results.status}
+          </span>
+        )}
       </h3>
-      <div className="bg-gray-50 rounded-md p-4 overflow-auto max-h-[500px]">
-        <pre className="font-mono text-sm text-gray-700 whitespace-pre-wrap">
+      
+      {isError && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h4 className="text-sm font-medium text-red-800">
+                Query Execution Failed
+              </h4>
+              <div className="mt-2 text-sm text-red-700">
+                <p>{results.error || 'An unknown error occurred'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div className={`rounded-md p-4 overflow-auto max-h-[500px] ${
+        isError ? 'bg-red-50 border border-red-200' : 'bg-gray-50'
+      }`}>
+        <pre className={`font-mono text-sm whitespace-pre-wrap ${
+          isError ? 'text-red-700' : 'text-gray-700'
+        }`}>
           {typeof results === 'string'
             ? results
-            : JSON.stringify(results, null, 2)
+            : JSON.stringify(hasData ? results.data : results, null, 2)
           }
         </pre>
       </div>

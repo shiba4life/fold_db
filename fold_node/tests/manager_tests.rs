@@ -66,16 +66,18 @@ fn test_field_manager_updates() {
     let value = field_manager.get_field_value(&schema, "name").unwrap();
     assert_eq!(value, json!("Alice"));
 
+    let mut schema_clone = schema.clone();
     field_manager
-        .update_field(&schema, "name", json!("Bob"), "key".to_string())
+        .update_field(&mut schema_clone, "name", json!("Bob"), "key".to_string())
         .unwrap();
-    let value = field_manager.get_field_value(&schema, "name").unwrap();
+    let value = field_manager.get_field_value(&schema_clone, "name").unwrap();
     assert_eq!(value, json!("Bob"));
 
+    let mut schema_clone2 = schema_clone.clone();
     field_manager
-        .delete_field(&schema, "name", "key".to_string())
+        .delete_field(&mut schema_clone2, "name", "key".to_string())
         .unwrap();
-    let value = field_manager.get_field_value(&schema, "name").unwrap();
+    let value = field_manager.get_field_value(&schema_clone2, "name").unwrap();
     assert_eq!(value, Value::Null);
 }
 

@@ -138,6 +138,9 @@ impl SchemaCore {
             all.insert(name.clone(), (schema, SchemaState::Loaded));
         }
 
+        // Ensure fields have proper ARefs assigned
+        let _ = self.map_fields(&name);
+
         // Persist state changes
         self.set_schema_state(&name, SchemaState::Loaded)?;
         info!("Schema '{}' loaded and state persisted", name);
@@ -325,6 +328,10 @@ impl SchemaCore {
                             if state == SchemaState::Loaded {
                                 let mut loaded = self.schemas.lock().map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
                                 loaded.insert(name.clone(), schema);
+                                drop(loaded); // Release the lock before calling map_fields
+                                
+                                // Ensure fields have proper ARefs assigned
+                                let _ = self.map_fields(&name);
                             }
                             info!("Loaded schema '{}' from disk", name);
                         }
@@ -431,8 +438,14 @@ impl SchemaCore {
         let mut atom_refs = Vec::new();
 
         // For unmapped fields, create a new ref_atom_uuid and AtomRef
+        // Only create new ARefs for fields that truly don't have them (None or empty)
         for field in schema.fields.values_mut() {
-            if field.ref_atom_uuid().is_none() {
+            let needs_new_aref = match field.ref_atom_uuid() {
+                None => true,
+                Some(uuid) => uuid.is_empty(),
+            };
+            
+            if needs_new_aref {
                 let ref_atom_uuid = Uuid::new_v4().to_string();
 
                 // Create a new AtomRef for this field
@@ -458,6 +471,20 @@ impl SchemaCore {
 
         // Persist the updated schema
         self.persist_schema(schema)?;
+
+        // Also update the available HashMap to keep it in sync
+        let updated_schema = schema.clone();
+        drop(schemas); // Release the schemas lock
+        
+        let mut available = self
+            .available
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+        
+        if let Some((_, state)) = available.get(schema_name) {
+            let state = *state;
+            available.insert(schema_name.to_string(), (updated_schema, state));
+        }
 
         Ok(atom_refs)
     }

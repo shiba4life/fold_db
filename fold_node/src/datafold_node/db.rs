@@ -160,11 +160,25 @@ impl DataFoldNode {
 
     /// Executes a query against the database.
     pub fn query(&mut self, mut query: Query) -> FoldDbResult<Vec<Result<Value, SchemaError>>> {
-        // if schema is not loaded, return an error
+        // Check if schema exists first
+        let schema_exists = {
+            let db = self.db.lock()
+                .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+            db.schema_manager.schema_exists(&query.schema_name).unwrap_or(false)
+        };
+        
+        if !schema_exists {
+            return Err(FoldDbError::Config(format!(
+                "Schema '{}' does not exist. Please create the schema first.",
+                query.schema_name
+            )));
+        }
+        
+        // if schema is not loaded, return an error with helpful message
         if !self.is_schema_loaded(&query.schema_name)? {
             return Err(FoldDbError::Config(format!(
-                "Schema {} is not loaded",
-                query.schema_name
+                "Schema '{}' exists but is not loaded. Please load the schema first using POST /api/schema/{}/load",
+                query.schema_name, query.schema_name
             )));
         }
         if !self.check_schema_permission(&query.schema_name)? {
@@ -185,10 +199,24 @@ impl DataFoldNode {
 
     /// Executes a mutation on the database.
     pub fn mutate(&mut self, mutation: Mutation) -> FoldDbResult<()> {
+        // Check if schema exists first
+        let schema_exists = {
+            let db = self.db.lock()
+                .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+            db.schema_manager.schema_exists(&mutation.schema_name).unwrap_or(false)
+        };
+        
+        if !schema_exists {
+            return Err(FoldDbError::Config(format!(
+                "Schema '{}' does not exist. Please create the schema first.",
+                mutation.schema_name
+            )));
+        }
+        
         if !self.is_schema_loaded(&mutation.schema_name)? {
             return Err(FoldDbError::Config(format!(
-                "Schema {} is not loaded",
-                mutation.schema_name
+                "Schema '{}' exists but is not loaded. Please load the schema first using POST /api/schema/{}/load",
+                mutation.schema_name, mutation.schema_name
             )));
         }
         if !self.check_schema_permission(&mutation.schema_name)? {

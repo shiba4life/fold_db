@@ -72,6 +72,25 @@ pub async fn unload_schema_route(path: web::Path<String>, state: web::Data<AppSt
     }
 }
 
+/// Load a schema that exists but is not currently loaded.
+pub async fn load_schema_route(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
+    let name = path.into_inner();
+    let mut node_guard = state.node.lock().await;
+
+    // First check if schema exists but is unloaded
+    match node_guard.get_schema(&name) {
+        Ok(Some(schema)) => {
+            // Schema exists, try to load it
+            match node_guard.load_schema(schema) {
+                Ok(_) => HttpResponse::Ok().json(json!({"success": true, "message": format!("Schema '{}' loaded successfully", name)})),
+                Err(e) => HttpResponse::InternalServerError().json(json!({"error": format!("Failed to load schema '{}': {}", name, e)})),
+            }
+        },
+        Ok(None) => HttpResponse::NotFound().json(json!({"error": format!("Schema '{}' not found", name)})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({"error": format!("Failed to get schema '{}': {}", name, e)})),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

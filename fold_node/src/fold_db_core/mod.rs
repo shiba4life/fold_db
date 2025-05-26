@@ -146,6 +146,25 @@ impl FoldDB {
         info!("Loading schema states from disk during FoldDB initialization");
         if let Err(e) = schema_manager.load_schema_states_from_disk() {
             info!("Failed to load schema states: {}", e);
+        } else {
+            // After loading schema states, we need to ensure AtomRefs are properly mapped and persisted
+            // for all loaded schemas
+            if let Ok(loaded_schemas) = schema_manager.list_loaded_schemas() {
+                for schema_name in loaded_schemas {
+                    if let Ok(atom_refs) = schema_manager.map_fields(&schema_name) {
+                        // Persist each atom ref
+                        for atom_ref in atom_refs {
+                            let aref_uuid = atom_ref.uuid().to_string();
+                            let atom_uuid = atom_ref.get_atom_uuid().clone();
+                            
+                            // Store the atom ref in the database
+                            if let Err(e) = atom_manager.update_atom_ref(&aref_uuid, atom_uuid, "system".to_string()) {
+                                info!("Failed to persist atom ref for schema '{}': {}", schema_name, e);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         Ok(Self {
@@ -182,7 +201,9 @@ impl FoldDB {
                 })?;
         }
 
+        // Get the updated schema with proper ARefs and register transforms
         if let Some(loaded_schema) = self.schema_manager.get_schema(&name)? {
+            info!("Registering transforms for schema '{}' with {} fields", name, loaded_schema.fields.len());
             self.register_transforms_for_schema(&loaded_schema)?;
         }
 
@@ -216,5 +237,10 @@ impl FoldDB {
     /// Mark a schema as unloaded without removing transforms.
     pub fn unload_schema(&self, schema_name: &str) -> Result<(), SchemaError> {
         self.schema_manager.unload_schema(schema_name)
+    }
+
+    /// Get a schema by name - public accessor for testing
+    pub fn get_schema(&self, schema_name: &str) -> Result<Option<crate::schema::Schema>, SchemaError> {
+        self.schema_manager.get_schema(schema_name)
     }
 }

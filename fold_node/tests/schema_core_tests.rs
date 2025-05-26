@@ -94,7 +94,8 @@ fn test_schema_persistence() {
 
 #[test]
 fn test_map_fields_success() {
-    let core = SchemaCore::new("data").unwrap();
+    let temp_dir = tempdir().unwrap();
+    let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
 
     let mut source_fields = HashMap::new();
     source_fields.insert(
