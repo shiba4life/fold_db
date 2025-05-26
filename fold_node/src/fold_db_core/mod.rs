@@ -9,6 +9,7 @@ mod mutation;
 mod transform_management;
 
 use std::sync::Arc;
+use log::info;
 use crate::atom::{Atom, AtomRefBehavior};
 use crate::db_operations::DbOperations;
 use crate::permissions::PermissionWrapper;
@@ -142,7 +143,10 @@ impl FoldDB {
             .set_orchestrator(Arc::clone(&orchestrator))
             .map_err(|e| sled::Error::Unsupported(e.to_string()))?;
 
-        let _ = schema_manager.load_schema_states_from_disk();
+        info!("Loading schema states from disk during FoldDB initialization");
+        if let Err(e) = schema_manager.load_schema_states_from_disk() {
+            info!("Failed to load schema states: {}", e);
+        }
 
         Ok(Self {
             atom_manager,

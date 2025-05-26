@@ -107,6 +107,12 @@ fn mutate_query_execute() {
     assert!(status.success());
 
     let status = Command::new(&exe)
+        .args(["-c", config.to_str().unwrap(), "allow-schema", "--name", "TestSchema"])
+        .status()
+        .expect("allow-schema command failed");
+    assert!(status.success());
+
+    let status = Command::new(&exe)
         .args([
             "-c",
             config.to_str().unwrap(),

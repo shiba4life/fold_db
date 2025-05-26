@@ -2,7 +2,7 @@ use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
 use crate::schema::Schema;
 use super::sample_manager::SampleManager;
-use super::{schema_routes, query_routes, network_routes};
+use super::{schema_routes, query_routes, network_routes, system_routes};
 use super::log_routes;
 
 use actix_cors::Cors;
@@ -149,6 +149,10 @@ impl DataFoldHttpServer {
                         // Log endpoints
                         .route("/logs", web::get().to(log_routes::list_logs))
                         .route("/logs/stream", web::get().to(log_routes::stream_logs))
+                        // System endpoints
+                        .route("/system/restart", web::post().to(system_routes::restart_node))
+                        .route("/system/soft-restart", web::post().to(system_routes::soft_restart_node))
+                        .route("/system/status", web::get().to(system_routes::get_system_status))
                         // Network endpoints
                         .service(
                             web::scope("/network")

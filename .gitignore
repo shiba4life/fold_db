@@ -27,6 +27,7 @@ Thumbs.db
 # Project specific
 /data/
 fold_node/data/
+fold_node/data_temp/
 src/datafold_node/data/db/
 src/datafold_node/data
 data/db*

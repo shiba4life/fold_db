@@ -38,6 +38,12 @@ enum Commands {
         #[arg(long, short, required = true)]
         name: String,
     },
+    /// Allow operations on a schema (loads it if unloaded)
+    AllowSchema {
+        /// Schema name to allow
+        #[arg(long, short, required = true)]
+        name: String,
+    },
     /// Execute a query operation
     Query {
         /// Schema name to query
@@ -109,6 +115,11 @@ fn handle_unload_schema(name: String, node: &mut DataFoldNode) -> Result<(), Box
     Ok(())
 }
 
+fn handle_allow_schema(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    node.allow_schema(&name)?;
+    info!("Schema '{}' allowed", name);
+    Ok(())
+}
 
 fn handle_query(
     node: &mut DataFoldNode,
@@ -227,6 +238,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::LoadSchema { path } => handle_load_schema(path, &mut node)?,
         Commands::ListSchemas {} => handle_list_schemas(&mut node)?,
         Commands::ListAvailableSchemas {} => handle_list_available_schemas(&mut node)?,
+        Commands::AllowSchema { name } => handle_allow_schema(name, &mut node)?,
         Commands::Query {
             schema,
             fields,

@@ -58,13 +58,16 @@ impl SchemaStorage {
     /// Load schema states from the sled tree
     pub fn load_states(&self) -> HashMap<String, SchemaState> {
         let mut map = HashMap::new();
+        info!("Loading states from sled tree...");
         for item in self.schema_states_tree.iter().flatten() {
             if let Ok(name) = String::from_utf8(item.0.to_vec()) {
                 if let Ok(state) = serde_json::from_slice::<SchemaState>(&item.1) {
+                    info!("Found schema state: {} = {:?}", name, state);
                     map.insert(name, state);
                 }
             }
         }
+        info!("Loaded {} schema states", map.len());
         map
     }
 

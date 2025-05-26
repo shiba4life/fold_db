@@ -156,17 +156,33 @@ impl SchemaCore {
         self.persist_schema(&schema)?;
 
         let name = schema.name.clone();
-        {
+        let state_to_use = {
             let mut available = self
                 .available
                 .lock()
                 .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-            available.insert(name.clone(), (schema, SchemaState::Unloaded));
-        }
+            
+            // Check if schema already exists and preserve its state
+            let existing_state = available.get(&name).map(|(_, state)| *state);
+            let state_to_use = existing_state.unwrap_or(SchemaState::Unloaded);
+            
+            available.insert(name.clone(), (schema, state_to_use));
+            
+            // If the existing state was Loaded, also add to the loaded schemas
+            if state_to_use == SchemaState::Loaded {
+                let mut schemas = self
+                    .schemas
+                    .lock()
+                    .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+                schemas.insert(name.clone(), available.get(&name).unwrap().0.clone());
+            }
+            
+            state_to_use
+        };
 
         // Persist state changes
         self.persist_states()?;
-        info!("Schema '{}' added as unloaded", name);
+        info!("Schema '{}' added with preserved state: {:?}", name, state_to_use);
 
         Ok(())
     }
@@ -179,6 +195,11 @@ impl SchemaCore {
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
         Ok(schemas.get(schema_name).cloned())
+    }
+
+    /// Gets the file path for a schema
+    pub fn get_schema_path(&self, schema_name: &str) -> PathBuf {
+        self.storage.schema_path(schema_name)
     }
 
     /// Updates the ref_atom_uuid for a specific field in a schema.
@@ -317,15 +338,50 @@ impl SchemaCore {
         Ok(())
     }
 
-    /// Loads only schema states from disk without populating the loaded schema map.
+    /// Loads schema states from disk and loads schemas that are marked as Loaded.
     pub fn load_schema_states_from_disk(&self) -> Result<(), SchemaError> {
         let states = self.load_states();
+        info!("Loading schema states from disk: {:?}", states);
         let mut available = self
             .available
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+        let mut schemas = self
+            .schemas
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            
         for (name, state) in states {
-            available.insert(name.clone(), (Schema::new(name), state));
+            if state == SchemaState::Loaded {
+                // Load the actual schema from disk
+                let schema_path = self.storage.schema_path(&name);
+                if schema_path.exists() {
+                    match std::fs::read_to_string(&schema_path) {
+                        Ok(schema_content) => {
+                            match serde_json::from_str::<Schema>(&schema_content) {
+                                Ok(schema) => {
+                                    info!("Auto-loading schema '{}' from disk", name);
+                                    schemas.insert(name.clone(), schema.clone());
+                                    available.insert(name, (schema, state));
+                                }
+                                Err(e) => {
+                                    info!("Failed to parse schema '{}': {}", name, e);
+                                    available.insert(name.clone(), (Schema::new(name), SchemaState::Unloaded));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            info!("Failed to read schema file for '{}': {}", name, e);
+                            available.insert(name.clone(), (Schema::new(name), SchemaState::Unloaded));
+                        }
+                    }
+                } else {
+                    info!("Schema file not found for '{}', marking as unloaded", name);
+                    available.insert(name.clone(), (Schema::new(name), SchemaState::Unloaded));
+                }
+            } else {
+                available.insert(name.clone(), (Schema::new(name), state));
+            }
         }
         Ok(())
     }

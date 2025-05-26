@@ -17,27 +17,15 @@ pub struct SchemaWithState {
 }
 
 impl DataFoldNode {
-    /// Ensure a schema is loaded into memory if its state is `Loaded` on disk.
-    fn ensure_schema_loaded(&mut self, schema_name: &str) -> FoldDbResult<()> {
+
+    pub fn is_schema_loaded(&self, schema_name: &str) -> FoldDbResult<bool> {
         let db = self
             .db
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        if db.schema_manager.get_schema(schema_name)?.is_some() {
-            return Ok(());
-        }
-        if matches!(db.schema_manager.get_schema_state(schema_name), Some(SchemaState::Loaded)) {
-            let path = self
-                .config
-                .storage_path
-                .join("schemas")
-                .join(format!("{}.json", schema_name));
-            db.schema_manager
-                .load_schema_from_file(path.to_str().ok_or_else(|| FoldDbError::Config("Invalid schema path".into()))?)
-                .map_err(|e| FoldDbError::Database(e.to_string()))?;
-        }
-        Ok(())
+        Ok(matches!(db.schema_manager.get_schema_state(schema_name), Some(SchemaState::Loaded)))
     }
+    
     /// Loads a schema into the database and grants this node permission.
     pub fn load_schema(&mut self, schema: Schema) -> FoldDbResult<()> {
         let schema_name = schema.name.clone();
@@ -172,13 +160,19 @@ impl DataFoldNode {
 
     /// Executes a query against the database.
     pub fn query(&mut self, mut query: Query) -> FoldDbResult<Vec<Result<Value, SchemaError>>> {
+        // if schema is not loaded, return an error
+        if !self.is_schema_loaded(&query.schema_name)? {
+            return Err(FoldDbError::Config(format!(
+                "Schema {} is not loaded",
+                query.schema_name
+            )));
+        }
         if !self.check_schema_permission(&query.schema_name)? {
             return Err(FoldDbError::Config(format!(
                 "Permission denied for schema {}",
                 query.schema_name
             )));
         }
-        self.ensure_schema_loaded(&query.schema_name)?;
         if query.trust_distance == 0 {
             query.trust_distance = self.config.default_trust_distance;
         }
@@ -191,13 +185,18 @@ impl DataFoldNode {
 
     /// Executes a mutation on the database.
     pub fn mutate(&mut self, mutation: Mutation) -> FoldDbResult<()> {
+        if !self.is_schema_loaded(&mutation.schema_name)? {
+            return Err(FoldDbError::Config(format!(
+                "Schema {} is not loaded",
+                mutation.schema_name
+            )));
+        }
         if !self.check_schema_permission(&mutation.schema_name)? {
             return Err(FoldDbError::Config(format!(
                 "Permission denied for schema {}",
                 mutation.schema_name
             )));
         }
-        self.ensure_schema_loaded(&mutation.schema_name)?;
         let mut db = self
             .db
             .lock()

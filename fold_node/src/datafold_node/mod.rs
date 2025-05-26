@@ -16,6 +16,7 @@ pub mod sample_manager;
 pub mod schema_routes;
 pub mod query_routes;
 pub mod network_routes;
+pub mod system_routes;
 pub mod loader;
 pub mod log_routes;
 mod db;

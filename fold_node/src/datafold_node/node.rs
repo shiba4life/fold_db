@@ -107,7 +107,10 @@ impl DataFoldNode {
 
     /// Loads an existing database node from the specified configuration.
     pub fn load(config: NodeConfig) -> FoldDbResult<Self> {
-        Self::new(config)
+        info!("Loading DataFoldNode from config");
+        let node = Self::new(config)?;
+        info!("DataFoldNode loaded successfully");
+        Ok(node)
     }
 
 
@@ -351,6 +354,90 @@ impl DataFoldNode {
     /// Gets the unique identifier for this node.
     pub fn get_node_id(&self) -> &str {
         &self.node_id
+    }
+
+    /// Restart the node by reinitializing all components
+    pub async fn restart(&mut self) -> FoldDbResult<()> {
+        info!("Restarting DataFoldNode...");
+        
+        // Stop network if it's running
+        if self.network.is_some() {
+            info!("Stopping network service for restart");
+            if let Err(e) = self.stop_network().await {
+                log::warn!("Failed to stop network during restart: {}", e);
+            }
+        }
+
+        // Get the storage path before dropping the old database
+        let storage_path = self.config
+            .storage_path
+            .to_str()
+            .ok_or_else(|| FoldDbError::Config("Invalid storage path".to_string()))?
+            .to_string();
+
+        // Properly close the existing database by dropping all references
+        info!("Closing existing database");
+        let old_db = std::mem::replace(&mut self.db, Arc::new(Mutex::new(
+            // Create a dummy database with a different path to avoid conflicts
+            FoldDB::new(&format!("{}_temp", storage_path))?
+        )));
+        
+        // Ensure the old database is fully dropped
+        drop(old_db);
+        
+        // Wait for file system to release locks
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        // Create new database instance
+        info!("Reinitializing database");
+        let new_db = Arc::new(Mutex::new(FoldDB::new(&storage_path)?));
+
+        // Update the database reference
+        self.db = new_db;
+
+        // Clear network state
+        self.network = None;
+
+        // Clear trusted nodes (they can be re-added if needed)
+        self.trusted_nodes.clear();
+
+        info!("DataFoldNode restart completed successfully");
+        Ok(())
+    }
+
+    /// Perform a soft restart that preserves network connections
+    pub async fn soft_restart(&mut self) -> FoldDbResult<()> {
+        info!("Performing soft restart of DataFoldNode...");
+        
+        // Get the storage path before dropping the old database
+        let storage_path = self.config
+            .storage_path
+            .to_str()
+            .ok_or_else(|| FoldDbError::Config("Invalid storage path".to_string()))?
+            .to_string();
+
+        // Properly close the existing database by dropping all references
+        info!("Closing existing database");
+        let old_db = std::mem::replace(&mut self.db, Arc::new(Mutex::new(
+            // Create a dummy database with a different path to avoid conflicts
+            FoldDB::new(&format!("{}_temp", storage_path))?
+        )));
+        
+        // Ensure the old database is fully dropped
+        drop(old_db);
+        
+        // Wait for file system to release locks
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        // Create new database instance
+        info!("Reinitializing database");
+        let new_db = Arc::new(Mutex::new(FoldDB::new(&storage_path)?));
+
+        // Update the database reference
+        self.db = new_db;
+
+        info!("DataFoldNode soft restart completed successfully");
+        Ok(())
     }
 
 }
