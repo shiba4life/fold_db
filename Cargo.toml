@@ -69,5 +69,9 @@ reqwest = { version = "0.11", features = ["json"] }
 name = "fold_db"
 path = "src/lib.rs"
 
+[[bin]]
+name = "test_available_schemas"
+path = "test_available_schemas.rs"
+
 [patch.crates-io]
 env_logger = { path = "vendor/env_logger" }

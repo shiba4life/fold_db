@@ -35,6 +35,9 @@ fn test_automatic_transform_trigger() {
     };
     node.mutate(mutation).unwrap();
 
+    // Process the transform queue to execute any queued transforms
+    node.process_transform_queue().unwrap();
+
     // Query the result field to verify the transform was executed automatically
     let query = Query::new(
         "TransformSchema".to_string(),

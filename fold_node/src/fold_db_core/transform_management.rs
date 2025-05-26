@@ -210,4 +210,8 @@ impl FoldDB {
     pub fn run_transform(&self, transform_id: &str) -> Result<Value, SchemaError> {
         self.transform_manager.execute_transform_now(transform_id)
     }
+
+    pub fn process_transform_queue(&self) {
+        self.transform_orchestrator.process_queue()
+    }
 }

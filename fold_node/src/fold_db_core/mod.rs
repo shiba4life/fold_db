@@ -300,4 +300,29 @@ impl FoldDB {
     pub fn get_schema(&self, schema_name: &str) -> Result<Option<crate::schema::Schema>, SchemaError> {
         self.schema_manager.get_schema(schema_name)
     }
+
+    /// List all loaded (approved) schemas
+    pub fn list_loaded_schemas(&self) -> Result<Vec<String>, SchemaError> {
+        self.schema_manager.list_loaded_schemas()
+    }
+
+    /// List all available schemas (any state)
+    pub fn list_available_schemas(&self) -> Result<Vec<String>, SchemaError> {
+        self.schema_manager.list_available_schemas()
+    }
+
+    /// Get the current state of a schema
+    pub fn get_schema_state(&self, schema_name: &str) -> Option<SchemaState> {
+        self.schema_manager.get_schema_state(schema_name)
+    }
+
+    /// Check if a schema exists
+    pub fn schema_exists(&self, schema_name: &str) -> Result<bool, SchemaError> {
+        self.schema_manager.schema_exists(schema_name)
+    }
+
+    /// List all schemas with their states
+    pub fn list_schemas_with_state(&self) -> Result<HashMap<String, SchemaState>, SchemaError> {
+        self.load_schema_state()
+    }
 }

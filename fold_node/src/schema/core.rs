@@ -248,12 +248,76 @@ impl SchemaCore {
         Ok(discovered_schemas)
     }
 
+    /// Discover schemas from the available_schemas directory
+    pub fn discover_available_schemas(&self) -> Result<Vec<Schema>, SchemaError> {
+        let mut discovered_schemas = Vec::new();
+        let available_schemas_dir = PathBuf::from("available_schemas");
+        
+        info!("Discovering available schemas from {}", available_schemas_dir.display());
+        if let Ok(entries) = std::fs::read_dir(&available_schemas_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().map(|e| e == "json").unwrap_or(false) {
+                    if let Ok(contents) = std::fs::read_to_string(&path) {
+                        let mut schema_opt = serde_json::from_str::<Schema>(&contents).ok();
+                        if schema_opt.is_none() {
+                            if let Ok(json_schema) = serde_json::from_str::<JsonSchemaDefinition>(&contents) {
+                                if let Ok(schema) = self.interpret_schema(json_schema) {
+                                    schema_opt = Some(schema);
+                                }
+                            }
+                        }
+                        if let Some(mut schema) = schema_opt {
+                            self.fix_transform_outputs(&mut schema);
+                            let schema_name = schema.name.clone();
+                            discovered_schemas.push(schema);
+                            info!("Discovered available schema '{}' from file", schema_name);
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(discovered_schemas)
+    }
+
+    /// Load all schemas from the available_schemas directory into SchemaCore
+    pub fn load_available_schemas_from_directory(&self) -> Result<(), SchemaError> {
+        let discovered_schemas = self.discover_available_schemas()?;
+        
+        for schema in discovered_schemas {
+            let schema_name = schema.name.clone();
+            info!("Loading available schema '{}' into SchemaCore", schema_name);
+            self.load_schema_internal(schema)?;
+        }
+        
+        info!("Loaded {} schemas from available_schemas directory", self.list_available_schemas()?.len());
+        Ok(())
+    }
+
     // ========== CONSOLIDATED SCHEMA API ==========
     
-    /// Fetch available schemas from files (example schemas directory)
+    /// Fetch available schemas from files (both data/schemas and available_schemas directories)
     pub fn fetch_available_schemas(&self) -> Result<Vec<String>, SchemaError> {
-        let discovered = self.discover_schemas_from_files()?;
-        Ok(discovered.into_iter().map(|s| s.name).collect())
+        let mut all_schemas = Vec::new();
+        
+        // Get schemas from the default data/schemas directory
+        let discovered_default = self.discover_schemas_from_files()?;
+        all_schemas.extend(discovered_default.into_iter().map(|s| s.name));
+        
+        // Get schemas from the available_schemas directory
+        let discovered_available = self.discover_available_schemas()?;
+        all_schemas.extend(discovered_available.into_iter().map(|s| s.name));
+        
+        // Remove duplicates while preserving order
+        let mut unique_schemas = Vec::new();
+        for schema_name in all_schemas {
+            if !unique_schemas.contains(&schema_name) {
+                unique_schemas.push(schema_name);
+            }
+        }
+        
+        Ok(unique_schemas)
     }
 
     /// Load schema state from sled
@@ -432,12 +496,29 @@ impl SchemaCore {
         self.set_available(schema_name)
     }
 
-    /// Loads all schema files from the schemas directory and restores their states.
+    /// Loads all schema files from both the schemas directory and available_schemas directory and restores their states.
     /// Schemas marked as Approved will be loaded into active memory.
     pub fn load_schemas_from_disk(&self) -> Result<(), SchemaError> {
         let states = self.load_states();
+        
+        // Load from default schemas directory
         info!("Loading schemas from {}", self.storage.schemas_dir.display());
-        if let Ok(entries) = std::fs::read_dir(&self.storage.schemas_dir) {
+        self.load_schemas_from_directory(&self.storage.schemas_dir, &states)?;
+        
+        // Load from available_schemas directory
+        let available_schemas_dir = PathBuf::from("available_schemas");
+        info!("Loading schemas from {}", available_schemas_dir.display());
+        self.load_schemas_from_directory(&available_schemas_dir, &states)?;
+        
+        // Persist any changes to schema states from newly discovered schemas
+        self.persist_states()?;
+
+        Ok(())
+    }
+
+    /// Helper method to load schemas from a specific directory
+    fn load_schemas_from_directory(&self, dir: &PathBuf, states: &HashMap<String, SchemaState>) -> Result<(), SchemaError> {
+        if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.extension().map(|e| e == "json").unwrap_or(false) {
@@ -469,15 +550,12 @@ impl SchemaCore {
                                 // Ensure fields have proper ARefs assigned
                                 let _ = self.map_fields(&name);
                             }
-                            info!("Loaded schema '{}' from disk with state: {:?}", name, state);
+                            info!("Loaded schema '{}' from {} with state: {:?}", name, dir.display(), state);
                         }
                     }
                 }
             }
         }
-        // Persist any changes to schema states from newly discovered schemas
-        self.persist_states()?;
-
         Ok(())
     }
 

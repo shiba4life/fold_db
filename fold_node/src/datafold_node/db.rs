@@ -170,6 +170,16 @@ impl DataFoldNode {
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
         Ok(db.run_transform(transform_id)?)
     }
+
+    /// Process all queued transforms.
+    pub fn process_transform_queue(&self) -> FoldDbResult<()> {
+        let db = self
+            .db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.process_transform_queue();
+        Ok(())
+    }
 }
 
 #[cfg(test)]
