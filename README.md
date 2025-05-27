@@ -193,8 +193,7 @@ cargo test --package fold_node
 
 ### UI Tests
 
-The React UI uses Node's built-in test runner. If a `test` script exists in the
-package configuration, run the tests with:
+The React UI uses Node's built-in test runner. Run the tests with:
 
 1. Install Node.js dependencies:
 ```bash
@@ -206,8 +205,7 @@ npm install
 ```bash
 npm test
 ```
-
-Any available tests will verify the React components and UI logic.
+The test runner automatically executes all files in the `tests` directory.
 
 ## Generating Coverage Reports
 
