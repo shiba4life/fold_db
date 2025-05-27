@@ -26,7 +26,7 @@ use uuid::Uuid;
 fn setup_managers() -> (FieldManager, CollectionManager, AtomManager) {
     let temp = tempdir().unwrap();
     let db = sled::open(temp.path()).unwrap();
-    let db_ops = fold_node::db_operations::DbOperations::new(db);
+    let db_ops = fold_node::db_operations::DbOperations::new(db).unwrap();
     let atom_manager = AtomManager::new(db_ops);
     let field_manager = FieldManager::new(atom_manager.clone());
     let collection_manager = CollectionManager::new(field_manager.clone());

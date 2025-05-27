@@ -40,18 +40,25 @@ pub struct SchemaCore {
     schemas: Mutex<HashMap<String, Schema>>,
     /// All schemas known to the system and their load state
     available: Mutex<HashMap<String, (Schema, SchemaState)>>,
-    /// Persistent storage helper
+    /// Persistent storage helper (legacy)
     storage: SchemaStorage,
+    /// Unified database operations (new)
+    db_ops: Option<std::sync::Arc<crate::db_operations::DbOperations>>,
+    /// Schema directory path
+    #[allow(dead_code)]
+    schemas_dir: PathBuf,
 }
 
 impl SchemaCore {
     /// Internal helper to create the schema directory and construct the struct.
     fn init_with_dir(schemas_dir: PathBuf, schema_states_tree: Tree, schemas_tree: Tree) -> Result<Self, SchemaError> {
-        let storage = SchemaStorage::new(schemas_dir, schema_states_tree, schemas_tree)?;
+        let storage = SchemaStorage::new(schemas_dir.clone(), schema_states_tree, schemas_tree)?;
         Ok(Self {
             schemas: Mutex::new(HashMap::new()),
             available: Mutex::new(HashMap::new()),
             storage,
+            db_ops: None,
+            schemas_dir,
         })
     }
 
@@ -81,6 +88,31 @@ impl SchemaCore {
         Self::init_with_dir(schemas_dir, schema_states_tree, schemas_tree)
     }
 
+    /// Creates a new `SchemaCore` using unified DbOperations (Phase 2 implementation)
+    pub fn new_with_db_ops(path: &str, db_ops: std::sync::Arc<crate::db_operations::DbOperations>) -> Result<Self, SchemaError> {
+        let schemas_dir = PathBuf::from(path).join("schemas");
+        
+        // Create directory if it doesn't exist
+        if let Err(e) = std::fs::create_dir_all(&schemas_dir) {
+            if e.kind() != std::io::ErrorKind::AlreadyExists {
+                return Err(SchemaError::InvalidData(format!(
+                    "Failed to create schemas directory: {}",
+                    e
+                )));
+            }
+        }
+        
+        Ok(Self {
+            schemas: Mutex::new(HashMap::new()),
+            available: Mutex::new(HashMap::new()),
+            storage: SchemaStorage::new(schemas_dir.clone(),
+                                      db_ops.db().open_tree("schema_states").map_err(|e| SchemaError::InvalidData(e.to_string()))?,
+                                      db_ops.db().open_tree("schemas").map_err(|e| SchemaError::InvalidData(e.to_string()))?)?,
+            db_ops: Some(db_ops),
+            schemas_dir,
+        })
+    }
+
     /// Gets the path for a schema file.
     pub fn schema_path(&self, schema_name: &str) -> PathBuf {
         self.storage.schema_path(schema_name)
@@ -88,21 +120,39 @@ impl SchemaCore {
 
     /// Persist all schema load states to the sled tree
     fn persist_states(&self) -> Result<(), SchemaError> {
-        let available = self
-            .available
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-        self.storage.persist_states(&available)
+        if let Some(_db_ops) = &self.db_ops {
+            // Use unified operations
+            self.persist_states_unified()
+        } else {
+            // Use legacy storage
+            let available = self
+                .available
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            self.storage.persist_states(&available)
+        }
     }
 
     /// Load schema states from the sled tree
     pub fn load_states(&self) -> HashMap<String, SchemaState> {
-        self.storage.load_states()
+        if self.db_ops.is_some() {
+            // Use unified operations
+            self.load_states_unified()
+        } else {
+            // Use legacy storage
+            self.storage.load_states()
+        }
     }
 
     /// Persists a schema to disk.
     fn persist_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
-        self.storage.persist_schema(schema)
+        if self.db_ops.is_some() {
+            // Use unified operations
+            self.persist_schema_unified(schema)
+        } else {
+            // Use legacy storage
+            self.storage.persist_schema(schema)
+        }
     }
 
     fn fix_transform_outputs(&self, schema: &mut Schema) {
@@ -862,6 +912,122 @@ impl SchemaCore {
 
         info!("Loading schema from file: {}, content length: {}", path, json_str.len());
         self.load_schema_from_json(&json_str)
+    }
+
+    // ========== UNIFIED DB OPERATIONS METHODS (Phase 2) ==========
+
+    /// Uses unified DbOperations for schema state persistence (when available)
+    fn persist_states_unified(&self) -> Result<(), SchemaError> {
+        if let Some(db_ops) = &self.db_ops {
+            let available = self
+                .available
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            
+            for (name, (_, state)) in available.iter() {
+                db_ops.store_schema_state(name, *state)?;
+            }
+            Ok(())
+        } else {
+            // Fallback to legacy storage
+            self.persist_states()
+        }
+    }
+
+    /// Uses unified DbOperations for schema state loading (when available)
+    fn load_states_unified(&self) -> HashMap<String, SchemaState> {
+        if let Some(db_ops) = &self.db_ops {
+            // Load all schema states using unified operations
+            let mut states = HashMap::new();
+            
+            // Get all available schemas and their states
+            let available = self.available.lock().ok();
+            if let Some(available) = available {
+                for schema_name in available.keys() {
+                    if let Ok(Some(state)) = db_ops.get_schema_state(schema_name) {
+                        states.insert(schema_name.clone(), state);
+                    }
+                }
+            }
+            
+            // Also try to get states for any schemas we might not know about yet
+            // This is a bit tricky since we need to know schema names first
+            // For now, we'll rely on the available schemas we already know about
+            states
+        } else {
+            // Fallback to legacy storage
+            self.load_states()
+        }
+    }
+
+    /// Uses unified DbOperations for schema persistence (when available)
+    fn persist_schema_unified(&self, schema: &Schema) -> Result<(), SchemaError> {
+        if let Some(db_ops) = &self.db_ops {
+            db_ops.store_schema(&schema.name, schema)
+        } else {
+            // Fallback to legacy storage
+            self.persist_schema(schema)
+        }
+    }
+
+    /// Uses unified DbOperations for schema loading (when available)
+    #[allow(dead_code)]
+    fn load_schema_unified(&self, schema_name: &str) -> Result<Option<Schema>, SchemaError> {
+        if let Some(db_ops) = &self.db_ops {
+            db_ops.get_schema(schema_name)
+        } else {
+            // Fallback to legacy storage
+            self.storage.load_schema(schema_name)
+        }
+    }
+
+    /// Uses unified DbOperations for listing schema names (when available)
+    #[allow(dead_code)]
+    fn list_schema_names_unified(&self) -> Result<Vec<String>, SchemaError> {
+        if let Some(db_ops) = &self.db_ops {
+            db_ops.list_all_schemas()
+        } else {
+            // Fallback to legacy storage
+            self.storage.list_schema_names()
+        }
+    }
+
+    /// Uses unified DbOperations for listing schemas by state (when available)
+    pub fn list_schemas_by_state_unified(&self, state: SchemaState) -> Result<Vec<String>, SchemaError> {
+        if let Some(db_ops) = &self.db_ops {
+            db_ops.list_schemas_by_state(state)
+        } else {
+            // Fallback to existing implementation
+            self.list_schemas_by_state(state)
+        }
+    }
+
+    /// Sets schema state using unified DbOperations (when available)
+    pub fn set_schema_state_unified(&self, schema_name: &str, state: SchemaState) -> Result<(), SchemaError> {
+        if let Some(db_ops) = &self.db_ops {
+            // Update in-memory state
+            let mut available = self
+                .available
+                .lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            if let Some((_, st)) = available.get_mut(schema_name) {
+                *st = state;
+            } else {
+                return Err(SchemaError::NotFound(format!("Schema {} not found", schema_name)));
+            }
+            drop(available);
+            
+            // Persist using unified operations
+            db_ops.store_schema_state(schema_name, state)
+        } else {
+            // Fallback to existing implementation
+            self.set_schema_state(schema_name, state)
+        }
+    }
+
+    /// Checks if unified DbOperations is available
+    pub fn has_unified_db_ops(&self) -> bool {
+        self.db_ops.is_some()
     }
 }
 

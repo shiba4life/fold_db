@@ -90,17 +90,19 @@ impl FoldDB {
 
         let metadata_tree = db.open_tree("metadata")?;
         let permissions_tree = db.open_tree("node_id_schema_permissions")?;
-        let transforms_tree = db.open_tree("transforms")?;
+        let _transforms_tree = db.open_tree("transforms")?;
         let orchestrator_tree = db.open_tree("orchestrator_state")?;
-        let schema_states_tree = db.open_tree("schema_states")?;
-        let schemas_tree = db.open_tree("schemas")?;
+        let _schema_states_tree = db.open_tree("schema_states")?;
+        let _schemas_tree = db.open_tree("schemas")?;
 
-        let db_ops = DbOperations::new(db.clone());
-        let atom_manager = AtomManager::new(db_ops);
+        let db_ops = DbOperations::new(db.clone())
+            .map_err(|e| sled::Error::Unsupported(e.to_string()))?;
+        
+        let atom_manager = AtomManager::new(db_ops.clone());
         let field_manager = FieldManager::new(atom_manager.clone());
         let collection_manager = CollectionManager::new(field_manager.clone());
         let schema_manager = Arc::new(
-            SchemaCore::new_with_trees(path, schema_states_tree, schemas_tree)
+            SchemaCore::new_with_db_ops(path, Arc::new(db_ops.clone()))
                 .map_err(|e| sled::Error::Unsupported(e.to_string()))?,
         );
         let atom_manager_clone = atom_manager.clone();
@@ -132,12 +134,12 @@ impl FoldDB {
         });
 
         let transform_manager = Arc::new(TransformManager::new(
-            transforms_tree,
+            Arc::new(db_ops.clone()),
             get_atom_fn,
             create_atom_fn,
             update_atom_ref_fn,
             get_field_fn,
-        ));
+        ).map_err(|e| sled::Error::Unsupported(e.to_string()))?);
 
         field_manager
             .set_transform_manager(Arc::clone(&transform_manager))

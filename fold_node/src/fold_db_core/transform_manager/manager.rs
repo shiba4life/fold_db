@@ -1,8 +1,11 @@
-use crate::schema::types::{Transform, SchemaError};
+use crate::schema::types::{Transform, SchemaError, TransformRegistration};
+use crate::db_operations::DbOperations;
+use crate::transform::TransformExecutor;
 use super::types::{CreateAtomFn, GetAtomFn, GetFieldFn, UpdateAtomRefFn, TransformRunner};
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
+use log::info;
 
 pub(super) const AREF_TO_TRANSFORMS_KEY: &str = "map_aref_to_transforms";
 pub(super) const TRANSFORM_TO_AREFS_KEY: &str = "map_transform_to_arefs";
@@ -12,8 +15,10 @@ pub(super) const TRANSFORM_TO_FIELDS_KEY: &str = "map_transform_to_fields";
 pub(super) const TRANSFORM_OUTPUTS_KEY: &str = "map_transform_outputs";
 
 pub struct TransformManager {
-    /// Tree for storing transforms
+    /// Tree for storing transforms (legacy)
     pub(super) transforms_tree: sled::Tree,
+    /// Unified database operations (new)
+    pub(super) db_ops: Option<std::sync::Arc<crate::db_operations::DbOperations>>,
     /// In-memory cache of registered transforms
     pub(super) registered_transforms: RwLock<HashMap<String, Transform>>,
     /// Maps atom reference UUIDs to the transforms that depend on them
@@ -39,71 +44,35 @@ pub struct TransformManager {
 }
 
 impl TransformManager {
-    /// Creates a new TransformManager instance
+    /// Creates a new TransformManager instance with unified database operations
     pub fn new(
-        transforms_tree: sled::Tree,
+        db_ops: std::sync::Arc<crate::db_operations::DbOperations>,
         get_atom_fn: GetAtomFn,
         create_atom_fn: CreateAtomFn,
         update_atom_ref_fn: UpdateAtomRefFn,
         get_field_fn: GetFieldFn,
-    ) -> Self {
-        // Load any persisted transforms
+    ) -> Result<Self, SchemaError> {
+        // Create a legacy tree for backward compatibility with existing code
+        let transforms_tree = db_ops.db().open_tree("transforms")
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to open transforms tree: {}", e)))?;
+
+        // Load any persisted transforms using unified operations
         let mut registered_transforms = HashMap::new();
-        for (key, value) in transforms_tree.iter().flatten() {
-            if let Ok(field_key) = String::from_utf8(key.to_vec()) {
-                if field_key.starts_with("map_") {
-                    continue;
-                }
-                if let Ok(transform) = serde_json::from_slice::<Transform>(&value) {
-                    registered_transforms.insert(field_key, transform);
-                }
+        let transform_ids = db_ops.list_transforms()?;
+        for transform_id in transform_ids {
+            if let Some(transform) = db_ops.get_transform(&transform_id)? {
+                registered_transforms.insert(transform_id, transform);
             }
         }
 
-        let aref_to_transforms = transforms_tree
-            .get(AREF_TO_TRANSFORMS_KEY)
-            .ok()
-            .and_then(|v| v)
-            .and_then(|v| serde_json::from_slice(&v).ok())
-            .unwrap_or_default();
+        // Load mappings using unified operations only
+        let (aref_to_transforms, transform_to_arefs, transform_input_names,
+             field_to_transforms, transform_to_fields, transform_outputs) =
+            Self::load_persisted_mappings_unified(&db_ops)?;
 
-        let transform_to_arefs = transforms_tree
-            .get(TRANSFORM_TO_AREFS_KEY)
-            .ok()
-            .and_then(|v| v)
-            .and_then(|v| serde_json::from_slice(&v).ok())
-            .unwrap_or_default();
-
-        let transform_input_names = transforms_tree
-            .get(TRANSFORM_INPUT_NAMES_KEY)
-            .ok()
-            .and_then(|v| v)
-            .and_then(|v| serde_json::from_slice(&v).ok())
-            .unwrap_or_default();
-
-        let field_to_transforms = transforms_tree
-            .get(FIELD_TO_TRANSFORMS_KEY)
-            .ok()
-            .and_then(|v| v)
-            .and_then(|v| serde_json::from_slice(&v).ok())
-            .unwrap_or_default();
-
-        let transform_to_fields = transforms_tree
-            .get(TRANSFORM_TO_FIELDS_KEY)
-            .ok()
-            .and_then(|v| v)
-            .and_then(|v| serde_json::from_slice(&v).ok())
-            .unwrap_or_default();
-
-        let transform_outputs = transforms_tree
-            .get(TRANSFORM_OUTPUTS_KEY)
-            .ok()
-            .and_then(|v| v)
-            .and_then(|v| serde_json::from_slice(&v).ok())
-            .unwrap_or_default();
-
-        Self {
+        Ok(Self {
             transforms_tree,
+            db_ops: Some(db_ops),
             registered_transforms: RwLock::new(registered_transforms),
             aref_to_transforms: RwLock::new(aref_to_transforms),
             transform_to_arefs: RwLock::new(transform_to_arefs),
@@ -115,9 +84,8 @@ impl TransformManager {
             create_atom_fn,
             update_atom_ref_fn,
             get_field_fn,
-        }
+        })
     }
-
 
     /// Returns true if a transform with the given id is registered.
     pub fn transform_exists(&self, transform_id: &str) -> Result<bool, SchemaError> {
@@ -202,6 +170,287 @@ impl TransformManager {
                 )
             })?;
         Ok(field_to_transforms.get(&key).cloned().unwrap_or_default())
+    }
+
+    /// Register transform using unified database operations
+    pub fn register_transform_with_db_ops(
+        &self,
+        registration: TransformRegistration,
+        db_ops: &Arc<DbOperations>,
+    ) -> Result<(), SchemaError> {
+        let TransformRegistration {
+            transform_id,
+            mut transform,
+            input_arefs,
+            input_names,
+            trigger_fields,
+            output_aref,
+            schema_name,
+            field_name,
+        } = registration;
+
+        // Validate the transform
+        TransformExecutor::validate_transform(&transform)?;
+
+        // Set transform output field
+        let output_field = format!("{}.{}", schema_name, field_name);
+        let inputs_len = input_arefs.len();
+        transform.set_output(output_field.clone());
+
+        // Store transform using unified operations
+        db_ops.store_transform(&transform_id, &transform)?;
+
+        // Update in-memory cache
+        {
+            let mut registered_transforms = self
+                .registered_transforms
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire registered_transforms lock".to_string(),
+                    )
+                })?;
+            registered_transforms.insert(transform_id.clone(), transform);
+        }
+
+        // Register the output atom reference
+        {
+            let mut transform_outputs = self
+                .transform_outputs
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire transform_outputs lock".to_string(),
+                    )
+                })?;
+            transform_outputs.insert(transform_id.clone(), output_aref.clone());
+        }
+
+        // Register the input atom references
+        {
+            let mut transform_to_arefs = self
+                .transform_to_arefs
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire transform_to_arefs lock".to_string(),
+                    )
+                })?;
+            let mut aref_set = HashSet::new();
+            for aref_uuid in &input_arefs {
+                aref_set.insert(aref_uuid.clone());
+            }
+            transform_to_arefs.insert(transform_id.clone(), aref_set);
+        }
+
+        // Store mapping of input names to refs
+        {
+            let mut transform_input_names = self
+                .transform_input_names
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire transform_input_names lock".to_string(),
+                    )
+                })?;
+            let mut map = HashMap::new();
+            for (aref_uuid, name) in input_arefs.iter().zip(input_names.iter()) {
+                map.insert(aref_uuid.clone(), name.clone());
+            }
+            transform_input_names.insert(transform_id.clone(), map);
+        }
+
+        // Register the fields that trigger this transform
+        {
+            let mut transform_to_fields = self
+                .transform_to_fields
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire transform_to_fields lock".to_string(),
+                    )
+                })?;
+            let mut field_to_transforms = self
+                .field_to_transforms
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire field_to_transforms lock".to_string(),
+                    )
+                })?;
+
+            let mut field_set = HashSet::new();
+            for field_key in &trigger_fields {
+                field_set.insert(field_key.clone());
+                let set = field_to_transforms.entry(field_key.clone()).or_default();
+                set.insert(transform_id.clone());
+            }
+
+            transform_to_fields.insert(transform_id.clone(), field_set);
+        }
+
+        // Update the reverse mapping (aref -> transforms)
+        {
+            let mut aref_to_transforms = self
+                .aref_to_transforms
+                .write()
+                .map_err(|_| {
+                    SchemaError::InvalidData(
+                        "Failed to acquire aref_to_transforms lock".to_string(),
+                    )
+                })?;
+
+            for aref_uuid in input_arefs {
+                let transform_set = aref_to_transforms.entry(aref_uuid).or_default();
+                transform_set.insert(transform_id.clone());
+            }
+        }
+
+        info!(
+            "Registered transform {} output {} with {} input references using unified operations",
+            transform_id,
+            output_field,
+            inputs_len
+        );
+
+        // Persist mappings using unified operations
+        self.persist_mappings_unified(db_ops)?;
+        Ok(())
+    }
+
+    /// Persist mappings using unified operations when available
+    pub fn persist_mappings_unified(&self, db_ops: &Arc<DbOperations>) -> Result<(), SchemaError> {
+        // Store aref_to_transforms mapping
+        {
+            let map = self.aref_to_transforms.read().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire aref_to_transforms lock".to_string())
+            })?;
+            let json = serde_json::to_vec(&*map).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize aref_to_transforms: {}", e))
+            })?;
+            db_ops.store_transform_mapping(AREF_TO_TRANSFORMS_KEY, &json)?;
+        }
+
+        // Store transform_to_arefs mapping
+        {
+            let map = self.transform_to_arefs.read().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire transform_to_arefs lock".to_string())
+            })?;
+            let json = serde_json::to_vec(&*map).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize transform_to_arefs: {}", e))
+            })?;
+            db_ops.store_transform_mapping(TRANSFORM_TO_AREFS_KEY, &json)?;
+        }
+
+        // Store transform_input_names mapping
+        {
+            let map = self.transform_input_names.read().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire transform_input_names lock".to_string())
+            })?;
+            let json = serde_json::to_vec(&*map).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize transform_input_names: {}", e))
+            })?;
+            db_ops.store_transform_mapping(TRANSFORM_INPUT_NAMES_KEY, &json)?;
+        }
+
+        // Store field_to_transforms mapping
+        {
+            let map = self.field_to_transforms.read().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire field_to_transforms lock".to_string())
+            })?;
+            let json = serde_json::to_vec(&*map).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize field_to_transforms: {}", e))
+            })?;
+            db_ops.store_transform_mapping(FIELD_TO_TRANSFORMS_KEY, &json)?;
+        }
+
+        // Store transform_to_fields mapping
+        {
+            let map = self.transform_to_fields.read().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire transform_to_fields lock".to_string())
+            })?;
+            let json = serde_json::to_vec(&*map).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize transform_to_fields: {}", e))
+            })?;
+            db_ops.store_transform_mapping(TRANSFORM_TO_FIELDS_KEY, &json)?;
+        }
+
+        // Store transform_outputs mapping
+        {
+            let map = self.transform_outputs.read().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire transform_outputs lock".to_string())
+            })?;
+            let json = serde_json::to_vec(&*map).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize transform_outputs: {}", e))
+            })?;
+            db_ops.store_transform_mapping(TRANSFORM_OUTPUTS_KEY, &json)?;
+        }
+
+        Ok(())
+    }
+
+    /// Load persisted mappings using unified operations
+    #[allow(clippy::type_complexity)]
+    fn load_persisted_mappings_unified(
+        db_ops: &Arc<DbOperations>,
+    ) -> Result<(
+        HashMap<String, HashSet<String>>,
+        HashMap<String, HashSet<String>>,
+        HashMap<String, HashMap<String, String>>,
+        HashMap<String, HashSet<String>>,
+        HashMap<String, HashSet<String>>,
+        HashMap<String, String>,
+    ), SchemaError> {
+        // Load aref_to_transforms
+        let aref_to_transforms = if let Some(data) = db_ops.get_transform_mapping(AREF_TO_TRANSFORMS_KEY)? {
+            serde_json::from_slice(&data).unwrap_or_default()
+        } else {
+            HashMap::new()
+        };
+
+        // Load transform_to_arefs
+        let transform_to_arefs = if let Some(data) = db_ops.get_transform_mapping(TRANSFORM_TO_AREFS_KEY)? {
+            serde_json::from_slice(&data).unwrap_or_default()
+        } else {
+            HashMap::new()
+        };
+
+        // Load transform_input_names
+        let transform_input_names = if let Some(data) = db_ops.get_transform_mapping(TRANSFORM_INPUT_NAMES_KEY)? {
+            serde_json::from_slice(&data).unwrap_or_default()
+        } else {
+            HashMap::new()
+        };
+
+        // Load field_to_transforms
+        let field_to_transforms = if let Some(data) = db_ops.get_transform_mapping(FIELD_TO_TRANSFORMS_KEY)? {
+            serde_json::from_slice(&data).unwrap_or_default()
+        } else {
+            HashMap::new()
+        };
+
+        // Load transform_to_fields
+        let transform_to_fields = if let Some(data) = db_ops.get_transform_mapping(TRANSFORM_TO_FIELDS_KEY)? {
+            serde_json::from_slice(&data).unwrap_or_default()
+        } else {
+            HashMap::new()
+        };
+
+        // Load transform_outputs
+        let transform_outputs = if let Some(data) = db_ops.get_transform_mapping(TRANSFORM_OUTPUTS_KEY)? {
+            serde_json::from_slice(&data).unwrap_or_default()
+        } else {
+            HashMap::new()
+        };
+
+        Ok((
+            aref_to_transforms,
+            transform_to_arefs,
+            transform_input_names,
+            field_to_transforms,
+            transform_to_fields,
+            transform_outputs,
+        ))
     }
 
 }

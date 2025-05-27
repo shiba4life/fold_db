@@ -9,7 +9,7 @@ use fold_node::fold_db_core::atom_manager::AtomManager;
 fn test_atom_history_retrieval() {
     let dir = tempdir().unwrap();
     let db = sled::open(dir.path()).unwrap();
-    let db_ops = DbOperations::new(db);
+    let db_ops = DbOperations::new(db).unwrap();
     let manager = AtomManager::new(db_ops);
 
     // create initial atom and reference
@@ -62,7 +62,7 @@ fn test_in_memory_caches_and_reinit() {
     let dir = tempdir().unwrap();
     let db = sled::open(dir.path()).unwrap();
     let db_clone = db.clone();
-    let db_ops = DbOperations::new(db);
+    let db_ops = DbOperations::new(db).unwrap();
     let manager = AtomManager::new(db_ops);
 
     let atom1 = manager
@@ -107,7 +107,7 @@ fn test_in_memory_caches_and_reinit() {
 fn test_reference_updates() {
     let dir = tempdir().unwrap();
     let db = sled::open(dir.path()).unwrap();
-    let db_ops = DbOperations::new(db);
+    let db_ops = DbOperations::new(db).unwrap();
     let manager = AtomManager::new(db_ops);
 
     let atom1 = manager
