@@ -44,13 +44,24 @@ impl FoldDB {
                     Err(e) => return Err(e),
                 };
 
-                if let Some(ref filter_value) = query.filter {
+                let result = if let Some(ref filter_value) = query.filter {
                     info!("Query processing - field: {}, has filter: true, filter: {:?}", field_name, filter_value);
                     self.field_manager.get_filtered_field_value(&schema, field_name, filter_value)
                 } else {
                     info!("Query processing - field: {}, has filter: false", field_name);
                     self.field_manager.get_field_value(&schema, field_name)
+                };
+                
+                match &result {
+                    Ok(value) => {
+                        info!("Query processing - field: {}, result: {:?}", field_name, value);
+                    }
+                    Err(e) => {
+                        info!("Query processing - field: {}, error: {:?}", field_name, e);
+                    }
                 }
+                
+                result
             })
             .collect::<Vec<Result<Value, SchemaError>>>()
     }

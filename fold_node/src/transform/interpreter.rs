@@ -184,8 +184,30 @@ impl Interpreter {
     fn add(&self, left: &Value, right: &Value) -> Result<Value, SchemaError> {
         match (left, right) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
-            (Value::String(a), Value::String(b)) => Ok(Value::String(format!("{}{}", a, b))),
-            _ => Err(SchemaError::InvalidField("Cannot add values of different types".to_string())),
+            (Value::String(a), Value::String(b)) => {
+                // Try to parse strings as numbers first
+                if let (Ok(num_a), Ok(num_b)) = (a.parse::<f64>(), b.parse::<f64>()) {
+                    Ok(Value::Number(num_a + num_b))
+                } else {
+                    // Fall back to string concatenation
+                    Ok(Value::String(format!("{}{}", a, b)))
+                }
+            },
+            (Value::Number(a), Value::String(b)) => {
+                if let Ok(num_b) = b.parse::<f64>() {
+                    Ok(Value::Number(a + num_b))
+                } else {
+                    Err(SchemaError::InvalidField("Cannot add number and non-numeric string".to_string()))
+                }
+            },
+            (Value::String(a), Value::Number(b)) => {
+                if let Ok(num_a) = a.parse::<f64>() {
+                    Ok(Value::Number(num_a + b))
+                } else {
+                    Err(SchemaError::InvalidField("Cannot add non-numeric string and number".to_string()))
+                }
+            },
+            _ => Err(SchemaError::InvalidField("Cannot add values of these types".to_string())),
         }
     }
     

@@ -7,15 +7,16 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-/// Handles persistence of schemas and their states on disk
+/// Handles persistence of schemas and their states using sled
 pub struct SchemaStorage {
     pub(crate) schemas_dir: PathBuf,
     pub(crate) schema_states_tree: Tree,
+    pub(crate) schemas_tree: Tree,
 }
 
 impl SchemaStorage {
     /// Create a new storage helper ensuring the schema directory exists
-    pub fn new(schemas_dir: PathBuf, schema_states_tree: Tree) -> Result<Self, SchemaError> {
+    pub fn new(schemas_dir: PathBuf, schema_states_tree: Tree, schemas_tree: Tree) -> Result<Self, SchemaError> {
         if let Err(e) = fs::create_dir_all(&schemas_dir) {
             if e.kind() != std::io::ErrorKind::AlreadyExists {
                 return Err(SchemaError::InvalidData(format!(
@@ -24,7 +25,7 @@ impl SchemaStorage {
                 )));
             }
         }
-        Ok(Self { schemas_dir, schema_states_tree })
+        Ok(Self { schemas_dir, schema_states_tree, schemas_tree })
     }
 
     /// Gets the path for a schema file
@@ -71,30 +72,43 @@ impl SchemaStorage {
         map
     }
 
-    /// Persists a schema to disk
+    /// Persists a schema to sled database
     pub fn persist_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
-        let path = self.schema_path(&schema.name);
-
-        info!("Persisting schema '{}' to {}", schema.name, path.display());
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                SchemaError::InvalidData(format!("Failed to create schema directory: {}", e))
-            })?;
-        }
-
-        let json = serde_json::to_string_pretty(schema)
+        info!("Persisting schema '{}' to sled database", schema.name);
+        
+        let bytes = serde_json::to_vec(schema)
             .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize schema: {}", e)))?;
-
-        fs::write(&path, json).map_err(|e| {
-            SchemaError::InvalidData(format!(
-                "Failed to write schema file: {}, path: {}",
-                e,
-                path.to_string_lossy()
-            ))
-        })?;
-
-        info!("Schema '{}' persisted to disk", schema.name);
+        
+        self.schemas_tree.insert(&schema.name, bytes)
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to persist schema to sled: {}", e)))?;
+        
+        info!("Schema '{}' persisted to sled database", schema.name);
         Ok(())
+    }
+
+    /// Loads a schema from sled database
+    pub fn load_schema(&self, schema_name: &str) -> Result<Option<Schema>, SchemaError> {
+        match self.schemas_tree.get(schema_name) {
+            Ok(Some(bytes)) => {
+                let schema: Schema = serde_json::from_slice(&bytes)
+                    .map_err(|e| SchemaError::InvalidData(format!("Failed to deserialize schema: {}", e)))?;
+                Ok(Some(schema))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(SchemaError::InvalidData(format!("Failed to load schema from sled: {}", e)))
+        }
+    }
+
+    /// Lists all schema names stored in sled
+    pub fn list_schema_names(&self) -> Result<Vec<String>, SchemaError> {
+        let mut names = Vec::new();
+        for key_result in self.schemas_tree.iter().keys() {
+            let key = key_result.map_err(|e| SchemaError::InvalidData(format!("Failed to read schema key: {}", e)))?;
+            let name = std::str::from_utf8(&key)
+                .map_err(|e| SchemaError::InvalidData(format!("Invalid UTF-8 in schema name: {}", e)))?;
+            names.push(name.to_string());
+        }
+        Ok(names)
     }
 }
 

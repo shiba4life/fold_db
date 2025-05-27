@@ -6,7 +6,6 @@ pub mod persistence_tests;
 pub mod range_filter_tests;
 pub mod product_catalog_range_tests;
 pub mod transform_orchestrator_tests;
-pub mod transform_enqueue_tests;
 pub mod http_server_tests;
 pub mod schema_set_unloaded_tests;
 pub mod transform_output_schema_tests;

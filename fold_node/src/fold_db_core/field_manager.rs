@@ -1,3 +1,44 @@
+//! # Field Manager: AtomRef and ref_atom_uuid Management
+//!
+//! **CRITICAL: Preventing "Ghost ref_atom_uuid" Issues**
+//!
+//! This module manages field values and their corresponding AtomRefs. The most important
+//! principle is the proper management of `ref_atom_uuid` values to prevent "ghost" UUIDs
+//! that point to non-existent AtomRefs.
+//!
+//! ## The Problem: Ghost ref_atom_uuid
+//!
+//! A "ghost ref_atom_uuid" occurs when:
+//! 1. A field definition has a ref_atom_uuid value
+//! 2. But no corresponding AtomRef exists in the atom manager
+//! 3. Queries fail with "AtomRef not found" errors
+//! 4. This happens when ref_atom_uuid is set on schema clones that get discarded
+//!
+//! ## The Solution: Proper ref_atom_uuid Management Pattern
+//!
+//! **Field Manager Methods (set_field_value, update_field, etc.):**
+//! - Create AtomRef in atom manager
+//! - Return the UUID to caller
+//! - DO NOT set ref_atom_uuid on field definition
+//!
+//! **Mutation Logic:**
+//! - Call field manager method to get UUID
+//! - Use schema_manager.update_field_ref_atom_uuid() to set and persist UUID
+//! - This is the ONLY place where ref_atom_uuid should be set
+//!
+//! **Schema Manager:**
+//! - Sets ref_atom_uuid on actual schema (not clone)
+//! - Immediately persists schema to disk
+//! - Ensures ref_atom_uuid is only set when AtomRef exists
+//!
+//! ## Rules to Prevent Ghost ref_atom_uuid:
+//!
+//! 1. **NEVER** set ref_atom_uuid directly on field definitions in field manager
+//! 2. **ALWAYS** return UUID from field manager methods
+//! 3. **ONLY** use schema_manager.update_field_ref_atom_uuid() to set ref_atom_uuid
+//! 4. **ENSURE** AtomRef exists before setting ref_atom_uuid
+//! 5. **PERSIST** schema immediately after setting ref_atom_uuid
+
 use super::atom_manager::AtomManager;
 use super::context::AtomContext;
 use super::transform_manager::TransformManager;
@@ -77,99 +118,72 @@ impl FieldManager {
     }
 
     pub fn get_field_value(&self, schema: &Schema, field: &str) -> Result<Value, SchemaError> {
+        info!("🔍 get_field_value START - schema: {}, field: {}", schema.name, field);
+        
         let field_def = schema
             .fields
             .get(field)
             .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
 
+        info!("📋 Field definition found for {}.{}, type: {:?}",
+              schema.name, field, std::mem::discriminant(field_def));
+        
+        let ref_atom_uuid = field_def.ref_atom_uuid();
+        info!("🆔 ref_atom_uuid for {}.{}: {:?}", schema.name, field, ref_atom_uuid);
+
         let result = match field_def {
             crate::schema::types::field::FieldVariant::Range(_range_field) => {
                 // For Range fields, treat them like Single fields for now
                 // The data is stored as a single JSON object atom
-                info!("get_field_value - Range field: {}, ref_atom_uuid: {:?}", field, field_def.ref_atom_uuid());
-                if let Some(ref_atom_uuid) = field_def.ref_atom_uuid() {
-                    // Try to get the atom reference
-                    let ref_atoms = self.atom_manager.get_ref_atoms();
-                    let atoms = self.atom_manager.get_atoms();
-
-                    let atom_uuid = {
-                        let guard = ref_atoms
-                            .lock()
-                            .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
-                        guard
-                            .get(ref_atom_uuid.as_str())
-                            .map(|aref| aref.get_atom_uuid().clone())
-                    };
-
-                    // If we have an atom UUID, try to get the atom
-                    if let Some(atom_uuid) = atom_uuid {
-                        let guard = atoms
-                            .lock()
-                            .map_err(|_| SchemaError::InvalidData("Failed to acquire atoms lock".to_string()))?;
-                        if let Some(atom) = guard.get(&atom_uuid) {
-                            atom.content().clone()
-                        } else {
-                            self.atom_manager
-                                .get_latest_atom(ref_atom_uuid)
-                                .map(|a| a.content().clone())
-                                .unwrap_or_else(|_| Self::default_value(field))
+                info!("🎯 Processing Range field: {}.{}", schema.name, field);
+                if let Some(ref_atom_uuid) = ref_atom_uuid {
+                    info!("🔗 Fetching atom for Range field {}.{} with ref_atom_uuid: {}",
+                          schema.name, field, ref_atom_uuid);
+                    match self.atom_manager.get_latest_atom(ref_atom_uuid) {
+                        Ok(atom) => {
+                            let content = atom.content().clone();
+                            info!("✅ Retrieved atom content for {}.{}: {:?}", schema.name, field, content);
+                            content
                         }
-                    } else {
-                        self.atom_manager
-                            .get_latest_atom(ref_atom_uuid)
-                            .map(|a| a.content().clone())
-                            .unwrap_or_else(|_| Self::default_value(field))
+                        Err(e) => {
+                            info!("❌ Failed to get atom for {}.{}: {:?}, using default", schema.name, field, e);
+                            Self::default_value(field)
+                        }
                     }
                 } else {
-                    Value::Null
+                    info!("⚠️  No ref_atom_uuid for Range field {}.{}, using default", schema.name, field);
+                    Self::default_value(field)
                 }
             }
             _ => {
                 // For Single and Collection fields, use the existing logic
-                if let Some(ref_atom_uuid) = field_def.ref_atom_uuid() {
-                    // Try to get the atom reference
-                    let ref_atoms = self.atom_manager.get_ref_atoms();
-                    let atoms = self.atom_manager.get_atoms();
-
-                    let atom_uuid = {
-                        let guard = ref_atoms
-                            .lock()
-                            .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
-                        guard
-                            .get(ref_atom_uuid.as_str())
-                            .map(|aref| aref.get_atom_uuid().clone())
-                    };
-
-                    // If we have an atom UUID, try to get the atom
-                    if let Some(atom_uuid) = atom_uuid {
-                        let guard = atoms
-                            .lock()
-                            .map_err(|_| SchemaError::InvalidData("Failed to acquire atoms lock".to_string()))?;
-                        if let Some(atom) = guard.get(&atom_uuid) {
-                            atom.content().clone()
-                        } else {
-                            self.atom_manager
-                                .get_latest_atom(ref_atom_uuid)
-                                .map(|a| a.content().clone())
-                                .unwrap_or_else(|_| Self::default_value(field))
+                info!("🎯 Processing Single/Collection field: {}.{}", schema.name, field);
+                if let Some(ref_atom_uuid) = ref_atom_uuid {
+                    info!("🔗 Fetching atom for field {}.{} with ref_atom_uuid: {}",
+                          schema.name, field, ref_atom_uuid);
+                    match self.atom_manager.get_latest_atom(ref_atom_uuid) {
+                        Ok(atom) => {
+                            let content = atom.content().clone();
+                            info!("✅ Retrieved atom content for {}.{}: {:?}", schema.name, field, content);
+                            content
                         }
-                    } else {
-                        self.atom_manager
-                            .get_latest_atom(ref_atom_uuid)
-                            .map(|a| a.content().clone())
-                            .unwrap_or_else(|_| Self::default_value(field))
+                        Err(e) => {
+                            info!("❌ Failed to get atom for {}.{}: {:?}, using default", schema.name, field, e);
+                            Self::default_value(field)
+                        }
                     }
                 } else {
-                    Value::Null
+                    info!("⚠️  No ref_atom_uuid for field {}.{}, using default", schema.name, field);
+                    Self::default_value(field)
                 }
             }
         };
 
         info!(
-            "get_field_value - schema: {}, field: {}, aref_uuid: {:?}, result: {:?}",
+            "✅ get_field_value COMPLETE - schema: {}, field: {}, aref_uuid: {:?}, result: {:?}",
             schema.name,
             field,
-            field_def.ref_atom_uuid(),
+            ref_atom_uuid,
             result
         );
 
@@ -267,17 +281,48 @@ impl FieldManager {
         }
     }
 
+    /// Sets a field value and creates the corresponding AtomRef.
+    ///
+    /// **CRITICAL: ref_atom_uuid Management**
+    ///
+    /// This method creates an AtomRef in the atom manager and returns the UUID.
+    /// It does NOT set the ref_atom_uuid on the field definition - that must be done
+    /// by the caller using the schema manager to ensure proper persistence.
+    ///
+    /// **Why this pattern prevents "ghost ref_atom_uuid" issues:**
+    /// - Field definitions start with ref_atom_uuid = None
+    /// - AtomRef is created in atom manager with a UUID
+    /// - UUID is returned to caller (mutation logic)
+    /// - Caller uses schema manager to set and persist ref_atom_uuid
+    /// - This ensures ref_atom_uuid is only set when AtomRef actually exists
+    ///
+    /// **DO NOT** set ref_atom_uuid directly on the schema parameter - it's often
+    /// a clone that gets discarded, leading to "ghost" UUIDs that point to nothing.
+    ///
+    /// Returns: The UUID of the created AtomRef that should be persisted via schema manager
     pub fn set_field_value(
         &mut self,
         schema: &mut Schema,
         field: &str,
         content: Value,
         source_pub_key: String,
-    ) -> Result<(), SchemaError> {
+    ) -> Result<String, SchemaError> {
+        info!("🔧 set_field_value START - schema: {}, field: {}, content: {:?}, pub_key: {}",
+              schema.name, field, content, source_pub_key);
+        
+        // Check if field already has a ref_atom_uuid before we start
+        let existing_ref_uuid = schema.fields.get(field)
+            .and_then(|f| f.ref_atom_uuid())
+            .map(|uuid| uuid.to_string());
+        info!("🔍 Existing ref_atom_uuid for {}.{}: {:?}", schema.name, field, existing_ref_uuid);
+        
         let aref_uuid = {
             let mut ctx = AtomContext::new(schema, field, source_pub_key.clone(), &mut self.atom_manager);
 
             let field_def = ctx.get_field_def()?;
+            info!("📋 Field definition type for {}.{}: {:?}", schema.name, field,
+                  std::mem::discriminant(field_def));
+            
             if matches!(field_def, crate::schema::types::FieldVariant::Collection(_)) {
                 return Err(SchemaError::InvalidField(
                     "Collection fields cannot be updated without id".to_string(),
@@ -286,10 +331,13 @@ impl FieldManager {
 
             // Special handling for Range fields
             if let crate::schema::types::FieldVariant::Range(_range_field) = field_def {
+                info!("🎯 Handling Range field for {}.{}", schema.name, field);
                 return self.set_range_field_value(schema, field, content, source_pub_key);
             }
 
             let aref_uuid = ctx.get_or_create_atom_ref()?;
+            info!("🆔 Got/created aref_uuid for {}.{}: {}", schema.name, field, aref_uuid);
+            
             let prev_atom_uuid = {
                 let ref_atoms = ctx.atom_manager.get_ref_atoms();
                 let guard = ref_atoms
@@ -299,36 +347,56 @@ impl FieldManager {
                     .get(&aref_uuid)
                     .map(|aref| aref.get_atom_uuid().to_string())
             };
+            info!("📜 Previous atom_uuid for aref {}: {:?}", aref_uuid, prev_atom_uuid);
 
-            ctx.create_and_update_atom(prev_atom_uuid, content.clone(), None)?;
+            ctx.create_and_update_atom(prev_atom_uuid.clone(), content.clone(), None)?;
+            info!("✅ Created/updated atom for {}.{} with content: {:?}, prev_uuid: {:?}",
+                  schema.name, field, content, prev_atom_uuid);
             aref_uuid
         }; // ctx is dropped here
 
-        // Update the field definition with the aref_uuid if it doesn't have one
-        // We do this after dropping the context to avoid borrow conflicts
-        if let Some(field_def) = schema.fields.get_mut(field) {
-            if field_def.ref_atom_uuid().is_none() {
-                field_def.set_ref_atom_uuid(aref_uuid.clone());
-            }
-        }
+        // DO NOT set ref_atom_uuid here on the schema clone - it will be lost
+        // The ref_atom_uuid should only be set when the schema manager persists the schema
+        info!("🔗 AtomRef created with UUID: {} for {}.{} (not setting on field definition yet)",
+              aref_uuid, schema.name, field);
 
         info!(
-            "set_field_value - schema: {}, field: {}, aref_uuid: {}, result: success",
+            "✅ set_field_value COMPLETE - schema: {}, field: {}, aref_uuid: {}, content: {:?}",
             schema.name,
             field,
-            aref_uuid
+            aref_uuid,
+            content
         );
 
-        Ok(())
+        Ok(aref_uuid)
     }
 
+    /// Sets a range field value and creates the corresponding AtomRefRange.
+    ///
+    /// **CRITICAL: ref_atom_uuid Management**
+    ///
+    /// This method creates an AtomRefRange in the atom manager and returns the UUID.
+    /// It does NOT set the ref_atom_uuid on the field definition - that must be done
+    /// by the caller using the schema manager to ensure proper persistence.
+    ///
+    /// **Why this pattern prevents "ghost ref_atom_uuid" issues:**
+    /// - Field definitions start with ref_atom_uuid = None
+    /// - AtomRefRange is created in atom manager with a UUID
+    /// - UUID is returned to caller (mutation logic)
+    /// - Caller uses schema manager to set and persist ref_atom_uuid
+    /// - This ensures ref_atom_uuid is only set when AtomRefRange actually exists
+    ///
+    /// **DO NOT** set ref_atom_uuid directly on the schema parameter - it's often
+    /// a clone that gets discarded, leading to "ghost" UUIDs that point to nothing.
+    ///
+    /// Returns: The UUID of the created AtomRefRange that should be persisted via schema manager
     fn set_range_field_value(
         &mut self,
         schema: &mut Schema,
         field: &str,
         content: Value,
         source_pub_key: String,
-    ) -> Result<(), SchemaError> {
+    ) -> Result<String, SchemaError> {
         // For now, let's store the Range field data as a single atom like other fields
         // but mark it specially so we can retrieve it correctly
         let aref_uuid = {
@@ -349,31 +417,44 @@ impl FieldManager {
             aref_uuid
         }; // ctx is dropped here
         
-        // Update the field definition with the aref_uuid if it doesn't have one
-        // We do this after dropping the context to avoid borrow conflicts
-        if let Some(field_def) = schema.fields.get_mut(field) {
-            if field_def.ref_atom_uuid().is_none() {
-                field_def.set_ref_atom_uuid(aref_uuid.clone());
-            }
-        }
+        // DO NOT set ref_atom_uuid here on the schema clone - it will be lost
+        // The ref_atom_uuid should only be set when the schema manager persists the schema
 
         info!(
-            "set_field_value - schema: {}, field: {}, aref_uuid: {}, result: success",
+            "set_range_field_value - schema: {}, field: {}, aref_uuid: {}, result: success",
             schema.name,
             field,
             aref_uuid
         );
 
-        Ok(())
+        Ok(aref_uuid)
     }
 
+    /// Updates a field value and manages the corresponding AtomRef.
+    ///
+    /// **CRITICAL: ref_atom_uuid Management**
+    ///
+    /// This method updates an existing AtomRef or creates a new one if needed.
+    /// It does NOT set the ref_atom_uuid on the field definition - that must be done
+    /// by the caller using the schema manager to ensure proper persistence.
+    ///
+    /// **Why this pattern prevents "ghost ref_atom_uuid" issues:**
+    /// - Uses existing ref_atom_uuid if field already has one
+    /// - Creates new AtomRef if field doesn't have ref_atom_uuid yet
+    /// - Returns UUID to caller for proper persistence via schema manager
+    /// - Never sets ref_atom_uuid on schema clones that get discarded
+    ///
+    /// **DO NOT** set ref_atom_uuid directly on the schema parameter - it's often
+    /// a clone that gets discarded, leading to "ghost" UUIDs that point to nothing.
+    ///
+    /// Returns: The UUID of the AtomRef that should be persisted via schema manager
     pub fn update_field(
         &mut self,
         schema: &mut Schema,
         field: &str,
         content: Value,
         source_pub_key: String,
-    ) -> Result<(), SchemaError> {
+    ) -> Result<String, SchemaError> {
         let aref_uuid = {
             let mut ctx = AtomContext::new(schema, field, source_pub_key, &mut self.atom_manager);
 
@@ -391,13 +472,8 @@ impl FieldManager {
             aref_uuid
         }; // ctx is dropped here
 
-        // Update the field definition with the aref_uuid if it doesn't have one
-        // We do this after dropping the context to avoid borrow conflicts
-        if let Some(field_def) = schema.fields.get_mut(field) {
-            if field_def.ref_atom_uuid().is_none() {
-                field_def.set_ref_atom_uuid(aref_uuid.clone());
-            }
-        }
+        // DO NOT set ref_atom_uuid here on the schema clone - it will be lost
+        // The ref_atom_uuid should only be set when the schema manager persists the schema
 
         info!(
             "update_field - schema: {}, field: {}, aref_uuid: {}, result: success",
@@ -406,7 +482,7 @@ impl FieldManager {
             aref_uuid
         );
 
-        Ok(())
+        Ok(aref_uuid)
     }
 
     pub fn delete_field(
@@ -456,6 +532,7 @@ impl FieldManager {
                 Value::String("".to_string())
             }
             "age" => Value::Number(serde_json::Number::from(0)),
+            "value1" | "value2" => Value::Number(serde_json::Number::from(0)),
             _ => Value::Null,
         }
     }

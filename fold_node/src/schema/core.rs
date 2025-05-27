@@ -46,8 +46,8 @@ pub struct SchemaCore {
 
 impl SchemaCore {
     /// Internal helper to create the schema directory and construct the struct.
-    fn init_with_dir(schemas_dir: PathBuf, schema_states_tree: Tree) -> Result<Self, SchemaError> {
-        let storage = SchemaStorage::new(schemas_dir, schema_states_tree)?;
+    fn init_with_dir(schemas_dir: PathBuf, schema_states_tree: Tree, schemas_tree: Tree) -> Result<Self, SchemaError> {
+        let storage = SchemaStorage::new(schemas_dir, schema_states_tree, schemas_tree)?;
         Ok(Self {
             schemas: Mutex::new(HashMap::new()),
             available: Mutex::new(HashMap::new()),
@@ -59,24 +59,26 @@ impl SchemaCore {
     #[must_use = "This returns a Result that should be handled"]
     pub fn init_default() -> Result<Self, SchemaError> {
         let db = sled::open("data")?;
-        let tree = db.open_tree("schema_states")?;
+        let schema_states_tree = db.open_tree("schema_states")?;
+        let schemas_tree = db.open_tree("schemas")?;
         let schemas_dir = PathBuf::from("data/schemas");
-        Self::init_with_dir(schemas_dir, tree)
+        Self::init_with_dir(schemas_dir, schema_states_tree, schemas_tree)
     }
 
     /// Creates a new `SchemaCore` instance with a custom schemas directory.
     #[must_use = "This returns a Result containing the schema core that should be handled"]
     pub fn new(path: &str) -> Result<Self, SchemaError> {
         let db = sled::open(path)?;
-        let tree = db.open_tree("schema_states")?;
+        let schema_states_tree = db.open_tree("schema_states")?;
+        let schemas_tree = db.open_tree("schemas")?;
         let schemas_dir = PathBuf::from(path).join("schemas");
-        Self::init_with_dir(schemas_dir, tree)
+        Self::init_with_dir(schemas_dir, schema_states_tree, schemas_tree)
     }
 
-    /// Creates a new `SchemaCore` using an existing sled tree for schema states.
-    pub fn new_with_tree(path: &str, schema_states_tree: Tree) -> Result<Self, SchemaError> {
+    /// Creates a new `SchemaCore` using existing sled trees for schema states and schemas.
+    pub fn new_with_trees(path: &str, schema_states_tree: Tree, schemas_tree: Tree) -> Result<Self, SchemaError> {
         let schemas_dir = PathBuf::from(path).join("schemas");
-        Self::init_with_dir(schemas_dir, schema_states_tree)
+        Self::init_with_dir(schemas_dir, schema_states_tree, schemas_tree)
     }
 
     /// Gets the path for a schema file.
@@ -119,7 +121,13 @@ impl SchemaCore {
     /// Load a schema into memory and persist it to disk.
     /// This creates the schema in Available state by default.
     pub fn load_schema_internal(&self, mut schema: Schema) -> Result<(), SchemaError> {
-        info!("Loading schema '{}' as Available with {} fields: {:?}", schema.name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
+        info!("🔄 LOAD_SCHEMA_INTERNAL START - schema: '{}' with {} fields: {:?}", schema.name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
+        
+        // Log ref_atom_uuid values for each field
+        for (field_name, field) in &schema.fields {
+            let ref_uuid = field.ref_atom_uuid().map(|s| s.to_string()).unwrap_or_else(|| "None".to_string());
+            info!("📋 Field {}.{} has ref_atom_uuid: {}", schema.name, field_name, ref_uuid);
+        }
 
         // Ensure any transforms on fields have the correct output schema
         self.fix_transform_outputs(&mut schema);
@@ -405,8 +413,30 @@ impl SchemaCore {
         self.storage.schema_path(schema_name)
     }
 
-    /// Updates the ref_atom_uuid for a specific field in a schema.
+    /// Updates the ref_atom_uuid for a specific field in a schema and persists it to disk.
+    ///
+    /// **CRITICAL: This is the ONLY method that should set ref_atom_uuid on field definitions**
+    ///
+    /// This method is the central point for managing ref_atom_uuid values to prevent
+    /// "ghost ref_atom_uuid" issues where UUIDs exist but don't point to actual AtomRefs.
+    ///
+    /// **Proper Usage Pattern:**
+    /// 1. Field manager methods (set_field_value, update_field) create AtomRef and return UUID
+    /// 2. Mutation logic calls this method with the returned UUID
+    /// 3. This method sets the UUID on the actual schema (not a clone)
+    /// 4. This method persists the schema to disk immediately
+    /// 5. This ensures ref_atom_uuid is only set when AtomRef actually exists
+    ///
+    /// **Why this prevents "ghost ref_atom_uuid" issues:**
+    /// - Centralizes all ref_atom_uuid setting in one place
+    /// - Always persists changes immediately to disk
+    /// - Only called after AtomRef is confirmed to exist
+    /// - Updates both in-memory and on-disk schema representations
+    ///
+    /// **DO NOT** set ref_atom_uuid directly on field definitions elsewhere in the code.
     pub fn update_field_ref_atom_uuid(&self, schema_name: &str, field_name: &str, ref_atom_uuid: String) -> Result<(), SchemaError> {
+        info!("🔧 UPDATE_FIELD_REF_ATOM_UUID START - schema: {}, field: {}, uuid: {}", schema_name, field_name, ref_atom_uuid);
+        
         let mut schemas = self
             .schemas
             .lock()
@@ -414,7 +444,27 @@ impl SchemaCore {
         
         if let Some(schema) = schemas.get_mut(schema_name) {
             if let Some(field) = schema.fields.get_mut(field_name) {
-                field.set_ref_atom_uuid(ref_atom_uuid);
+                field.set_ref_atom_uuid(ref_atom_uuid.clone());
+                info!("Field {}.{} ref_atom_uuid updated in memory", schema_name, field_name);
+                
+                // Persist the updated schema to disk
+                info!("Persisting updated schema {} to disk", schema_name);
+                self.storage.persist_schema(schema)?;
+                info!("Schema {} persisted successfully with updated ref_atom_uuid", schema_name);
+                
+                // Also update the available schemas map to keep it in sync
+                let mut available = self
+                    .available
+                    .lock()
+                    .map_err(|_| SchemaError::InvalidData("Failed to acquire available schemas lock".to_string()))?;
+                
+                if let Some((available_schema, _state)) = available.get_mut(schema_name) {
+                    if let Some(available_field) = available_schema.fields.get_mut(field_name) {
+                        available_field.set_ref_atom_uuid(ref_atom_uuid);
+                        info!("Available schema {}.{} ref_atom_uuid updated", schema_name, field_name);
+                    }
+                }
+                
                 Ok(())
             } else {
                 Err(SchemaError::InvalidField(format!("Field {} not found in schema {}", field_name, schema_name)))
@@ -559,10 +609,10 @@ impl SchemaCore {
         Ok(())
     }
 
-    /// Loads schema states from disk and loads schemas that are marked as Approved.
+    /// Loads schema states from sled and loads schemas that are marked as Approved.
     pub fn load_schema_states_from_disk(&self) -> Result<(), SchemaError> {
         let states = self.load_states();
-        info!("Loading schema states from disk: {:?}", states);
+        info!("Loading schema states from sled: {:?}", states);
         info!("DEBUG: load_schema_states_from_disk called with {} states", states.len());
         let mut available = self
             .available
@@ -576,93 +626,76 @@ impl SchemaCore {
         for (name, state) in states {
             info!("DEBUG: Processing schema '{}' with state {:?}", name, state);
             if state == SchemaState::Approved {
-                // Load the actual schema from disk into active memory
-                let schema_path = self.storage.schema_path(&name);
-                if schema_path.exists() {
-                    match std::fs::read_to_string(&schema_path) {
-                        Ok(schema_content) => {
-                            let mut schema_opt = serde_json::from_str::<Schema>(&schema_content).ok();
-                            if schema_opt.is_none() {
-                                if let Ok(json_schema) = serde_json::from_str::<JsonSchemaDefinition>(&schema_content) {
-                                    if let Ok(schema) = self.interpret_schema(json_schema) {
-                                        schema_opt = Some(schema);
-                                    }
-                                }
-                            }
-                            
-                            match schema_opt {
-                                Some(mut schema) => {
-                                    info!("Auto-loading approved schema '{}' from disk with {} fields: {:?}", name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
-                                    self.fix_transform_outputs(&mut schema);
-                                    info!("After fix_transform_outputs, auto-loaded schema '{}' has {} fields: {:?}", name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
-                                    schemas.insert(name.clone(), schema.clone());
-                                    available.insert(name.clone(), (schema, state));
-                                    drop(schemas); // Release the lock before calling map_fields
-                                    drop(available); // Release the lock before calling map_fields
-                                    
-                                    // Ensure fields have proper ARefs assigned
-                                    let _ = self.map_fields(&name);
-                                    
-                                    // Re-acquire locks for the next iteration
-                                    available = self
-                                        .available
-                                        .lock()
-                                        .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-                                    schemas = self
-                                        .schemas
-                                        .lock()
-                                        .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-                                }
-                                None => {
-                                    info!("Failed to parse schema '{}' from disk", name);
-                                    available.insert(name.clone(), (Schema::new(name), SchemaState::Available));
-                                }
+                // Load the actual schema from sled database into active memory
+                match self.storage.load_schema(&name) {
+                    Ok(Some(mut schema)) => {
+                        info!("Auto-loading approved schema '{}' from sled with {} fields: {:?}", name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
+                        
+                        // 🔄 Log ref_atom_uuid values during schema loading
+                        info!("🔄 SCHEMA_LOAD - Loading schema '{}' with {} fields", name, schema.fields.len());
+                        for (field_name, field_def) in &schema.fields {
+                            use crate::schema::types::Field;
+                            match field_def.ref_atom_uuid() {
+                                Some(uuid) => info!("📋 Field {}.{} has ref_atom_uuid: {}", name, field_name, uuid),
+                                None => info!("📋 Field {}.{} has ref_atom_uuid: None", name, field_name),
                             }
                         }
-                        Err(e) => {
-                            info!("Failed to read schema file for '{}': {}", name, e);
-                            available.insert(name.clone(), (Schema::new(name), SchemaState::Available));
-                        }
+                        
+                        self.fix_transform_outputs(&mut schema);
+                        info!("After fix_transform_outputs, auto-loaded schema '{}' has {} fields: {:?}", name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
+                        schemas.insert(name.clone(), schema.clone());
+                        available.insert(name.clone(), (schema, state));
+                        drop(schemas); // Release the lock before calling map_fields
+                        drop(available); // Release the lock before calling map_fields
+                        
+                        // Ensure fields have proper ARefs assigned
+                        let _ = self.map_fields(&name);
+                        
+                        // Re-acquire locks for the next iteration
+                        available = self
+                            .available
+                            .lock()
+                            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+                        schemas = self
+                            .schemas
+                            .lock()
+                            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
                     }
-                } else {
-                    info!("Schema file not found for '{}', marking as available", name);
-                    available.insert(name.clone(), (Schema::new(name), SchemaState::Available));
+                    Ok(None) => {
+                        info!("Schema '{}' not found in sled, creating empty schema", name);
+                        available.insert(name.clone(), (Schema::new(name), SchemaState::Available));
+                    }
+                    Err(e) => {
+                        info!("Failed to load schema '{}' from sled: {}", name, e);
+                        available.insert(name.clone(), (Schema::new(name), SchemaState::Available));
+                    }
                 }
             } else {
-                // Load the actual schema from disk for non-Approved states too
-                let schema_path = self.storage.schema_path(&name);
-                if schema_path.exists() {
-                    match std::fs::read_to_string(&schema_path) {
-                        Ok(schema_content) => {
-                            let mut schema_opt = serde_json::from_str::<Schema>(&schema_content).ok();
-                            if schema_opt.is_none() {
-                                if let Ok(json_schema) = serde_json::from_str::<JsonSchemaDefinition>(&schema_content) {
-                                    if let Ok(schema) = self.interpret_schema(json_schema) {
-                                        schema_opt = Some(schema);
-                                    }
-                                }
-                            }
-                            
-                            match schema_opt {
-                                Some(mut schema) => {
-                                    self.fix_transform_outputs(&mut schema);
-                                    info!("Loading schema '{}' from disk with state {:?} and {} fields: {:?}", name, state, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
-                                    available.insert(name.clone(), (schema, state));
-                                }
-                                None => {
-                                    info!("Failed to parse schema '{}' from disk, creating empty schema", name);
-                                    available.insert(name.clone(), (Schema::new(name), state));
-                                }
+                // Load the actual schema from sled for non-Approved states too
+                match self.storage.load_schema(&name) {
+                    Ok(Some(mut schema)) => {
+                        // 🔄 Log ref_atom_uuid values during schema loading (non-Approved)
+                        info!("🔄 SCHEMA_LOAD - Loading schema '{}' (state: {:?}) with {} fields", name, state, schema.fields.len());
+                        for (field_name, field_def) in &schema.fields {
+                            use crate::schema::types::Field;
+                            match field_def.ref_atom_uuid() {
+                                Some(uuid) => info!("📋 Field {}.{} has ref_atom_uuid: {}", name, field_name, uuid),
+                                None => info!("📋 Field {}.{} has ref_atom_uuid: None", name, field_name),
                             }
                         }
-                        Err(e) => {
-                            info!("Failed to read schema file for '{}': {}, creating empty schema", name, e);
-                            available.insert(name.clone(), (Schema::new(name), state));
-                        }
+                        
+                        self.fix_transform_outputs(&mut schema);
+                        info!("Loading schema '{}' from sled with state {:?} and {} fields: {:?}", name, state, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
+                        available.insert(name.clone(), (schema, state));
                     }
-                } else {
-                    info!("Schema file not found for '{}', creating empty schema", name);
-                    available.insert(name.clone(), (Schema::new(name), state));
+                    Ok(None) => {
+                        info!("Schema '{}' not found in sled, creating empty schema", name);
+                        available.insert(name.clone(), (Schema::new(name), state));
+                    }
+                    Err(e) => {
+                        info!("Failed to load schema '{}' from sled: {}, creating empty schema", name, e);
+                        available.insert(name.clone(), (Schema::new(name), state));
+                    }
                 }
             }
         }

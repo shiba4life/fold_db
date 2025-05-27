@@ -93,13 +93,14 @@ impl FoldDB {
         let transforms_tree = db.open_tree("transforms")?;
         let orchestrator_tree = db.open_tree("orchestrator_state")?;
         let schema_states_tree = db.open_tree("schema_states")?;
+        let schemas_tree = db.open_tree("schemas")?;
 
         let db_ops = DbOperations::new(db.clone());
         let atom_manager = AtomManager::new(db_ops);
         let field_manager = FieldManager::new(atom_manager.clone());
         let collection_manager = CollectionManager::new(field_manager.clone());
         let schema_manager = Arc::new(
-            SchemaCore::new_with_tree(path, schema_states_tree)
+            SchemaCore::new_with_trees(path, schema_states_tree, schemas_tree)
                 .map_err(|e| sled::Error::Unsupported(e.to_string()))?,
         );
         let atom_manager_clone = atom_manager.clone();
