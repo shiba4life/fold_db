@@ -190,8 +190,19 @@ impl FoldDB {
     // ========== CONSOLIDATED SCHEMA API - DELEGATES TO SCHEMA_CORE ==========
     
     /// Fetch available schemas from files (example schemas directory)
+    /// DEPRECATED: Use get_schema_status() instead
     pub fn fetch_available_schemas(&self) -> Result<Vec<String>, SchemaError> {
         self.schema_manager.fetch_available_schemas()
+    }
+
+    /// Get comprehensive schema status (NEW UNIFIED METHOD)
+    pub fn get_schema_status(&self) -> Result<crate::schema::core::SchemaLoadingReport, SchemaError> {
+        self.schema_manager.get_schema_status()
+    }
+
+    /// Refresh schemas from all sources (NEW UNIFIED METHOD)
+    pub fn refresh_schemas(&self) -> Result<crate::schema::core::SchemaLoadingReport, SchemaError> {
+        self.schema_manager.discover_and_load_all_schemas()
     }
 
     /// Approve a schema for queries and mutations
@@ -234,8 +245,14 @@ impl FoldDB {
     }
 
     /// Load available schemas from sled and files
+    /// DEPRECATED: Use initialize_schema_system() instead
     pub fn load_available_schemas(&self) -> Result<(), SchemaError> {
         self.schema_manager.load_available_schemas()
+    }
+
+    /// Initialize schema system (NEW UNIFIED METHOD)
+    pub fn initialize_schema_system(&self) -> Result<(), SchemaError> {
+        self.schema_manager.initialize_schema_system()
     }
 
     /// Load schema from JSON string (creates Available schema)

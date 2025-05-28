@@ -13,6 +13,34 @@ use uuid::Uuid;
 use super::storage::SchemaStorage;
 use super::validator::SchemaValidator;
 
+/// Report of schema discovery and loading operations
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SchemaLoadingReport {
+    /// All schemas discovered from any source
+    pub discovered_schemas: Vec<String>,
+    /// Schemas currently loaded (approved state)
+    pub loaded_schemas: Vec<String>,
+    /// Schemas that failed to load with error messages
+    pub failed_schemas: Vec<(String, String)>,
+    /// Current state of all known schemas
+    pub schema_states: HashMap<String, SchemaState>,
+    /// Source where each schema was discovered
+    pub loading_sources: HashMap<String, SchemaSource>,
+    /// Timestamp of last discovery operation
+    pub last_updated: chrono::DateTime<chrono::Utc>,
+}
+
+/// Source of a discovered schema
+#[derive(Debug, Serialize, Deserialize)]
+pub enum SchemaSource {
+    /// Schema from available_schemas/ directory
+    AvailableDirectory,
+    /// Schema from data/schemas/ directory
+    DataDirectory,
+    /// Schema from previously saved state
+    Persistence,
+}
+
 /// State of a schema within the system
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum SchemaState {
@@ -353,9 +381,121 @@ impl SchemaCore {
         Ok(())
     }
 
-    // ========== CONSOLIDATED SCHEMA API ==========
+    // ========== UNIFIED SCHEMA DISCOVERY API ==========
+    
+    /// Single entry point for all schema discovery and loading
+    /// Consolidates all existing discovery methods (no sample manager)
+    pub fn discover_and_load_all_schemas(&self) -> Result<SchemaLoadingReport, SchemaError> {
+        info!("🔍 Starting unified schema discovery and loading");
+        
+        let mut discovered_schemas = Vec::new();
+        let mut failed_schemas = Vec::new();
+        let mut loading_sources = HashMap::new();
+        
+        // 1. Discover from available_schemas/ directory
+        match self.discover_available_schemas() {
+            Ok(schemas) => {
+                for schema in schemas {
+                    let schema_name = schema.name.clone();
+                    discovered_schemas.push(schema_name.clone());
+                    loading_sources.insert(schema_name.clone(), SchemaSource::AvailableDirectory);
+                    
+                    // Load schema into SchemaCore
+                    if let Err(e) = self.load_schema_internal(schema) {
+                        failed_schemas.push((schema_name, e.to_string()));
+                    }
+                }
+            }
+            Err(e) => {
+                info!("Failed to discover schemas from available_schemas/: {}", e);
+            }
+        }
+        
+        // 2. Discover from data/schemas/ directory
+        match self.discover_schemas_from_files() {
+            Ok(schemas) => {
+                for schema in schemas {
+                    let schema_name = schema.name.clone();
+                    if !discovered_schemas.contains(&schema_name) {
+                        discovered_schemas.push(schema_name.clone());
+                        loading_sources.insert(schema_name.clone(), SchemaSource::DataDirectory);
+                        
+                        // Load schema into SchemaCore
+                        if let Err(e) = self.load_schema_internal(schema) {
+                            failed_schemas.push((schema_name, e.to_string()));
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                info!("Failed to discover schemas from data/schemas/: {}", e);
+            }
+        }
+        
+        // 3. Load existing states from persistence
+        let schema_states = self.load_states();
+        for (schema_name, _state) in &schema_states {
+            if !loading_sources.contains_key(schema_name) {
+                loading_sources.insert(schema_name.clone(), SchemaSource::Persistence);
+            }
+        }
+        
+        // 4. Get loaded schemas (approved state)
+        let loaded_schemas = self.list_schemas_by_state(SchemaState::Approved)
+            .unwrap_or_else(|_| Vec::new());
+        
+        info!("✅ Schema discovery complete: {} discovered, {} loaded, {} failed",
+              discovered_schemas.len(), loaded_schemas.len(), failed_schemas.len());
+        
+        Ok(SchemaLoadingReport {
+            discovered_schemas,
+            loaded_schemas,
+            failed_schemas,
+            schema_states,
+            loading_sources,
+            last_updated: chrono::Utc::now(),
+        })
+    }
+    
+    /// Initialize schema system - called during node startup
+    pub fn initialize_schema_system(&self) -> Result<(), SchemaError> {
+        info!("🚀 Initializing schema system");
+        self.discover_and_load_all_schemas()?;
+        info!("✅ Schema system initialized successfully");
+        Ok(())
+    }
+    
+    /// Get comprehensive schema status for UI
+    pub fn get_schema_status(&self) -> Result<SchemaLoadingReport, SchemaError> {
+        info!("📊 Getting schema status");
+        
+        let schema_states = self.load_states();
+        let loaded_schemas = self.list_schemas_by_state(SchemaState::Approved)
+            .unwrap_or_else(|_| Vec::new());
+        
+        // Get all known schemas from states
+        let discovered_schemas: Vec<String> = schema_states.keys().cloned().collect();
+        
+        // Create loading sources map (we don't track this in current implementation)
+        let loading_sources: HashMap<String, SchemaSource> = discovered_schemas
+            .iter()
+            .map(|name| (name.clone(), SchemaSource::Persistence))
+            .collect();
+        
+        Ok(SchemaLoadingReport {
+            discovered_schemas,
+            loaded_schemas,
+            failed_schemas: Vec::new(), // No failures in status check
+            schema_states,
+            loading_sources,
+            last_updated: chrono::Utc::now(),
+        })
+    }
+    
+    // ========== LEGACY CONSOLIDATED SCHEMA API ==========
     
     /// Fetch available schemas from files (both data/schemas and available_schemas directories)
+    /// DEPRECATED: Use discover_and_load_all_schemas() instead
     pub fn fetch_available_schemas(&self) -> Result<Vec<String>, SchemaError> {
         let mut all_schemas = Vec::new();
         
@@ -949,33 +1089,30 @@ impl SchemaCore {
             // Load all schema states using unified operations
             let mut states = HashMap::new();
             
-            // Get all available schemas and their states
-            let available = self.available.lock().ok();
-            if let Some(available) = available {
-                log::info!("Loading states for {} available schemas: {:?}", available.len(), available.keys().collect::<Vec<_>>());
-                for schema_name in available.keys() {
-                    match db_ops.get_schema_state(schema_name) {
-                        Ok(Some(state)) => {
-                            log::info!("Found state for schema '{}': {:?}", schema_name, state);
-                            states.insert(schema_name.clone(), state);
-                        },
-                        Ok(None) => {
-                            log::warn!("No state found for schema '{}' in database", schema_name);
-                        },
-                        Err(e) => {
-                            log::error!("Error getting state for schema '{}': {}", schema_name, e);
+            // Iterate through ALL schema states in the database, not just available ones
+            // This fixes the chicken-and-egg problem where we need states to populate available schemas
+            match db_ops.schema_states_tree.iter().collect::<Result<Vec<_>, _>>() {
+                Ok(entries) => {
+                    log::info!("Loading states for {} schemas from database", entries.len());
+                    for (key, value) in entries {
+                        let schema_name = String::from_utf8_lossy(&key).to_string();
+                        match serde_json::from_slice::<crate::schema::core::SchemaState>(&value) {
+                            Ok(state) => {
+                                log::info!("Found state for schema '{}': {:?}", schema_name, state);
+                                states.insert(schema_name, state);
+                            },
+                            Err(e) => {
+                                log::error!("Error deserializing state for schema '{}': {}", schema_name, e);
+                            }
                         }
                     }
+                },
+                Err(e) => {
+                    log::error!("Error iterating schema states tree: {}", e);
                 }
-            } else {
-                log::warn!("Could not lock available schemas mutex");
             }
             
             log::info!("Loaded {} schema states: {:?}", states.len(), states);
-            
-            // Also try to get states for any schemas we might not know about yet
-            // This is a bit tricky since we need to know schema names first
-            // For now, we'll rely on the available schemas we already know about
             states
         } else {
             // Fallback to legacy storage

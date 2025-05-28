@@ -1,6 +1,5 @@
 use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
-use super::sample_manager::SampleManager;
 use super::{schema_routes, query_routes, network_routes, system_routes};
 use super::log_routes;
 
@@ -29,8 +28,6 @@ pub struct DataFoldHttpServer {
     node: Arc<tokio::sync::Mutex<DataFoldNode>>,
     /// The HTTP server bind address
     bind_address: String,
-    /// The sample data manager
-    sample_manager: SampleManager,
 }
 
 
@@ -38,8 +35,6 @@ pub struct DataFoldHttpServer {
 pub struct AppState {
     /// The DataFold node
     pub(crate) node: Arc<tokio::sync::Mutex<DataFoldNode>>,
-    /// The sample data manager
-    pub(crate) sample_manager: SampleManager,
 }
 
 impl DataFoldHttpServer {
@@ -60,18 +55,14 @@ impl DataFoldHttpServer {
     /// # Errors
     ///
     /// Returns a `FoldDbError` if:
-    /// * There is an error creating the sample manager
+    /// * There is an error starting the HTTP server
     pub async fn new(node: DataFoldNode, bind_address: &str) -> FoldDbResult<Self> {
         // Ensure the web logger is initialized so log routes have data
         crate::web_logger::init().ok();
 
-        // Create sample manager for serving sample data via API
-        let sample_manager = SampleManager::new().await?;
-
         Ok(Self {
             node: Arc::new(Mutex::new(node)),
             bind_address: bind_address.to_string(),
-            sample_manager,
         })
     }
 
@@ -96,7 +87,6 @@ impl DataFoldHttpServer {
         // Create shared application state
         let app_state = web::Data::new(AppState {
             node: self.node.clone(),
-            sample_manager: self.sample_manager.clone(),
         });
 
         // Start the HTTP server
@@ -115,6 +105,8 @@ impl DataFoldHttpServer {
                     web::scope("/api")
                         // Schema endpoints
                         .route("/schemas", web::get().to(schema_routes::list_schemas))
+                        .route("/schemas/status", web::get().to(schema_routes::get_schema_status))
+                        .route("/schemas/refresh", web::post().to(schema_routes::refresh_schemas))
                         .route("/schemas/available", web::get().to(schema_routes::list_available_schemas))
                         .route("/schemas/by-state/{state}", web::get().to(schema_routes::list_schemas_by_state))
                         .route("/schema/{name}", web::get().to(schema_routes::get_schema))
@@ -184,12 +176,12 @@ mod tests {
     use std::net::TcpListener;
     use tempfile::tempdir;
 
-    /// Verify that server startup does not reload samples.
+    /// Test the new unified schema status endpoint
     #[tokio::test]
-    async fn server_uses_existing_samples() {
+    async fn test_unified_schema_status() {
         let temp_dir = tempdir().unwrap();
         let config = NodeConfig::new(temp_dir.path().to_path_buf());
-        let node = DataFoldNode::new(config).unwrap();
+        let node = DataFoldNode::load(config).await.unwrap();
 
         // pick an available port
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -197,45 +189,33 @@ mod tests {
         drop(listener);
         let bind_addr = format!("127.0.0.1:{}", addr.port());
 
-        let mut server = DataFoldHttpServer::new(node, &bind_addr)
+        let server = DataFoldHttpServer::new(node, &bind_addr)
             .await
             .expect("server init");
-
-        // Replace loaded samples with a single custom entry
-        server.sample_manager.schemas.clear();
-        server
-            .sample_manager
-            .schemas
-            .insert("Custom".to_string(), json!({"type": "schema"}));
 
         let handle = tokio::spawn(async move { server.run().await.unwrap() });
 
         // Wait for server to start
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-        // Make request to server
+        // Test new unified schema status endpoint
         let client = reqwest::Client::new();
-        let url = format!("http://{}/api/samples/schemas", bind_addr);
+        let url = format!("http://{}/api/schemas/status", bind_addr);
         
-        let json_value = client.get(&url)
+        let response = client.get(&url)
             .timeout(std::time::Duration::from_secs(5))
             .send()
             .await
-            .expect("Failed to connect to server")
-            .error_for_status()
-            .expect("Server returned error status")
-            .json::<serde_json::Value>()
+            .expect("Failed to connect to server");
+        
+        assert!(response.status().is_success());
+        
+        let json_value: serde_json::Value = response.json()
             .await
             .expect("Failed to parse JSON response");
         
-        // Verify response
-        let schemas = json_value.get("data")
-            .expect("missing data field")
-            .as_array()
-            .expect("data field is not an array");
-        assert_eq!(schemas.len(), 1, "expected exactly one schema");
-        assert_eq!(schemas[0].as_str().expect("schema name is not a string"), "Custom");
-
+        // Verify response structure
+        assert!(json_value.get("data").is_some());
 
         handle.abort();
         let _ = handle.await;

@@ -32,6 +32,5 @@ pub mod tests;
 pub use config::NodeConfig;
 pub use config::load_node_config;
 pub use http_server::DataFoldHttpServer;
-pub use sample_manager::SampleManager;
 pub use node::DataFoldNode;
 pub use tcp_server::TcpServer;

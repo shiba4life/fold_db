@@ -1,5 +1,3 @@
-#[cfg(test)]
-use super::sample_manager::SampleManager;
 use super::http_server::AppState;
 use crate::schema::Schema;
 use actix_web::{web, HttpResponse, Responder};
@@ -214,6 +212,38 @@ pub async fn get_schema_state(path: web::Path<String>, state: web::Data<AppState
     }
 }
 
+/// Get comprehensive schema status (NEW UNIFIED ENDPOINT)
+pub async fn get_schema_status(state: web::Data<AppState>) -> impl Responder {
+    info!("Received request to get comprehensive schema status");
+    let node_guard = state.node.lock().await;
+
+    match node_guard.get_schema_status() {
+        Ok(report) => HttpResponse::Ok().json(json!({"data": report})),
+        Err(e) => {
+            error!("Failed to get schema status: {}", e);
+            HttpResponse::InternalServerError().json(json!({"error": format!("Failed to get schema status: {}", e)}))
+        }
+    }
+}
+
+/// Refresh schemas from all sources (NEW UNIFIED ENDPOINT)
+pub async fn refresh_schemas(state: web::Data<AppState>) -> impl Responder {
+    info!("Received request to refresh schemas from all sources");
+    let node_guard = state.node.lock().await;
+
+    match node_guard.refresh_schemas() {
+        Ok(report) => {
+            info!("Schema refresh completed: {} discovered, {} loaded, {} failed",
+                  report.discovered_schemas.len(), report.loaded_schemas.len(), report.failed_schemas.len());
+            HttpResponse::Ok().json(json!({"data": report}))
+        },
+        Err(e) => {
+            error!("Failed to refresh schemas: {}", e);
+            HttpResponse::InternalServerError().json(json!({"error": format!("Failed to refresh schemas: {}", e)}))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -228,7 +258,6 @@ mod tests {
         let node = DataFoldNode::new(config).unwrap();
         let state = web::Data::new(super::super::http_server::AppState {
             node: std::sync::Arc::new(tokio::sync::Mutex::new(node)),
-            sample_manager: SampleManager { schemas: Default::default(), queries: Default::default(), mutations: Default::default() }
         });
         use actix_web::test;
         let req = test::TestRequest::default().to_http_request();

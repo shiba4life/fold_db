@@ -85,49 +85,37 @@ pub async fn execute_mutation(mutation: web::Json<Value>, state: web::Data<AppSt
     }
 }
 
-/// List all sample schemas.
-pub async fn list_schema_samples(state: web::Data<AppState>) -> impl Responder {
-    HttpResponse::Ok().json(json!({"data": state.sample_manager.list_schema_samples()}))
+/// List all sample schemas (DEPRECATED - samples removed).
+pub async fn list_schema_samples(_state: web::Data<AppState>) -> impl Responder {
+    HttpResponse::Ok().json(json!({"data": []}))
 }
 
-/// List all sample queries.
-pub async fn list_query_samples(state: web::Data<AppState>) -> impl Responder {
-    HttpResponse::Ok().json(json!({"data": state.sample_manager.list_query_samples()}))
+/// List all sample queries (DEPRECATED - samples removed).
+pub async fn list_query_samples(_state: web::Data<AppState>) -> impl Responder {
+    HttpResponse::Ok().json(json!({"data": []}))
 }
 
-/// List all sample mutations.
-pub async fn list_mutation_samples(state: web::Data<AppState>) -> impl Responder {
-    HttpResponse::Ok().json(json!({"data": state.sample_manager.list_mutation_samples()}))
+/// List all sample mutations (DEPRECATED - samples removed).
+pub async fn list_mutation_samples(_state: web::Data<AppState>) -> impl Responder {
+    HttpResponse::Ok().json(json!({"data": []}))
 }
 
-/// Get a sample schema by name.
-pub async fn get_schema_sample(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
+/// Get a sample schema by name (DEPRECATED - samples removed).
+pub async fn get_schema_sample(path: web::Path<String>, _state: web::Data<AppState>) -> impl Responder {
     let name = path.into_inner();
-
-    match state.sample_manager.get_schema_sample(&name) {
-        Some(schema) => HttpResponse::Ok().json(schema),
-        None => HttpResponse::NotFound().json(json!({"error": format!("Sample schema '{}' not found", name)})),
-    }
+    HttpResponse::NotFound().json(json!({"error": format!("Sample schema '{}' not found - samples have been removed", name)}))
 }
 
-/// Get a sample query by name.
-pub async fn get_query_sample(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
+/// Get a sample query by name (DEPRECATED - samples removed).
+pub async fn get_query_sample(path: web::Path<String>, _state: web::Data<AppState>) -> impl Responder {
     let name = path.into_inner();
-
-    match state.sample_manager.get_query_sample(&name) {
-        Some(query) => HttpResponse::Ok().json(query),
-        None => HttpResponse::NotFound().json(json!({"error": format!("Sample query '{}' not found", name)})),
-    }
+    HttpResponse::NotFound().json(json!({"error": format!("Sample query '{}' not found - samples have been removed", name)}))
 }
 
-/// Get a sample mutation by name.
-pub async fn get_mutation_sample(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
+/// Get a sample mutation by name (DEPRECATED - samples removed).
+pub async fn get_mutation_sample(path: web::Path<String>, _state: web::Data<AppState>) -> impl Responder {
     let name = path.into_inner();
-
-    match state.sample_manager.get_mutation_sample(&name) {
-        Some(mutation) => HttpResponse::Ok().json(mutation),
-        None => HttpResponse::NotFound().json(json!({"error": format!("Sample mutation '{}' not found", name)})),
-    }
+    HttpResponse::NotFound().json(json!({"error": format!("Sample mutation '{}' not found - samples have been removed", name)}))
 }
 
 pub async fn list_transforms(state: web::Data<AppState>) -> impl Responder {
@@ -188,7 +176,6 @@ mod tests {
         let node = DataFoldNode::new(config).unwrap();
         let state = web::Data::new(super::super::http_server::AppState {
             node: std::sync::Arc::new(tokio::sync::Mutex::new(node)),
-            sample_manager: super::super::sample_manager::SampleManager { schemas: Default::default(), queries: Default::default(), mutations: Default::default() }
         });
         use actix_web::test;
         let req = test::TestRequest::default().to_http_request();

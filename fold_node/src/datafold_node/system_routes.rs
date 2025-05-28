@@ -90,7 +90,6 @@ pub async fn get_system_status(_state: web::Data<AppState>) -> impl Responder {
 mod tests {
     use super::*;
     use crate::datafold_node::{DataFoldNode, NodeConfig};
-    use crate::datafold_node::sample_manager::SampleManager;
     use actix_web::test;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -100,11 +99,9 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let config = NodeConfig::new(temp_dir.path().to_path_buf());
         let node = DataFoldNode::new(config).unwrap();
-        let sample_manager = SampleManager::new().await.unwrap();
         
         let state = web::Data::new(AppState {
             node: Arc::new(tokio::sync::Mutex::new(node)),
-            sample_manager,
         });
 
         let req = test::TestRequest::get().to_http_request();
@@ -117,11 +114,9 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let config = NodeConfig::new(temp_dir.path().to_path_buf());
         let node = DataFoldNode::new(config).unwrap();
-        let sample_manager = SampleManager::new().await.unwrap();
         
         let state = web::Data::new(AppState {
             node: Arc::new(tokio::sync::Mutex::new(node)),
-            sample_manager,
         });
 
         let req = test::TestRequest::post().to_http_request();
@@ -136,11 +131,9 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let config = NodeConfig::new(temp_dir.path().to_path_buf());
         let node = DataFoldNode::new(config).unwrap();
-        let sample_manager = SampleManager::new().await.unwrap();
         
         let state = web::Data::new(AppState {
             node: Arc::new(tokio::sync::Mutex::new(node)),
-            sample_manager,
         });
 
         let req = test::TestRequest::post().to_http_request();

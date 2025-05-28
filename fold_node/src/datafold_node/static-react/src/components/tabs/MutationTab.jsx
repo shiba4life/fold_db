@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import SchemaSelector from './mutation/SchemaSelector'
 import MutationEditor from './mutation/MutationEditor'
 import ResultViewer from './mutation/ResultViewer'
@@ -7,26 +7,7 @@ function MutationTab({ schemas, onResult }) {
   const [selectedSchema, setSelectedSchema] = useState('')
   const [mutationData, setMutationData] = useState({})
   const [mutationType, setMutationType] = useState('Create')
-  const [sampleMutations, setSampleMutations] = useState([])
-  const [selectedSample, setSelectedSample] = useState('')
-  const [loadingSample, setLoadingSample] = useState(false)
-  const [samplesError, setSamplesError] = useState(null)
   const [result, setResult] = useState(null)
-
-  useEffect(() => {
-    fetchSampleMutations()
-  }, [])
-
-  const fetchSampleMutations = async () => {
-    try {
-      const resp = await fetch('/api/samples/mutations')
-      const data = await resp.json()
-      setSampleMutations(data.data || [])
-    } catch (err) {
-      console.error('Failed to fetch sample mutations:', err)
-      setSamplesError('Failed to load sample mutations')
-    }
-  }
 
   const handleSchemaChange = (schemaName) => {
     setSelectedSchema(schemaName)
@@ -84,87 +65,12 @@ function MutationTab({ schemas, onResult }) {
     }
   }
 
-  const runSampleMutation = async () => {
-    if (!selectedSample) return
-    setLoadingSample(true)
-    setSamplesError(null)
-
-    try {
-      const resp = await fetch(`/api/samples/mutation/${selectedSample}`)
-      if (!resp.ok) throw new Error(`Failed to fetch sample: ${resp.status}`)
-      const mutation = await resp.json()
-      const execResp = await fetch('/api/mutation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mutation)
-      })
-      const data = await execResp.json()
-      
-      // Check if the HTTP response was successful
-      if (!execResp.ok) {
-        console.error('Sample mutation failed with status:', execResp.status, data)
-        const errData = {
-          error: data.error || `Sample mutation failed with status ${execResp.status}`,
-          status: execResp.status,
-          details: data
-        }
-        setResult(errData)
-        onResult(errData)
-        return
-      }
-      
-      setResult(data)
-      onResult(data)
-      if (data.success) setMutationData({})
-      setSelectedSample('')
-    } catch (err) {
-      console.error('Failed to run sample mutation:', err)
-      setSamplesError('Failed to run sample mutation')
-      const errData = { error: 'Failed to run sample mutation' }
-      setResult(errData)
-      onResult(errData)
-    } finally {
-      setLoadingSample(false)
-    }
-  }
-
   const selectedSchemaFields = selectedSchema
     ? schemas.find(s => s.name === selectedSchema)?.fields || {}
     : {}
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Run Sample Mutation</h3>
-        <div className="flex items-center space-x-2">
-          <select
-            className="border-gray-300 rounded-md px-3 py-2"
-            value={selectedSample}
-            onChange={(e) => setSelectedSample(e.target.value)}
-          >
-            <option value="">Select a sample...</option>
-            {sampleMutations.map(name => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={runSampleMutation}
-            disabled={!selectedSample || loadingSample}
-            className={`px-4 py-2 text-sm font-medium rounded-md text-white ${
-              !selectedSample || loadingSample
-                ? 'bg-gray-300 cursor-not-allowed'
-                : 'bg-primary hover:bg-primary/90'
-            }`}
-          >
-            {loadingSample ? 'Running...' : 'Run'}
-          </button>
-        </div>
-        {samplesError && (
-          <p className="mt-2 text-sm text-red-600">{samplesError}</p>
-        )}
-      </div>
-
       <form onSubmit={handleSubmit} className="space-y-6">
         <SchemaSelector
           schemas={schemas}

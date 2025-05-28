@@ -6,11 +6,9 @@ use log::info;
 
 use crate::datafold_node::config::NodeConfig;
 use crate::datafold_node::config::NodeInfo;
-use crate::datafold_node::sample_manager::SampleManager;
 use crate::error::{FoldDbError, FoldDbResult, NetworkErrorKind};
 use crate::fold_db_core::FoldDB;
 use crate::network::{NetworkConfig, NetworkCore, PeerId};
-use crate::schema::Schema;
 
 /// A node in the DataFold distributed database system.
 ///
@@ -110,25 +108,35 @@ impl DataFoldNode {
     /// Loads an existing database node from the specified configuration.
     pub async fn load(config: NodeConfig) -> FoldDbResult<Self> {
         info!("Loading DataFoldNode from config");
-        let mut node = Self::new(config)?;
+        let node = Self::new(config)?;
         
-        // Create sample manager and load sample schemas
-        let sample_manager = SampleManager::new().await?;
-        
-        // Load sample schemas into the node in name order to satisfy dependencies
-        let mut sample_schemas: Vec<_> = sample_manager.schemas.values().cloned().collect();
-        sample_schemas.sort_by_key(|v| v.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string());
-        for schema_value in sample_schemas {
-            let schema: Schema = serde_json::from_value(schema_value)
-                .map_err(|e| FoldDbError::Config(format!("Failed to deserialize sample schema: {}", e)))?;
-            info!("Adding sample schema to node as available: {}", schema.name);
-            node.add_schema_available(schema)?;
+        // Delegate to SchemaCore for unified schema discovery and loading
+        {
+            let db = node.db.lock()
+                .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+            db.schema_manager.initialize_schema_system()
+                .map_err(|e| FoldDbError::Config(format!("Failed to initialize schema system: {}", e)))?;
         }
         
-        info!("DataFoldNode loaded successfully");
+        info!("DataFoldNode loaded successfully with schema system initialized");
         Ok(node)
     }
 
+    /// Get comprehensive schema status for UI
+    pub fn get_schema_status(&self) -> FoldDbResult<crate::schema::core::SchemaLoadingReport> {
+        let db = self.db.lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.schema_manager.get_schema_status()
+            .map_err(|e| FoldDbError::Config(format!("Failed to get schema status: {}", e)))
+    }
+
+    /// Refresh schemas from all sources
+    pub fn refresh_schemas(&self) -> FoldDbResult<crate::schema::core::SchemaLoadingReport> {
+        let db = self.db.lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+        db.schema_manager.discover_and_load_all_schemas()
+            .map_err(|e| FoldDbError::Config(format!("Failed to refresh schemas: {}", e)))
+    }
 
     /// Initialize the network layer
     pub async fn init_network(&mut self, network_config: NetworkConfig) -> FoldDbResult<()> {

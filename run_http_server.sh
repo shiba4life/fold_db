@@ -24,12 +24,25 @@ cd fold_node
 # Clean up any existing locks and processes
 cleanup_locks
 
-# Build the project
-echo "Building the project..."
+# Build the React frontend first
+echo "Building the React frontend..."
+cd src/datafold_node/static-react
+npm run build
+
+if [ $? -ne 0 ]; then
+    echo "React build failed. Exiting."
+    exit 1
+fi
+
+# Go back to fold_node directory
+cd ../../..
+
+# Build the Rust project
+echo "Building the Rust project..."
 cargo build
 
 if [ $? -ne 0 ]; then
-    echo "Build failed. Exiting."
+    echo "Rust build failed. Exiting."
     exit 1
 fi
 
