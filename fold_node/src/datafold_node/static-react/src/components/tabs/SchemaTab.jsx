@@ -333,10 +333,16 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     )
   }
 
-  // Filter schemas by state
-  const availableSchemas = allSchemas.filter(schema => schema.state?.toLowerCase() === 'available')
-  const approvedSchemas = allSchemas.filter(schema => schema.state?.toLowerCase() === 'approved')
-  const blockedSchemas = allSchemas.filter(schema => schema.state?.toLowerCase() === 'blocked')
+  // Filter schemas by state - safely handle non-string states
+  const getStateString = (state) => {
+    if (typeof state === 'string') return state.toLowerCase()
+    if (typeof state === 'object' && state !== null) return String(state).toLowerCase()
+    return String(state || '').toLowerCase()
+  }
+  
+  const availableSchemas = allSchemas.filter(schema => getStateString(schema.state) === 'available')
+  const approvedSchemas = allSchemas.filter(schema => getStateString(schema.state) === 'approved')
+  const blockedSchemas = allSchemas.filter(schema => getStateString(schema.state) === 'blocked')
 
   return (
     <div className="p-6 space-y-6">

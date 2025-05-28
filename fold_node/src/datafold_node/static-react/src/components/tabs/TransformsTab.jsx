@@ -97,7 +97,7 @@ const TransformsTab = ({ schemas, onResult }) => {
         <div className="bg-blue-50 p-4 rounded-lg mb-4">
           <h3 className="text-md font-medium text-blue-800 mb-2">Transform Queue</h3>
           <ul className="list-disc list-inside space-y-1">
-            {queueInfo.queue.map((transformId, index) => (
+            {(queueInfo.queue || []).map((transformId, index) => (
               <li key={index} className="text-blue-700">
                 {transformId}
               </li>

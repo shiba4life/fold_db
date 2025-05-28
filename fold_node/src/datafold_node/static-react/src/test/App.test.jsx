@@ -2,6 +2,9 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import App from '../App'
 
+// Mock fetch globally
+global.fetch = vi.fn()
+
 // Mock the components to focus on App logic
 vi.mock('../components/Header', () => ({
   default: () => <div data-testid="header">Header</div>
@@ -75,13 +78,37 @@ vi.mock('../components/tabs/SchemaDependenciesTab', () => ({
 describe('App Component', () => {
   beforeEach(() => {
     // Mock successful API response for schemas
-    fetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: [
-          { name: 'TestSchema1', state: 'Loaded', fields: {} },
-          { name: 'TestSchema2', state: 'Loaded', fields: {} }
-        ]
+    fetch.mockImplementation((url) => {
+      if (url === '/api/schemas') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            data: {
+              'TestSchema1': 'Approved',
+              'TestSchema2': 'Available'
+            }
+          })
+        })
+      }
+      
+      if (url.startsWith('/api/schema/')) {
+        const schemaName = url.split('/').pop()
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            name: schemaName,
+            fields: {
+              id: { field_type: 'string', writable: false },
+              name: { field_type: 'string', writable: true }
+            }
+          })
+        })
+      }
+      
+      // Default fallback
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ data: {} })
       })
     })
   })
@@ -124,7 +151,7 @@ describe('App Component', () => {
     })
     
     await waitFor(() => {
-      expect(screen.getByText('Schema Tab - 2 schemas')).toBeInTheDocument()
+      expect(screen.getByText('Schema Tab - 1 schemas')).toBeInTheDocument()
     })
   })
 
@@ -255,24 +282,24 @@ describe('App Component', () => {
     render(<App />)
     
     await waitFor(() => {
-      expect(screen.getByText('Schema Tab - 2 schemas')).toBeInTheDocument()
+      expect(screen.getByText('Schema Tab - 1 schemas')).toBeInTheDocument()
     })
     
     // Switch to query tab
     fireEvent.click(screen.getByText('Query'))
-    expect(screen.getByText('Query Tab - 2 schemas')).toBeInTheDocument()
+    expect(screen.getByText('Query Tab - 1 schemas')).toBeInTheDocument()
     
     // Switch to mutation tab
     fireEvent.click(screen.getByText('Mutation'))
-    expect(screen.getByText('Mutation Tab - 2 schemas')).toBeInTheDocument()
+    expect(screen.getByText('Mutation Tab - 1 schemas')).toBeInTheDocument()
     
     // Switch to transforms tab
     fireEvent.click(screen.getByText('Transforms'))
-    expect(screen.getByText('Transforms Tab - 2 schemas')).toBeInTheDocument()
+    expect(screen.getByText('Transforms Tab - 1 schemas')).toBeInTheDocument()
     
     // Switch to dependencies tab
     fireEvent.click(screen.getByText('Dependencies'))
-    expect(screen.getByText('Dependencies Tab - 2 schemas')).toBeInTheDocument()
+    expect(screen.getByText('Dependencies Tab - 1 schemas')).toBeInTheDocument()
   })
 
   it('handles results from different tabs', async () => {
@@ -306,14 +333,13 @@ describe('App Component', () => {
     expect(screen.getByText('Results: {"transform":"test"}')).toBeInTheDocument()
   })
 
-  it('filters schemas by loaded state', async () => {
+  it('filters schemas by approved state', async () => {
     fetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        data: [
-          { name: 'LoadedSchema', state: 'Loaded', fields: {} },
-          { name: 'OtherSchema', state: 'Unloaded', fields: {} }
-        ]
+        data: {
+          'ApprovedSchema': 'Approved'
+        }
       })
     })
 
