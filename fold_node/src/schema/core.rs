@@ -924,9 +924,18 @@ impl SchemaCore {
                 .lock()
                 .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
             
+            log::info!("Persisting states for {} schemas using unified operations", available.len());
             for (name, (_, state)) in available.iter() {
-                db_ops.store_schema_state(name, *state)?;
+                log::info!("Storing state for schema '{}': {:?}", name, state);
+                match db_ops.store_schema_state(name, *state) {
+                    Ok(()) => log::info!("Successfully stored state for schema '{}'", name),
+                    Err(e) => {
+                        log::error!("Failed to store state for schema '{}': {}", name, e);
+                        return Err(e);
+                    }
+                }
             }
+            log::info!("Successfully persisted all schema states");
             Ok(())
         } else {
             // Fallback to legacy storage
@@ -943,12 +952,26 @@ impl SchemaCore {
             // Get all available schemas and their states
             let available = self.available.lock().ok();
             if let Some(available) = available {
+                log::info!("Loading states for {} available schemas: {:?}", available.len(), available.keys().collect::<Vec<_>>());
                 for schema_name in available.keys() {
-                    if let Ok(Some(state)) = db_ops.get_schema_state(schema_name) {
-                        states.insert(schema_name.clone(), state);
+                    match db_ops.get_schema_state(schema_name) {
+                        Ok(Some(state)) => {
+                            log::info!("Found state for schema '{}': {:?}", schema_name, state);
+                            states.insert(schema_name.clone(), state);
+                        },
+                        Ok(None) => {
+                            log::warn!("No state found for schema '{}' in database", schema_name);
+                        },
+                        Err(e) => {
+                            log::error!("Error getting state for schema '{}': {}", schema_name, e);
+                        }
                     }
                 }
+            } else {
+                log::warn!("Could not lock available schemas mutex");
             }
+            
+            log::info!("Loaded {} schema states: {:?}", states.len(), states);
             
             // Also try to get states for any schemas we might not know about yet
             // This is a bit tricky since we need to know schema names first

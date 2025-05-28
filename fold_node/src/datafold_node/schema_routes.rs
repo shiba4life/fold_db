@@ -12,7 +12,10 @@ pub async fn list_schemas(state: web::Data<AppState>) -> impl Responder {
     let node_guard = state.node.lock().await;
 
     match node_guard.list_schemas_with_state() {
-        Ok(schemas) => HttpResponse::Ok().json(json!({"data": schemas})),
+        Ok(schemas) => {
+            info!("Successfully loaded {} schemas with states: {:?}", schemas.len(), schemas);
+            HttpResponse::Ok().json(json!({"data": schemas}))
+        },
         Err(e) => {
             error!("Failed to list schemas: {}", e);
             HttpResponse::InternalServerError().json(json!({"error": format!("Failed to list schemas: {}", e)}))

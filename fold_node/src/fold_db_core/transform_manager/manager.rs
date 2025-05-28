@@ -59,9 +59,19 @@ impl TransformManager {
         // Load any persisted transforms using unified operations
         let mut registered_transforms = HashMap::new();
         let transform_ids = db_ops.list_transforms()?;
+        
         for transform_id in transform_ids {
-            if let Some(transform) = db_ops.get_transform(&transform_id)? {
-                registered_transforms.insert(transform_id, transform);
+            match db_ops.get_transform(&transform_id) {
+                Ok(Some(transform)) => {
+                    registered_transforms.insert(transform_id, transform);
+                },
+                Ok(None) => {
+                    log::warn!("Transform '{}' not found in storage during initialization", transform_id);
+                },
+                Err(e) => {
+                    log::error!("Failed to load transform '{}' during initialization: {}", transform_id, e);
+                    return Err(e);
+                }
             }
         }
 

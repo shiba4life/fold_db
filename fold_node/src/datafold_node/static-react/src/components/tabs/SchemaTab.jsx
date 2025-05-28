@@ -80,12 +80,13 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
       if (schema && (!schema.fields || Object.keys(schema.fields).length === 0)) {
         try {
           const resp = await fetch(`/api/schema/${schemaName}`)
+          console.log('resp', resp)
           if (resp.ok) {
             const schemaData = await resp.json()
             // Update the schema with field details
             setAllSchemas(prev => prev.map(s =>
               s.name === schemaName
-                ? { ...s, fields: schemaData.fields || {} }
+                ? { ...s, fields: schemaData.fields || {}, fieldsLoaded: true }
                 : s
             ))
           }
@@ -298,9 +299,6 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
                 <ChevronRightIcon className="icon icon-sm text-gray-400 transition-transform duration-200" />
               )}
               <h3 className="font-medium text-gray-900">{schema.name}</h3>
-              <span className="text-xs text-gray-500">
-                ({Object.keys(schema.fields || {}).length} fields)
-              </span>
               <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStateColor(state)}`}>
                 {state}
               </span>
@@ -400,7 +398,6 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
                       <div className="flex items-center space-x-3">
                         <div>
                           <h4 className="font-medium text-gray-900">{schema.name}</h4>
-                          <p className="text-sm text-gray-500">({Object.keys(schema.fields || {}).length} fields)</p>
                         </div>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStateColor(schema.state)}`}>
                           {schema.state}

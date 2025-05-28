@@ -81,9 +81,10 @@ impl DataFoldNode {
             )));
         }
         if !self.check_schema_permission(&query.schema_name)? {
+            let current_perms = self.log_permission_denied(&query.schema_name, "query")?;
             return Err(FoldDbError::Config(format!(
-                "Permission denied for schema {}",
-                query.schema_name
+                "Permission denied for schema '{}'. Node '{}' does not have access. Current permissions: {:?}",
+                query.schema_name, self.node_id, current_perms
             )));
         }
         if query.trust_distance == 0 {
@@ -126,9 +127,10 @@ impl DataFoldNode {
             )));
         }
         if !self.check_schema_permission(&mutation.schema_name)? {
+            let current_perms = self.log_permission_denied(&mutation.schema_name, "mutation")?;
             return Err(FoldDbError::Config(format!(
-                "Permission denied for schema {}",
-                mutation.schema_name
+                "Permission denied for schema '{}'. Node '{}' does not have access. Current permissions: {:?}",
+                mutation.schema_name, self.node_id, current_perms
             )));
         }
         let mut db = self
@@ -180,6 +182,22 @@ impl DataFoldNode {
         db.process_transform_queue();
         Ok(())
     }
+
+    /// Helper method to log and create permission denied errors
+    fn log_permission_denied(&self, schema_name: &str, operation_type: &str) -> FoldDbResult<Vec<String>> {
+        let node_id = &self.node_id;
+        let current_perms = {
+            let db = self.db.lock()
+                .map_err(|_| FoldDbError::Config("Cannot lock database mutex for permission details".into()))?;
+            db.get_schema_permissions(node_id)
+        };
+        
+        log::error!("Permission denied for {} on schema '{}': Node '{}' permissions: {:?}",
+            operation_type, schema_name, node_id, current_perms);
+        
+        Ok(current_perms)
+    }
+
 }
 
 #[cfg(test)]
