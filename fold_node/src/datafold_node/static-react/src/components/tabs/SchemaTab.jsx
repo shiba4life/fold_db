@@ -81,33 +81,34 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     }
   }
 
-  const loadSchemaDetails = async (schemaName) => {
-    try {
-      const resp = await fetch(`/api/schema/${schemaName}`)
-      if (resp.ok) {
-        const data = await resp.json()
-        setAllSchemas(prev =>
-          prev.map(s =>
-            s.name === schemaName ? { ...s, fields: data.fields || {} } : s
-          )
-        )
-      }
-    } catch (err) {
-      console.error('Failed to fetch schema details:', err)
-    }
-  }
+  const toggleSchema = async (schemaName) => {
+    const isCurrentlyExpanded = expandedSchemas[schemaName]
+    
+    setExpandedSchemas(prev => ({
+      ...prev,
+      [schemaName]: !prev[schemaName]
+    }))
 
-  const toggleSchema = (schemaName) => {
-    setExpandedSchemas(prev => {
-      const newExpanded = !prev[schemaName]
-      if (newExpanded) {
-        const schema = allSchemas.find(s => s.name === schemaName)
-        if (schema && Object.keys(schema.fields || {}).length === 0) {
-          loadSchemaDetails(schemaName)
+    // If expanding and schema doesn't have fields yet, fetch them
+    if (!isCurrentlyExpanded) {
+      const schema = allSchemas.find(s => s.name === schemaName)
+      if (schema && (!schema.fields || Object.keys(schema.fields).length === 0)) {
+        try {
+          const resp = await fetch(`/api/schema/${schemaName}`)
+          if (resp.ok) {
+            const schemaData = await resp.json()
+            // Update the schema with field details
+            setAllSchemas(prev => prev.map(s =>
+              s.name === schemaName
+                ? { ...s, fields: schemaData.fields || {} }
+                : s
+            ))
+          }
+        } catch (err) {
+          console.error(`Failed to fetch schema details for ${schemaName}:`, err)
         }
       }
-      return { ...prev, [schemaName]: newExpanded }
-    })
+    }
   }
 
   const removeSchema = async (schemaName) => {
@@ -378,7 +379,8 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
   }
   
   const availableSchemas = allSchemas.filter(schema => getStateString(schema.state) === 'available')
-  const approvedSchemas = allSchemas.filter(schema => getStateString(schema.state) === 'approved')
+  // Use the schemas prop from App.jsx for approved schemas (these have field details)
+  const approvedSchemas = schemas || []
   const blockedSchemas = allSchemas.filter(schema => getStateString(schema.state) === 'blocked')
 
   return (
