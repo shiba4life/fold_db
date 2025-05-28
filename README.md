@@ -8,7 +8,7 @@ DataFold is a Rust-based distributed data platform providing a core library, a n
   Core Rust library (`datafold_lib`) defining schema types, query/mutation APIs, and shared components.
 
 - **fold_node/**  
-  Rust crate that implements a DataFold node. Exposes a TCP‐based server for schema loading, network discovery, query execution, and mutation handling.
+  Rust crate that implements a DataFold node. Exposes a TCP‐based server for schema loading, network discovery, query execution, and mutation handling. The underlying `FoldDB` stores an `Arc<DbOperations>` accessible via `db_ops()` for unified database access.
 
 - **datafold_api_examples/**  
   Python example scripts showing how to interact with a running DataFold node: load schemas, list schemas, run queries, and execute mutations.
