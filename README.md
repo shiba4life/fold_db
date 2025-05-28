@@ -203,10 +203,11 @@ See **datafold_api_examples/** for Python scripts that demonstrate:
 
 In‑depth technical and architectural notes are in the **cline_docs/** directory:
 
-- `productContext.md` – why DataFold exists and its use cases  
-- `systemPatterns.md` – architecture and design patterns  
-- `techContext.md` – technologies and development setup  
-- `progress.md` – current progress and roadmap  
+- `productContext.md` – why DataFold exists and its use cases
+- `systemPatterns.md` – architecture and design patterns
+- `techContext.md` – technologies and development setup
+- `progress.md` – current progress and roadmap
+- [Unified_Architecture.md](docs/Unified_Architecture.md) – canonical overview of the final unified architecture
 
 ## Pre‑commit Hooks
 
