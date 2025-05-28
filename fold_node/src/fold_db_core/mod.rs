@@ -7,6 +7,7 @@ pub mod transform_orchestrator;
 mod query;
 mod mutation;
 mod transform_management;
+mod init;
 
 use std::sync::Arc;
 use std::path::Path;
@@ -18,14 +19,13 @@ use crate::permissions::PermissionWrapper;
 use crate::schema::SchemaCore;
 use crate::schema::{Schema, SchemaError};
 use crate::schema::core::SchemaState;
-use serde_json;
-use serde_json::Value;
 
 use self::atom_manager::AtomManager;
 use self::collection_manager::CollectionManager;
 use self::field_manager::FieldManager;
 use self::transform_manager::TransformManager;
 use self::transform_orchestrator::TransformOrchestrator;
+use self::init::{build_closure_fns, init_transform_manager, init_orchestrator};
 
 /// The main database coordinator that manages schemas, permissions, and data storage.
 pub struct FoldDB {
@@ -88,49 +88,9 @@ impl FoldDB {
             SchemaCore::new_with_db_ops(path, Arc::new(db_ops.clone()))
                 .map_err(|e| sled::Error::Unsupported(e.to_string()))?,
         );
-        let atom_manager_clone = atom_manager.clone();
-        let get_atom_fn = Arc::new(move |aref_uuid: &str| {
-            atom_manager_clone.get_latest_atom(aref_uuid)
-        });
-
-        let atom_manager_clone = atom_manager.clone();
-        let create_atom_fn = Arc::new(move |schema_name: &str,
-                                           source_pub_key: String,
-                                           prev_atom_uuid: Option<String>,
-                                           content: Value,
-                                           status: Option<crate::atom::AtomStatus>| {
-            atom_manager_clone.create_atom(schema_name, source_pub_key, prev_atom_uuid, content, status)
-        });
-
-        let atom_manager_clone = atom_manager.clone();
-        let update_atom_ref_fn = Arc::new(move |aref_uuid: &str, atom_uuid: String, source_pub_key: String| {
-            atom_manager_clone.update_atom_ref(aref_uuid, atom_uuid, source_pub_key)
-        });
-
-        let field_value_manager = FieldManager::new(atom_manager.clone());
-        let schema_manager_clone = Arc::clone(&schema_manager);
-        let get_field_fn = Arc::new(move |schema_name: &str, field_name: &str| {
-            match schema_manager_clone.get_schema(schema_name)? {
-                Some(schema) => field_value_manager.get_field_value(&schema, field_name),
-                None => Err(SchemaError::InvalidField(format!("Field not found: {}.{}", schema_name, field_name))),
-            }
-        });
-
-        let transform_manager = Arc::new(TransformManager::new(
-            Arc::new(db_ops.clone()),
-            get_atom_fn,
-            create_atom_fn,
-            update_atom_ref_fn,
-            get_field_fn,
-        ).map_err(|e| sled::Error::Unsupported(e.to_string()))?);
-
-        field_manager
-            .set_transform_manager(Arc::clone(&transform_manager))
-            .map_err(|e| sled::Error::Unsupported(e.to_string()))?;
-        let orchestrator = Arc::new(TransformOrchestrator::new(transform_manager.clone(), orchestrator_tree));
-        field_manager
-            .set_orchestrator(Arc::clone(&orchestrator))
-            .map_err(|e| sled::Error::Unsupported(e.to_string()))?;
+        let closures = build_closure_fns(&atom_manager, &schema_manager);
+        let transform_manager = init_transform_manager(Arc::new(db_ops.clone()), closures)?;
+        let orchestrator = init_orchestrator(&field_manager, transform_manager.clone(), orchestrator_tree)?;
 
         info!("Loading schema states from disk during FoldDB initialization");
         if let Err(e) = schema_manager.load_schema_states_from_disk() {
