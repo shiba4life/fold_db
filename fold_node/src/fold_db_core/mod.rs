@@ -20,7 +20,6 @@ use crate::schema::{Schema, SchemaError};
 use crate::schema::core::SchemaState;
 use serde_json;
 use serde_json::Value;
-use uuid::Uuid;
 
 use self::atom_manager::AtomManager;
 use self::collection_manager::CollectionManager;
@@ -36,44 +35,34 @@ pub struct FoldDB {
     pub(crate) schema_manager: Arc<SchemaCore>,
     pub(crate) transform_manager: Arc<TransformManager>,
     pub(crate) transform_orchestrator: Arc<TransformOrchestrator>,
+    /// Shared database operations
+    pub(crate) db_ops: Arc<DbOperations>,
     permission_wrapper: PermissionWrapper,
-    /// Tree for storing metadata such as node_id
-    metadata_tree: sled::Tree,
-    /// Tree for storing per-node schema permissions
-    permissions_tree: sled::Tree,
 }
 
 impl FoldDB {
     /// Retrieves or generates and persists the node identifier.
     pub fn get_node_id(&self) -> Result<String, sled::Error> {
-        if let Some(bytes) = self.metadata_tree.get("node_id")? {
-            let id = String::from_utf8(bytes.to_vec()).unwrap_or_else(|_| String::new());
-            if !id.is_empty() {
-                return Ok(id);
-            }
-        }
-        let new_id = Uuid::new_v4().to_string();
-        self.metadata_tree.insert("node_id", new_id.as_bytes())?;
-        self.metadata_tree.flush()?;
-        Ok(new_id)
+        self
+            .db_ops
+            .get_node_id()
+            .map_err(|e| sled::Error::Unsupported(e.to_string()))
     }
 
     /// Retrieves the list of permitted schemas for the given node.
     pub fn get_schema_permissions(&self, node_id: &str) -> Vec<String> {
-        if let Ok(Some(bytes)) = self.permissions_tree.get(node_id) {
-            if let Ok(list) = serde_json::from_slice::<Vec<String>>(&bytes) {
-                return list;
-            }
-        }
-        Vec::new()
+        self
+            .db_ops
+            .get_schema_permissions(node_id)
+            .unwrap_or_default()
     }
 
     /// Sets the permitted schemas for the given node.
     pub fn set_schema_permissions(&self, node_id: &str, schemas: &[String]) -> sled::Result<()> {
-        let bytes = serde_json::to_vec(schemas).unwrap();
-        self.permissions_tree.insert(node_id, bytes)?;
-        self.permissions_tree.flush()?;
-        Ok(())
+        self
+            .db_ops
+            .set_schema_permissions(node_id, schemas)
+            .map_err(|e| sled::Error::Unsupported(e.to_string()))
     }
     /// Creates a new FoldDB instance with the specified storage path.
     pub fn new(path: &str) -> sled::Result<Self> {
@@ -88,15 +77,9 @@ impl FoldDB {
             }
         };
 
-        let metadata_tree = db.open_tree("metadata")?;
-        let permissions_tree = db.open_tree("node_id_schema_permissions")?;
-        let _transforms_tree = db.open_tree("transforms")?;
-        let orchestrator_tree = db.open_tree("orchestrator_state")?;
-        let _schema_states_tree = db.open_tree("schema_states")?;
-        let _schemas_tree = db.open_tree("schemas")?;
-
         let db_ops = DbOperations::new(db.clone())
             .map_err(|e| sled::Error::Unsupported(e.to_string()))?;
+        let orchestrator_tree = db_ops.orchestrator_tree.clone();
         
         let atom_manager = AtomManager::new(db_ops.clone());
         let field_manager = FieldManager::new(atom_manager.clone());
@@ -180,9 +163,8 @@ impl FoldDB {
             schema_manager,
             transform_manager,
             transform_orchestrator: orchestrator,
+            db_ops: Arc::new(db_ops.clone()),
             permission_wrapper: PermissionWrapper::new(),
-            metadata_tree,
-            permissions_tree,
         })
     }
 
@@ -344,5 +326,10 @@ impl FoldDB {
     /// List all schemas with their states
     pub fn list_schemas_with_state(&self) -> Result<HashMap<String, SchemaState>, SchemaError> {
         self.load_schema_state()
+    }
+
+    /// Provides access to the underlying database operations
+    pub fn db_ops(&self) -> Arc<DbOperations> {
+        Arc::clone(&self.db_ops)
     }
 }
