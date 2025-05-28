@@ -252,4 +252,40 @@ describe('SchemaTab Component', () => {
       expect(fetch).toHaveBeenCalledWith('/api/schema/ApprovedSchema', { method: 'DELETE' })
     })
   })
+
+  it('fetches and displays fields when expanding an approved schema', async () => {
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            ApprovedSchema: 'Approved'
+          }
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          name: 'ApprovedSchema',
+          fields: {
+            id: { field_type: 'string', writable: true }
+          }
+        })
+      })
+
+    render(<SchemaTab {...mockProps} />)
+
+    // Expand the approved schema to trigger field fetch
+    await waitFor(() => {
+      fireEvent.click(screen.getByText('ApprovedSchema'))
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('id')).toBeInTheDocument()
+    })
+  })
 })

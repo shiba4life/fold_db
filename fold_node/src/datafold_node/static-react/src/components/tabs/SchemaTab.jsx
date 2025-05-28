@@ -363,10 +363,19 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     return String(state || '').toLowerCase()
   }
   
-  const availableSchemas = allSchemas.filter(schema => getStateString(schema.state) === 'available')
-  // Use the schemas prop from App.jsx for approved schemas (these have field details)
-  const approvedSchemas = schemas || []
-  const blockedSchemas = allSchemas.filter(schema => getStateString(schema.state) === 'blocked')
+  const availableSchemas = allSchemas.filter(
+    (schema) => getStateString(schema.state) === 'available'
+  )
+
+  // Derive approved schemas from the full schema list so newly fetched field
+  // details are reflected when a schema is expanded.
+  const approvedSchemas = allSchemas.filter(
+    (schema) => getStateString(schema.state) === 'approved'
+  )
+
+  const blockedSchemas = allSchemas.filter(
+    (schema) => getStateString(schema.state) === 'blocked'
+  )
 
   return (
     <div className="p-6 space-y-6">
