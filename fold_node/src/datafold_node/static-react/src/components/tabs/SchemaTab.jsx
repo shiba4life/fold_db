@@ -29,13 +29,28 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     try {
       const resp = await fetch('/api/schemas')
       const data = await resp.json()
-      // Convert the state map to an array of schema objects with states
       const schemasWithStates = Object.entries(data.data || {}).map(([name, state]) => ({
         name,
         state,
-        fields: {} // Will be populated when expanded
+        fields: {}
       }))
-      setAllSchemas(schemasWithStates)
+
+      const schemasWithFields = await Promise.all(
+        schemasWithStates.map(async (schema) => {
+          try {
+            const detailResp = await fetch(`/api/schema/${schema.name}`)
+            if (detailResp.ok) {
+              const detail = await detailResp.json()
+              return { ...schema, fields: detail.fields || {} }
+            }
+          } catch (e) {
+            console.error('Failed to fetch schema details:', e)
+          }
+          return schema
+        })
+      )
+
+      setAllSchemas(schemasWithFields)
     } catch (err) {
       console.error('Failed to fetch all schemas:', err)
     }
@@ -66,11 +81,33 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     }
   }
 
+  const loadSchemaDetails = async (schemaName) => {
+    try {
+      const resp = await fetch(`/api/schema/${schemaName}`)
+      if (resp.ok) {
+        const data = await resp.json()
+        setAllSchemas(prev =>
+          prev.map(s =>
+            s.name === schemaName ? { ...s, fields: data.fields || {} } : s
+          )
+        )
+      }
+    } catch (err) {
+      console.error('Failed to fetch schema details:', err)
+    }
+  }
+
   const toggleSchema = (schemaName) => {
-    setExpandedSchemas(prev => ({
-      ...prev,
-      [schemaName]: !prev[schemaName]
-    }))
+    setExpandedSchemas(prev => {
+      const newExpanded = !prev[schemaName]
+      if (newExpanded) {
+        const schema = allSchemas.find(s => s.name === schemaName)
+        if (schema && Object.keys(schema.fields || {}).length === 0) {
+          loadSchemaDetails(schemaName)
+        }
+      }
+      return { ...prev, [schemaName]: newExpanded }
+    })
   }
 
   const removeSchema = async (schemaName) => {
