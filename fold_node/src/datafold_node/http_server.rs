@@ -1,6 +1,5 @@
 use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
-use crate::schema::Schema;
 use super::sample_manager::SampleManager;
 use super::{schema_routes, query_routes, network_routes, system_routes};
 use super::log_routes;
@@ -62,22 +61,12 @@ impl DataFoldHttpServer {
     ///
     /// Returns a `FoldDbError` if:
     /// * There is an error creating the sample manager
-    pub async fn new(mut node: DataFoldNode, bind_address: &str) -> FoldDbResult<Self> {
+    pub async fn new(node: DataFoldNode, bind_address: &str) -> FoldDbResult<Self> {
         // Ensure the web logger is initialized so log routes have data
         crate::web_logger::init().ok();
 
-        // Create sample manager
+        // Create sample manager for serving sample data via API
         let sample_manager = SampleManager::new().await?;
-
-        // Load sample schemas into the node in name order to satisfy dependencies
-        let mut sample_schemas: Vec<_> = sample_manager.schemas.values().cloned().collect();
-        sample_schemas.sort_by_key(|v| v.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string());
-        for schema_value in sample_schemas {
-            let schema: Schema = serde_json::from_value(schema_value)
-                .map_err(|e| FoldDbError::Config(format!("Failed to deserialize sample schema: {}", e)))?;
-            info!("Adding sample schema to node as available: {}", schema.name);
-            node.add_schema_available(schema)?;
-        }
 
         Ok(Self {
             node: Arc::new(Mutex::new(node)),
@@ -296,7 +285,7 @@ mod tests {
     async fn samples_start_unloaded() {
         let temp_dir = tempdir().unwrap();
         let config = NodeConfig::new(temp_dir.path().to_path_buf());
-        let node = DataFoldNode::new(config).unwrap();
+        let node = DataFoldNode::load(config).await.unwrap();
 
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap();

@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load or initialize node
     info!("Loading DataFold Node...");
-    let mut node = DataFoldNode::load(config)?;
+    let mut node = DataFoldNode::load(config).await?;
     info!("Node loaded successfully");
 
     // Schemas are loaded from disk during node initialization

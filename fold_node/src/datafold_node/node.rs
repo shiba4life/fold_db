@@ -6,9 +6,11 @@ use log::info;
 
 use crate::datafold_node::config::NodeConfig;
 use crate::datafold_node::config::NodeInfo;
+use crate::datafold_node::sample_manager::SampleManager;
 use crate::error::{FoldDbError, FoldDbResult, NetworkErrorKind};
 use crate::fold_db_core::FoldDB;
 use crate::network::{NetworkConfig, NetworkCore, PeerId};
+use crate::schema::Schema;
 
 /// A node in the DataFold distributed database system.
 ///
@@ -106,9 +108,23 @@ impl DataFoldNode {
     }
 
     /// Loads an existing database node from the specified configuration.
-    pub fn load(config: NodeConfig) -> FoldDbResult<Self> {
+    pub async fn load(config: NodeConfig) -> FoldDbResult<Self> {
         info!("Loading DataFoldNode from config");
-        let node = Self::new(config)?;
+        let mut node = Self::new(config)?;
+        
+        // Create sample manager and load sample schemas
+        let sample_manager = SampleManager::new().await?;
+        
+        // Load sample schemas into the node in name order to satisfy dependencies
+        let mut sample_schemas: Vec<_> = sample_manager.schemas.values().cloned().collect();
+        sample_schemas.sort_by_key(|v| v.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string());
+        for schema_value in sample_schemas {
+            let schema: Schema = serde_json::from_value(schema_value)
+                .map_err(|e| FoldDbError::Config(format!("Failed to deserialize sample schema: {}", e)))?;
+            info!("Adding sample schema to node as available: {}", schema.name);
+            node.add_schema_available(schema)?;
+        }
+        
         info!("DataFoldNode loaded successfully");
         Ok(node)
     }

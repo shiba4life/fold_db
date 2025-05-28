@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load or initialize node
     info!("Loading DataFold Node...");
-    let node = DataFoldNode::load(config)?;
+    let node = DataFoldNode::load(config).await?;
     info!("Node loaded successfully");
 
     // Print node ID for connecting
