@@ -434,7 +434,7 @@ impl SchemaCore {
         
         // 3. Load existing states from persistence
         let schema_states = self.load_states();
-        for (schema_name, _state) in &schema_states {
+        for schema_name in schema_states.keys() {
             if !loading_sources.contains_key(schema_name) {
                 loading_sources.insert(schema_name.clone(), SchemaSource::Persistence);
             }
