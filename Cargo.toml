@@ -73,5 +73,9 @@ path = "src/lib.rs"
 name = "test_available_schemas"
 path = "test_available_schemas.rs"
 
+[[bin]]
+name = "test_schema_core"
+path = "test_schema_core.rs"
+
 [patch.crates-io]
 env_logger = { path = "vendor/env_logger" }

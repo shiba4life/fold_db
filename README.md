@@ -1,5 +1,8 @@
 # DataFold
 
+## Test UI
+./run_http_server
+
 DataFold is a Rust-based distributed data platform providing a core library, a node server, and a command‑line interface to load schemas, run queries, and execute mutations across connected nodes.
 
 ## Repository Structure
@@ -59,15 +62,6 @@ Additional server flags:
 ### Command‑Line Interface
 
 See [README_CLI.md](README_CLI.md) for detailed CLI commands: loading schemas, listing schemas, querying, mutating, and executing operations from JSON.
-
-### Running a DataFold Node
-
-```bash
-target/release/datafold_node \
-  --config config/node_config.json \
-  --port 9000 \
-  --tcp-port 9000
-```
 
 Once running, use the CLI or HTTP/TCP clients to interact.
 

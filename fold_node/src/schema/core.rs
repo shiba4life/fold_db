@@ -679,7 +679,7 @@ impl SchemaCore {
             .available
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-        Ok(available.keys().cloned().collect())
+            Ok(available.keys().cloned().collect())
     }
 
     /// Retrieve the persisted state for a schema if known.
