@@ -149,7 +149,7 @@ impl SchemaCore {
     }
 
     /// Load a schema into memory and persist it to disk.
-    /// This creates the schema in Available state by default.
+    /// This preserves existing schema state if it exists, otherwise defaults to Available.
     pub fn load_schema_internal(&self, mut schema: Schema) -> Result<(), SchemaError> {
         info!("🔄 LOAD_SCHEMA_INTERNAL START - schema: '{}' with {} fields: {:?}", schema.name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
         
@@ -167,19 +167,30 @@ impl SchemaCore {
         self.persist_schema(&schema)?;
         info!("After persist_schema, schema '{}' has {} fields: {:?}", schema.name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
 
-        // Add to memory with Available state
+        // Check for existing schema state, preserve it if it exists
         let name = schema.name.clone();
+        let existing_state = self.db_ops.get_schema_state(&name).unwrap_or(None);
+        let schema_state = existing_state.unwrap_or(SchemaState::Available);
+        
+        info!("Schema '{}' existing state: {:?}, using state: {:?}", name, existing_state, schema_state);
+
+        // Add to memory with preserved or default state
         {
             let mut all = self
                 .available
                 .lock()
                 .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
-            all.insert(name.clone(), (schema, SchemaState::Available));
+            all.insert(name.clone(), (schema, schema_state));
         }
 
-        // Persist state changes
-        self.set_schema_state(&name, SchemaState::Available)?;
-        info!("Schema '{}' loaded and marked as Available", name);
+        // Only persist state changes if we're using the default Available state
+        // (existing states are already persisted)
+        if existing_state.is_none() {
+            self.set_schema_state(&name, SchemaState::Available)?;
+            info!("Schema '{}' loaded and marked as Available (new schema)", name);
+        } else {
+            info!("Schema '{}' loaded with preserved state: {:?}", name, schema_state);
+        }
 
         Ok(())
     }
@@ -344,6 +355,13 @@ impl SchemaCore {
         let mut failed_schemas = Vec::new();
         let mut loading_sources = HashMap::new();
         
+        // Get current schemas in memory to avoid unnecessary reloading
+        let current_schemas = {
+            let available = self.available.lock()
+                .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+            available.keys().cloned().collect::<std::collections::HashSet<String>>()
+        };
+
         // 1. Discover from available_schemas/ directory
         match self.discover_available_schemas() {
             Ok(schemas) => {
@@ -352,9 +370,14 @@ impl SchemaCore {
                     discovered_schemas.push(schema_name.clone());
                     loading_sources.insert(schema_name.clone(), SchemaSource::AvailableDirectory);
                     
-                    // Load schema into SchemaCore
-                    if let Err(e) = self.load_schema_internal(schema) {
-                        failed_schemas.push((schema_name, e.to_string()));
+                    // Only load if not already in memory
+                    if !current_schemas.contains(&schema_name) {
+                        info!("Loading new schema '{}' from available_schemas/", schema_name);
+                        if let Err(e) = self.load_schema_internal(schema) {
+                            failed_schemas.push((schema_name, e.to_string()));
+                        }
+                    } else {
+                        info!("Schema '{}' already in memory, skipping reload", schema_name);
                     }
                 }
             }
@@ -372,9 +395,14 @@ impl SchemaCore {
                         discovered_schemas.push(schema_name.clone());
                         loading_sources.insert(schema_name.clone(), SchemaSource::DataDirectory);
                         
-                        // Load schema into SchemaCore
-                        if let Err(e) = self.load_schema_internal(schema) {
-                            failed_schemas.push((schema_name, e.to_string()));
+                        // Only load if not already in memory
+                        if !current_schemas.contains(&schema_name) {
+                            info!("Loading new schema '{}' from data/schemas/", schema_name);
+                            if let Err(e) = self.load_schema_internal(schema) {
+                                failed_schemas.push((schema_name, e.to_string()));
+                            }
+                        } else {
+                            info!("Schema '{}' already in memory, skipping reload", schema_name);
                         }
                     }
                 }

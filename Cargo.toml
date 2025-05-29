@@ -49,33 +49,10 @@ tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "full"] }
 fold_node = { path = "./fold_node", features = ["test-utils"] }  # Enable test-utils for tests
 reqwest = { version = "0.11", features = ["json"] }
 
-# Commented out missing example
-# [[example]]
-# name = "social_app_tcp"
-# path = "examples/social_app_tcp.rs"
-
-# Commented out missing example
-# [[example]]
-# name = "social_app_two_nodes"
-# path = "examples/social_app_two_nodes.rs"
-
-# Commented out missing example
-# [[example]]
-# name = "sandboxed_app_two_nodes"
-# path = "examples/sandboxed_app_two_nodes/main.rs"
-
 
 [lib]
 name = "fold_db"
 path = "src/lib.rs"
-
-[[bin]]
-name = "test_available_schemas"
-path = "test_available_schemas.rs"
-
-[[bin]]
-name = "test_schema_core"
-path = "test_schema_core.rs"
 
 [patch.crates-io]
 env_logger = { path = "vendor/env_logger" }
