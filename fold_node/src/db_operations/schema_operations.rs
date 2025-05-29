@@ -4,77 +4,64 @@ use crate::schema::Schema;
 use super::core::DbOperations;
 
 impl DbOperations {
-    /// Stores a schema state
+    /// Stores a schema state using generic tree operations
     pub fn store_schema_state(&self, schema_name: &str, state: SchemaState) -> Result<(), SchemaError> {
-        let bytes = serde_json::to_vec(&state)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize schema state: {}", e)))?;
-        self.schema_states_tree.insert(schema_name.as_bytes(), bytes)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to store schema state: {}", e)))?;
-        self.schema_states_tree.flush()
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush schema states: {}", e)))?;
-        Ok(())
+        self.store_in_tree(&self.schema_states_tree, schema_name, &state)
     }
 
-    /// Gets a schema state
+    /// Gets a schema state using generic tree operations
     pub fn get_schema_state(&self, schema_name: &str) -> Result<Option<SchemaState>, SchemaError> {
-        if let Some(bytes) = self.schema_states_tree.get(schema_name.as_bytes())
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to get schema state: {}", e)))? {
-            let state = serde_json::from_slice(&bytes)
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to deserialize schema state: {}", e)))?;
-            Ok(Some(state))
-        } else {
-            Ok(None)
-        }
+        self.get_from_tree(&self.schema_states_tree, schema_name)
     }
 
     /// Lists all schemas with a specific state
     pub fn list_schemas_by_state(&self, target_state: SchemaState) -> Result<Vec<String>, SchemaError> {
-        let mut schemas = Vec::new();
-        for result in self.schema_states_tree.iter() {
-            let (key, value) = result
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to iterate schema states: {}", e)))?;
-            let schema_name = String::from_utf8_lossy(&key).to_string();
-            let state: SchemaState = serde_json::from_slice(&value)
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to deserialize schema state: {}", e)))?;
-            if state == target_state {
-                schemas.push(schema_name);
-            }
-        }
-        Ok(schemas)
+        let all_states: Vec<(String, SchemaState)> = self.list_items_in_tree(&self.schema_states_tree)?;
+        Ok(all_states
+            .into_iter()
+            .filter(|(_, state)| *state == target_state)
+            .map(|(name, _)| name)
+            .collect())
     }
 
-    /// Stores a schema definition
+    /// Stores a schema definition using generic tree operations
     pub fn store_schema(&self, schema_name: &str, schema: &Schema) -> Result<(), SchemaError> {
-        let bytes = serde_json::to_vec(schema)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize schema: {}", e)))?;
-        self.schemas_tree.insert(schema_name.as_bytes(), bytes)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to store schema: {}", e)))?;
-        self.schemas_tree.flush()
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush schemas: {}", e)))?;
-        Ok(())
+        self.store_in_tree(&self.schemas_tree, schema_name, schema)
     }
 
-    /// Gets a schema definition
+    /// Gets a schema definition using generic tree operations
     pub fn get_schema(&self, schema_name: &str) -> Result<Option<Schema>, SchemaError> {
-        if let Some(bytes) = self.schemas_tree.get(schema_name.as_bytes())
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to get schema: {}", e)))? {
-            let schema = serde_json::from_slice(&bytes)
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to deserialize schema: {}", e)))?;
-            Ok(Some(schema))
-        } else {
-            Ok(None)
-        }
+        self.get_from_tree(&self.schemas_tree, schema_name)
     }
 
-    /// Lists all stored schemas
+    /// Lists all stored schemas using generic tree operations
     pub fn list_all_schemas(&self) -> Result<Vec<String>, SchemaError> {
-        let mut schemas = Vec::new();
-        for result in self.schemas_tree.iter() {
-            let (key, _) = result
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to iterate schemas: {}", e)))?;
-            let schema_name = String::from_utf8_lossy(&key).to_string();
-            schemas.push(schema_name);
-        }
-        Ok(schemas)
+        self.list_keys_in_tree(&self.schemas_tree)
+    }
+
+    /// Deletes a schema definition
+    pub fn delete_schema(&self, schema_name: &str) -> Result<bool, SchemaError> {
+        self.delete_from_tree(&self.schemas_tree, schema_name)
+    }
+
+    /// Deletes a schema state
+    pub fn delete_schema_state(&self, schema_name: &str) -> Result<bool, SchemaError> {
+        self.delete_from_tree(&self.schema_states_tree, schema_name)
+    }
+
+    /// Checks if a schema exists
+    pub fn schema_exists(&self, schema_name: &str) -> Result<bool, SchemaError> {
+        self.exists_in_tree(&self.schemas_tree, schema_name)
+    }
+
+    /// Checks if a schema state exists
+    pub fn schema_state_exists(&self, schema_name: &str) -> Result<bool, SchemaError> {
+        self.exists_in_tree(&self.schema_states_tree, schema_name)
+    }
+
+    /// Gets all schema states as a HashMap
+    pub fn get_all_schema_states(&self) -> Result<std::collections::HashMap<String, SchemaState>, SchemaError> {
+        let items: Vec<(String, SchemaState)> = self.list_items_in_tree(&self.schema_states_tree)?;
+        Ok(items.into_iter().collect())
     }
 }

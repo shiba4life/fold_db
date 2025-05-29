@@ -17,7 +17,7 @@ fn test_non_reversible_transform_not_writable() {
     let _ = env_logger::builder().is_test(true).try_init();
     let wrapper = PermissionWrapper::new();
     let temp_dir = tempdir().unwrap();
-    let schema_manager = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
+    let schema_manager = SchemaCore::new_for_testing(temp_dir.path().to_str().unwrap()).unwrap();
 
     let transform = Transform::new(
         "1 + 1".to_string(),
@@ -65,7 +65,7 @@ fn test_permission_wrapper_query() {
     // Setup
     let wrapper = PermissionWrapper::new();
     let temp_dir = tempdir().unwrap();
-    let schema_manager = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
+    let schema_manager = SchemaCore::new_for_testing(temp_dir.path().to_str().unwrap()).unwrap();
 
     // Create a test schema
     let mut fields = HashMap::new();
@@ -128,7 +128,7 @@ fn test_permission_wrapper_no_requirement() {
     // Setup
     let wrapper = PermissionWrapper::new();
     let temp_dir = tempdir().unwrap();
-    let schema_manager = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
+    let schema_manager = SchemaCore::new_for_testing(temp_dir.path().to_str().unwrap()).unwrap();
 
     // Create a test schema with no distance requirement
     let mut fields = HashMap::new();
@@ -180,7 +180,7 @@ fn test_permission_wrapper_mutation() {
     // Setup
     let wrapper = PermissionWrapper::new();
     let temp_dir = tempdir().unwrap();
-    let schema_manager = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
+    let schema_manager = SchemaCore::new_for_testing(temp_dir.path().to_str().unwrap()).unwrap();
 
     // Create a test schema with both explicit write permissions and trust distance
     let mut fields = HashMap::new();

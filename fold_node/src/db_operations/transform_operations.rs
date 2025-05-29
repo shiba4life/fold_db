@@ -3,33 +3,29 @@ use crate::schema::types::transform::{Transform, TransformRegistration};
 use super::core::DbOperations;
 
 impl DbOperations {
-    /// Stores a transform
+    /// Stores a transform using generic tree operations
     pub fn store_transform(&self, transform_id: &str, transform: &Transform) -> Result<(), SchemaError> {
-        let bytes = serde_json::to_vec(transform)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize transform: {}", e)))?;
-        self.transforms_tree.insert(transform_id.as_bytes(), bytes)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to store transform: {}", e)))?;
-        self.transforms_tree.flush()
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush transforms: {}", e)))?;
-        Ok(())
+        self.store_in_tree(&self.transforms_tree, transform_id, transform)
     }
 
-    /// Gets a transform
+    /// Gets a transform with enhanced error logging
     pub fn get_transform(&self, transform_id: &str) -> Result<Option<Transform>, SchemaError> {
-        if let Some(bytes) = self.transforms_tree.get(transform_id.as_bytes())
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to get transform: {}", e)))? {
-            
-            let transform = serde_json::from_slice(&bytes)
-                .map_err(|e| {
+        match self.get_from_tree(&self.transforms_tree, transform_id) {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                // Enhanced error logging for transform deserialization issues
+                if let Ok(Some(bytes)) = self.transforms_tree.get(transform_id.as_bytes()) {
                     let raw_data = String::from_utf8_lossy(&bytes);
                     log::error!("Failed to deserialize transform '{}': {}", transform_id, e);
                     log::error!("Raw transform data: {}", raw_data);
-                    SchemaError::InvalidData(format!("Failed to deserialize transform '{}': {}. Raw data: {}", transform_id, e, raw_data))
-                })?;
-            
-            Ok(Some(transform))
-        } else {
-            Ok(None)
+                    Err(SchemaError::InvalidData(format!(
+                        "Failed to deserialize transform '{}': {}. Raw data: {}",
+                        transform_id, e, raw_data
+                    )))
+                } else {
+                    Err(e)
+                }
+            }
         }
     }
 
@@ -63,13 +59,9 @@ impl DbOperations {
         Ok(transforms)
     }
 
-    /// Deletes a transform
-    pub fn delete_transform(&self, transform_id: &str) -> Result<(), SchemaError> {
-        self.transforms_tree.remove(transform_id.as_bytes())
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to delete transform: {}", e)))?;
-        self.transforms_tree.flush()
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush transforms: {}", e)))?;
-        Ok(())
+    /// Deletes a transform using generic tree operations
+    pub fn delete_transform(&self, transform_id: &str) -> Result<bool, SchemaError> {
+        self.delete_from_tree(&self.transforms_tree, transform_id)
     }
 
     /// Stores a transform registration

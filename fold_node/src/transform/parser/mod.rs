@@ -32,7 +32,8 @@ impl TransformParser {
             .map_err(|e| SchemaError::InvalidField(format!("Parse error: {}", e)))?;
         
         // Get the expression from the parse result
-        let expr_pair = pairs.into_iter().next().unwrap();
+        let expr_pair = pairs.into_iter().next()
+            .ok_or_else(|| SchemaError::InvalidField("No expression found in parse result".to_string()))?;
         
         // Convert the parse tree to an AST
         self.build_ast(expr_pair)
@@ -45,7 +46,8 @@ impl TransformParser {
             .map_err(|e| SchemaError::InvalidField(format!("Parse error: {}", e)))?;
         
         // Get the transform declaration from the parse result
-        let transform_pair = pairs.into_iter().next().unwrap();
+        let transform_pair = pairs.into_iter().next()
+            .ok_or_else(|| SchemaError::InvalidField("No transform declaration found in parse result".to_string()))?;
         
         // Convert the parse tree to a TransformDeclaration
         self.build_transform_decl(transform_pair)
@@ -56,12 +58,14 @@ impl TransformParser {
         match pair.as_rule() {
             Rule::complete_expr => {
                 // Get the expression inside the complete_expr
-                let expr_pair = pair.into_inner().next().unwrap();
+                let expr_pair = pair.into_inner().next()
+                    .ok_or_else(|| SchemaError::InvalidField("No expression found inside complete_expr".to_string()))?;
                 self.build_ast(expr_pair)
             },
             Rule::expr => {
                 // Get the expression inside the expr
-                let inner_pair = pair.into_inner().next().unwrap();
+                let inner_pair = pair.into_inner().next()
+                    .ok_or_else(|| SchemaError::InvalidField("No expression found inside expr".to_string()))?;
                 self.build_ast(inner_pair)
             },
             Rule::logic_expr => self.parse_logic_expr(pair),
@@ -80,7 +84,8 @@ impl TransformParser {
         let mut pairs = pair.into_inner();
         
         // Parse the first comparison expression
-        let first = pairs.next().unwrap();
+        let first = pairs.next()
+            .ok_or_else(|| SchemaError::InvalidField("No first comparison expression found".to_string()))?;
         let mut expr = self.build_ast(first)?;
         
         // Parse any additional logic operations
@@ -93,7 +98,8 @@ impl TransformParser {
                     _ => return Err(SchemaError::InvalidField(format!("Unknown logic operator: {}", op_str))),
                 };
                 
-                let right_pair = pairs.next().unwrap();
+                let right_pair = pairs.next()
+                    .ok_or_else(|| SchemaError::InvalidField("No right operand found in logic expression".to_string()))?;
                 let right = self.build_ast(right_pair)?;
                 
                 expr = Expression::BinaryOp {
@@ -112,7 +118,8 @@ impl TransformParser {
         let mut pairs = pair.into_inner();
         
         // Parse the first addition expression
-        let first = pairs.next().unwrap();
+        let first = pairs.next()
+            .ok_or_else(|| SchemaError::InvalidField("No first addition expression found".to_string()))?;
         let mut expr = self.build_ast(first)?;
         
         // Parse any additional comparison operations
@@ -129,7 +136,8 @@ impl TransformParser {
                     _ => return Err(SchemaError::InvalidField(format!("Unknown comparison operator: {}", op_str))),
                 };
                 
-                let right_pair = pairs.next().unwrap();
+                let right_pair = pairs.next()
+                    .ok_or_else(|| SchemaError::InvalidField("No right operand found in comparison expression".to_string()))?;
                 let right = self.build_ast(right_pair)?;
                 
                 expr = Expression::BinaryOp {
@@ -148,7 +156,8 @@ impl TransformParser {
         let mut pairs = pair.into_inner();
         
         // Parse the first multiplication expression
-        let first = pairs.next().unwrap();
+        let first = pairs.next()
+            .ok_or_else(|| SchemaError::InvalidField("No first multiplication expression found".to_string()))?;
         let mut expr = self.build_ast(first)?;
         
         // Parse any additional addition operations
@@ -161,7 +170,8 @@ impl TransformParser {
                     _ => return Err(SchemaError::InvalidField(format!("Unknown addition operator: {}", op_str))),
                 };
                 
-                let right_pair = pairs.next().unwrap();
+                let right_pair = pairs.next()
+                    .ok_or_else(|| SchemaError::InvalidField("No right operand found in addition expression".to_string()))?;
                 let right = self.build_ast(right_pair)?;
                 
                 expr = Expression::BinaryOp {
@@ -180,7 +190,8 @@ impl TransformParser {
         let mut pairs = pair.into_inner();
         
         // Parse the first power expression
-        let first = pairs.next().unwrap();
+        let first = pairs.next()
+            .ok_or_else(|| SchemaError::InvalidField("No first power expression found".to_string()))?;
         let mut expr = self.build_ast(first)?;
         
         // Parse any additional multiplication operations
@@ -193,7 +204,8 @@ impl TransformParser {
                     _ => return Err(SchemaError::InvalidField(format!("Unknown multiplication operator: {}", op_str))),
                 };
                 
-                let right_pair = pairs.next().unwrap();
+                let right_pair = pairs.next()
+                    .ok_or_else(|| SchemaError::InvalidField("No right operand found in multiplication expression".to_string()))?;
                 let right = self.build_ast(right_pair)?;
                 
                 expr = Expression::BinaryOp {
@@ -212,7 +224,8 @@ impl TransformParser {
         let mut pairs = pair.into_inner();
         
         // Parse the first unary expression
-        let first = pairs.next().unwrap();
+        let first = pairs.next()
+            .ok_or_else(|| SchemaError::InvalidField("No first unary expression found".to_string()))?;
         let mut expr = self.build_ast(first)?;
         
         // Parse any additional power operations
@@ -224,7 +237,8 @@ impl TransformParser {
                     _ => return Err(SchemaError::InvalidField(format!("Unknown power operator: {}", op_str))),
                 };
                 
-                let right_pair = pairs.next().unwrap();
+                let right_pair = pairs.next()
+                    .ok_or_else(|| SchemaError::InvalidField("No right operand found in power expression".to_string()))?;
                 let right = self.build_ast(right_pair)?;
                 
                 expr = Expression::BinaryOp {
@@ -260,7 +274,8 @@ impl TransformParser {
         }
         
         // Parse the atom
-        let atom_pair = pairs.next().unwrap();
+        let atom_pair = pairs.next()
+            .ok_or_else(|| SchemaError::InvalidField("No atom found in unary expression".to_string()))?;
         let mut expr = self.build_ast(atom_pair)?;
         
         // Apply unary operators in reverse order (right to left)
@@ -276,7 +291,8 @@ impl TransformParser {
     
     /// Parses an atom (number, string, boolean, null, function call, field access, identifier, or parenthesized expression).
     fn parse_atom(&self, pair: Pair<Rule>) -> Result<Expression, SchemaError> {
-        let inner = pair.into_inner().next().unwrap();
+        let inner = pair.into_inner().next()
+            .ok_or_else(|| SchemaError::InvalidField("No inner content found in atom".to_string()))?;
         
         match inner.as_rule() {
             Rule::number => {

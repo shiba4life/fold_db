@@ -189,19 +189,45 @@ impl TransformManager {
 
     /// Unregisters a transform.
     pub fn unregister_transform(&self, transform_id: &str) -> Result<bool, SchemaError> {
-        // Remove from transforms tree and cache
-        let found = if self.transforms_tree.remove(transform_id.as_bytes()).is_ok() {
-            let mut registered_transforms = self
-                .registered_transforms
-                .write()
-                .map_err(|_| {
-                    SchemaError::InvalidData(
-                        "Failed to acquire registered_transforms lock".to_string(),
-                    )
-                })?;
-            registered_transforms.remove(transform_id).is_some()
+        // Remove from database using unified operations
+        let found = if let Some(db_ops) = &self.db_ops {
+            // Use unified operations
+            match db_ops.delete_transform(transform_id) {
+                Ok(existed) => {
+                    if existed {
+                        let mut registered_transforms = self
+                            .registered_transforms
+                            .write()
+                            .map_err(|_| {
+                                SchemaError::InvalidData(
+                                    "Failed to acquire registered_transforms lock".to_string(),
+                                )
+                            })?;
+                        registered_transforms.remove(transform_id).is_some()
+                    } else {
+                        false
+                    }
+                }
+                Err(e) => {
+                    log::error!("Failed to delete transform '{}': {}", transform_id, e);
+                    return Err(e);
+                }
+            }
         } else {
-            false
+            // Fallback to legacy tree (for backward compatibility)
+            if self.transforms_tree.remove(transform_id.as_bytes()).is_ok() {
+                let mut registered_transforms = self
+                    .registered_transforms
+                    .write()
+                    .map_err(|_| {
+                        SchemaError::InvalidData(
+                            "Failed to acquire registered_transforms lock".to_string(),
+                        )
+                    })?;
+                registered_transforms.remove(transform_id).is_some()
+            } else {
+                false
+            }
         };
         
         if found {

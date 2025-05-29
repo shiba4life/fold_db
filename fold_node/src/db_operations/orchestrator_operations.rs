@@ -3,26 +3,23 @@ use serde::{de::DeserializeOwned, Serialize};
 use super::core::DbOperations;
 
 impl DbOperations {
-    /// Stores orchestrator state
+    /// Stores orchestrator state using generic tree operations
     pub fn store_orchestrator_state<T: Serialize>(&self, key: &str, state: &T) -> Result<(), SchemaError> {
-        let bytes = serde_json::to_vec(state)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize orchestrator state: {}", e)))?;
-        self.orchestrator_tree.insert(key.as_bytes(), bytes)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to store orchestrator state: {}", e)))?;
-        self.orchestrator_tree.flush()
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush orchestrator state: {}", e)))?;
-        Ok(())
+        self.store_in_tree(&self.orchestrator_tree, key, state)
     }
 
-    /// Gets orchestrator state
+    /// Gets orchestrator state using generic tree operations
     pub fn get_orchestrator_state<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>, SchemaError> {
-        if let Some(bytes) = self.orchestrator_tree.get(key.as_bytes())
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to get orchestrator state: {}", e)))? {
-            let state = serde_json::from_slice(&bytes)
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to deserialize orchestrator state: {}", e)))?;
-            Ok(Some(state))
-        } else {
-            Ok(None)
-        }
+        self.get_from_tree(&self.orchestrator_tree, key)
+    }
+
+    /// Lists all orchestrator state keys
+    pub fn list_orchestrator_keys(&self) -> Result<Vec<String>, SchemaError> {
+        self.list_keys_in_tree(&self.orchestrator_tree)
+    }
+
+    /// Deletes orchestrator state
+    pub fn delete_orchestrator_state(&self, key: &str) -> Result<bool, SchemaError> {
+        self.delete_from_tree(&self.orchestrator_tree, key)
     }
 }

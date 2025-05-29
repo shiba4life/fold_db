@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 fn create_core() -> SchemaCore {
     let dir = tempdir().unwrap();
-    SchemaCore::new(dir.path().to_str().unwrap()).unwrap()
+    SchemaCore::new_for_testing(dir.path().to_str().unwrap()).unwrap()
 }
 
 fn base_field() -> FieldVariant {

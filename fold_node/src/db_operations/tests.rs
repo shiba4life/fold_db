@@ -354,10 +354,10 @@ mod tests {
         use std::collections::HashMap;
         
         let db_ops = Arc::new(create_temp_db());
-        let schema_core = SchemaCore::new_with_db_ops("test_path", db_ops.clone()).unwrap();
+        let schema_core = SchemaCore::new("test_path", db_ops.clone()).unwrap();
         
-        // Verify that SchemaCore is using unified DbOperations
-        assert!(schema_core.has_unified_db_ops());
+        // SchemaCore now always uses DbOperations - no need to check
+        // The fact that it was created successfully means it's working
         
         // Create a test schema and add it to SchemaCore
         let test_schema = Schema {
@@ -370,14 +370,14 @@ mod tests {
         schema_core.add_schema_available(test_schema).unwrap();
         
         // Now test schema state operations through SchemaCore using unified DbOperations
-        schema_core.set_schema_state_unified("TestSchema", SchemaState::Approved).unwrap();
+        schema_core.set_schema_state("TestSchema", SchemaState::Approved).unwrap();
         
         // Verify the state was stored using unified operations
         let state = db_ops.get_schema_state("TestSchema").unwrap();
         assert_eq!(state, Some(SchemaState::Approved));
         
         // Test listing schemas by state through unified operations
-        let approved_schemas = schema_core.list_schemas_by_state_unified(SchemaState::Approved).unwrap();
+        let approved_schemas = schema_core.list_schemas_by_state(SchemaState::Approved).unwrap();
         assert!(approved_schemas.contains(&"TestSchema".to_string()));
     }
 }

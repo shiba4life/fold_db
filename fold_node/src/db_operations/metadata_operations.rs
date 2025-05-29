@@ -26,25 +26,30 @@ impl DbOperations {
         Ok(())
     }
 
-    /// Retrieves the list of permitted schemas for the given node
+    /// Retrieves the list of permitted schemas for the given node using generic operations
     pub fn get_schema_permissions(&self, node_id: &str) -> Result<Vec<String>, SchemaError> {
-        if let Some(bytes) = self.permissions_tree.get(node_id)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to get permissions: {}", e)))? {
-            if let Ok(list) = serde_json::from_slice::<Vec<String>>(&bytes) {
-                return Ok(list);
-            }
-        }
-        Ok(Vec::new())
+        self.get_from_tree(&self.permissions_tree, node_id)
+            .map(|opt| opt.unwrap_or_default())
     }
 
-    /// Sets the permitted schemas for the given node
+    /// Sets the permitted schemas for the given node using generic operations
     pub fn set_schema_permissions(&self, node_id: &str, schemas: &[String]) -> Result<(), SchemaError> {
-        let bytes = serde_json::to_vec(schemas)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize permissions: {}", e)))?;
-        self.permissions_tree.insert(node_id, bytes)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to store permissions: {}", e)))?;
-        self.permissions_tree.flush()
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush permissions: {}", e)))?;
-        Ok(())
+        let schemas_vec: Vec<String> = schemas.to_vec();
+        self.store_in_tree(&self.permissions_tree, node_id, &schemas_vec)
+    }
+
+    /// Lists all nodes with permissions
+    pub fn list_nodes_with_permissions(&self) -> Result<Vec<String>, SchemaError> {
+        self.list_keys_in_tree(&self.permissions_tree)
+    }
+
+    /// Deletes permissions for a node
+    pub fn delete_schema_permissions(&self, node_id: &str) -> Result<bool, SchemaError> {
+        self.delete_from_tree(&self.permissions_tree, node_id)
+    }
+
+    /// Checks if a node has permissions set
+    pub fn node_has_permissions(&self, node_id: &str) -> Result<bool, SchemaError> {
+        self.exists_in_tree(&self.permissions_tree, node_id)
     }
 }
