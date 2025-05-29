@@ -1,14 +1,22 @@
 use fold_node::testing::{Field, SchemaCore};
 use fold_node::fold_db_core::FoldDB;
+use fold_node::db_operations::core::DbOperations;
 use tempfile::tempdir;
+use std::sync::Arc;
 mod test_data;
 use test_data::schema_test_data::*;
+
+fn create_test_db_ops() -> Arc<DbOperations> {
+    let db = sled::Config::new().temporary(true).open().unwrap();
+    Arc::new(DbOperations::new(db).unwrap())
+}
 
 #[test]
 fn test_schema_aref_preservation_on_reload() {
     // Create a temporary directory for test
     let test_dir = tempdir().unwrap();
-    let manager = SchemaCore::new(test_dir.path().to_str().unwrap()).unwrap();
+    let db_ops = create_test_db_ops();
+    let manager = SchemaCore::new(test_dir.path().to_str().unwrap(), db_ops).unwrap();
 
     // Create and load a test schema with a specific ref_atom_uuid
     let original_schema = create_test_schema("aref_preservation_test");
@@ -60,7 +68,12 @@ fn test_schema_aref_preservation_on_reload() {
 fn test_schema_state_preservation_on_reload() {
     // Create a temporary directory for test
     let test_dir = tempdir().unwrap();
-    let manager = SchemaCore::new(test_dir.path().to_str().unwrap()).unwrap();
+    let db_path = test_dir.path().join("test.db");
+    
+    // Create first manager instance
+    let db1 = sled::open(&db_path).unwrap();
+    let db_ops1 = Arc::new(DbOperations::new(db1).unwrap());
+    let manager = SchemaCore::new(test_dir.path().to_str().unwrap(), db_ops1).unwrap();
 
     // Create and load a test schema
     let schema = create_test_schema("state_preservation_test");
@@ -78,12 +91,15 @@ fn test_schema_state_preservation_on_reload() {
     // Drop the manager to simulate a restart
     drop(manager);
     
-    // Create a new manager instance - this should reload schemas that were marked as Loaded
-    let new_manager = SchemaCore::new(test_dir.path().to_str().unwrap()).unwrap();
+    // Create a new manager instance with the same database - this should reload schemas that were marked as Loaded
+    let db2 = sled::open(&db_path).unwrap();
+    let db_ops2 = Arc::new(DbOperations::new(db2).unwrap());
+    let new_manager = SchemaCore::new(test_dir.path().to_str().unwrap(), db_ops2).unwrap();
     new_manager.load_schema_states_from_disk().unwrap();
     
     // The schema should be automatically loaded because it was previously in Loaded state
-    let reloaded_schema = new_manager.get_schema("state_preservation_test").unwrap().unwrap();
+    let reloaded_schema = new_manager.get_schema("state_preservation_test").unwrap()
+        .expect("Schema should be automatically loaded because it was previously in Loaded state");
     
     // The ref_atom_uuid should be preserved
     let reloaded_ref_uuid = reloaded_schema
@@ -162,7 +178,8 @@ fn test_folddb_aref_preservation_on_reload() {
 fn test_schema_without_ref_atom_uuid_gets_new_one() {
     // This test verifies that schemas without ref_atom_uuid get new ones assigned
     let test_dir = tempdir().unwrap();
-    let manager = SchemaCore::new(test_dir.path().to_str().unwrap()).unwrap();
+    let db_ops = create_test_db_ops();
+    let manager = SchemaCore::new(test_dir.path().to_str().unwrap(), db_ops).unwrap();
 
     // Create a schema without ref_atom_uuid
     use fold_node::testing::{SingleField, FieldVariant, PermissionsPolicy, FieldPaymentConfig, TrustDistanceScaling};

@@ -85,7 +85,7 @@ impl FoldDB {
         let field_manager = FieldManager::new(atom_manager.clone());
         let collection_manager = CollectionManager::new(field_manager.clone());
         let schema_manager = Arc::new(
-            SchemaCore::new_with_db_ops(path, Arc::new(db_ops.clone()))
+            SchemaCore::new(path, Arc::new(db_ops.clone()))
                 .map_err(|e| sled::Error::Unsupported(e.to_string()))?,
         );
         let closures = build_closure_fns(&atom_manager, &schema_manager);

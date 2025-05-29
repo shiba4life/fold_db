@@ -23,13 +23,11 @@
 
 // Internal modules
 pub mod core;
-pub(crate) mod storage;
 pub mod types;
 
 
 // Public re-exports
 pub use core::{SchemaCore, SchemaState};
-pub use storage::SchemaStorage;
 pub use types::{errors::SchemaError, schema::Schema, Transform};
 pub mod validator;
 pub use validator::SchemaValidator;

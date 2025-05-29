@@ -1,5 +1,12 @@
 use fold_node::testing::SchemaCore;
+use fold_node::db_operations::core::DbOperations;
 use tempfile::tempdir;
+use std::sync::Arc;
+
+fn create_test_db_ops() -> Arc<DbOperations> {
+    let db = sled::Config::new().temporary(true).open().unwrap();
+    Arc::new(DbOperations::new(db).unwrap())
+}
 
 #[test]
 fn test_invalid_schema_validation() {
@@ -35,7 +42,8 @@ fn test_invalid_schema_validation() {
     }"#;
     
     let temp_dir = tempdir().unwrap();
-    let core = SchemaCore::new(temp_dir.path().to_str().unwrap()).unwrap();
+    let db_ops = create_test_db_ops();
+    let core = SchemaCore::new(temp_dir.path().to_str().unwrap(), db_ops).unwrap();
     let result = core.load_schema_from_json(invalid_json_str);
     assert!(result.is_err());
 }
