@@ -128,7 +128,12 @@ impl FieldManager {
         info!("📋 Field definition found for {}.{}, type: {:?}",
               schema.name, field, std::mem::discriminant(field_def));
         
-        let ref_atom_uuid = field_def.ref_atom_uuid();
+        // If the ref_atom_uuid hasn't been set yet, treat it as missing so
+        // queries return `null` for this field until a value is written.
+        let ref_atom_uuid = match field_def.ref_atom_uuid() {
+            Some(id) if id.is_empty() => None,
+            other => other,
+        };
         info!("🆔 ref_atom_uuid for {}.{}: {:?}", schema.name, field, ref_atom_uuid);
 
         let result = match field_def {

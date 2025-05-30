@@ -134,3 +134,20 @@ fn test_version_history() {
     assert_eq!(history[0], json!("Jane Doe")); // Most recent first
     assert_eq!(history[1], json!("John Doe"));
 }
+
+#[test]
+fn test_query_returns_null_for_unwritten_field() {
+    let mut node = create_test_node();
+    let schema = create_basic_user_profile_schema();
+    load_and_allow(&mut node, schema).unwrap();
+
+    // Query a field that has never been written to
+    let value = query_value(&mut node, "user_profile", "name").unwrap();
+    assert_eq!(value, serde_json::Value::Null);
+
+    // Ensure the field has a ref_atom_uuid even though no data exists yet
+    let schema_after = node.get_schema("user_profile").unwrap().unwrap();
+    let name_field = schema_after.fields.get("name").unwrap();
+    assert!(name_field.ref_atom_uuid().is_some());
+    assert!(!name_field.ref_atom_uuid().unwrap().is_empty());
+}
