@@ -137,8 +137,6 @@ impl DataFoldHttpServer {
                         .route("/logs", web::get().to(log_routes::list_logs))
                         .route("/logs/stream", web::get().to(log_routes::stream_logs))
                         // System endpoints
-                        .route("/system/restart", web::post().to(system_routes::restart_node))
-                        .route("/system/soft-restart", web::post().to(system_routes::soft_restart_node))
                         .route("/system/status", web::get().to(system_routes::get_system_status))
                         // Network endpoints
                         .service(

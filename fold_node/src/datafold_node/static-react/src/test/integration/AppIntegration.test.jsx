@@ -162,9 +162,6 @@ describe('App Integration Tests', () => {
   it('shows system status controls', async () => {
     render(<App />)
     
-    // Check for restart buttons
-    expect(screen.getByText('Soft Restart')).toBeInTheDocument()
-    expect(screen.getByText('Full Restart')).toBeInTheDocument()
   })
 
   it('displays log sidebar', async () => {
