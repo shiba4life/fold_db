@@ -186,6 +186,22 @@ fn test_json_filter() {
 }
 
 #[test]
+fn test_json_filter_key_range() {
+    let mut range_field = create_test_range_field();
+    populate_test_data(&mut range_field);
+
+    let json_filter = serde_json::json!({
+        "KeyRange": {"start": "user:", "end": "user:z"}
+    });
+
+    let result = range_field.apply_json_filter(&json_filter).unwrap();
+    assert_eq!(result.total_count, 2);
+    assert!(result.matches.contains_key("user:123"));
+    assert!(result.matches.contains_key("user:456"));
+    assert!(!result.matches.contains_key("product:789"));
+}
+
+#[test]
 fn test_get_all_keys() {
     let mut range_field = create_test_range_field();
     populate_test_data(&mut range_field);
