@@ -223,6 +223,18 @@ impl TransformOrchestrator {
         info!("🏁 PROCESS_QUEUE COMPLETE - processed {} transforms", processed_count);
     }
 
+    /// List queued transform IDs without dequeuing or running them.
+    pub fn list_queued_transforms(&self) -> Result<Vec<String>, SchemaError> {
+        let q = self
+            .queue
+            .lock()
+            .map_err(|e| {
+                error!("Failed to acquire queue lock: {}", e);
+                SchemaError::InvalidData("Failed to acquire queue lock".to_string())
+            })?;
+        Ok(q.queue.iter().map(|item| item.id.clone()).collect())
+    }
+
     /// Queue length, useful for tests.
     pub fn len(&self) -> Result<usize, SchemaError> {
         let q = self
