@@ -2,6 +2,7 @@ pub mod atom_manager;
 pub mod collection_manager;
 pub mod context;
 pub mod field_manager;
+pub mod field_retrieval;
 pub mod transform_manager;
 pub mod transform_orchestrator;
 mod query;

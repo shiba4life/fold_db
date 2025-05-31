@@ -41,10 +41,10 @@
 
 use super::atom_manager::AtomManager;
 use super::context::AtomContext;
+use super::field_retrieval::FieldRetrievalService;
 use super::transform_manager::TransformManager;
 use crate::atom::AtomStatus;
 use crate::schema::types::Field;
-use crate::schema::types::field::FieldVariant;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
 use serde_json::Value;
@@ -55,6 +55,7 @@ use super::transform_orchestrator::TransformOrchestrator;
 
 pub struct FieldManager {
     pub(super) atom_manager: AtomManager,
+    retrieval_service: FieldRetrievalService,
     transform_manager: Arc<RwLock<Option<Arc<TransformManager>>>>,
     orchestrator: Arc<RwLock<Option<Arc<TransformOrchestrator>>>>,
 }
@@ -63,6 +64,7 @@ impl FieldManager {
     pub fn new(atom_manager: AtomManager) -> Self {
         Self {
             atom_manager,
+            retrieval_service: FieldRetrievalService::new(),
             transform_manager: Arc::new(RwLock::new(None)),
             orchestrator: Arc::new(RwLock::new(None)),
         }
@@ -118,208 +120,19 @@ impl FieldManager {
     }
 
     pub fn get_field_value(&self, schema: &Schema, field: &str) -> Result<Value, SchemaError> {
-        info!("🔍 get_field_value START - schema: {}, field: {}", schema.name, field);
-        
-        let field_def = schema
-            .fields
-            .get(field)
-            .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
-
-        info!("📋 Field definition found for {}.{}, type: {:?}",
-              schema.name, field, std::mem::discriminant(field_def));
-        
-        // If the ref_atom_uuid hasn't been set yet, treat it as missing so
-        // queries return `null` for this field until a value is written.
-        let ref_atom_uuid = match field_def.ref_atom_uuid() {
-            Some(id) if id.is_empty() => None,
-            other => other,
-        };
-        info!("🆔 ref_atom_uuid for {}.{}: {:?}", schema.name, field, ref_atom_uuid);
-
-        let result = match field_def {
-            crate::schema::types::field::FieldVariant::Range(_range_field) => {
-                // Range fields are stored in AtomRefRange, not as regular atoms
-                info!("🎯 Processing Range field: {}.{}", schema.name, field);
-                if let Some(ref_atom_uuid) = ref_atom_uuid {
-                    info!("🔗 Fetching AtomRefRange for Range field {}.{} with ref_atom_uuid: {}",
-                          schema.name, field, ref_atom_uuid);
-                    
-                    // Get the AtomRefRange from the atom manager
-                    let result = match self.atom_manager.get_ref_ranges().lock() {
-                        Ok(ranges_guard) => {
-                            if let Some(atom_ref_range) = ranges_guard.get(ref_atom_uuid) {
-                                println!("🔍 Found AtomRefRange with {} entries", atom_ref_range.atom_uuids.len());
-                                info!("🔍 Found AtomRefRange with {} entries", atom_ref_range.atom_uuids.len());
-                                // Convert AtomRefRange to JSON object by getting the actual atom content for each key
-                                let mut result_obj = serde_json::Map::new();
-                                
-                                for (key, atom_uuid) in &atom_ref_range.atom_uuids {
-                                    info!("🔑 Processing key: {} -> atom_uuid: {}", key, atom_uuid);
-                                    info!("🔑 Processing key: {} -> atom_uuid: {}", key, atom_uuid);
-                                    // Access atoms directly since these are individual atoms, not AtomRefs
-                                    match self.atom_manager.get_atoms().lock() {
-                                        Ok(atoms_guard) => {
-                                            if let Some(atom) = atoms_guard.get(atom_uuid) {
-                                                info!("✅ Retrieved atom for key: {} -> content: {:?}", key, atom.content());
-                                                info!("✅ Retrieved atom for key: {} -> content: {:?}", key, atom.content());
-                                                // For range field atoms, the content is the direct value
-                                                result_obj.insert(key.clone(), atom.content().clone());
-                                            } else {
-                                                info!("❌ Atom not found in atoms collection for key: {} -> atom_uuid: {}", key, atom_uuid);
-                                                info!("⚠️  Atom not found in atoms collection for key: {} -> atom_uuid: {}", key, atom_uuid);
-                                            }
-                                        }
-                                        Err(e) => {
-                                            info!("❌ Failed to acquire atoms lock for key {}: {:?}", key, e);
-                                            info!("⚠️  Failed to acquire atoms lock for key {}: {:?}", key, e);
-                                        }
-                                    }
-                                }
-                                
-                                let result = serde_json::Value::Object(result_obj);
-                                info!("✅ Retrieved Range field content for {}.{}: {:?}", schema.name, field, result);
-                                result
-                            } else {
-                                info!("⚠️  No AtomRefRange found for {}.{} with UUID: {}", schema.name, field, ref_atom_uuid);
-                                Self::default_value(field)
-                            }
-                        }
-                        Err(e) => {
-                            info!("❌ Failed to acquire ref_ranges lock for {}.{}: {:?}", schema.name, field, e);
-                            Self::default_value(field)
-                        }
-                    };
-                    result
-                } else {
-                    info!("⚠️  No ref_atom_uuid for Range field {}.{}, using default", schema.name, field);
-                    Self::default_value(field)
-                }
-            }
-            _ => {
-                // For Single and Collection fields, use the existing logic
-                info!("🎯 Processing Single/Collection field: {}.{}", schema.name, field);
-                if let Some(ref_atom_uuid) = ref_atom_uuid {
-                    info!("🔗 Fetching atom for field {}.{} with ref_atom_uuid: {}",
-                          schema.name, field, ref_atom_uuid);
-                    match self.atom_manager.get_latest_atom(ref_atom_uuid) {
-                        Ok(atom) => {
-                            let content = atom.content().clone();
-                            info!("✅ Retrieved atom content for {}.{}: {:?}", schema.name, field, content);
-                            content
-                        }
-                        Err(e) => {
-                            info!("❌ Failed to get atom for {}.{}: {:?}, using default", schema.name, field, e);
-                            Self::default_value(field)
-                        }
-                    }
-                } else {
-                    info!("⚠️  No ref_atom_uuid for field {}.{}, using default", schema.name, field);
-                    Self::default_value(field)
-                }
-            }
-        };
-
-        info!(
-            "✅ get_field_value COMPLETE - schema: {}, field: {}, aref_uuid: {:?}, result: {:?}",
-            schema.name,
-            field,
-            ref_atom_uuid,
-            result
-        );
-
-        Ok(result)
+        info!("🔍 FieldManager::get_field_value - delegating to FieldRetrievalService");
+        self.retrieval_service.get_field_value(&self.atom_manager, schema, field)
     }
 
-    pub fn get_filtered_field_value(&self, schema: &Schema, field: &str, filter: &Value) -> Result<Value, SchemaError> {
-        let field_def = schema
-            .fields
-            .get(field)
-            .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
-
-        // Check if this is a RangeField that supports filtering
-        match field_def {
-            FieldVariant::Range(_range_field) => {
-                // Extract the range_filter from the filter object
-                let range_filter = if let Some(filter_obj) = filter.as_object() {
-                    if let Some(target_field) = filter_obj.get("field") {
-                        if target_field.as_str() == Some(field) {
-                            filter_obj.get("range_filter")
-                                .ok_or_else(|| SchemaError::InvalidData("Missing range_filter in filter".to_string()))?
-                        } else {
-                            // This filter is not for this field, return regular field value
-                            return self.get_field_value(schema, field);
-                        }
-                    } else {
-                        // Assume the entire filter is the range filter (for backward compatibility)
-                        filter
-                    }
-                } else {
-                    return Err(SchemaError::InvalidData("Filter must be an object".to_string()));
-                };
-
-                // Get the full Range field data first
-                info!("get_filtered_field_value - About to call get_field_value for Range field: {}", field);
-                let range_data = self.get_field_value(schema, field)?;
-                info!("get_filtered_field_value - Retrieved range_data: {:?}", range_data);
-                
-                // Apply filtering to the data
-                if let Value::Object(data_map) = range_data {
-                    let mut matches = std::collections::HashMap::new();
-                    
-                    // Parse the range filter
-                    if let Some(filter_obj) = range_filter.as_object() {
-                        if let Some(key_prefix) = filter_obj.get("KeyPrefix").and_then(|v| v.as_str()) {
-                            // Filter by key prefix
-                            for (key, value) in data_map {
-                                if key.starts_with(key_prefix) {
-                                    matches.insert(key, value.as_str().unwrap_or("").to_string());
-                                }
-                            }
-                        } else if let Some(exact_key) = filter_obj.get("Key").and_then(|v| v.as_str()) {
-                            // Filter by exact key
-                            if let Some(value) = data_map.get(exact_key) {
-                                matches.insert(exact_key.to_string(), value.as_str().unwrap_or("").to_string());
-                            }
-                        } else if let Some(pattern) = filter_obj.get("KeyPattern").and_then(|v| v.as_str()) {
-                            // Filter by key pattern (simple glob matching)
-                            for (key, value) in data_map {
-                                // Simple glob pattern matching
-                                let is_match = if let Some(prefix) = pattern.strip_suffix('*') {
-                                    key.starts_with(prefix)
-                                } else if let Some(suffix) = pattern.strip_prefix('*') {
-                                    key.ends_with(suffix)
-                                } else {
-                                    key == pattern
-                                };
-                                
-                                if is_match {
-                                    matches.insert(key, value.as_str().unwrap_or("").to_string());
-                                }
-                            }
-                        }
-                    }
-                    
-                    let result = serde_json::json!({
-                        "matches": matches,
-                        "total_count": matches.len()
-                    });
-                    Ok(result)
-                } else {
-                    // No data or invalid data format
-                    let result = serde_json::json!({
-                        "matches": {},
-                        "total_count": 0
-                    });
-                    Ok(result)
-                }
-            }
-            _ => {
-                // For non-range fields, fall back to regular field value retrieval
-                // In the future, we could add filtering support for other field types
-                self.get_field_value(schema, field)
-            }
-        }
+    /// Get field value with optional filtering using the field's native filtering capabilities.
+    ///
+    /// This method delegates to the FieldRetrievalService which handles field type detection
+    /// and applies appropriate filtering logic for each field type.
+    pub fn get_field_value_with_filter(&self, schema: &Schema, field: &str, filter: &Value) -> Result<Value, SchemaError> {
+        info!("🔄 FieldManager::get_field_value_with_filter - delegating to FieldRetrievalService");
+        self.retrieval_service.get_field_value_with_filter(&self.atom_manager, schema, field, filter)
     }
+
 
     /// Sets a field value and creates the corresponding AtomRef.
     ///
@@ -597,22 +410,13 @@ impl FieldManager {
         Ok(())
     }
 
-    fn default_value(field: &str) -> Value {
-        match field {
-            "username" | "email" | "full_name" | "bio" | "location" => {
-                Value::String("".to_string())
-            }
-            "age" => Value::Number(serde_json::Number::from(0)),
-            "value1" | "value2" => Value::Number(serde_json::Number::from(0)),
-            _ => Value::Null,
-        }
-    }
 }
 
 impl Clone for FieldManager {
     fn clone(&self) -> Self {
         Self {
             atom_manager: self.atom_manager.clone(),
+            retrieval_service: FieldRetrievalService::new(),
             transform_manager: Arc::clone(&self.transform_manager),
             orchestrator: Arc::clone(&self.orchestrator),
         }

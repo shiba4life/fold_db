@@ -46,7 +46,7 @@ impl FoldDB {
 
                 let result = if let Some(ref filter_value) = query.filter {
                     info!("Query processing - field: {}, has filter: true, filter: {:?}", field_name, filter_value);
-                    self.field_manager.get_filtered_field_value(&schema, field_name, filter_value)
+                    self.field_manager.get_field_value_with_filter(&schema, field_name, filter_value)
                 } else {
                     info!("Query processing - field: {}, has filter: false", field_name);
                     self.field_manager.get_field_value(&schema, field_name)
