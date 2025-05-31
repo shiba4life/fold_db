@@ -29,13 +29,28 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     try {
       const resp = await fetch('/api/schemas')
       const data = await resp.json()
-      // Convert the state map to an array of schema objects with states
       const schemasWithStates = Object.entries(data.data || {}).map(([name, state]) => ({
         name,
         state,
-        fields: {} // Will be populated when expanded
+        fields: {}
       }))
-      setAllSchemas(schemasWithStates)
+
+      const schemasWithFields = await Promise.all(
+        schemasWithStates.map(async (schema) => {
+          try {
+            const detailResp = await fetch(`/api/schema/${schema.name}`)
+            if (detailResp.ok) {
+              const detail = await detailResp.json()
+              return { ...schema, fields: detail.fields || {} }
+            }
+          } catch (e) {
+            console.error('Failed to fetch schema details:', e)
+          }
+          return schema
+        })
+      )
+
+      setAllSchemas(schemasWithFields)
     } catch (err) {
       console.error('Failed to fetch all schemas:', err)
     }
