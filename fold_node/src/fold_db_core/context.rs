@@ -179,13 +179,26 @@ impl<'a> AtomContext<'a> {
                     .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
             }
             crate::schema::types::FieldVariant::Range(_) => {
-                // For Range fields, the content should be a JSON object with key-value pairs
+                // For Range fields, create separate atoms for each key-value pair
                 if let Some(obj) = content_for_range.as_object() {
-                    for (key, _value) in obj {
+                    for (key, value) in obj {
+                        // Create a separate atom for each key-value pair
+                        let key_atom = self
+                            .atom_manager
+                            .create_atom(
+                                &self.schema.name,
+                                self.source_pub_key.clone(),
+                                None, // No previous atom for individual keys
+                                value.clone(),
+                                None,
+                            )
+                            .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+                        
+                        
                         self.atom_manager
                             .update_atom_ref_range(
                                 &aref_uuid,
-                                atom.uuid().to_string(),
+                                key_atom.uuid().to_string(),
                                 key.clone(),
                                 self.source_pub_key.clone(),
                             )

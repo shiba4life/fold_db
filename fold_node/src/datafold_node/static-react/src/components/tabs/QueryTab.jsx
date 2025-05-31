@@ -3,11 +3,13 @@ import { useState } from 'react'
 function QueryTab({ schemas, onResult }) {
   const [selectedSchema, setSelectedSchema] = useState('')
   const [queryFields, setQueryFields] = useState([])
+  const [rangeFilters, setRangeFilters] = useState({})
 
   const handleSchemaChange = (e) => {
     const schemaName = e.target.value
     setSelectedSchema(schemaName)
     setQueryFields([])
+    setRangeFilters({})
   }
 
   const handleFieldToggle = (fieldName) => {
@@ -17,6 +19,16 @@ function QueryTab({ schemas, onResult }) {
       }
       return [...prev, fieldName]
     })
+  }
+
+  const handleRangeFilterChange = (fieldName, filterType, value) => {
+    setRangeFilters(prev => ({
+      ...prev,
+      [fieldName]: {
+        ...prev[fieldName],
+        [filterType]: value
+      }
+    }))
   }
 
   const handleSubmit = async (e) => {
@@ -30,6 +42,44 @@ function QueryTab({ schemas, onResult }) {
       type: 'query',
       schema: selectedSchema,
       fields: queryFields
+    }
+
+    // Add range filters if any are specified
+    const selectedSchemaFields = schemas.find(s => s.name === selectedSchema)?.fields || {}
+    const rangeFieldsWithFilters = queryFields.filter(fieldName => {
+      const field = selectedSchemaFields[fieldName]
+      return field?.field_type === 'Range' && rangeFilters[fieldName]
+    })
+
+    if (rangeFieldsWithFilters.length > 0) {
+      const fieldName = rangeFieldsWithFilters[0] // For now, support one range filter
+      const filter = rangeFilters[fieldName]
+      
+      if (filter.start && filter.end) {
+        query.filter = {
+          field: fieldName,
+          range_filter: {
+            KeyRange: {
+              start: filter.start,
+              end: filter.end
+            }
+          }
+        }
+      } else if (filter.key) {
+        query.filter = {
+          field: fieldName,
+          range_filter: {
+            Key: filter.key
+          }
+        }
+      } else if (filter.keyPrefix) {
+        query.filter = {
+          field: fieldName,
+          range_filter: {
+            KeyPrefix: filter.keyPrefix
+          }
+        }
+      }
     }
 
     try {
@@ -64,9 +114,13 @@ function QueryTab({ schemas, onResult }) {
     }
   }
 
-  const selectedSchemaFields = selectedSchema ? 
-    schemas.find(s => s.name === selectedSchema)?.fields || {} : 
+  const selectedSchemaFields = selectedSchema ?
+    schemas.find(s => s.name === selectedSchema)?.fields || {} :
     {}
+
+  const rangeFields = selectedSchema ?
+    Object.entries(selectedSchemaFields).filter(([_, field]) => field.field_type === 'Range') :
+    []
 
   return (
     <div className="p-6">
@@ -115,6 +169,76 @@ function QueryTab({ schemas, onResult }) {
                   </label>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {rangeFields.length > 0 && queryFields.some(fieldName =>
+          selectedSchemaFields[fieldName]?.field_type === 'Range'
+        ) && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Range Field Filters
+            </label>
+            <div className="bg-blue-50 rounded-md p-4 space-y-4">
+              {rangeFields
+                .filter(([fieldName]) => queryFields.includes(fieldName))
+                .map(([fieldName]) => (
+                  <div key={fieldName} className="border-b border-blue-200 pb-4 last:border-b-0 last:pb-0">
+                    <h4 className="text-sm font-medium text-gray-800 mb-3">{fieldName}</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Key Range Filter */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-medium text-gray-600">Key Range</label>
+                        <input
+                          type="text"
+                          placeholder="Start key"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                          value={rangeFilters[fieldName]?.start || ''}
+                          onChange={(e) => handleRangeFilterChange(fieldName, 'start', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          placeholder="End key"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                          value={rangeFilters[fieldName]?.end || ''}
+                          onChange={(e) => handleRangeFilterChange(fieldName, 'end', e.target.value)}
+                        />
+                      </div>
+
+                      {/* Single Key Filter */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-medium text-gray-600">Exact Key</label>
+                        <input
+                          type="text"
+                          placeholder="Exact key to match"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                          value={rangeFilters[fieldName]?.key || ''}
+                          onChange={(e) => handleRangeFilterChange(fieldName, 'key', e.target.value)}
+                        />
+                      </div>
+
+                      {/* Key Prefix Filter */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-medium text-gray-600">Key Prefix</label>
+                        <input
+                          type="text"
+                          placeholder="Key prefix (e.g., 'user:')"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                          value={rangeFilters[fieldName]?.keyPrefix || ''}
+                          onChange={(e) => handleRangeFilterChange(fieldName, 'keyPrefix', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 text-xs text-gray-500">
+                      <p><strong>Key Range:</strong> Matches keys between start and end (inclusive start, exclusive end)</p>
+                      <p><strong>Exact Key:</strong> Matches a specific key exactly</p>
+                      <p><strong>Key Prefix:</strong> Matches all keys starting with the prefix</p>
+                    </div>
+                  </div>
+                ))}
             </div>
           </div>
         )}

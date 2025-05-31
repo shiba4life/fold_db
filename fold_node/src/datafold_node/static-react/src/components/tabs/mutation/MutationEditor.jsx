@@ -13,7 +13,9 @@ function MutationEditor({ fields, mutationType, mutationData, onFieldChange }) {
   }
 
   const renderField = (fieldName, field) => {
-    if (!field.writable) return null
+    // Fields are writable by default unless explicitly marked as non-writable
+    const isWritable = field.writable !== false
+    if (!isWritable) return null
     const value = mutationData[fieldName] || ''
 
     switch (field.field_type) {
@@ -76,14 +78,16 @@ function MutationEditor({ fields, mutationType, mutationData, onFieldChange }) {
 
         const addKeyValuePair = () => {
           const newEntries = [...rangeEntries, ['', '']]
-          const newRangeValue = Object.fromEntries(newEntries.filter(([k]) => k.trim() !== ''))
+          // Don't filter out empty keys immediately - let user type
+          const newRangeValue = Object.fromEntries(newEntries)
           onFieldChange(fieldName, newRangeValue)
         }
 
         const updateKeyValuePair = (index, key, val) => {
           const newEntries = [...rangeEntries]
           newEntries[index] = [key, val]
-          const newRangeValue = Object.fromEntries(newEntries.filter(([k]) => k.trim() !== ''))
+          // Keep all entries during editing, including empty ones
+          const newRangeValue = Object.fromEntries(newEntries)
           onFieldChange(fieldName, newRangeValue)
         }
 

@@ -138,23 +138,58 @@ impl FieldManager {
 
         let result = match field_def {
             crate::schema::types::field::FieldVariant::Range(_range_field) => {
-                // For Range fields, treat them like Single fields for now
-                // The data is stored as a single JSON object atom
+                // Range fields are stored in AtomRefRange, not as regular atoms
                 info!("🎯 Processing Range field: {}.{}", schema.name, field);
                 if let Some(ref_atom_uuid) = ref_atom_uuid {
-                    info!("🔗 Fetching atom for Range field {}.{} with ref_atom_uuid: {}",
+                    info!("🔗 Fetching AtomRefRange for Range field {}.{} with ref_atom_uuid: {}",
                           schema.name, field, ref_atom_uuid);
-                    match self.atom_manager.get_latest_atom(ref_atom_uuid) {
-                        Ok(atom) => {
-                            let content = atom.content().clone();
-                            info!("✅ Retrieved atom content for {}.{}: {:?}", schema.name, field, content);
-                            content
+                    
+                    // Get the AtomRefRange from the atom manager
+                    let result = match self.atom_manager.get_ref_ranges().lock() {
+                        Ok(ranges_guard) => {
+                            if let Some(atom_ref_range) = ranges_guard.get(ref_atom_uuid) {
+                                println!("🔍 Found AtomRefRange with {} entries", atom_ref_range.atom_uuids.len());
+                                info!("🔍 Found AtomRefRange with {} entries", atom_ref_range.atom_uuids.len());
+                                // Convert AtomRefRange to JSON object by getting the actual atom content for each key
+                                let mut result_obj = serde_json::Map::new();
+                                
+                                for (key, atom_uuid) in &atom_ref_range.atom_uuids {
+                                    info!("🔑 Processing key: {} -> atom_uuid: {}", key, atom_uuid);
+                                    info!("🔑 Processing key: {} -> atom_uuid: {}", key, atom_uuid);
+                                    // Access atoms directly since these are individual atoms, not AtomRefs
+                                    match self.atom_manager.get_atoms().lock() {
+                                        Ok(atoms_guard) => {
+                                            if let Some(atom) = atoms_guard.get(atom_uuid) {
+                                                info!("✅ Retrieved atom for key: {} -> content: {:?}", key, atom.content());
+                                                info!("✅ Retrieved atom for key: {} -> content: {:?}", key, atom.content());
+                                                // For range field atoms, the content is the direct value
+                                                result_obj.insert(key.clone(), atom.content().clone());
+                                            } else {
+                                                info!("❌ Atom not found in atoms collection for key: {} -> atom_uuid: {}", key, atom_uuid);
+                                                info!("⚠️  Atom not found in atoms collection for key: {} -> atom_uuid: {}", key, atom_uuid);
+                                            }
+                                        }
+                                        Err(e) => {
+                                            info!("❌ Failed to acquire atoms lock for key {}: {:?}", key, e);
+                                            info!("⚠️  Failed to acquire atoms lock for key {}: {:?}", key, e);
+                                        }
+                                    }
+                                }
+                                
+                                let result = serde_json::Value::Object(result_obj);
+                                info!("✅ Retrieved Range field content for {}.{}: {:?}", schema.name, field, result);
+                                result
+                            } else {
+                                info!("⚠️  No AtomRefRange found for {}.{} with UUID: {}", schema.name, field, ref_atom_uuid);
+                                Self::default_value(field)
+                            }
                         }
                         Err(e) => {
-                            info!("❌ Failed to get atom for {}.{}: {:?}, using default", schema.name, field, e);
+                            info!("❌ Failed to acquire ref_ranges lock for {}.{}: {:?}", schema.name, field, e);
                             Self::default_value(field)
                         }
-                    }
+                    };
+                    result
                 } else {
                     info!("⚠️  No ref_atom_uuid for Range field {}.{}, using default", schema.name, field);
                     Self::default_value(field)
@@ -402,23 +437,54 @@ impl FieldManager {
         content: Value,
         source_pub_key: String,
     ) -> Result<String, SchemaError> {
-        // For now, let's store the Range field data as a single atom like other fields
-        // but mark it specially so we can retrieve it correctly
+        // Range fields need special handling to populate the AtomRefRange properly
+        info!("🔧 set_range_field_value - content: {:?}", content);
+        
         let aref_uuid = {
             let mut ctx = AtomContext::new(schema, field, source_pub_key.clone(), &mut self.atom_manager);
             let aref_uuid = ctx.get_or_create_atom_ref()?;
             
-            let prev_atom_uuid = {
-                let ref_atoms = ctx.atom_manager.get_ref_atoms();
-                let guard = ref_atoms
-                    .lock()
-                    .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
-                guard
-                    .get(&aref_uuid)
-                    .map(|aref| aref.get_atom_uuid().to_string())
-            };
-
-            ctx.create_and_update_atom(prev_atom_uuid, content.clone(), None)?;
+            // For range fields, we don't create a main atom with the full JSON content.
+            // Instead, we directly process the range field content to create individual atoms
+            // for each key-value pair and populate the AtomRefRange.
+            
+            // Clone content for Range field processing
+            let content_for_range = content.clone();
+            
+            // Process range field content directly (similar to context.rs logic)
+            if let Some(obj) = content_for_range.as_object() {
+                info!("📦 Range field has {} key-value pairs", obj.len());
+                for (key, value) in obj {
+                    // Create a separate atom for each key-value pair
+                    let key_atom = self.atom_manager
+                        .create_atom(
+                            &schema.name,
+                            source_pub_key.clone(),
+                            None, // No previous atom for individual keys
+                            value.clone(),
+                            None,
+                        )
+                        .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+                    
+                    info!("🔑 Created atom for key: {} -> value: {:?} -> atom: {} (aref_uuid: {})",
+                            key, value, key_atom.uuid(), aref_uuid);
+                    
+                    self.atom_manager
+                        .update_atom_ref_range(
+                            &aref_uuid,
+                            key_atom.uuid().to_string(),
+                            key.clone(),
+                            source_pub_key.clone(),
+                        )
+                        .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+                }
+                info!("✅ Finished creating atoms and updating AtomRefRange for all keys");
+            } else {
+                return Err(SchemaError::InvalidData(
+                    "Range field data must be a JSON object with key-value pairs".to_string()
+                ));
+            }
+            
             aref_uuid
         }; // ctx is dropped here
         
