@@ -50,7 +50,7 @@ impl NodeConfig {
 /// If the file does not exist, a default [`NodeConfig`] is returned. When a
 /// `port` is provided in this case, the returned config will have its
 /// `network_listen_address` set to `"/ip4/0.0.0.0/tcp/<port>"`.
-pub fn load_node_config(path: Option<&str>, port: Option<u16>) -> NodeConfig {
+pub fn load_node_config(path: Option<&str>, port: Option<u16>) -> Result<NodeConfig, std::io::Error> {
     use std::fs;
 
     let config_path = path
@@ -59,8 +59,18 @@ pub fn load_node_config(path: Option<&str>, port: Option<u16>) -> NodeConfig {
         .unwrap_or_else(|| "config/node_config.json".to_string());
 
     if let Ok(config_str) = fs::read_to_string(&config_path) {
-        serde_json::from_str(&config_str)
-            .expect("Failed to parse node configuration")
+        match serde_json::from_str::<NodeConfig>(&config_str) {
+            Ok(mut cfg) => {
+                if let Some(p) = port {
+                    cfg.network_listen_address = format!("/ip4/0.0.0.0/tcp/{}", p);
+                }
+                Ok(cfg)
+            }
+            Err(e) => {
+                log::error!("Failed to parse node configuration: {}", e);
+                Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+            }
+        }
     } else {
         let mut config = NodeConfig::default();
         
@@ -80,7 +90,7 @@ pub fn load_node_config(path: Option<&str>, port: Option<u16>) -> NodeConfig {
         if let Some(p) = port {
             config.network_listen_address = format!("/ip4/0.0.0.0/tcp/{}", p);
         }
-        config
+        Ok(config)
     }
 }
 

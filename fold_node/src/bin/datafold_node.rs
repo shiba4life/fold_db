@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let Cli { port, tcp_port } = Cli::parse();
 
     // Load node configuration
-    let config = load_node_config(None, Some(port));
+    let config = load_node_config(None, Some(port))?;
     info!("Config loaded successfully");
 
     // Load or initialize node

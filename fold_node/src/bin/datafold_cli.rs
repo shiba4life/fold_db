@@ -291,7 +291,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load node configuration
     info!("Loading config from: {}", cli.config);
-    let config = load_node_config(Some(&cli.config), None);
+    let config = load_node_config(Some(&cli.config), None)?;
 
     // Initialize node
     info!("Initializing DataFold Node...");
