@@ -364,6 +364,7 @@ mod tests {
             name: "TestSchema".to_string(),
             fields: HashMap::new(),
             payment_config: SchemaPaymentConfig::default(),
+            hash: None,
         };
         
         // Add the schema as available first

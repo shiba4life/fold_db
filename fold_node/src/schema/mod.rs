@@ -7,6 +7,10 @@
 //!
 //! * `core` - Core schema functionality including loading, validation, and field mapping
 //! * `types` - Schema-related data structures and type definitions
+//! * `hasher` - Schema hashing and integrity verification with configurable directory paths
+//! * `file_operations` - File-based operations for reading and writing schemas
+//! * `duplicate_detection` - Duplicate detection and conflict resolution for schemas
+//! * `validator` - Schema validation logic
 //!
 //! ## Architecture
 //!
@@ -24,6 +28,9 @@
 // Internal modules
 pub mod core;
 pub mod types;
+pub mod hasher;
+pub mod file_operations;
+pub mod duplicate_detection;
 
 
 // Public re-exports
@@ -31,6 +38,9 @@ pub use core::{SchemaCore, SchemaState};
 pub use types::{errors::SchemaError, schema::Schema, Transform};
 pub mod validator;
 pub use validator::SchemaValidator;
+pub use hasher::SchemaHasher;
+pub use file_operations::SchemaFileOperations;
+pub use duplicate_detection::SchemaDuplicateDetector;
 pub use crate::{Operation, MutationType};
 
 /// Public prelude module containing types needed by tests and external code

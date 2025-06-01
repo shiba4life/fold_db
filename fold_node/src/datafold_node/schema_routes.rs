@@ -244,6 +244,48 @@ pub async fn refresh_schemas(state: web::Data<AppState>) -> impl Responder {
     }
 }
 
+/// Add a new schema to the available_schemas directory with validation
+pub async fn add_schema_to_available(
+    schema_data: web::Json<serde_json::Value>,
+    state: web::Data<AppState>
+) -> impl Responder {
+    info!("Received request to add schema to available_schemas directory");
+    let node_guard = state.node.lock().await;
+    
+    // Extract optional custom name from query parameters or JSON
+    let custom_name = schema_data.get("custom_name")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    
+    // Convert JSON value to string for processing
+    let json_content = match serde_json::to_string(&*schema_data) {
+        Ok(content) => content,
+        Err(e) => {
+            error!("Failed to serialize JSON: {}", e);
+            return HttpResponse::BadRequest().json(json!({
+                "error": format!("Invalid JSON format: {}", e)
+            }));
+        }
+    };
+    
+    match node_guard.add_schema_to_available_directory(&json_content, custom_name) {
+        Ok(schema_name) => {
+            info!("Successfully added schema '{}' to available_schemas directory", schema_name);
+            HttpResponse::Created().json(json!({
+                "success": true,
+                "schema_name": schema_name,
+                "message": format!("Schema '{}' added to available_schemas directory and is ready for approval", schema_name)
+            }))
+        },
+        Err(e) => {
+            error!("Failed to add schema to available_schemas: {}", e);
+            HttpResponse::BadRequest().json(json!({
+                "error": format!("Failed to add schema: {}", e)
+            }))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

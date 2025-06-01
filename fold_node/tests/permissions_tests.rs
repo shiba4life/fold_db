@@ -38,6 +38,7 @@ fn test_non_reversible_transform_not_writable() {
         name: "test_schema".to_string(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
+        hash: None,
     };
 
     schema_manager.add_schema_available(schema).unwrap();
@@ -85,6 +86,7 @@ fn test_permission_wrapper_query() {
         name: "test_schema".to_string(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
+        hash: None,
     };
 
     schema_manager.add_schema_available(schema).unwrap();
@@ -148,6 +150,7 @@ fn test_permission_wrapper_no_requirement() {
         name: "test_schema".to_string(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
+        hash: None,
     };
 
     schema_manager.add_schema_available(schema).unwrap();
@@ -207,6 +210,7 @@ fn test_permission_wrapper_mutation() {
         name: "test_schema".to_string(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
+        hash: None,
     };
 
     schema_manager.add_schema_available(schema).unwrap();

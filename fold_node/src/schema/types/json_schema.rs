@@ -15,6 +15,9 @@ pub struct JsonSchemaDefinition {
     pub name: String,
     pub fields: HashMap<String, JsonSchemaField>,
     pub payment_config: SchemaPaymentConfig,
+    /// SHA256 hash of the schema content for integrity verification
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
 }
 
 /// Represents a field in the JSON schema

@@ -531,6 +531,11 @@ impl SchemaCore {
         // Ensure any transforms on fields have the correct output schema
         self.fix_transform_outputs(&mut schema);
 
+        // Validate the schema after fixing transform outputs
+        let validator = super::validator::SchemaValidator::new(self);
+        validator.validate(&schema)?;
+        info!("Schema '{}' validation passed", schema.name);
+
         info!("After fix_transform_outputs, schema '{}' has {} fields: {:?}", schema.name, schema.fields.len(), schema.fields.keys().collect::<Vec<_>>());
 
         // Persist the updated schema
@@ -568,6 +573,92 @@ impl SchemaCore {
         Ok(())
     }
 
+    /// Add a new schema from JSON to the available_schemas directory with validation
+    pub fn add_schema_to_available_directory(
+        &self,
+        json_content: &str,
+        schema_name: Option<String>,
+    ) -> Result<String, SchemaError> {
+        info!("Adding new schema to available_schemas directory");
+        
+        // Parse and validate the JSON schema
+        let json_schema = self.parse_and_validate_json_schema(json_content)?;
+        let final_name = schema_name.unwrap_or_else(|| json_schema.name.clone());
+        
+        // Check for duplicates and conflicts using the dedicated module
+        super::duplicate_detection::SchemaDuplicateDetector::check_schema_conflicts(
+            &json_schema,
+            &final_name,
+            "available_schemas",
+            |hash, exclude| self.find_schema_by_hash(hash, exclude)
+        )?;
+        
+        // Write schema to file with hash using the dedicated module
+        super::file_operations::SchemaFileOperations::write_schema_to_file(&json_schema, &final_name, "available_schemas")?;
+        
+        // Load schema into memory
+        let schema = self.interpret_schema(json_schema)?;
+        self.load_schema_internal(schema)?;
+        
+        info!("Schema '{}' added to available schemas and ready for approval", final_name);
+        Ok(final_name)
+    }
+    
+    /// Parse and validate JSON schema content
+    fn parse_and_validate_json_schema(&self, json_content: &str) -> Result<super::types::JsonSchemaDefinition, SchemaError> {
+        let json_schema: super::types::JsonSchemaDefinition = serde_json::from_str(json_content)
+            .map_err(|e| SchemaError::InvalidField(format!("Invalid JSON schema: {}", e)))?;
+        
+        let validator = super::validator::SchemaValidator::new(self);
+        validator.validate_json_schema(&json_schema)?;
+        info!("JSON schema validation passed for '{}'", json_schema.name);
+        
+        Ok(json_schema)
+    }
+
+    /// Find a schema with the same hash (for duplicate detection) in the specified directory
+    /// Find a schema with the same hash (for duplicate detection)
+    fn find_schema_by_hash(&self, target_hash: &str, exclude_name: &str) -> Result<Option<String>, SchemaError> {
+        let available_schemas_dir = std::path::PathBuf::from("available_schemas");
+        
+        if let Ok(entries) = std::fs::read_dir(&available_schemas_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().map(|e| e == "json").unwrap_or(false) {
+                    // Skip the file we're trying to create
+                    if let Some(file_stem) = path.file_stem() {
+                        if file_stem == exclude_name {
+                            continue;
+                        }
+                    }
+                    
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        if let Ok(schema_json) = serde_json::from_str::<serde_json::Value>(&content) {
+                            // Check if schema has a hash field
+                            if let Some(existing_hash) = schema_json.get("hash").and_then(|h| h.as_str()) {
+                                if existing_hash == target_hash {
+                                    if let Some(name) = schema_json.get("name").and_then(|n| n.as_str()) {
+                                        return Ok(Some(name.to_string()));
+                                    }
+                                }
+                            } else {
+                                // Calculate hash for schemas without hash field
+                                if let Ok(calculated_hash) = super::hasher::SchemaHasher::calculate_hash(&schema_json) {
+                                    if calculated_hash == target_hash {
+                                        if let Some(name) = schema_json.get("name").and_then(|n| n.as_str()) {
+                                            return Ok(Some(name.to_string()));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(None)
+    }
 
     /// Retrieves a schema by name.
     pub fn get_schema(&self, schema_name: &str) -> Result<Option<Schema>, SchemaError> {
@@ -1010,6 +1101,7 @@ impl SchemaCore {
             name: json_schema.name,
             fields,
             payment_config: json_schema.payment_config,
+            hash: json_schema.hash,
         })
     }
 
