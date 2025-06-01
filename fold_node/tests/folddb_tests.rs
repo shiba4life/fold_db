@@ -2,6 +2,7 @@ use fold_node::testing::{
     ExplicitCounts, Field, FieldPaymentConfig, Mutation, MutationType, PermissionsPolicy,
     Query, Schema, SingleField, FieldVariant, SchemaPaymentConfig, TrustDistance, TrustDistanceScaling,
 };
+use fold_node::schema::types::schema::default_schema_type;
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -49,6 +50,7 @@ fn test_schema_operations() {
 
     let schema = Schema {
         name: "test_schema".to_string(),
+        schema_type: default_schema_type(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
         hash: None,
@@ -90,6 +92,7 @@ fn test_write_and_query() {
 
     let schema = Schema {
         name: "test_schema".to_string(),
+        schema_type: default_schema_type(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
         hash: None,
@@ -161,6 +164,7 @@ fn test_atom_history() {
 
     let schema = Schema {
         name: "test_schema".to_string(),
+        schema_type: default_schema_type(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
         hash: None,

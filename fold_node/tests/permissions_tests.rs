@@ -3,6 +3,7 @@ use fold_node::testing::{
     PermissionsPolicy, Query, Schema, SchemaCore, SingleField, FieldVariant, SchemaPaymentConfig, TrustDistance,
     TrustDistanceScaling,
 };
+use fold_node::schema::types::schema::default_schema_type;
 use fold_node::schema::types::Transform;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -36,6 +37,7 @@ fn test_non_reversible_transform_not_writable() {
 
     let schema = Schema {
         name: "test_schema".to_string(),
+        schema_type: default_schema_type(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
         hash: None,
@@ -84,6 +86,7 @@ fn test_permission_wrapper_query() {
 
     let schema = Schema {
         name: "test_schema".to_string(),
+        schema_type: default_schema_type(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
         hash: None,
@@ -148,6 +151,7 @@ fn test_permission_wrapper_no_requirement() {
 
     let schema = Schema {
         name: "test_schema".to_string(),
+        schema_type: default_schema_type(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
         hash: None,
@@ -208,6 +212,7 @@ fn test_permission_wrapper_mutation() {
 
     let schema = Schema {
         name: "test_schema".to_string(),
+        schema_type: default_schema_type(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
         hash: None,

@@ -5,6 +5,7 @@ pub use crate::schema::types::{Mutation, MutationType, Operation, Query, Transfo
 pub use crate::schema::Schema;
 pub use crate::schema::SchemaCore;
 pub use crate::schema::SchemaError;
+pub use crate::schema::types::schema::default_schema_type;
 pub use crate::schema::SchemaValidator;
 
 pub use crate::transform::parser::TransformParser;
@@ -24,6 +25,7 @@ use std::collections::HashMap;
 pub fn create_test_schema(name: &str) -> Schema {
     Schema {
         name: name.to_string(),
+        schema_type: default_schema_type(),
         fields: HashMap::new(),
         payment_config: Default::default(),
         hash: None,
