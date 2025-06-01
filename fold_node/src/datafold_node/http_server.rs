@@ -2,6 +2,7 @@ use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
 use super::{schema_routes, query_routes, network_routes, system_routes};
 use super::log_routes;
+use crate::ingestion::routes as ingestion_routes;
 
 use actix_cors::Cors;
 use actix_files::Files;
@@ -122,6 +123,14 @@ impl DataFoldHttpServer {
                         .route("/execute", web::post().to(query_routes::execute_operation))
                         .route("/query", web::post().to(query_routes::execute_query))
                         .route("/mutation", web::post().to(query_routes::execute_mutation))
+                        // Ingestion endpoints
+                        .route("/ingestion/process", web::post().to(ingestion_routes::process_json))
+                        .route("/ingestion/status", web::get().to(ingestion_routes::get_status))
+                        .route("/ingestion/health", web::get().to(ingestion_routes::health_check))
+                        .route("/ingestion/config", web::get().to(ingestion_routes::get_config))
+                        .route("/ingestion/validate", web::post().to(ingestion_routes::validate_json))
+                        .route("/ingestion/openrouter-config", web::get().to(ingestion_routes::get_openrouter_config))
+                        .route("/ingestion/openrouter-config", web::post().to(ingestion_routes::save_openrouter_config))
                         // Sample endpoints
                         .route("/samples/schemas", web::get().to(query_routes::list_schema_samples))
                         .route("/samples/queries", web::get().to(query_routes::list_query_samples))

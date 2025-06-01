@@ -32,6 +32,7 @@ pub mod error;
 pub mod error_handling;
 pub mod fees;
 pub mod fold_db_core;
+pub mod ingestion;
 pub mod network;
 pub mod permissions;
 pub mod schema;
@@ -52,3 +53,6 @@ pub use schema::types::operation::Operation;
 pub use schema::core::SchemaState;
 pub use schema::types::operations::MutationType;
 pub use schema::Schema;
+
+// Re-export ingestion types
+pub use ingestion::{IngestionCore, IngestionConfig, IngestionError, IngestionResponse};

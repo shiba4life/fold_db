@@ -155,16 +155,42 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
   }
 
   const renderField = (field, fieldName) => {
+    const formatPermissionPolicy = (policy) => {
+      if (!policy) return 'Unknown'
+      if (policy.NoRequirement !== undefined) return 'No Requirement'
+      if (policy.Distance !== undefined) return `Trust Distance ${policy.Distance}`
+      return 'Unknown'
+    }
+
     return (
       <div key={fieldName} className="bg-gray-50 rounded-md p-4 hover:bg-gray-100 transition-colors duration-200">
         <div className="flex justify-between items-start">
-          <div className="space-y-1">
+          <div className="space-y-2">
             <div className="flex items-center">
               <span className="font-medium text-gray-900">{fieldName}</span>
               <span className="ml-2 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-700">
                 {field.field_type}
               </span>
             </div>
+            
+            {/* Permission Policies */}
+            {field.permission_policy && (
+              <div className="space-y-1">
+                <div className="flex items-center text-xs text-gray-600">
+                  <span className="font-medium mr-2">Read:</span>
+                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded">
+                    {formatPermissionPolicy(field.permission_policy.read_policy)}
+                  </span>
+                </div>
+                <div className="flex items-center text-xs text-gray-600">
+                  <span className="font-medium mr-2">Write:</span>
+                  <span className="px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded">
+                    {formatPermissionPolicy(field.permission_policy.write_policy)}
+                  </span>
+                </div>
+              </div>
+            )}
+            
             {field.transform && (
               <div className="flex items-center text-sm text-gray-600">
                 <svg className="icon icon-xs mr-1" viewBox="0 0 20 20" fill="currentColor">
