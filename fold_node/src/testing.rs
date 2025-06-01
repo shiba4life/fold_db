@@ -23,13 +23,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 pub fn create_test_schema(name: &str) -> Schema {
-    Schema {
-        name: name.to_string(),
-        schema_type: default_schema_type(),
-        fields: HashMap::new(),
-        payment_config: Default::default(),
-        hash: None,
-    }
+    Schema::new_range(name.to_string(), "key".to_string())
 }
 
 pub fn create_test_value(value: &str) -> Value {
