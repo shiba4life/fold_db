@@ -3,6 +3,15 @@ use crate::schema::types::field::FieldVariant;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Represents the schema-level type information.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SchemaType {
+    /// Single schema without range semantics
+    Single,
+    /// Schema that stores data in a key range
+    Range { range_key: String },
+}
+
 /// Defines the structure, permissions, and payment requirements for a data collection.
 ///
 /// A Schema is the fundamental building block for data organization in the database.

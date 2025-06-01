@@ -11,5 +11,5 @@ pub use field::{Field, FieldVariant, SingleField, CollectionField, RangeField, F
 pub use json_schema::{JsonSchemaDefinition, JsonSchemaField};
 pub use operation::Operation;
 pub use operations::{Mutation, MutationType, Query};
-pub use schema::Schema;
+pub use schema::{Schema, SchemaType};
 pub use transform::{Transform, TransformRegistration};
