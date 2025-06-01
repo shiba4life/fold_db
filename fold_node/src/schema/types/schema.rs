@@ -70,6 +70,21 @@ impl Schema {
         }
     }
 
+    /// Creates a new range Schema with the specified name and range key.
+    ///
+    /// This mirrors [`Schema::new`] but sets [`schema_type`] to
+    /// [`SchemaType::Range`] with the provided `range_key`.
+    #[must_use]
+    pub fn new_range(name: String, range_key: String) -> Self {
+        Self {
+            name,
+            schema_type: SchemaType::Range { range_key },
+            fields: HashMap::new(),
+            payment_config: SchemaPaymentConfig::default(),
+            hash: None,
+        }
+    }
+
     /// Sets the fields for this schema.
     ///
     /// This builder method allows setting all fields at once,
@@ -170,6 +185,18 @@ mod tests {
         let schema = Schema::new(schema_name.clone());
 
         assert_eq!(schema.name, schema_name);
+        assert!(schema.fields.is_empty());
+    }
+
+    #[test]
+    fn test_schema_range_creation() {
+        let schema = Schema::new_range("range_schema".to_string(), "user_id".to_string());
+
+        assert_eq!(schema.name, "range_schema");
+        match schema.schema_type {
+            SchemaType::Range { ref range_key } => assert_eq!(range_key, "user_id"),
+            _ => panic!("Expected Range variant"),
+        }
         assert!(schema.fields.is_empty());
     }
 
