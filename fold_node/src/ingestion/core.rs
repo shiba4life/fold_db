@@ -1,0 +1,371 @@
+//! Core ingestion orchestrator
+
+use crate::ingestion::{
+    IngestionError, IngestionResult, IngestionConfig, IngestionResponse,
+    openrouter_service::{OpenRouterService, AISchemaResponse},
+    schema_stripper::SchemaStripper,
+    mutation_generator::MutationGenerator,
+};
+use crate::schema::{SchemaCore, Schema};
+use crate::schema::types::{Mutation, JsonSchemaDefinition};
+use crate::fold_db_core::FoldDB;
+use serde_json::Value;
+use std::sync::Arc;
+use log::{info, error};
+
+/// Core ingestion service that orchestrates the entire ingestion process
+pub struct IngestionCore {
+    config: IngestionConfig,
+    openrouter_service: OpenRouterService,
+    schema_stripper: SchemaStripper,
+    mutation_generator: MutationGenerator,
+    schema_core: Arc<SchemaCore>,
+    fold_db: Arc<std::sync::Mutex<FoldDB>>,
+}
+
+/// Request for processing JSON ingestion
+#[derive(Debug, serde::Deserialize)]
+pub struct IngestionRequest {
+    /// JSON data to ingest
+    pub data: Value,
+    /// Whether to auto-execute mutations after generation
+    pub auto_execute: Option<bool>,
+    /// Trust distance for mutations
+    pub trust_distance: Option<u32>,
+    /// Public key for mutations
+    pub pub_key: Option<String>,
+}
+
+impl IngestionCore {
+    /// Create a new ingestion core
+    pub fn new(
+        config: IngestionConfig,
+        schema_core: Arc<SchemaCore>,
+        fold_db: Arc<std::sync::Mutex<FoldDB>>,
+    ) -> IngestionResult<Self> {
+        let openrouter_service = OpenRouterService::new(config.clone())?;
+        let schema_stripper = SchemaStripper::new();
+        let mutation_generator = MutationGenerator::new();
+
+        Ok(Self {
+            config,
+            openrouter_service,
+            schema_stripper,
+            mutation_generator,
+            schema_core,
+            fold_db,
+        })
+    }
+
+    /// Process JSON ingestion request
+    pub async fn process_json_ingestion(&self, request: IngestionRequest) -> IngestionResult<IngestionResponse> {
+        info!("Starting JSON ingestion process");
+
+        if !self.config.is_ready() {
+            return Ok(IngestionResponse::failure(vec![
+                "Ingestion module is not properly configured or disabled".to_string()
+            ]));
+        }
+
+        // Step 1: Get available schemas and strip them
+        let available_schemas = self.get_stripped_available_schemas().await?;
+        let schema_count = if let Some(obj) = available_schemas.as_object() {
+            obj.len()
+        } else {
+            0
+        };
+        info!("Retrieved {} available schemas", schema_count);
+
+        // Step 2: Get AI recommendation
+        let ai_response = self.get_ai_schema_recommendation(&request.data, &available_schemas).await?;
+        info!("Received AI recommendation: {} existing schemas, new schema: {}",
+              ai_response.existing_schemas.len(),
+              ai_response.new_schemas.is_some());
+
+        // Step 3: Determine schema to use
+        let schema_name = self.determine_schema_to_use(&ai_response).await?;
+        let new_schema_created = ai_response.new_schemas.is_some();
+
+        // Step 4: Generate mutations
+        let mutations = self.generate_mutations_for_data(
+            &schema_name,
+            &request.data,
+            &ai_response.mutation_mappers,
+            request.trust_distance.unwrap_or(self.config.default_trust_distance),
+            request.pub_key.unwrap_or_else(|| "default".to_string()),
+        )?;
+
+        info!("Generated {} mutations", mutations.len());
+
+        // Step 5: Execute mutations if requested
+        let mutations_executed = if request.auto_execute.unwrap_or(self.config.auto_execute_mutations) {
+            self.execute_mutations(&mutations).await?
+        } else {
+            0
+        };
+
+        info!("Ingestion completed successfully: schema '{}', {} mutations generated, {} executed",
+              schema_name, mutations.len(), mutations_executed);
+
+        Ok(IngestionResponse::success(
+            schema_name,
+            new_schema_created,
+            mutations.len(),
+            mutations_executed,
+        ))
+    }
+
+    /// Get available schemas stripped of payment and permission data
+    async fn get_stripped_available_schemas(&self) -> IngestionResult<Value> {
+        // Get all available schemas from SchemaCore
+        let available_schema_names = self.schema_core.list_available_schemas()
+            .map_err(|e| IngestionError::SchemaSystemError(e))?;
+
+        let mut schemas = Vec::new();
+        for schema_name in available_schema_names {
+            if let Ok(Some(schema)) = self.schema_core.get_schema(&schema_name) {
+                schemas.push(schema);
+            }
+        }
+
+        // Strip payment and permission data
+        self.schema_stripper.create_ai_schema_representation(&schemas)
+    }
+
+    /// Get AI schema recommendation
+    async fn get_ai_schema_recommendation(
+        &self,
+        json_data: &Value,
+        available_schemas: &Value,
+    ) -> IngestionResult<AISchemaResponse> {
+        self.openrouter_service.get_schema_recommendation(json_data, available_schemas).await
+    }
+
+    /// Determine which schema to use based on AI response
+    async fn determine_schema_to_use(&self, ai_response: &AISchemaResponse) -> IngestionResult<String> {
+        // If existing schemas were recommended, use the first one
+        if !ai_response.existing_schemas.is_empty() {
+            let schema_name = &ai_response.existing_schemas[0];
+            info!("Using existing schema: {}", schema_name);
+            return Ok(schema_name.clone());
+        }
+
+        // If a new schema was provided, create it
+        if let Some(new_schema_def) = &ai_response.new_schemas {
+            let schema_name = self.create_new_schema(new_schema_def).await?;
+            info!("Created new schema: {}", schema_name);
+            return Ok(schema_name);
+        }
+
+        Err(IngestionError::ai_response_validation_error(
+            "AI response contains neither existing schemas nor new schema definition"
+        ))
+    }
+
+    /// Create a new schema from AI response
+    async fn create_new_schema(&self, schema_def: &Value) -> IngestionResult<String> {
+        info!("Creating new schema from AI definition");
+
+        // Parse the schema definition
+        let schema = self.parse_schema_definition(schema_def)?;
+        let schema_name = schema.name.clone();
+
+        // Load the schema into SchemaCore
+        self.schema_core.load_schema_internal(schema)
+            .map_err(|e| IngestionError::SchemaSystemError(e))?;
+
+        // Set the schema to approved state
+        self.schema_core.approve_schema(&schema_name)
+            .map_err(|e| IngestionError::SchemaSystemError(e))?;
+
+        info!("New schema '{}' created and approved", schema_name);
+        Ok(schema_name)
+    }
+
+    /// Parse schema definition from AI response
+    fn parse_schema_definition(&self, schema_def: &Value) -> IngestionResult<Schema> {
+        // Try to parse as a complete Schema first
+        if let Ok(schema) = serde_json::from_value::<Schema>(schema_def.clone()) {
+            return Ok(schema);
+        }
+
+        // Try to parse as JsonSchemaDefinition
+        if let Ok(json_schema) = serde_json::from_value::<JsonSchemaDefinition>(schema_def.clone()) {
+            return self.schema_core.interpret_schema(json_schema)
+                .map_err(|e| IngestionError::SchemaSystemError(e));
+        }
+
+        // Try to create a basic schema from the definition
+        self.create_basic_schema_from_definition(schema_def)
+    }
+
+    /// Create a basic schema from a simple definition
+    fn create_basic_schema_from_definition(&self, schema_def: &Value) -> IngestionResult<Schema> {
+        let obj = schema_def.as_object().ok_or_else(|| {
+            IngestionError::schema_parsing_error("Schema definition must be an object")
+        })?;
+
+        let name = obj.get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| IngestionError::schema_parsing_error("Schema must have a name"))?;
+
+        let mut schema = Schema::new(name.to_string());
+
+        // Add fields if provided
+        if let Some(Value::Object(fields)) = obj.get("fields") {
+            for (field_name, field_def) in fields {
+                // Create a basic single field for each field in the definition
+                let field = self.create_basic_field_from_definition(field_def)?;
+                schema.add_field(field_name.clone(), field);
+            }
+        }
+
+        Ok(schema)
+    }
+
+    /// Create a basic field from definition
+    fn create_basic_field_from_definition(&self, _field_def: &Value) -> IngestionResult<crate::schema::types::field::FieldVariant> {
+        use crate::schema::types::field::{FieldVariant, SingleField};
+        use crate::permissions::types::policy::PermissionsPolicy;
+        use crate::fees::types::FieldPaymentConfig;
+        use std::collections::HashMap;
+
+        // Create a basic single field with default permissions and payment config
+        let field = SingleField::new(
+            PermissionsPolicy::default(),
+            FieldPaymentConfig::default(),
+            HashMap::new(),
+        );
+
+        Ok(FieldVariant::Single(field))
+    }
+
+    /// Generate mutations for the data
+    fn generate_mutations_for_data(
+        &self,
+        schema_name: &str,
+        json_data: &Value,
+        mutation_mappers: &std::collections::HashMap<String, String>,
+        trust_distance: u32,
+        pub_key: String,
+    ) -> IngestionResult<Vec<Mutation>> {
+        self.mutation_generator.generate_mutations(
+            schema_name,
+            json_data,
+            mutation_mappers,
+            trust_distance,
+            pub_key,
+        )
+    }
+
+    /// Execute mutations
+    async fn execute_mutations(&self, mutations: &[Mutation]) -> IngestionResult<usize> {
+        let mut executed_count = 0;
+
+        for mutation in mutations {
+            match self.execute_single_mutation(mutation).await {
+                Ok(()) => {
+                    executed_count += 1;
+                    info!("Successfully executed mutation for schema '{}'", mutation.schema_name);
+                }
+                Err(e) => {
+                    error!("Failed to execute mutation for schema '{}': {}", mutation.schema_name, e);
+                    // Continue with other mutations even if one fails
+                }
+            }
+        }
+
+        Ok(executed_count)
+    }
+
+    /// Execute a single mutation
+    async fn execute_single_mutation(&self, mutation: &Mutation) -> IngestionResult<()> {
+        let mut db = self.fold_db.lock()
+            .map_err(|_| IngestionError::DatabaseError("Failed to acquire database lock".to_string()))?;
+
+        db.write_schema(mutation.clone())
+            .map_err(|e| IngestionError::SchemaSystemError(e))?;
+
+        Ok(())
+    }
+
+    /// Get ingestion status
+    pub fn get_status(&self) -> IngestionResult<Value> {
+        Ok(serde_json::json!({
+            "enabled": self.config.enabled,
+            "configured": self.config.is_ready(),
+            "model": self.config.openrouter_model,
+            "auto_execute_mutations": self.config.auto_execute_mutations,
+            "default_trust_distance": self.config.default_trust_distance
+        }))
+    }
+
+    /// Validate JSON input
+    pub fn validate_input(&self, data: &Value) -> IngestionResult<()> {
+        if data.is_null() {
+            return Err(IngestionError::invalid_input("Input data cannot be null"));
+        }
+
+        if !data.is_object() && !data.is_array() {
+            return Err(IngestionError::invalid_input(
+                "Input data must be a JSON object or array"
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::schema::SchemaCore;
+    use crate::fold_db_core::FoldDB;
+    use std::sync::{Arc, Mutex};
+
+    fn create_test_ingestion_core() -> IngestionResult<IngestionCore> {
+        let mut config = IngestionConfig::default();
+        config.openrouter_api_key = "test-key".to_string();
+        config.enabled = true;
+
+        // Create test schema core and fold db
+        let schema_core = Arc::new(SchemaCore::new_for_testing("test_data").unwrap());
+        let fold_db = Arc::new(Mutex::new(FoldDB::new("test_data").unwrap()));
+
+        IngestionCore::new(config, schema_core, fold_db)
+    }
+
+    #[test]
+    fn test_validate_input() {
+        let core = create_test_ingestion_core().unwrap();
+
+        // Valid inputs
+        assert!(core.validate_input(&serde_json::json!({"key": "value"})).is_ok());
+        assert!(core.validate_input(&serde_json::json!([1, 2, 3])).is_ok());
+
+        // Invalid inputs
+        assert!(core.validate_input(&serde_json::json!(null)).is_err());
+        assert!(core.validate_input(&serde_json::json!("string")).is_err());
+        assert!(core.validate_input(&serde_json::json!(42)).is_err());
+    }
+
+    #[test]
+    fn test_create_basic_schema_from_definition() {
+        let core = create_test_ingestion_core().unwrap();
+        
+        let schema_def = serde_json::json!({
+            "name": "TestSchema",
+            "fields": {
+                "field1": {"type": "string"},
+                "field2": {"type": "number"}
+            }
+        });
+
+        let result = core.create_basic_schema_from_definition(&schema_def);
+        assert!(result.is_ok());
+        
+        let schema = result.unwrap();
+        assert_eq!(schema.name, "TestSchema");
+        assert_eq!(schema.fields.len(), 2);
+    }
+}
