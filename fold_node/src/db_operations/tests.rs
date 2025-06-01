@@ -349,6 +349,7 @@ mod tests {
     fn test_schema_core_integration_with_unified_db_ops() {
         use crate::schema::{SchemaCore, Schema};
         use crate::schema::core::SchemaState;
+        use crate::schema::types::schema::default_schema_type;
         use crate::fees::payment_config::SchemaPaymentConfig;
         use std::sync::Arc;
         use std::collections::HashMap;
@@ -362,6 +363,7 @@ mod tests {
         // Create a test schema and add it to SchemaCore
         let test_schema = Schema {
             name: "TestSchema".to_string(),
+            schema_type: default_schema_type(),
             fields: HashMap::new(),
             payment_config: SchemaPaymentConfig::default(),
             hash: None,

@@ -1,7 +1,9 @@
 use crate::atom::AtomRef;
 use crate::schema::types::{
-    JsonSchemaDefinition, JsonSchemaField, Schema, SchemaError, Field, FieldVariant, SingleField,
+    JsonSchemaDefinition, JsonSchemaField, Schema, SchemaError, Field, FieldVariant,
+    SingleField,
 };
+use crate::schema::types::schema::default_schema_type;
 use serde_json;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
@@ -1099,6 +1101,7 @@ impl SchemaCore {
         // Create the schema
         Ok(Schema {
             name: json_schema.name,
+            schema_type: default_schema_type(),
             fields,
             payment_config: json_schema.payment_config,
             hash: json_schema.hash,

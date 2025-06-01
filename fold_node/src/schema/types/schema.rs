@@ -12,6 +12,12 @@ pub enum SchemaType {
     Range { range_key: String },
 }
 
+pub fn default_schema_type() -> SchemaType {
+    SchemaType::Range {
+        range_key: "key".to_string(),
+    }
+}
+
 /// Defines the structure, permissions, and payment requirements for a data collection.
 ///
 /// A Schema is the fundamental building block for data organization in the database.
@@ -31,6 +37,9 @@ pub enum SchemaType {
 pub struct Schema {
     /// Unique name identifying this schema
     pub name: String,
+    /// The type of schema. Defaults to a key range schema.
+    #[serde(default = "default_schema_type")]
+    pub schema_type: SchemaType,
     /// Collection of fields with their definitions and configurations
     pub fields: HashMap<String, FieldVariant>,
     /// Payment configuration for schema-level access control
@@ -54,6 +63,7 @@ impl Schema {
     pub fn new(name: String) -> Self {
         Self {
             name,
+            schema_type: default_schema_type(),
             fields: HashMap::new(),
             payment_config: SchemaPaymentConfig::default(),
             hash: None,
