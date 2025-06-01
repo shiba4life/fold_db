@@ -99,9 +99,13 @@ mod tests {
     }
     
     #[test]
+    #[allow(clippy::approx_constant)]
     fn test_parse_number() {
         assert_eq!(StringUtils::parse_number::<i32>("42", "test").unwrap(), 42);
-        assert_eq!(StringUtils::parse_number::<f64>("3.14", "test").unwrap(), 3.14);
+        assert_eq!(
+            StringUtils::parse_number::<f64>("3.14", "test").unwrap(),
+            3.14
+        );
         assert!(StringUtils::parse_number::<i32>("not_a_number", "test").is_err());
     }
     
