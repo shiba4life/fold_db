@@ -26,6 +26,9 @@ pub struct Schema {
     pub fields: HashMap<String, FieldVariant>,
     /// Payment configuration for schema-level access control
     pub payment_config: SchemaPaymentConfig,
+    /// SHA256 hash of the schema content for integrity verification
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
 }
 
 impl Schema {
@@ -44,6 +47,7 @@ impl Schema {
             name,
             fields: HashMap::new(),
             payment_config: SchemaPaymentConfig::default(),
+            hash: None,
         }
     }
 

@@ -601,4 +601,18 @@ impl DataFoldNode {
             .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to set schema permissions: {}", e)))
     }
 
+    /// Add a new schema from JSON content to the available_schemas directory with validation
+    pub fn add_schema_to_available_directory(
+        &self,
+        json_content: &str,
+        schema_name: Option<String>,
+    ) -> crate::error::FoldDbResult<String> {
+        let db = self.db.lock()
+            .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        
+        // Use the schema core method for full validation
+        db.schema_manager.add_schema_to_available_directory(json_content, schema_name)
+            .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to add schema: {}", e)))
+    }
+
 }

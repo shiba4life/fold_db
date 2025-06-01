@@ -108,6 +108,7 @@ impl DataFoldHttpServer {
                         .route("/schemas/status", web::get().to(schema_routes::get_schema_status))
                         .route("/schemas/refresh", web::post().to(schema_routes::refresh_schemas))
                         .route("/schemas/available", web::get().to(schema_routes::list_available_schemas))
+                        .route("/schemas/available/add", web::post().to(schema_routes::add_schema_to_available))
                         .route("/schemas/by-state/{state}", web::get().to(schema_routes::list_schemas_by_state))
                         .route("/schema/{name}", web::get().to(schema_routes::get_schema))
                         .route("/schema", web::post().to(schema_routes::create_schema))

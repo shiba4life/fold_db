@@ -49,6 +49,13 @@ impl DbOperations {
         self.delete_from_tree(&self.schema_states_tree, schema_name)
     }
 
+    // NOTE: add_schema_to_available_directory has been removed to eliminate duplication.
+    // Use SchemaCore::add_schema_to_available_directory instead, which provides:
+    // - Comprehensive validation
+    // - Hash-based de-duplication
+    // - Conflict resolution
+    // - Proper integration with the schema system
+
     /// Checks if a schema exists
     pub fn schema_exists(&self, schema_name: &str) -> Result<bool, SchemaError> {
         self.exists_in_tree(&self.schemas_tree, schema_name)

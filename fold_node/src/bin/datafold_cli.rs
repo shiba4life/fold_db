@@ -3,6 +3,7 @@ use fold_node::{
     load_node_config, DataFoldNode, MutationType,
     Operation, SchemaState,
 };
+use fold_node::schema::SchemaHasher;
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
@@ -27,6 +28,21 @@ enum Commands {
         /// Path to the schema JSON file
         #[arg(required = true)]
         path: PathBuf,
+    },
+    /// Add a new schema to the available_schemas directory
+    AddSchema {
+        /// Path to the schema JSON file to add
+        #[arg(required = true)]
+        path: PathBuf,
+        /// Optional custom name for the schema (defaults to filename)
+        #[arg(long, short)]
+        name: Option<String>,
+    },
+    /// Hash all schemas in the available_schemas directory
+    HashSchemas {
+        /// Verify existing hashes instead of updating them
+        #[arg(long, short)]
+        verify: bool,
     },
     /// List all loaded schemas
     ListSchemas {},
@@ -113,6 +129,89 @@ fn handle_load_schema(path: PathBuf, node: &mut DataFoldNode) -> Result<(), Box<
     let path_str = path.to_str().ok_or("Invalid file path")?;
     node.load_schema_from_file(path_str)?;
     info!("Schema loaded successfully");
+    Ok(())
+}
+
+fn handle_add_schema(
+    path: PathBuf,
+    name: Option<String>,
+    node: &mut DataFoldNode
+) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Adding schema from: {}", path.display());
+    
+    // Read the schema file
+    let schema_content = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read schema file: {}", e))?;
+    
+    // Determine schema name from parameter or filename
+    let custom_name = name.or_else(|| {
+        path.file_stem()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_string())
+    });
+    
+    info!("Using database-level validation (always enabled)");
+    
+    // Use the database-level method which includes full validation
+    let final_schema_name = node.add_schema_to_available_directory(&schema_content, custom_name)
+        .map_err(|e| format!("Schema validation failed: {}", e))?;
+    
+    // Reload available schemas
+    info!("Reloading available schemas...");
+    node.refresh_schemas()
+        .map_err(|e| format!("Failed to reload schemas: {}", e))?;
+    
+    info!("Schema '{}' is now available for approval and use", final_schema_name);
+    Ok(())
+}
+
+fn handle_hash_schemas(verify: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if verify {
+        info!("Verifying schema hashes in available_schemas directory...");
+        
+        match SchemaHasher::verify_available_schemas_directory() {
+            Ok(results) => {
+                let mut all_valid = true;
+                info!("Hash verification results:");
+                
+                for (filename, is_valid) in results {
+                    if is_valid {
+                        info!("  ✅ {}: Valid hash", filename);
+                    } else {
+                        info!("  ❌ {}: Invalid or missing hash", filename);
+                        all_valid = false;
+                    }
+                }
+                
+                if all_valid {
+                    info!("All schemas have valid hashes!");
+                } else {
+                    info!("Some schemas have invalid or missing hashes. Run without --verify to update them.");
+                }
+            }
+            Err(e) => {
+                return Err(format!("Failed to verify schema hashes: {}", e).into());
+            }
+        }
+    } else {
+        info!("Adding/updating hashes for all schemas in available_schemas directory...");
+        
+        match SchemaHasher::hash_available_schemas_directory() {
+            Ok(results) => {
+                info!("Successfully processed {} schema files:", results.len());
+                
+                for (filename, hash) in results {
+                    info!("  ✅ {}: {}", filename, hash);
+                }
+                
+                info!("All schemas have been updated with hashes!");
+            }
+            Err(e) => {
+                return Err(format!("Failed to hash schemas: {}", e).into());
+            }
+        }
+    }
+    
     Ok(())
 }
 
@@ -289,6 +388,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     fold_node::web_logger::init().ok();
     let cli = Cli::parse();
 
+    // Handle commands that don't need the node first
+    match cli.command {
+        Commands::HashSchemas { verify } => {
+            return handle_hash_schemas(verify);
+        }
+        _ => {}
+    }
+
     // Load node configuration
     info!("Loading config from: {}", cli.config);
     let config = load_node_config(Some(&cli.config), None)?;
@@ -301,6 +408,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Process command
     match cli.command {
         Commands::LoadSchema { path } => handle_load_schema(path, &mut node)?,
+        Commands::AddSchema { path, name } => handle_add_schema(path, name, &mut node)?,
+        Commands::HashSchemas { .. } => unreachable!(), // Already handled above
         Commands::ListSchemas {} => handle_list_schemas(&mut node)?,
         Commands::ListAvailableSchemas {} => handle_list_available_schemas(&mut node)?,
         Commands::AllowSchema { name } => handle_allow_schema(name, &mut node)?,

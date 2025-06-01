@@ -51,6 +51,7 @@ fn test_schema_operations() {
         name: "test_schema".to_string(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
+        hash: None,
     };
 
     // Test schema loading
@@ -91,6 +92,7 @@ fn test_write_and_query() {
         name: "test_schema".to_string(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
+        hash: None,
     };
 
     db.add_schema_available(schema).expect("Failed to load schema");
@@ -161,6 +163,7 @@ fn test_atom_history() {
         name: "test_schema".to_string(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
+        hash: None,
     };
 
     db.add_schema_available(schema).expect("Failed to load schema");

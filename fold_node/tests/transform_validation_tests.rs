@@ -39,6 +39,7 @@ fn build_schema(transform_logic: &str) -> JsonSchemaDefinition {
         name: "test".to_string(),
         fields,
         payment_config: SchemaPaymentConfig::default(),
+        hash: None,
     }
 }
 

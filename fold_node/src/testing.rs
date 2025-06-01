@@ -26,6 +26,7 @@ pub fn create_test_schema(name: &str) -> Schema {
         name: name.to_string(),
         fields: HashMap::new(),
         payment_config: Default::default(),
+        hash: None,
     }
 }
 
