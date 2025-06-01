@@ -32,7 +32,7 @@ pub fn create_field_with_permissions(
 
 #[allow(dead_code)]
 pub fn create_schema_with_fields(name: String, fields: HashMap<String, FieldVariant>) -> Schema {
-    Schema::new(name)
+    Schema::new_range(name, "key".to_string())
         .with_fields(fields)
         .with_payment_config(SchemaPaymentConfig::default())
 }
