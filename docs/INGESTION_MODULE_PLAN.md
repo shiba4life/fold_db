@@ -124,7 +124,7 @@ Available Schemas:
 ## Configuration
 
 ### Environment Variables:
-- `OPENROUTER_API_KEY` - OpenRouter API key
+- `FOLD_OPENROUTER_API_KEY` - OpenRouter API key
 - `OPENROUTER_MODEL` - Model to use (default: "anthropic/claude-3.5-sonnet")
 - `INGESTION_ENABLED` - Enable/disable ingestion module
 

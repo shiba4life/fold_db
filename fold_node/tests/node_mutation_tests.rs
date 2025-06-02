@@ -177,3 +177,84 @@ fn test_schema_validation() {
     let result = node.mutate(unknown_field);
     assert!(result.is_err());
 }
+
+#[test]
+fn test_range_schema_mutation_enforcement() {
+    use fold_node::schema::types::field::{RangeField, FieldVariant};
+    use fold_node::schema::types::Schema;
+    use fold_node::testing::{Mutation, MutationType, PermissionsPolicy, FieldPaymentConfig, TrustDistance};
+    use std::collections::HashMap;
+
+    // Setup node
+    let mut node = setup_test_node();
+
+    // Create a RangeSchema with two rangeFields
+    let mut range_schema = Schema::new_range("RangeTest".to_string(), "user_id".to_string());
+    let policy = PermissionsPolicy::new(TrustDistance::Distance(0), TrustDistance::Distance(0));
+    let payment = FieldPaymentConfig::default();
+    let rf1 = RangeField::new(policy.clone(), payment.clone(), HashMap::new());
+    let rf2 = RangeField::new(policy.clone(), payment.clone(), HashMap::new());
+    range_schema.add_field("field1".to_string(), FieldVariant::Range(rf1));
+    range_schema.add_field("field2".to_string(), FieldVariant::Range(rf2));
+    node.add_schema_available(range_schema.clone()).unwrap();
+
+    // Valid mutation: both fields have the same range_key value
+    let mut valid_fields = HashMap::new();
+    valid_fields.insert("field1".to_string(), serde_json::json!({"user_id": 42, "value": 100}));
+    valid_fields.insert("field2".to_string(), serde_json::json!({"user_id": 42, "value": 200}));
+    let valid_mutation = Mutation {
+        schema_name: "RangeTest".to_string(),
+        fields_and_values: valid_fields,
+        pub_key: "test".to_string(),
+        trust_distance: 0,
+        mutation_type: MutationType::Create,
+    };
+    assert!(node.mutate(valid_mutation).is_ok());
+
+    // Invalid mutation: one field missing the range_key
+    let mut missing_key_fields = HashMap::new();
+    missing_key_fields.insert("field1".to_string(), serde_json::json!({"user_id": 42, "value": 100}));
+    missing_key_fields.insert("field2".to_string(), serde_json::json!({"value": 200}));
+    let missing_key_mutation = Mutation {
+        schema_name: "RangeTest".to_string(),
+        fields_and_values: missing_key_fields,
+        pub_key: "test".to_string(),
+        trust_distance: 0,
+        mutation_type: MutationType::Create,
+    };
+    assert!(node.mutate(missing_key_mutation).is_err());
+
+    // Invalid mutation: range_key values differ
+    let mut diff_key_fields = HashMap::new();
+    diff_key_fields.insert("field1".to_string(), serde_json::json!({"user_id": 42, "value": 100}));
+    diff_key_fields.insert("field2".to_string(), serde_json::json!({"user_id": 99, "value": 200}));
+    let diff_key_mutation = Mutation {
+        schema_name: "RangeTest".to_string(),
+        fields_and_values: diff_key_fields,
+        pub_key: "test".to_string(),
+        trust_distance: 0,
+        mutation_type: MutationType::Create,
+    };
+    assert!(node.mutate(diff_key_mutation).is_err());
+
+    // Invalid mutation: one field is not a rangeField
+    let mut mixed_schema = Schema::new_range("MixedTest".to_string(), "user_id".to_string());
+    mixed_schema.add_field("field1".to_string(), FieldVariant::Range(RangeField::new(policy.clone(), payment.clone(), HashMap::new())));
+    // Add a single field (not a rangeField)
+    use fold_node::schema::types::field::SingleField;
+    let single = SingleField::new(policy, payment, HashMap::new());
+    mixed_schema.add_field("field2".to_string(), FieldVariant::Single(single));
+    node.add_schema_available(mixed_schema.clone()).unwrap();
+
+    let mut mixed_fields = HashMap::new();
+    mixed_fields.insert("field1".to_string(), serde_json::json!({"user_id": 42, "value": 100}));
+    mixed_fields.insert("field2".to_string(), serde_json::json!({"user_id": 42, "value": 200}));
+    let mixed_mutation = Mutation {
+        schema_name: "MixedTest".to_string(),
+        fields_and_values: mixed_fields,
+        pub_key: "test".to_string(),
+        trust_distance: 0,
+        mutation_type: MutationType::Create,
+    };
+    assert!(node.mutate(mixed_mutation).is_err());
+}

@@ -33,7 +33,7 @@ pub async fn process_json(
     let mut node = state.node.lock().await;
 
     // Process the ingestion request
-    match service.process_json_with_node(request.into_inner(), &mut *node).await {
+    match service.process_json_with_node(request.into_inner(), &mut node).await {
         Ok(response) => {
             if response.success {
                 info!("Ingestion completed successfully");

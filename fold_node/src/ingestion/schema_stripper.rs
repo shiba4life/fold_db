@@ -42,6 +42,7 @@ impl SchemaStripper {
     }
 
     /// Strip payment and permission data from a field
+    #[allow(clippy::only_used_in_recursion)]
     fn strip_field_data(&self, field_value: &mut Value) -> IngestionResult<()> {
         if let Value::Object(ref mut field_obj) = field_value {
             // Remove payment_config

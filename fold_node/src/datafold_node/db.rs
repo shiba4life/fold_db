@@ -199,18 +199,3 @@ impl DataFoldNode {
     }
 
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::datafold_node::config::NodeConfig;
-
-    fn create_node(path: &std::path::Path) -> DataFoldNode {
-        let config = NodeConfig {
-            storage_path: path.into(),
-            default_trust_distance: 1,
-            network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-        };
-        DataFoldNode::new(config).unwrap()
-    }
-}

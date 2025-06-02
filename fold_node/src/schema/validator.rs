@@ -23,6 +23,16 @@ impl<'a> SchemaValidator<'a> {
             ));
         }
 
+        // For RangeSchema, ensure the range_key is a field in the schema
+        if let Some(range_key) = schema.range_key() {
+            if !schema.fields.contains_key(range_key) {
+                return Err(SchemaError::InvalidField(format!(
+                    "RangeSchema range_key '{}' must be one of the schema's fields.",
+                    range_key
+                )));
+            }
+        }
+
         if schema.payment_config.base_multiplier <= 0.0 {
             return Err(SchemaError::InvalidField(
                 "Schema base_multiplier must be positive".to_string(),
@@ -156,6 +166,46 @@ impl<'a> SchemaValidator<'a> {
             }
         }
 
+        Ok(())
+    }
+
+    /// Validate a mutation for a RangeSchema.
+    pub fn validate_range_schema_mutation(
+        &self,
+        schema: &crate::schema::types::Schema,
+        mutation: &crate::schema::types::operations::Mutation,
+    ) -> Result<(), crate::schema::types::SchemaError> {
+        if let Some(range_key) = schema.range_key() {
+            // 1. Ensure all fields are rangeFields
+            for (field_name, field_def) in &schema.fields {
+                if !matches!(field_def, crate::schema::types::field::FieldVariant::Range(_)) {
+                    return Err(crate::schema::types::SchemaError::InvalidData(format!(
+                        "All fields in a RangeSchema must be rangeFields. Field '{}' is not a rangeField.",
+                        field_name
+                    )));
+                }
+            }
+            // 2. Ensure all values in fields_and_values contain the same range_key value
+            let mut found_range_key_value: Option<&serde_json::Value> = None;
+            for (field_name, value) in mutation.fields_and_values.iter() {
+                // Value must be an object containing the range_key
+                let obj = value.as_object().ok_or_else(|| crate::schema::types::SchemaError::InvalidData(format!(
+                    "Value for field '{}' must be an object containing the range_key '{}'.", field_name, range_key
+                )))?;
+                let key_val = obj.get(range_key).ok_or_else(|| crate::schema::types::SchemaError::InvalidData(format!(
+                    "Value for field '{}' must contain the range_key '{}'.", field_name, range_key
+                )))?;
+                if let Some(existing) = &found_range_key_value {
+                    if existing != &key_val {
+                        return Err(crate::schema::types::SchemaError::InvalidData(format!(
+                            "All range_key values must match for RangeSchema. Field '{}' has a different value.", field_name
+                        )));
+                    }
+                } else {
+                    found_range_key_value = Some(key_val);
+                }
+            }
+        }
         Ok(())
     }
 }

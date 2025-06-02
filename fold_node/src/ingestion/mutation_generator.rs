@@ -121,7 +121,7 @@ impl MutationGenerator {
                     }
 
                     let mut index_str = String::new();
-                    while let Some(index_ch) = chars.next() {
+                    for index_ch in chars.by_ref() {
                         if index_ch == ']' {
                             break;
                         }
@@ -194,7 +194,7 @@ impl MutationGenerator {
                 
                 collection_groups
                     .entry(field_name)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push((json_path.clone(), schema_path.clone()));
             }
         }
@@ -219,10 +219,10 @@ impl MutationGenerator {
     fn get_base_collection_path(&self, path: &str) -> IngestionResult<String> {
         // Remove all array indices from the path
         let mut result = String::new();
-        let mut chars = path.chars().peekable();
+        let chars = path.chars();
         let mut skip_until_bracket = false;
 
-        while let Some(ch) = chars.next() {
+        for ch in chars {
             if ch == '[' {
                 skip_until_bracket = true;
             } else if ch == ']' {
@@ -295,7 +295,7 @@ impl MutationGenerator {
             if ch == '[' {
                 result.push(ch);
                 // Skip the existing index
-                while let Some(index_ch) = chars.next() {
+                for index_ch in chars.by_ref() {
                     if index_ch == ']' {
                         result.push_str(&new_index.to_string());
                         result.push(index_ch);

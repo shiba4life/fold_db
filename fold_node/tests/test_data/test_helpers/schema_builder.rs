@@ -2,6 +2,7 @@ use fold_node::testing::{
     ExplicitCounts, Field, FieldPaymentConfig, PermissionsPolicy, Schema, SingleField, FieldVariant,
     SchemaPaymentConfig, TrustDistance,
 };
+use fold_node::testing::TrustDistanceScaling;
 use std::collections::HashMap;
 
 #[allow(dead_code)]
@@ -32,7 +33,7 @@ pub fn create_field_with_permissions(
 
 #[allow(dead_code)]
 pub fn create_schema_with_fields(name: String, fields: HashMap<String, FieldVariant>) -> Schema {
-    Schema::new_range(name, "key".to_string())
+    Schema::new(name)
         .with_fields(fields)
         .with_payment_config(SchemaPaymentConfig::default())
 }

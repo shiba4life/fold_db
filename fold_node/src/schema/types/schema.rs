@@ -13,9 +13,7 @@ pub enum SchemaType {
 }
 
 pub fn default_schema_type() -> SchemaType {
-    SchemaType::Range {
-        range_key: "key".to_string(),
-    }
+    SchemaType::Single
 }
 
 /// Defines the structure, permissions, and payment requirements for a data collection.
@@ -82,6 +80,14 @@ impl Schema {
             fields: HashMap::new(),
             payment_config: SchemaPaymentConfig::default(),
             hash: None,
+        }
+    }
+
+    /// Returns the range_key if this schema is a Range schema, otherwise None.
+    pub fn range_key(&self) -> Option<&str> {
+        match &self.schema_type {
+            SchemaType::Range { range_key } => Some(range_key.as_str()),
+            _ => None,
         }
     }
 

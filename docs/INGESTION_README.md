@@ -20,7 +20,7 @@ The DataFold Ingestion Module provides AI-powered automatic data ingestion capab
 Set the required environment variables:
 
 ```bash
-export OPENROUTER_API_KEY="your-openrouter-api-key"
+export FOLD_OPENROUTER_API_KEY="your-openrouter-api-key"
 export INGESTION_ENABLED="true"
 export OPENROUTER_MODEL="anthropic/claude-3.5-sonnet"
 ```
@@ -120,7 +120,7 @@ Validates JSON data without processing it.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OPENROUTER_API_KEY` | OpenRouter API key (required) | - |
+| `FOLD_OPENROUTER_API_KEY` | OpenRouter API key (required) | - |
 | `OPENROUTER_MODEL` | AI model to use | `anthropic/claude-3.5-sonnet` |
 | `OPENROUTER_BASE_URL` | API base URL | `https://openrouter.ai/api/v1` |
 | `INGESTION_ENABLED` | Enable/disable ingestion | `true` |
@@ -133,7 +133,7 @@ Validates JSON data without processing it.
 
 ```bash
 # Required
-export OPENROUTER_API_KEY="sk-or-v1-your-key-here"
+export FOLD_OPENROUTER_API_KEY="sk-or-v1-your-key-here"
 
 # Optional (with defaults shown)
 export OPENROUTER_MODEL="anthropic/claude-3.5-sonnet"
@@ -363,7 +363,7 @@ Common error scenarios and responses:
   "success": false,
   "errors": [
     "OpenRouter API error: Invalid API key",
-    "Configuration error: OPENROUTER_API_KEY environment variable not set"
+    "Configuration error: FOLD_OPENROUTER_API_KEY environment variable not set"
   ]
 }
 ```
@@ -466,7 +466,7 @@ If you encounter "Read access denied" errors:
 - Verify the server restarted after code changes
 
 **OpenRouter API Errors**
-- Verify `OPENROUTER_API_KEY` is set correctly
+- Verify `FOLD_OPENROUTER_API_KEY` is set correctly
 - Check API key permissions and quotas
 - Ensure network connectivity to OpenRouter
 

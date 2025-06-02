@@ -43,7 +43,7 @@ impl IngestionConfig {
     /// Create a new ingestion config from environment variables and saved config file
     pub fn from_env() -> Result<Self, crate::ingestion::IngestionError> {
         // Try to get API key from environment first, then from saved config
-        let mut api_key = env::var("OPENROUTER_API_KEY").unwrap_or_default();
+        let mut api_key = env::var("FOLD_OPENROUTER_API_KEY").unwrap_or_default();
         let mut model = env::var("OPENROUTER_MODEL")
             .unwrap_or_else(|_| "anthropic/claude-3.5-sonnet".to_string());
 
@@ -60,7 +60,7 @@ impl IngestionConfig {
         // If still no API key, return error
         if api_key.is_empty() {
             return Err(crate::ingestion::IngestionError::configuration_error(
-                "OPENROUTER_API_KEY not set in environment or saved config"
+                "FOLD_OPENROUTER_API_KEY not set in environment or saved config"
             ));
         }
 
@@ -107,7 +107,7 @@ impl IngestionConfig {
     /// Create a new ingestion config allowing empty API key (for configuration endpoints)
     pub fn from_env_allow_empty() -> Self {
         // Try to get API key from environment first, then from saved config
-        let mut api_key = env::var("OPENROUTER_API_KEY").unwrap_or_default();
+        let mut api_key = env::var("FOLD_OPENROUTER_API_KEY").unwrap_or_default();
         let mut model = env::var("OPENROUTER_MODEL")
             .unwrap_or_else(|_| "anthropic/claude-3.5-sonnet".to_string());
 

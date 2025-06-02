@@ -40,12 +40,14 @@ struct OpenRouterResponse {
 #[derive(Debug, Deserialize)]
 struct OpenRouterChoice {
     message: OpenRouterResponseMessage,
+    #[allow(dead_code)]
     finish_reason: Option<String>,
 }
 
 /// Response message from OpenRouter
 #[derive(Debug, Deserialize)]
 struct OpenRouterResponseMessage {
+    #[allow(dead_code)]
     role: String,
     content: String,
 }
@@ -252,10 +254,10 @@ The response must be valid JSON."#,
     fn extract_json_from_response(&self, response_text: &str) -> IngestionResult<String> {
         // Look for JSON block markers
         if let Some(start) = response_text.find("```json") {
-            if let Some(end) = response_text[start..].find("```") {
-                let json_start = start + 7; // Length of "```json"
-                let json_end = start + end;
-                return Ok(response_text[json_start..json_end].trim().to_string());
+            let search_start = start + 7; // Length of "```json"
+            if let Some(end_offset) = response_text[search_start..].find("```") {
+                let json_end = search_start + end_offset;
+                return Ok(response_text[search_start..json_end].trim().to_string());
             }
         }
 
