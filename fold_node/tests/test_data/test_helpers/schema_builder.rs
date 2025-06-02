@@ -2,7 +2,6 @@ use fold_node::testing::{
     ExplicitCounts, Field, FieldPaymentConfig, PermissionsPolicy, Schema, SingleField, FieldVariant,
     SchemaPaymentConfig, TrustDistance,
 };
-use fold_node::testing::TrustDistanceScaling;
 use std::collections::HashMap;
 
 #[allow(dead_code)]

@@ -156,6 +156,7 @@ mod tests {
     use crate::schema::types::field::{FieldVariant, RangeField};
     use crate::schema::types::operations::MutationType;
     use crate::schema::types::SchemaError;
+    use crate::testing::{FieldPaymentConfig, PermissionsPolicy};
     use std::collections::HashMap;
     use serde_json::json;
 

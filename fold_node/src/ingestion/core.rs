@@ -324,6 +324,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use tempfile::TempDir;
 
+    #[allow(dead_code)]
     fn create_test_ingestion_core() -> IngestionResult<IngestionCore> {
         let mut config = IngestionConfig::default();
         config.openrouter_api_key = "test-key".to_string();
