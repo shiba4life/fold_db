@@ -2,7 +2,7 @@ use fold_node::schema::types::json_schema::{
     JsonSchemaDefinition, JsonSchemaField, JsonTransform, JsonPermissionPolicy, JsonFieldPaymentConfig
 };
 use fold_node::schema::types::field::FieldType;
-use fold_node::schema::types::SchemaError;
+use fold_node::schema::types::{SchemaError, SchemaType};
 use fold_node::fees::{SchemaPaymentConfig, TrustDistanceScaling};
 use fold_node::permissions::types::policy::TrustDistance;
 use std::collections::HashMap;
@@ -37,6 +37,7 @@ fn build_schema(transform_logic: &str) -> JsonSchemaDefinition {
 
     JsonSchemaDefinition {
         name: "test".to_string(),
+        schema_type: SchemaType::Single,
         fields,
         payment_config: SchemaPaymentConfig::default(),
         hash: None,

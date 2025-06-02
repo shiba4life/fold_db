@@ -146,7 +146,6 @@ impl Schema {
     /// Returns error if wrong key is used or range_key is missing.
     pub fn validate_range_filter(&self, filter: &serde_json::Value) -> Result<(), crate::schema::types::SchemaError> {
         use crate::schema::types::SchemaError;
-        use serde_json::Value;
 
         // Only validate if this is a Range schema
         if let Some(range_key) = self.range_key() {

@@ -52,7 +52,7 @@ impl DataFoldNode {
 
 
     /// Executes a query against the database.
-    pub fn query(&mut self, mut query: Query) -> FoldDbResult<Vec<Result<Value, SchemaError>>> {
+    pub fn query(&mut self, query: Query) -> FoldDbResult<Vec<Result<Value, SchemaError>>> {
         // Check if schema exists first
         let schema_exists = {
             let db = self.db.lock()
@@ -87,9 +87,8 @@ impl DataFoldNode {
                 query.schema_name, self.node_id, current_perms
             )));
         }
-        if query.trust_distance == 0 {
-            query.trust_distance = self.config.default_trust_distance;
-        }
+        // Note: trust_distance 0 is a valid value meaning "maximum trust" for web UI access
+        // Do not override explicitly set trust_distance values
         let db = self
             .db
             .lock()

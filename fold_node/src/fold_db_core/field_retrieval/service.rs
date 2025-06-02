@@ -150,7 +150,7 @@ impl FieldRetrievalService {
             match self.get_field_value_with_filter(atom_manager, schema, field_name, &wrapped_filter) {
                 Ok(field_value) => {
                     // Ensure the range_key entry exists in result
-                    let range_entry = result.entry(range_key_str.clone()).or_insert_with(HashMap::new);
+                    let range_entry = result.entry(range_key_str.clone()).or_default();
                     range_entry.insert(field_name.clone(), field_value);
                     info!("✅ Added field '{}' to range key '{}'", field_name, range_key_str);
                 }

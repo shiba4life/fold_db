@@ -116,15 +116,39 @@ impl Mutation {
 
     /// Convert this mutation into a RangeSchemaMutation by populating the range_key in every field's value.
     /// The range_key field itself is left as-is (primitive value), while other fields get the range_key inserted.
+    ///
+    /// This method ensures that:
+    /// - The mutation contains the required range_key field
+    /// - The range_key value is valid (not null or empty)
+    /// - All non-range_key fields that are objects get the range_key value applied
     pub fn to_range_schema_mutation(&self, schema: &crate::schema::types::Schema) -> Result<Self, crate::schema::types::SchemaError> {
         use serde_json::Value;
         if let Some(range_key) = schema.range_key() {
-            // Get the value for the range_key field from the mutation
+            // MANDATORY: Get the value for the range_key field from the mutation
             let range_key_value = self.fields_and_values.get(range_key).ok_or_else(|| {
                 crate::schema::types::SchemaError::InvalidData(format!(
-                    "Mutation is missing the value for the range_key field '{}'", range_key
+                    "Range schema mutation for '{}' is missing required range_key field '{}'. All range schema mutations must provide a value for the range_key.",
+                    self.schema_name, range_key
                 ))
             })?;
+
+            // Validate the range_key value is not null
+            if range_key_value.is_null() {
+                return Err(crate::schema::types::SchemaError::InvalidData(format!(
+                    "Range schema mutation for '{}' has null value for range_key field '{}'. Range key must have a valid value.",
+                    self.schema_name, range_key
+                )));
+            }
+
+            // If range_key value is a string, ensure it's not empty
+            if let Some(str_value) = range_key_value.as_str() {
+                if str_value.trim().is_empty() {
+                    return Err(crate::schema::types::SchemaError::InvalidData(format!(
+                        "Range schema mutation for '{}' has empty string value for range_key field '{}'. Range key must have a non-empty value.",
+                        self.schema_name, range_key
+                    )));
+                }
+            }
 
             // For each field except the range_key field itself, insert/overwrite the range_key in its value
             let mut new_fields_and_values = self.fields_and_values.clone();
@@ -148,9 +172,10 @@ impl Mutation {
                 mutation_type: self.mutation_type.clone(),
             })
         } else {
-            Err(crate::schema::types::SchemaError::InvalidData(
-                "Schema is not a RangeSchema".to_string(),
-            ))
+            Err(crate::schema::types::SchemaError::InvalidData(format!(
+                "Schema '{}' is not a RangeSchema. Only range schemas support range_key propagation.",
+                self.schema_name
+            )))
         }
     }
 }
@@ -217,5 +242,71 @@ mod tests {
 
         let result = mutation.to_range_schema_mutation(&schema);
         assert!(matches!(result, Err(SchemaError::InvalidData(_))));
+        
+        // Verify the error message mentions the missing range_key requirement
+        if let Err(SchemaError::InvalidData(msg)) = result {
+            assert!(msg.contains("missing required range_key field"));
+            assert!(msg.contains("user_id"));
+        }
+    }
+
+    #[test]
+    fn test_to_range_schema_mutation_null_range_key() {
+        // Create a RangeSchema with range_key "user_id"
+        let mut schema = Schema::new_range("TestRange".to_string(), "user_id".to_string());
+        let rf = RangeField::new(PermissionsPolicy::default(), FieldPaymentConfig::default(), HashMap::new());
+        schema.fields.insert("user_id".to_string(), FieldVariant::Range(rf.clone()));
+        schema.fields.insert("score".to_string(), FieldVariant::Range(rf));
+
+        // Create a mutation with null user_id field
+        let mut fields_and_values = HashMap::new();
+        fields_and_values.insert("user_id".to_string(), json!(null));
+        fields_and_values.insert("score".to_string(), json!({"points": 42}));
+
+        let mutation = Mutation {
+            schema_name: "TestRange".to_string(),
+            fields_and_values,
+            pub_key: "test".to_string(),
+            trust_distance: 0,
+            mutation_type: MutationType::Create,
+        };
+
+        let result = mutation.to_range_schema_mutation(&schema);
+        assert!(matches!(result, Err(SchemaError::InvalidData(_))));
+        
+        // Verify the error message mentions null value
+        if let Err(SchemaError::InvalidData(msg)) = result {
+            assert!(msg.contains("null value for range_key field"));
+        }
+    }
+
+    #[test]
+    fn test_to_range_schema_mutation_empty_string_range_key() {
+        // Create a RangeSchema with range_key "user_id"
+        let mut schema = Schema::new_range("TestRange".to_string(), "user_id".to_string());
+        let rf = RangeField::new(PermissionsPolicy::default(), FieldPaymentConfig::default(), HashMap::new());
+        schema.fields.insert("user_id".to_string(), FieldVariant::Range(rf.clone()));
+        schema.fields.insert("score".to_string(), FieldVariant::Range(rf));
+
+        // Create a mutation with empty string user_id field
+        let mut fields_and_values = HashMap::new();
+        fields_and_values.insert("user_id".to_string(), json!(""));
+        fields_and_values.insert("score".to_string(), json!({"points": 42}));
+
+        let mutation = Mutation {
+            schema_name: "TestRange".to_string(),
+            fields_and_values,
+            pub_key: "test".to_string(),
+            trust_distance: 0,
+            mutation_type: MutationType::Create,
+        };
+
+        let result = mutation.to_range_schema_mutation(&schema);
+        assert!(matches!(result, Err(SchemaError::InvalidData(_))));
+        
+        // Verify the error message mentions empty string value
+        if let Err(SchemaError::InvalidData(msg)) = result {
+            assert!(msg.contains("empty string value for range_key field"));
+        }
     }
 }

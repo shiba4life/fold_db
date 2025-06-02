@@ -1,15 +1,24 @@
 import { useState } from 'react'
+import {
+  isRangeSchema,
+  formatRangeSchemaQuery,
+  getRangeKey
+} from '../../utils/rangeSchemaUtils'
 
 function QueryTab({ schemas, onResult }) {
   const [selectedSchema, setSelectedSchema] = useState('')
   const [queryFields, setQueryFields] = useState([])
   const [rangeFilters, setRangeFilters] = useState({})
+  const [rangeKeyValue, setRangeKeyValue] = useState('')
+  const [rangeSchemaFilter, setRangeSchemaFilter] = useState({})
 
   const handleSchemaChange = (e) => {
     const schemaName = e.target.value
     setSelectedSchema(schemaName)
     setQueryFields([])
     setRangeFilters({})
+    setRangeKeyValue('')
+    setRangeSchemaFilter({})
   }
 
   const handleFieldToggle = (fieldName) => {
@@ -38,45 +47,87 @@ function QueryTab({ schemas, onResult }) {
       return
     }
 
-    const query = {
-      type: 'query',
-      schema: selectedSchema,
-      fields: queryFields
-    }
+    const selectedSchemaObj = schemas.find(s => s.name === selectedSchema)
+    let query
 
-    // Add range filters if any are specified
-    const selectedSchemaFields = schemas.find(s => s.name === selectedSchema)?.fields || {}
-    const rangeFieldsWithFilters = queryFields.filter(fieldName => {
-      const field = selectedSchemaFields[fieldName]
-      return field?.field_type === 'Range' && rangeFilters[fieldName]
-    })
+    // Check if this is a range schema
+    if (isRangeSchema(selectedSchemaObj)) {
+      // For range schemas, use the enhanced range filtering
+      query = {
+        type: 'query',
+        schema: selectedSchema,
+        fields: queryFields
+      }
 
-    if (rangeFieldsWithFilters.length > 0) {
-      const fieldName = rangeFieldsWithFilters[0] // For now, support one range filter
-      const filter = rangeFilters[fieldName]
-      
-      if (filter.start && filter.end) {
+      // Add range filter based on the enhanced filter options
+      if (rangeSchemaFilter.start && rangeSchemaFilter.end) {
         query.filter = {
-          field: fieldName,
           range_filter: {
-            KeyRange: {
-              start: filter.start,
-              end: filter.end
+            [getRangeKey(selectedSchemaObj)]: {
+              KeyRange: {
+                start: rangeSchemaFilter.start,
+                end: rangeSchemaFilter.end
+              }
             }
           }
         }
-      } else if (filter.key) {
+      } else if (rangeSchemaFilter.key) {
         query.filter = {
-          field: fieldName,
           range_filter: {
-            Key: filter.key
+            [getRangeKey(selectedSchemaObj)]: rangeSchemaFilter.key
           }
         }
-      } else if (filter.keyPrefix) {
+      } else if (rangeSchemaFilter.keyPrefix) {
         query.filter = {
-          field: fieldName,
           range_filter: {
-            KeyPrefix: filter.keyPrefix
+            [getRangeKey(selectedSchemaObj)]: {
+              KeyPrefix: rangeSchemaFilter.keyPrefix
+            }
+          }
+        }
+      }
+    } else {
+      // For regular schemas, use the existing logic
+      query = {
+        type: 'query',
+        schema: selectedSchema,
+        fields: queryFields
+      }
+
+      // Add range filters if any are specified for regular schemas
+      const selectedSchemaFields = selectedSchemaObj?.fields || {}
+      const rangeFieldsWithFilters = queryFields.filter(fieldName => {
+        const field = selectedSchemaFields[fieldName]
+        return field?.field_type === 'Range' && rangeFilters[fieldName]
+      })
+
+      if (rangeFieldsWithFilters.length > 0) {
+        const fieldName = rangeFieldsWithFilters[0] // For now, support one range filter
+        const filter = rangeFilters[fieldName]
+        
+        if (filter.start && filter.end) {
+          query.filter = {
+            field: fieldName,
+            range_filter: {
+              KeyRange: {
+                start: filter.start,
+                end: filter.end
+              }
+            }
+          }
+        } else if (filter.key) {
+          query.filter = {
+            field: fieldName,
+            range_filter: {
+              Key: filter.key
+            }
+          }
+        } else if (filter.keyPrefix) {
+          query.filter = {
+            field: fieldName,
+            range_filter: {
+              KeyPrefix: filter.keyPrefix
+            }
           }
         }
       }
@@ -114,9 +165,13 @@ function QueryTab({ schemas, onResult }) {
     }
   }
 
-  const selectedSchemaFields = selectedSchema ?
-    schemas.find(s => s.name === selectedSchema)?.fields || {} :
-    {}
+  const selectedSchemaObj = selectedSchema ?
+    schemas.find(s => s.name === selectedSchema) : null
+
+  const selectedSchemaFields = selectedSchemaObj?.fields || {}
+
+  const isCurrentSchemaRangeSchema = selectedSchemaObj ? isRangeSchema(selectedSchemaObj) : false
+  const rangeKey = selectedSchemaObj ? getRangeKey(selectedSchemaObj) : null
 
   const rangeFields = selectedSchema ?
     Object.entries(selectedSchemaFields).filter(([_, field]) => field.field_type === 'Range') :
@@ -173,7 +228,76 @@ function QueryTab({ schemas, onResult }) {
           </div>
         )}
 
-        {rangeFields.length > 0 && queryFields.some(fieldName =>
+        {/* Range Schema Filter - only show for range schemas */}
+        {isCurrentSchemaRangeSchema && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Range Key Filter
+            </label>
+            <div className="bg-yellow-50 rounded-md p-4 space-y-4">
+              <div className="mb-3">
+                <span className="text-sm font-medium text-gray-800">
+                  Range Key: {rangeKey}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Key Range Filter */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-medium text-gray-600">Key Range</label>
+                  <input
+                    type="text"
+                    placeholder="Start key"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                    value={rangeSchemaFilter.start || ''}
+                    onChange={(e) => setRangeSchemaFilter(prev => ({ ...prev, start: e.target.value, key: '', keyPrefix: '' }))}
+                  />
+                  <input
+                    type="text"
+                    placeholder="End key"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                    value={rangeSchemaFilter.end || ''}
+                    onChange={(e) => setRangeSchemaFilter(prev => ({ ...prev, end: e.target.value, key: '', keyPrefix: '' }))}
+                  />
+                </div>
+
+                {/* Single Key Filter */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-medium text-gray-600">Exact Key</label>
+                  <input
+                    type="text"
+                    placeholder="Exact key to match"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                    value={rangeSchemaFilter.key || ''}
+                    onChange={(e) => setRangeSchemaFilter({ key: e.target.value })}
+                  />
+                </div>
+
+                {/* Key Prefix Filter */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-medium text-gray-600">Key Prefix (Begins With)</label>
+                  <input
+                    type="text"
+                    placeholder={`Key prefix (e.g., 'user:')`}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                    value={rangeSchemaFilter.keyPrefix || ''}
+                    onChange={(e) => setRangeSchemaFilter({ keyPrefix: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 text-xs text-gray-500">
+                <p><strong>Key Range:</strong> Matches keys between start and end (inclusive start, exclusive end)</p>
+                <p><strong>Exact Key:</strong> Matches a specific {rangeKey} exactly</p>
+                <p><strong>Key Prefix:</strong> Matches all {rangeKey} values starting with the prefix</p>
+                <p className="mt-2 text-yellow-700"><strong>Note:</strong> Leave all fields empty to query all data from this range schema.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Regular Range Field Filters - only show for non-range schemas */}
+        {!isCurrentSchemaRangeSchema && rangeFields.length > 0 && queryFields.some(fieldName =>
           selectedSchemaFields[fieldName]?.field_type === 'Range'
         ) && (
           <div>

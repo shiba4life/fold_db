@@ -2,7 +2,7 @@
 
 This directory contains pre-defined schema templates that can be loaded into SchemaCore. These schemas demonstrate various field types, permission policies, payment configurations, and transform capabilities.
 
-## Schema Files (7 total)
+## Schema Files (8 total)
 
 ### BlogPost.json
 A schema for blog post content with the following fields:
@@ -55,6 +55,16 @@ Base schema for transform demonstrations:
 ### TransformSchema.json
 Schema demonstrating cross-schema transforms:
 - **result**: Computed field that adds TransformBase.value1 + TransformBase.value2
+
+### UserScores.json
+A range schema for gaming user score tracking and analytics:
+- **user_id**: Range key field for user identification
+- **game_scores**: Range field for storing individual game scores with Linear payment scaling
+- **achievements**: Range field for user achievements with moderate access controls
+- **player_statistics**: Range field for detailed player stats with Exponential payment scaling
+- **ranking_data**: Computed range field that calculates rankings from game scores
+
+This schema demonstrates the range functionality with a realistic gaming use case, including proper range_key configuration and mixed data format handling.
 
 ## Field Types
 

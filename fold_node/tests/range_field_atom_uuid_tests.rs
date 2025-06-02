@@ -22,11 +22,11 @@ fn test_atom_ref_range_missing_uuid_deserialization() {
     // This simulates what might happen if range data is stored incorrectly
     let problematic_json = json!({
         "atom_uuids": {
-            "2024-01-01:daily": "1250",
-            "2024-01-01:hourly:00": "45",
-            "2024-01-01:hourly:01": "52",
-            "2024-01-01:hourly:02": "38",
-            "2024-01-02:daily": "1180"
+            "2024-01-01:daily": ["1250"],
+            "2024-01-01:hourly:00": ["45"],
+            "2024-01-01:hourly:01": ["52"],
+            "2024-01-01:hourly:02": ["38"],
+            "2024-01-02:daily": ["1180"]
         },
         "updated_at": "2024-01-01T00:00:00Z",
         "status": "Active",

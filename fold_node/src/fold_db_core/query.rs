@@ -3,7 +3,6 @@ use crate::schema::types::Query;
 use crate::schema::SchemaError;
 use log::info;
 use serde_json::Value;
-use std::collections::HashMap;
 
 impl FoldDB {
     /// Query a Range schema and return grouped results by range_key
@@ -40,25 +39,16 @@ impl FoldDB {
         
         // Check permissions for all fields
         for field_name in &query.fields {
-            let perm_allowed = if query.trust_distance == 0 {
-                true
-            } else {
-                let perm = self.permission_wrapper.check_query_field_permission(
-                    &query,
-                    field_name,
-                    &self.schema_manager,
-                );
-                perm.allowed
-            };
+            let perm = self.permission_wrapper.check_query_field_permission(
+                &query,
+                field_name,
+                &self.schema_manager,
+            );
 
-            if !perm_allowed {
-                let err = self
-                    .permission_wrapper
-                    .check_query_field_permission(&query, field_name, &self.schema_manager)
-                    .error
-                    .unwrap_or(SchemaError::InvalidPermission(
-                        "Unknown permission error".to_string(),
-                    ));
+            if !perm.allowed {
+                let err = perm.error.unwrap_or(SchemaError::InvalidPermission(
+                    "Unknown permission error".to_string(),
+                ));
                 return Err(err);
             }
         }

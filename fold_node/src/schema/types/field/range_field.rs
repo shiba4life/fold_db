@@ -86,23 +86,33 @@ impl RangeField {
                 }
             }
             RangeFilter::KeyPrefix(prefix) => {
-                for (key, value) in &atom_ref_range.atom_uuids {
+                for (key, values) in &atom_ref_range.atom_uuids {
                     if key.starts_with(prefix) {
-                        matches.insert(key.clone(), value.clone());
+                        // For backward compatibility, use the first UUID if available
+                        if let Some(first_value) = values.first() {
+                            matches.insert(key.clone(), first_value.clone());
+                        }
                     }
                 }
             }
             RangeFilter::KeyRange { start, end } => {
-                for (key, value) in &atom_ref_range.atom_uuids {
+                for (key, values) in &atom_ref_range.atom_uuids {
                     if key >= start && key < end {
-                        matches.insert(key.clone(), value.clone());
+                        // For backward compatibility, use the first UUID if available
+                        if let Some(first_value) = values.first() {
+                            matches.insert(key.clone(), first_value.clone());
+                        }
                     }
                 }
             }
             RangeFilter::Value(target_value) => {
-                for (key, value) in &atom_ref_range.atom_uuids {
-                    if value == target_value {
-                        matches.insert(key.clone(), value.clone());
+                for (key, values) in &atom_ref_range.atom_uuids {
+                    // Check if any of the values match the target
+                    if values.contains(target_value) {
+                        // For backward compatibility, use the first UUID if available
+                        if let Some(first_value) = values.first() {
+                            matches.insert(key.clone(), first_value.clone());
+                        }
                     }
                 }
             }
@@ -114,9 +124,12 @@ impl RangeField {
                 }
             }
             RangeFilter::KeyPattern(pattern) => {
-                for (key, value) in &atom_ref_range.atom_uuids {
+                for (key, values) in &atom_ref_range.atom_uuids {
                     if matches_pattern(key, pattern) {
-                        matches.insert(key.clone(), value.clone());
+                        // For backward compatibility, use the first UUID if available
+                        if let Some(first_value) = values.first() {
+                            matches.insert(key.clone(), first_value.clone());
+                        }
                     }
                 }
             }

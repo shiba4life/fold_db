@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/solid'
+import { isRangeSchema, getRangeSchemaInfo } from '../../utils/rangeSchemaUtils'
 
 function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
   const [expandedSchemas, setExpandedSchemas] = useState({})
@@ -154,7 +155,7 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     }
   }
 
-  const renderField = (field, fieldName) => {
+  const renderField = (field, fieldName, isRangeKey = false) => {
     const formatPermissionPolicy = (policy) => {
       if (!policy) return 'Unknown'
       if (policy.NoRequirement !== undefined) return 'No Requirement'
@@ -163,7 +164,9 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
     }
 
     return (
-      <div key={fieldName} className="bg-gray-50 rounded-md p-4 hover:bg-gray-100 transition-colors duration-200">
+      <div key={fieldName} className={`rounded-md p-4 hover:bg-gray-100 transition-colors duration-200 ${
+        isRangeKey ? 'bg-purple-50 border border-purple-200' : 'bg-gray-50'
+      }`}>
         <div className="flex justify-between items-start">
           <div className="space-y-2">
             <div className="flex items-center">
@@ -171,6 +174,11 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
               <span className="ml-2 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-700">
                 {field.field_type}
               </span>
+              {isRangeKey && (
+                <span className="ml-2 px-2 py-0.5 text-xs font-medium rounded-full bg-purple-200 text-purple-800">
+                  Range Key
+                </span>
+              )}
             </div>
             
             {/* Permission Policies */}
@@ -310,6 +318,7 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
   const renderSchema = (schema) => {
     const isExpanded = expandedSchemas[schema.name]
     const state = schema.state || 'Unknown'
+    const rangeSchemaInfo = schema.fields ? getRangeSchemaInfo(schema) : null
 
     return (
       <div key={schema.name} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md">
@@ -328,6 +337,11 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
               <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStateColor(state)}`}>
                 {state}
               </span>
+              {rangeSchemaInfo && (
+                <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                  Range Schema
+                </span>
+              )}
             </div>
             <div className="flex items-center space-x-2">
               {state.toLowerCase() === 'available' && (
@@ -369,9 +383,24 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
         
         {isExpanded && schema.fields && (
           <div className="p-4 border-t border-gray-200">
+            {/* Range Schema Information */}
+            {rangeSchemaInfo && (
+              <div className="mb-4 p-3 bg-purple-50 rounded-md border border-purple-200">
+                <h4 className="text-sm font-medium text-purple-900 mb-2">Range Schema Information</h4>
+                <div className="space-y-1 text-xs text-purple-800">
+                  <p><strong>Range Key:</strong> {rangeSchemaInfo.rangeKey}</p>
+                  <p><strong>Total Fields:</strong> {rangeSchemaInfo.totalFields}</p>
+                  <p><strong>Range Fields:</strong> {rangeSchemaInfo.rangeFields.length}</p>
+                  <p className="text-purple-600">
+                    This schema uses range-based storage for efficient querying and mutations.
+                  </p>
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-3">
               {Object.entries(schema.fields).map(([fieldName, field]) =>
-                renderField(field, fieldName)
+                renderField(field, fieldName, rangeSchemaInfo?.rangeKey === fieldName)
               )}
             </div>
           </div>
@@ -419,16 +448,23 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
                 <div className="p-4 text-gray-500 text-center">No available schemas</div>
               ) : (
                 <div className="space-y-2 p-4">
-                  {availableSchemas.map(schema => (
-                    <div key={schema.name} className="flex items-center justify-between p-3 bg-white rounded border">
-                      <div className="flex items-center space-x-3">
-                        <div>
-                          <h4 className="font-medium text-gray-900">{schema.name}</h4>
+                  {availableSchemas.map(schema => {
+                    const schemaRangeInfo = schema.fields ? getRangeSchemaInfo(schema) : null
+                    return (
+                      <div key={schema.name} className="flex items-center justify-between p-3 bg-white rounded border">
+                        <div className="flex items-center space-x-3">
+                          <div>
+                            <h4 className="font-medium text-gray-900">{schema.name}</h4>
+                          </div>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStateColor(schema.state)}`}>
+                            {schema.state}
+                          </span>
+                          {schemaRangeInfo && (
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                              Range Schema
+                            </span>
+                          )}
                         </div>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStateColor(schema.state)}`}>
-                          {schema.state}
-                        </span>
-                      </div>
                       
                       <div className="flex space-x-2">
                         <button
@@ -445,7 +481,7 @@ function SchemaTab({ schemas, onResult, onSchemaUpdated }) {
                         </button>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               )}
             </div>

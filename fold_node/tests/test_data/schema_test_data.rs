@@ -12,6 +12,16 @@ pub fn create_default_payment_config() -> FieldPaymentConfig {
 #[allow(dead_code)]
 pub fn create_test_schema(name: &str) -> Schema {
     let mut schema = Schema::new_range(name.to_string(), "key".to_string());
+    
+    // Add the range_key field
+    let key_field = SingleField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+        HashMap::new(),
+    );
+    schema.add_field("key".to_string(), FieldVariant::Single(key_field));
+    
+    // Add the test field
     let field_name = "test_field".to_string();
     let mut field = SingleField::new(
         PermissionsPolicy::default(),
@@ -27,6 +37,14 @@ pub fn create_test_schema(name: &str) -> Schema {
 #[allow(dead_code)]
 pub fn create_user_profile_schema() -> Schema {
     let mut schema = Schema::new_range("user_profile".to_string(), "key".to_string());
+
+    // Add the range_key field
+    let key_field = SingleField::new(
+        PermissionsPolicy::default(),
+        create_default_payment_config(),
+        HashMap::new(),
+    );
+    schema.add_field("key".to_string(), FieldVariant::Single(key_field));
 
     // Public fields - basic profile info
     let mut username_field = SingleField::new(

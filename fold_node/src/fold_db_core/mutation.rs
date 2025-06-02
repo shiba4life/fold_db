@@ -51,17 +51,39 @@ impl FoldDB {
     }
 
     /// Validates Range schema mutations to ensure:
+    /// - Range schema mutations MUST include a range_key field
     /// - All fields in Range schemas are RangeFields
     /// - All fields have consistent range_key values
     fn validate_range_schema_mutation(&self, schema: &Schema, mutation: &Mutation) -> Result<(), SchemaError> {
         if let Some(range_key) = schema.range_key() {
             log::info!("🔍 Validating Range schema mutation for schema: {} with range_key: {}", schema.name, range_key);
             
-            // Get the range_key value from mutation
+            // MANDATORY: Range schema mutations MUST include the range_key field
             let range_key_value = mutation.fields_and_values.get(range_key)
                 .ok_or_else(|| SchemaError::InvalidData(format!(
-                    "Range schema mutation missing range_key field '{}'", range_key
+                    "Range schema mutation for '{}' is missing required range_key field '{}'. All range schema mutations must provide a value for the range_key.",
+                    schema.name, range_key
                 )))?;
+            
+            log::info!("✅ Range schema mutation contains required range_key '{}' with value: {:?}", range_key, range_key_value);
+            
+            // Validate the range_key value is not null or empty
+            if range_key_value.is_null() {
+                return Err(SchemaError::InvalidData(format!(
+                    "Range schema mutation for '{}' has null value for range_key field '{}'. Range key must have a valid value.",
+                    schema.name, range_key
+                )));
+            }
+            
+            // If range_key value is a string, ensure it's not empty
+            if let Some(str_value) = range_key_value.as_str() {
+                if str_value.trim().is_empty() {
+                    return Err(SchemaError::InvalidData(format!(
+                        "Range schema mutation for '{}' has empty string value for range_key field '{}'. Range key must have a non-empty value.",
+                        schema.name, range_key
+                    )));
+                }
+            }
             
             // Validate all fields in the schema are RangeFields
             for (field_name, field_variant) in &schema.fields {
