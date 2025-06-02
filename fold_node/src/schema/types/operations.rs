@@ -115,6 +115,7 @@ impl Mutation {
     }
 
     /// Convert this mutation into a RangeSchemaMutation by populating the range_key in every field's value.
+    /// The range_key field itself is left as-is (primitive value), while other fields get the range_key inserted.
     pub fn to_range_schema_mutation(&self, schema: &crate::schema::types::Schema) -> Result<Self, crate::schema::types::SchemaError> {
         use serde_json::Value;
         if let Some(range_key) = schema.range_key() {
@@ -125,9 +126,14 @@ impl Mutation {
                 ))
             })?;
 
-            // For each field, insert/overwrite the range_key in its value
+            // For each field except the range_key field itself, insert/overwrite the range_key in its value
             let mut new_fields_and_values = self.fields_and_values.clone();
-            for (_field, value) in new_fields_and_values.iter_mut() {
+            for (field_name, value) in new_fields_and_values.iter_mut() {
+                // Skip the range_key field - it should remain as a primitive value
+                if field_name == range_key {
+                    continue;
+                }
+                
                 // Only update if the value is an object
                 if let Value::Object(obj) = value {
                     obj.insert(range_key.to_string(), range_key_value.clone());

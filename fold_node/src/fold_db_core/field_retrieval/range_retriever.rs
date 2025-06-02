@@ -49,9 +49,8 @@ impl<'a> RangeFieldRetriever<'a> {
             match self.base.atom_manager.get_atoms().lock() {
                 Ok(atoms_guard) => {
                     if let Some(atom) = atoms_guard.get(atom_uuid) {
-                        info!("✅ Retrieved atom for key: {} -> content: {:?}", key, atom.content());
-                        // For range field atoms, the content is the direct value
                         result_obj.insert(key.clone(), atom.content().clone());
+                        info!("✅ Added atom content for key: {} -> value: {:?}", key, atom.content());
                     } else {
                         info!("⚠️  Atom not found in atoms collection for key: {} -> atom_uuid: {}", key, atom_uuid);
                     }
@@ -67,13 +66,49 @@ impl<'a> RangeFieldRetriever<'a> {
 
     /// Applies range filter using RangeField's native filtering
     fn apply_range_filter(&self, range_field: &mut crate::schema::types::field::RangeField, filter: &Value) -> Result<Value, SchemaError> {
-        // Extract the range_filter field from the filter object
-        let range_filter_value = filter.get("range_filter")
-            .ok_or_else(|| SchemaError::InvalidData("Filter must contain 'range_filter' field".to_string()))?;
+        // Check if the filter contains range_filter - if not, return empty result
+        let range_filter_value = match filter.get("range_filter") {
+            Some(value) => value,
+            None => {
+                info!("🔄 Filter does not contain 'range_filter', returning empty result for range field");
+                return Ok(serde_json::json!({
+                    "matches": {},
+                    "total_count": 0
+                }));
+            }
+        };
         
-        // Parse the range_filter into a RangeFilter
-        let range_filter: RangeFilter = serde_json::from_value(range_filter_value.clone())
-            .map_err(|e| SchemaError::InvalidData(format!("Invalid range filter format: {}", e)))?;
+        // Convert range_filter to RangeFilter enum
+        let range_filter = if let Ok(range_filter) = serde_json::from_value::<RangeFilter>(range_filter_value.clone()) {
+            range_filter
+        } else if let Some(obj) = range_filter_value.as_object() {
+            if obj.len() == 1 {
+                // Get the single key-value pair
+                let (_key, value) = obj.iter().next().unwrap();
+                
+                // Convert the value to string and create RangeFilter::Key
+                let value_str = match value {
+                    Value::String(s) => s.clone(),
+                    Value::Number(n) => n.to_string(),
+                    Value::Bool(b) => b.to_string(),
+                    _ => serde_json::to_string(value)
+                        .map_err(|e| SchemaError::InvalidData(format!("Failed to convert range filter value to string: {}", e)))?
+                        .trim_matches('"').to_string(), // Remove quotes from JSON strings
+                };
+                
+                RangeFilter::Key(value_str)
+            } else {
+                return Err(SchemaError::InvalidData(format!(
+                    "range_filter should contain exactly one key-value pair, found {} keys", 
+                    obj.len()
+                )));
+            }
+        } else {
+            return Err(SchemaError::InvalidData(format!(
+                "Invalid range filter format: expected object with single key-value pair or valid RangeFilter enum, got: {:?}", 
+                range_filter_value
+            )));
+        };
 
         // Load AtomRefRange data into the RangeField before filtering
         if let Some(ref_atom_uuid) = &range_field.inner.ref_atom_uuid {
@@ -91,21 +126,17 @@ impl<'a> RangeFieldRetriever<'a> {
                 }));
             }
         } else {
-            info!("❌ No ref_atom_uuid set on RangeField");
+            info!("❌ No ref_atom_uuid found in RangeField");
             return Ok(serde_json::json!({
                 "matches": {},
                 "total_count": 0
             }));
         }
-        
-        info!("🔍 Applying range filter to field with {} keys",
-              range_field.atom_ref_range.as_ref().map(|r| r.atom_uuids.len()).unwrap_or(0));
-        
-        // Use the RangeField's native apply_filter method with populated data
+
+        // Apply the filter using RangeField's native apply_filter method
         let filter_result = range_field.apply_filter(&range_filter);
-        info!("✅ RangeField native filtering successful: {} matches", filter_result.total_count);
-        
-        // Convert RangeFilterResult to the expected JSON format
+        info!("🔍 Filter result: {} matches", filter_result.matches.len());
+
         Ok(serde_json::json!({
             "matches": filter_result.matches,
             "total_count": filter_result.total_count

@@ -2,6 +2,7 @@ use super::FoldDB;
 use crate::schema::types::{Mutation, MutationType};
 use crate::schema::SchemaError;
 use crate::schema::types::field::common::Field;
+use crate::schema::types::field::FieldVariant;
 use crate::schema::types::schema::Schema;
 use sha2::{Digest, Sha256};
 
@@ -34,16 +35,82 @@ impl FoldDB {
             .ok_or_else(|| {
                 SchemaError::NotFound(format!("Schema {} not found", mutation.schema_name))
             })?;
-        log::info!("Retrieved schema: {} with {} fields", schema.name, schema.fields.len());
-    
-        // Convert mutation to a range_schema_mutation if needed
-        let mutation = if schema.range_key().is_some() {
-            mutation.to_range_schema_mutation(&schema)?
-        } else {
-            mutation
-        };
-    
-        Ok((schema, mutation, mutation_hash))
+            log::info!("Retrieved schema: {} with {} fields", schema.name, schema.fields.len());
+        
+            // Validate Range schema mutation before processing
+            self.validate_range_schema_mutation(&schema, &mutation)?;
+        
+            // Convert mutation to a range_schema_mutation if needed
+            let mutation = if schema.range_key().is_some() {
+                mutation.to_range_schema_mutation(&schema)?
+            } else {
+                mutation
+            };
+        
+            Ok((schema, mutation, mutation_hash))
+    }
+
+    /// Validates Range schema mutations to ensure:
+    /// - All fields in Range schemas are RangeFields
+    /// - All fields have consistent range_key values
+    fn validate_range_schema_mutation(&self, schema: &Schema, mutation: &Mutation) -> Result<(), SchemaError> {
+        if let Some(range_key) = schema.range_key() {
+            log::info!("🔍 Validating Range schema mutation for schema: {} with range_key: {}", schema.name, range_key);
+            
+            // Get the range_key value from mutation
+            let range_key_value = mutation.fields_and_values.get(range_key)
+                .ok_or_else(|| SchemaError::InvalidData(format!(
+                    "Range schema mutation missing range_key field '{}'", range_key
+                )))?;
+            
+            // Validate all fields in the schema are RangeFields
+            for (field_name, field_variant) in &schema.fields {
+                match field_variant {
+                    FieldVariant::Range(_) => {
+                        log::info!("✅ Field '{}' is correctly a RangeField", field_name);
+                    }
+                    FieldVariant::Single(_) => {
+                        return Err(SchemaError::InvalidData(format!(
+                            "Range schema '{}' contains Single field '{}', but all fields must be RangeFields",
+                            schema.name, field_name
+                        )));
+                    }
+                    FieldVariant::Collection(_) => {
+                        return Err(SchemaError::InvalidData(format!(
+                            "Range schema '{}' contains Collection field '{}', but all fields must be RangeFields",
+                            schema.name, field_name
+                        )));
+                    }
+                }
+            }
+            
+            // Validate all mutation field values have consistent range_key
+            for (field_name, field_value) in &mutation.fields_and_values {
+                if field_name == range_key {
+                    // Skip validation for the range_key field itself
+                    continue;
+                }
+                
+                // Check if field value is an object and contains the range_key
+                if let Some(value_obj) = field_value.as_object() {
+                    if let Some(field_range_value) = value_obj.get(range_key) {
+                        if field_range_value != range_key_value {
+                            return Err(SchemaError::InvalidData(format!(
+                                "Inconsistent range_key value in field '{}': expected {:?}, got {:?}",
+                                field_name, range_key_value, field_range_value
+                            )));
+                        }
+                    } else {
+                        log::info!("⚠️ Field '{}' does not contain range_key '{}' - this will be added by to_range_schema_mutation",
+                                 field_name, range_key);
+                    }
+                }
+            }
+            
+            log::info!("✅ Range schema mutation validation passed for schema: {}", schema.name);
+        }
+        
+        Ok(())
     }
 
     fn process_field_mutations(&mut self, schema: &Schema, mutation: &Mutation, mutation_hash: &str) -> Result<(), SchemaError> {

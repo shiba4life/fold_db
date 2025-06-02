@@ -264,38 +264,95 @@ impl FieldManager {
             // Clone content for Range field processing
             let content_for_range = content.clone();
             
-            // Process range field content directly (similar to context.rs logic)
-            if let Some(obj) = content_for_range.as_object() {
-                info!("📦 Range field has {} key-value pairs", obj.len());
-                for (key, value) in obj {
-                    // Create a separate atom for each key-value pair
+            // Check if this field is the range_key field - it should be handled as primitive
+            if let Some(range_key) = schema.range_key() {
+                if field == range_key {
+                    // For range_key field, store the primitive value directly as a single atom
+                    info!("🔑 Processing range_key field '{}' with primitive value: {:?}", field, content_for_range);
+                    
                     let key_atom = self.atom_manager
                         .create_atom(
                             &schema.name,
                             source_pub_key.clone(),
-                            None, // No previous atom for individual keys
-                            value.clone(),
+                            None,
+                            content_for_range,
                             None,
                         )
                         .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
                     
-                    info!("🔑 Created atom for key: {} -> value: {:?} -> atom: {} (aref_uuid: {})",
-                            key, value, key_atom.uuid(), aref_uuid);
+                    info!("✅ Created atom for range_key field '{}': {}", field, key_atom.uuid());
                     
-                    self.atom_manager
-                        .update_atom_ref_range(
-                            &aref_uuid,
-                            key_atom.uuid().to_string(),
-                            key.clone(),
-                            source_pub_key.clone(),
-                        )
-                        .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+                    // For range_key fields, we don't need to update AtomRefRange with key-value pairs
+                    // The primitive value is stored directly in the atom
+                } else {
+                    // For non-range_key fields, process as object with key-value pairs
+                    if let Some(obj) = content_for_range.as_object() {
+                        info!("📦 Range field '{}' has {} key-value pairs", field, obj.len());
+                        for (key, value) in obj {
+                            // Create a separate atom for each key-value pair
+                            let key_atom = self.atom_manager
+                                .create_atom(
+                                    &schema.name,
+                                    source_pub_key.clone(),
+                                    None, // No previous atom for individual keys
+                                    value.clone(),
+                                    None,
+                                )
+                                .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+                            
+                            info!("🔑 Created atom for key: {} -> value: {:?} -> atom: {} (aref_uuid: {})",
+                                    key, value, key_atom.uuid(), aref_uuid);
+                            
+                            self.atom_manager
+                                .update_atom_ref_range(
+                                    &aref_uuid,
+                                    key_atom.uuid().to_string(),
+                                    key.clone(),
+                                    source_pub_key.clone(),
+                                )
+                                .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+                        }
+                        info!("✅ Finished creating atoms and updating AtomRefRange for all keys");
+                    } else {
+                        return Err(SchemaError::InvalidData(
+                            format!("Non-range_key field '{}' must be a JSON object with key-value pairs", field)
+                        ));
+                    }
                 }
-                info!("✅ Finished creating atoms and updating AtomRefRange for all keys");
             } else {
-                return Err(SchemaError::InvalidData(
-                    "Range field data must be a JSON object with key-value pairs".to_string()
-                ));
+                // Not a range schema, fall back to original validation
+                if let Some(obj) = content_for_range.as_object() {
+                    info!("📦 Range field has {} key-value pairs", obj.len());
+                    for (key, value) in obj {
+                        // Create a separate atom for each key-value pair
+                        let key_atom = self.atom_manager
+                            .create_atom(
+                                &schema.name,
+                                source_pub_key.clone(),
+                                None, // No previous atom for individual keys
+                                value.clone(),
+                                None,
+                            )
+                            .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+                        
+                        info!("🔑 Created atom for key: {} -> value: {:?} -> atom: {} (aref_uuid: {})",
+                                key, value, key_atom.uuid(), aref_uuid);
+                        
+                        self.atom_manager
+                            .update_atom_ref_range(
+                                &aref_uuid,
+                                key_atom.uuid().to_string(),
+                                key.clone(),
+                                source_pub_key.clone(),
+                            )
+                            .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+                    }
+                    info!("✅ Finished creating atoms and updating AtomRefRange for all keys");
+                } else {
+                    return Err(SchemaError::InvalidData(
+                        "Range field data must be a JSON object with key-value pairs".to_string()
+                    ));
+                }
             }
             
             aref_uuid

@@ -10,6 +10,7 @@ use crate::schema::types::field::FieldVariant;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
 use serde_json::Value;
+use std::collections::HashMap;
 use log::info;
 
 pub struct FieldRetrievalService;
@@ -102,5 +103,67 @@ impl FieldRetrievalService {
         };
         
         Ok(supports)
+    }
+
+    /// Query Range schema and group results by range_key value
+    /// Returns map of range_key -> field_name -> field_value
+    pub fn query_range_schema(&self,
+        atom_manager: &AtomManager,
+        schema: &Schema,
+        fields: &[String],
+        range_filter: &Value
+    ) -> Result<HashMap<String, HashMap<String, Value>>, SchemaError> {
+        info!("🎯 FieldRetrievalService::query_range_schema - schema: {}, fields: {:?}", schema.name, fields);
+        
+        // Validate this is a Range schema
+        let range_key = schema.range_key()
+            .ok_or_else(|| SchemaError::InvalidData(format!("Schema '{}' is not a Range schema", schema.name)))?;
+        
+        // Extract range_filter object
+        let range_filter_obj = range_filter.as_object()
+            .ok_or_else(|| SchemaError::InvalidData("range_filter must be an object".to_string()))?;
+        
+        // Get the range_key value from the filter
+        let range_key_value = range_filter_obj.get(range_key)
+            .ok_or_else(|| SchemaError::InvalidData(format!("range_filter missing key '{}'", range_key)))?;
+        
+        info!("🔍 Range key '{}' filtering for value: {:?}", range_key, range_key_value);
+        
+        let mut result: HashMap<String, HashMap<String, Value>> = HashMap::new();
+        let range_key_str = range_key_value.to_string().trim_matches('"').to_string();
+        
+        // For each requested field, get its value with the range filter
+        for field_name in fields {
+            info!("🔄 Processing field: {}", field_name);
+            
+            // Validate field exists in schema
+            if !schema.fields.contains_key(field_name) {
+                return Err(SchemaError::InvalidField(format!("Field '{}' not found in schema '{}'", field_name, schema.name)));
+            }
+            
+            // Wrap the range filter in the expected format for individual field processing
+            let wrapped_filter = serde_json::json!({
+                "range_filter": range_filter
+            });
+            
+            // Get field value with the wrapped range filter
+            match self.get_field_value_with_filter(atom_manager, schema, field_name, &wrapped_filter) {
+                Ok(field_value) => {
+                    // Ensure the range_key entry exists in result
+                    let range_entry = result.entry(range_key_str.clone()).or_insert_with(HashMap::new);
+                    range_entry.insert(field_name.clone(), field_value);
+                    info!("✅ Added field '{}' to range key '{}'", field_name, range_key_str);
+                }
+                Err(e) => {
+                    info!("⚠️ Failed to get field '{}': {:?}", field_name, e);
+                    return Err(e);
+                }
+            }
+        }
+        
+        info!("✅ FieldRetrievalService::query_range_schema COMPLETE - schema: {}, result keys: {:?}",
+              schema.name, result.keys().collect::<Vec<_>>());
+        
+        Ok(result)
     }
 }

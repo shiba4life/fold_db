@@ -24,6 +24,7 @@ use crate::schema::core::SchemaState;
 use self::atom_manager::AtomManager;
 use self::collection_manager::CollectionManager;
 use self::field_manager::FieldManager;
+use self::field_retrieval::service::FieldRetrievalService;
 use self::transform_manager::TransformManager;
 use self::transform_orchestrator::TransformOrchestrator;
 use self::init::{build_closure_fns, init_transform_manager, init_orchestrator};
@@ -32,6 +33,7 @@ use self::init::{build_closure_fns, init_transform_manager, init_orchestrator};
 pub struct FoldDB {
     pub(crate) atom_manager: AtomManager,
     pub(crate) field_manager: FieldManager,
+    pub(crate) field_retrieval_service: FieldRetrievalService,
     pub(crate) collection_manager: CollectionManager,
     pub(crate) schema_manager: Arc<SchemaCore>,
     pub(crate) transform_manager: Arc<TransformManager>,
@@ -120,6 +122,7 @@ impl FoldDB {
         Ok(Self {
             atom_manager,
             field_manager,
+            field_retrieval_service: FieldRetrievalService::new(),
             collection_manager,
             schema_manager,
             transform_manager,
@@ -292,5 +295,15 @@ impl FoldDB {
     /// Provides access to the underlying database operations
     pub fn db_ops(&self) -> Arc<DbOperations> {
         Arc::clone(&self.db_ops)
+    }
+
+    /// Provides access to the field retrieval service for testing
+    pub fn field_retrieval_service(&self) -> &FieldRetrievalService {
+        &self.field_retrieval_service
+    }
+
+    /// Provides access to the atom manager for testing
+    pub fn atom_manager(&self) -> &AtomManager {
+        &self.atom_manager
     }
 }
