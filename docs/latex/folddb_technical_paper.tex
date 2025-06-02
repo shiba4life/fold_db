@@ -1,0 +1,931 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{colortbl}
+\usepackage{url}
+\usepackage{subcaption}
+\usepackage{authblk}
+
+% TikZ packages for diagrams
+\usepackage{tikz}
+\usepackage{pgf}
+\usepackage{forest}
+\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds,calc,trees}
+\usetikzlibrary{shapes.geometric,shapes.multipart,decorations.pathreplacing}
+
+% Define colors for diagrams
+\definecolor{corecolor}{RGB}{225,245,254}
+\definecolor{managementcolor}{RGB}{243,229,245}
+\definecolor{retrievalcolor}{RGB}{232,245,232}
+\definecolor{processingcolor}{RGB}{255,243,224}
+\definecolor{storagecolor}{RGB}{255,235,238}
+\definecolor{fieldcolor}{RGB}{225,245,254}
+\definecolor{atomrefcolor}{RGB}{243,229,245}
+\definecolor{atomcolor}{RGB}{232,245,232}
+\definecolor{rangecolor}{RGB}{255,243,224}
+\definecolor{standardcolor}{RGB}{227,242,253}
+\definecolor{commoncolor}{RGB}{245,245,245}
+
+% Code listing settings
+\lstset{
+    basicstyle=\footnotesize\ttfamily,
+    breaklines=true,
+    captionpos=b,
+    frame=single,
+    showstringspaces=false,
+    tabsize=2,
+    numbers=left,
+    numberstyle=\tiny,
+    commentstyle=\color{gray},
+    keywordstyle=\color{blue},
+    stringstyle=\color{red}
+}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{FoldDB: A Schema-Driven Immutable Database with Range-Based Partitioning and Real-Time Transformations}
+
+\author[1]{Engineering Team}
+\affil[1]{DataFold Systems, Database Research Group\\
+Email: engineering@datafold.systems}
+
+\date{\today}
+
+\maketitle
+
+\begin{abstract}
+We present FoldDB, a novel distributed database system that combines immutable data storage with mutable reference semantics to provide strong consistency guarantees while enabling efficient querying and real-time data transformations. FoldDB employs a unique architecture centered around atomic data units (Atoms) referenced by mutable pointers (AtomRefs), managed through a flexible schema system supporting three distinct field types: Single, Collection, and Range. The system's innovative Range schema implementation utilizes BTreeMap-based storage for O(log n) range queries and supports efficient data partitioning. FoldDB incorporates a custom domain-specific language (DSL) for real-time data transformations and implements fine-grained permission controls. Our evaluation demonstrates that FoldDB achieves O(1) data access performance for direct lookups while maintaining complete audit trails and supporting concurrent operations through Rust's ownership model. The system shows particular strength in scenarios requiring both OLTP-style operations and analytical query patterns.
+\end{abstract}
+
+\noindent\textbf{Keywords:} distributed databases, immutable storage, schema management, range partitioning, data transformations
+
+\vspace{0.5cm}
+
+\section{Introduction}
+
+Modern database systems face increasing demands for both consistency and flexibility, requiring architectures that can handle diverse workloads while maintaining data integrity. Traditional approaches often force a choice between immutable storage systems that provide strong consistency but limited mutability, and mutable systems that offer flexibility at the cost of complexity in maintaining consistency.
+
+FoldDB addresses this challenge through a novel architecture that separates data storage from data access patterns. By storing immutable data atoms while providing mutable reference semantics, FoldDB enables applications to benefit from both strong consistency guarantees and operational flexibility.
+
+\subsection{Motivation}
+
+The motivation for FoldDB stems from several key challenges in contemporary database design:
+
+\begin{itemize}
+\item \textbf{Data Integrity vs. Flexibility}: Applications require the ability to modify data while maintaining complete audit trails and version history.
+\item \textbf{Schema Evolution}: Systems must support dynamic schema changes without compromising existing data or requiring expensive migrations.
+\item \textbf{Query Diversity}: Modern applications need to support both transactional operations and analytical queries on the same dataset.
+\item \textbf{Real-time Processing}: Data transformations must occur in real-time as data is ingested and modified.
+\end{itemize}
+
+\subsection{Contributions}
+
+This paper makes the following contributions:
+
+\begin{enumerate}
+\item A novel architecture combining immutable data storage with mutable reference semantics
+\item A three-tier field type system supporting diverse data access patterns
+\item An innovative Range schema implementation for efficient range queries and data partitioning
+\item A custom transformation DSL integrated directly into the storage layer
+\item Comprehensive performance analysis and comparison with existing systems
+\end{enumerate}
+
+\section{System Architecture}
+
+FoldDB's architecture is built around four core components that work together to provide a unified data management platform, as illustrated in Figure~\ref{fig:system_architecture}.
+
+\begin{figure}[htbp]
+\centering
+\begin{tabular}{|c|l|}
+\hline
+\textbf{Layer} & \textbf{Components} \\
+\hline
+\hline
+\rowcolor{processingcolor}
+Client Layer & CLI Interface, HTTP Server, TCP Server \\
+\hline
+\rowcolor{corecolor}
+FoldDB Core & Central orchestration and coordination \\
+\hline
+\rowcolor{managementcolor}
+Management & SchemaCore, AtomManager, FieldManager, \\
+& CollectionManager, TransformManager \\
+\hline
+\rowcolor{retrievalcolor}
+Retrieval & FieldRetrievalService, SingleRetriever, \\
+& CollectionRetriever, RangeRetriever \\
+\hline
+\rowcolor{processingcolor}
+Processing & Mutation Engine, Query Engine, \\
+& Permission Wrapper \\
+\hline
+\rowcolor{storagecolor}
+Storage & DbOperations, Sled Database \\
+\hline
+\end{tabular}
+\caption{FoldDB System Architecture organized by functional layers.}
+\label{fig:system_architecture}
+\end{figure}
+
+\subsection{Core Components}
+
+\subsubsection{Schema Management Layer}
+The SchemaCore component manages the complete lifecycle of database schemas, from discovery through validation to runtime execution. Schemas in FoldDB exist in one of three states as shown in Figure~\ref{fig:schema_lifecycle}:
+
+\begin{itemize}
+\item \textbf{Available}: Discovered but not yet approved for use
+\item \textbf{Approved}: Active and available for queries and mutations
+\item \textbf{Blocked}: Inactive for queries but transformations continue
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\begin{tabular}{|c|c|l|}
+\hline
+\textbf{State} & \textbf{Description} & \textbf{Allowed Transitions} \\
+\hline
+\hline
+\rowcolor{commoncolor}
+Available & Schema discovered, not active & $\rightarrow$ Approved, Blocked \\
+\hline
+\rowcolor{retrievalcolor}
+Approved & Schema active and queryable & $\rightarrow$ Blocked \\
+\hline
+\rowcolor{storagecolor}
+Blocked & Schema disabled, transforms continue & $\rightarrow$ Approved \\
+\hline
+\end{tabular}
+
+\vspace{0.5cm}
+
+\textbf{Schema Lifecycle Flow:}
+\begin{enumerate}
+\item Schema files discovered $\rightarrow$ \textbf{Available} state
+\item Manual approval $\rightarrow$ \textbf{Approved} state (queries/mutations enabled)
+\item Manual blocking $\rightarrow$ \textbf{Blocked} state (transforms continue)
+\item Re-approval possible from Blocked state
+\end{enumerate}
+
+\caption{Schema Lifecycle showing states, descriptions, and valid transitions.}
+\label{fig:schema_lifecycle}
+\end{figure}
+
+This state-based approach allows for controlled schema deployment and rollback capabilities without service interruption.
+
+\subsubsection{Atom Storage System}
+At the foundation of FoldDB lies the Atom storage system, which provides immutable data containers with the following properties:
+
+\begin{lstlisting}[caption=Atom Structure Definition]
+pub struct Atom {
+    uuid: String,
+    source_schema_name: String,
+    source_pub_key: String,
+    created_at: DateTime<Utc>,
+    prev_atom_uuid: Option<String>,
+    content: Value,
+    status: AtomStatus,
+}
+\end{lstlisting}
+
+Each Atom maintains a forward-linking version chain through the \texttt{prev\_atom\_uuid} field, enabling complete audit trails while preserving storage efficiency. The lifecycle of atoms and their references follows a specific sequence as shown in Figure~\ref{fig:atom_lifecycle}.
+
+\begin{figure}[htbp]
+\centering
+
+\textbf{Atom Creation Process:}
+\begin{enumerate}
+\item Client calls \texttt{write\_schema()}
+\item FoldDB requests AtomManager to \texttt{create\_atom()}
+\item AtomManager creates new immutable Atom instance
+\item Atom stored in persistent Storage
+\item AtomRef created pointing to new Atom
+\item AtomRef stored in Storage with unique UUID
+\item Schema updated with AtomRef UUID
+\end{enumerate}
+
+\vspace{0.5cm}
+
+\textbf{Atom Update Process:}
+\begin{enumerate}
+\item Client calls \texttt{update\_data()}
+\item New Atom created with updated content
+\item Existing AtomRef updated to point to new Atom
+\item Previous Atom remains in storage (immutable audit trail)
+\end{enumerate}
+
+\vspace{0.5cm}
+
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Component} & \textbf{Responsibility} \\
+\hline
+\textbf{Atom} & Immutable data container with UUID and content \\
+\textbf{AtomRef} & Mutable pointer to current Atom version \\
+\textbf{AtomManager} & Orchestrates atom creation and versioning \\
+\textbf{Storage} & Persists atoms and references durably \\
+\hline
+\end{tabular}
+
+\caption{Atom Lifecycle and Versioning showing creation and update processes with component responsibilities.}
+\label{fig:atom_lifecycle}
+\end{figure}
+
+\subsubsection{Reference Management}
+FoldDB implements three types of reference structures to support different data access patterns:
+
+\begin{itemize}
+\item \textbf{AtomRef}: Single value references for simple data types
+\item \textbf{AtomRefCollection}: HashMap-based collections for key-value data
+\item \textbf{AtomRefRange}: BTreeMap-based ranges for ordered data with efficient range queries
+\end{itemize}
+
+\subsubsection{Field Type System}
+The field type system provides three distinct storage and access patterns as shown in Figure~\ref{fig:field_type_hierarchy}:
+
+\begin{itemize}
+\item \textbf{SingleField}: Direct value storage with single AtomRef
+\item \textbf{CollectionField}: Key-value collections using AtomRefCollection
+\item \textbf{RangeField}: Ordered range storage using AtomRefRange
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+
+\textbf{Field Type Hierarchy:}
+
+\vspace{0.5cm}
+
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Field Type} & \textbf{Use Case} & \textbf{Storage Pattern} \\
+\hline
+\hline
+\rowcolor{retrievalcolor}
+\textbf{SingleField} & Simple values & Single AtomRef $\rightarrow$ Atom \\
+\hline
+\rowcolor{retrievalcolor}
+\textbf{CollectionField} & Key-value data & HashMap<Key, AtomRef> \\
+\hline
+\rowcolor{retrievalcolor}
+\textbf{RangeField} & Ordered ranges & BTreeMap<Key, Vec<AtomRef>> \\
+\hline
+\end{tabular}
+
+\vspace{0.5cm}
+
+\textbf{Common Field Properties:}
+\begin{itemize}
+\item \textbf{permission\_policy}: Access control configuration
+\item \textbf{payment\_config}: Fee structure for field operations
+\item \textbf{ref\_atom\_uuid}: Reference to current data atom
+\item \textbf{field\_mappers}: Data transformation functions
+\item \textbf{transform}: Real-time data processing rules
+\item \textbf{writable}: Field mutability flag
+\end{itemize}
+
+\vspace{0.5cm}
+
+\textbf{FieldVariant Enum:}
+Provides unified interface for all field types while maintaining type safety and enabling pattern matching on field operations.
+
+\caption{Field Type Hierarchy showing the three field types, their use cases, and common properties.}
+\label{fig:field_type_hierarchy}
+\end{figure}
+
+\subsection{Data Flow Architecture}
+
+FoldDB's data flow follows a carefully orchestrated process designed to prevent inconsistencies and maintain referential integrity, as illustrated in Figure~\ref{fig:mutation_flow}:
+
+\begin{enumerate}
+\item \textbf{Mutation Validation}: Schema and field-level validation
+\item \textbf{Atom Creation}: New immutable atom with content and version chain
+\item \textbf{Reference Update}: AtomRef points to new atom
+\item \textbf{Schema Persistence}: Reference UUID persisted in schema
+\item \textbf{Transform Orchestration}: Downstream transformations triggered
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=0.8,
+  participant/.style={rectangle, draw, minimum width=3cm, minimum height=1.2cm, align=center},
+  message/.style={->, thick},
+  note/.style={rectangle, draw, dashed, minimum width=3.5cm, align=center, fill=yellow!20}
+]
+
+% Participants
+\node[participant] (client) at (0,9) {Client};
+\node[participant] (folddb) at (2.5,9) {FoldDB};
+\node[participant] (schema) at (5,9) {SchemaCore};
+\node[participant] (atom) at (7.5,9) {AtomManager};
+\node[participant] (field) at (10,9) {FieldManager};
+\node[participant] (transform) at (12.5,9) {TransformOrchestrator};
+\node[participant] (storage) at (15,9) {Storage};
+
+% Lifelines
+\foreach \x in {0,2.5,5,7.5,10,12.5,15} {
+  \draw[dashed] (\x,8.5) -- (\x,0);
+}
+
+% Messages
+\draw[message] (0,8) -- (2.5,8) node[midway, above] {\footnotesize write\_schema()};
+
+% Phase 1: Prepare and Validate
+\node[note] at (7.5,7.5) {\footnotesize 1. Prepare and Validate};
+\draw[message] (2.5,7) -- (2.5,7) node[right] {\footnotesize prepare\_mutation\_and\_schema()};
+\draw[message] (2.5,6.5) -- (5,6.5) node[midway, above] {\footnotesize get\_schema()};
+\draw[message] (5,6) -- (2.5,6) node[midway, above] {\footnotesize schema};
+\draw[message] (2.5,5.5) -- (2.5,5.5) node[right] {\footnotesize validate\_range\_schema\_mutation()};
+
+% Phase 2: Process Field Mutations
+\node[note] at (7.5,5) {\footnotesize 2. Process Field Mutations};
+\draw[message] (2.5,4.5) -- (2.5,4.5) node[right] {\footnotesize process\_field\_mutations()};
+\draw[message] (2.5,4) -- (10,4) node[midway, above] {\footnotesize write\_field\_data()};
+\draw[message] (10,3.5) -- (7.5,3.5) node[midway, above] {\footnotesize create\_atom()};
+\draw[message] (7.5,3) -- (15,3) node[midway, above] {\footnotesize store\_atom()};
+\draw[message] (7.5,2.5) -- (15,2.5) node[midway, above] {\footnotesize store\_atom\_ref()};
+\draw[message] (15,2) -- (10,2) node[midway, above] {\footnotesize success};
+\draw[message] (10,1.5) -- (2.5,1.5) node[midway, above] {\footnotesize atom\_ref\_uuid};
+
+% Phase 3: Update Schema
+\draw[message] (2.5,1) -- (5,1) node[midway, above] {\footnotesize update\_field\_ref\_atom\_uuid()};
+\draw[message] (5,0.5) -- (15,0.5) node[midway, above] {\footnotesize persist\_schema()};
+
+% Phase 4: Trigger Transforms
+\draw[message] (2.5,0) -- (12.5,0) node[midway, above] {\footnotesize trigger\_transforms()};
+
+\end{tikzpicture}
+\caption{Complete Data Mutation Flow showing the four phases: validation, field processing, schema updates, and transform orchestration.}
+\label{fig:mutation_flow}
+\end{figure}
+
+This flow ensures that no "ghost references" can exist in the system, as AtomRef objects must be created before their UUIDs are stored in schema definitions.
+
+\section{Range Schema Implementation}
+
+One of FoldDB's most innovative features is its Range schema implementation, which provides efficient range-based data partitioning and querying capabilities.
+
+\subsection{Range Schema Design}
+
+Range schemas in FoldDB require that all fields be of type Range, with one field designated as the range\_key. This constraint enables several optimizations:
+
+\begin{itemize}
+\item Consistent data partitioning across all fields
+\item Efficient range queries spanning multiple fields
+\item Simplified query optimization and planning
+\end{itemize}
+
+\subsection{AtomRefRange Implementation}
+
+The AtomRefRange structure uses a BTreeMap for ordered storage:
+
+\begin{lstlisting}[caption=AtomRefRange Structure]
+pub struct AtomRefRange {
+    uuid: String,
+    atom_uuids: BTreeMap<String, Vec<String>>,
+    updated_at: DateTime<Utc>,
+    status: AtomRefStatus,
+    update_history: Vec<AtomRefUpdate>,
+}
+\end{lstlisting}
+
+The BTreeMap structure provides O(log n) complexity for range operations while supporting multiple atom versions per key through the Vec<String> value type.
+
+\subsection{Range Query Processing}
+
+Range queries in FoldDB support multiple filter types:
+
+\begin{itemize}
+\item \textbf{Key}: Exact key matching (O(log n))
+\item \textbf{KeyPrefix}: Prefix-based filtering
+\item \textbf{KeyRange}: Range-based filtering with start/end boundaries
+\item \textbf{Keys}: Multiple key selection
+\item \textbf{Value}: Value-based matching
+\item \textbf{KeyPattern}: Pattern-based matching
+\end{itemize}
+
+The query processing pipeline leverages the BTreeMap's ordered structure to efficiently implement these filter types as shown in Figure~\ref{fig:query_processing}.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.1,
+  node distance=2cm,
+  decision/.style={diamond, draw, minimum width=2.5cm, minimum height=1.2cm, align=center, fill=commoncolor},
+  process/.style={rectangle, draw, minimum width=3cm, minimum height=1cm, align=center},
+  rangenode/.style={process, fill=rangecolor},
+  standard/.style={process, fill=standardcolor},
+  start/.style={ellipse, draw, minimum width=2cm, minimum height=1cm, align=center, fill=commoncolor},
+  end/.style={start}
+]
+
+% Start and main decision
+\node[start] (start) at (0,8) {Query\\Request};
+\node[decision] (route) at (0,6.5) {Schema\\Type?};
+
+% Range query path
+\node[rangenode] (rquery) at (-3,5) {Range Query\\Path};
+\node[rangenode] (validate) at (-3,4) {Validate Range\\Filter};
+\node[rangenode] (checkperms) at (-3,3) {Check Field\\Permissions};
+\node[rangenode] (extract) at (-3,2) {Extract\\range\_filter};
+\node[rangenode] (retrieval) at (-3,1) {FieldRetrievalService\\query\_range\_schema};
+\node[rangenode] (group) at (-3,0) {Group by\\Range Key};
+\node[rangenode] (retgroup) at (-3,-1) {Return Grouped\\Results};
+
+% Standard query path
+\node[standard] (squery) at (3,5) {Standard Query\\Path};
+\node[standard] (checkperms2) at (3,4) {Check Field\\Permissions};
+\node[decision] (fieldloop) at (3,3) {For Each\\Field};
+\node[standard] (getfield) at (3,2) {Retrieve\\Field Data};
+\node[standard] (process) at (3,1) {Process\\Field Value};
+\node[standard] (retind) at (3,0) {Return Individual\\Results};
+
+% End
+\node[end] (end) at (0,-2) {Query\\Complete};
+
+% Connections
+\draw[->] (start) -- (route);
+\draw[->] (route) -- (rquery) node[midway, left] {\footnotesize Range Schema};
+\draw[->] (route) -- (squery) node[midway, right] {\footnotesize Single Schema};
+
+% Range path
+\draw[->] (rquery) -- (validate);
+\draw[->] (validate) -- (checkperms);
+\draw[->] (checkperms) -- (extract);
+\draw[->] (extract) -- (retrieval);
+\draw[->] (retrieval) -- (group);
+\draw[->] (group) -- (retgroup);
+\draw[->] (retgroup) -- (end);
+
+% Standard path
+\draw[->] (squery) -- (checkperms2);
+\draw[->] (checkperms2) -- (fieldloop);
+\draw[->] (fieldloop) -- (getfield);
+\draw[->] (getfield) -- (process);
+\draw[->] (process) -- (fieldloop);
+\draw[->] (fieldloop) -- (retind);
+\draw[->] (retind) -- (end);
+
+\end{tikzpicture}
+\caption{Query Processing Flow showing the different paths for Range schemas versus Standard schemas, with specialized handling for range-based queries.}
+\label{fig:query_processing}
+\end{figure}
+
+\subsection{AtomRef Storage Patterns}
+
+FoldDB uses different storage patterns for different field types, each optimized for their specific access patterns as shown in Figure~\ref{fig:atomref_storage}.
+
+\begin{figure}[htbp]
+\centering
+
+\textbf{AtomRef Storage Patterns:}
+
+\vspace{0.5cm}
+
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Field Type} & \textbf{Reference Structure} & \textbf{Data Organization} & \textbf{Access Pattern} \\
+\hline
+\hline
+\rowcolor{fieldcolor}
+\textbf{SingleField} & Single AtomRef &
+\begin{tabular}[t]{@{}l@{}}
+One AtomRef points to \\
+current Atom version \\
+Previous versions retained \\
+for audit trail
+\end{tabular} &
+\begin{tabular}[t]{@{}l@{}}
+Direct O(1) access \\
+Version history \\
+Simple mutation
+\end{tabular} \\
+\hline
+\rowcolor{atomrefcolor}
+\textbf{CollectionField} & HashMap<Key, AtomRef> &
+\begin{tabular}[t]{@{}l@{}}
+Multiple AtomRefs \\
+Each key maps to \\
+independent AtomRef \\
+Dynamic key addition
+\end{tabular} &
+\begin{tabular}[t]{@{}l@{}}
+O(1) key lookup \\
+Independent versioning \\
+Flexible key space
+\end{tabular} \\
+\hline
+\rowcolor{atomcolor}
+\textbf{RangeField} & BTreeMap<Key, Vec<AtomRef>> &
+\begin{tabular}[t]{@{}l@{}}
+Ordered key storage \\
+Multiple AtomRefs per key \\
+Range query optimization \\
+Natural partitioning
+\end{tabular} &
+\begin{tabular}[t]{@{}l@{}}
+O(log n) range queries \\
+Efficient key traversal \\
+Bulk operations
+\end{tabular} \\
+\hline
+\end{tabular}
+
+\vspace{0.5cm}
+
+\textbf{Version Management:}
+\begin{itemize}
+\item \textbf{Atoms}: Immutable once created, provide audit trail
+\item \textbf{AtomRefs}: Mutable pointers, updated to reference new versions
+\item \textbf{Storage}: Previous atom versions retained for complete history
+\item \textbf{Efficiency}: Reference updates avoid data copying
+\end{itemize}
+
+\caption{AtomRef Storage Patterns showing how different field types organize their data references and optimize for different access patterns.}
+\label{fig:atomref_storage}
+\end{figure}
+
+\section{Transform System}
+
+FoldDB incorporates a custom domain-specific language (DSL) for real-time data transformations, providing capabilities comparable to stored procedures but with stronger type safety and performance characteristics.
+
+\subsection{Transform DSL Architecture}
+
+The transform system consists of three main components as shown in Figure~\ref{fig:transform_system}:
+
+\begin{itemize}
+\item \textbf{Parser}: Converts DSL code into Abstract Syntax Tree (AST)
+\item \textbf{Interpreter}: Executes AST with runtime context
+\item \textbf{Executor}: Manages transform lifecycle and integration
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+
+\textbf{Transform System Architecture:}
+
+\vspace{0.5cm}
+
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Component} & \textbf{Responsibilities} & \textbf{Key Properties} \\
+\hline
+\hline
+\rowcolor{processingcolor}
+\textbf{Transform} &
+\begin{tabular}[t]{@{}l@{}}
+• Define transformation logic \\
+• Parse DSL expressions \\
+• Maintain input/output mappings \\
+• Execute transformations
+\end{tabular} &
+\begin{tabular}[t]{@{}l@{}}
+• Immutable definition \\
+• Type-safe DSL \\
+• Functional composition \\
+• Error handling
+\end{tabular} \\
+\hline
+\rowcolor{processingcolor}
+\textbf{TransformRegistration} &
+\begin{tabular}[t]{@{}l@{}}
+• Register transforms with system \\
+• Map inputs to AtomRefs \\
+• Define trigger conditions \\
+• Manage transform lifecycle
+\end{tabular} &
+\begin{tabular}[t]{@{}l@{}}
+• Unique transform IDs \\
+• AtomRef bindings \\
+• Field-level triggers \\
+• Schema associations
+\end{tabular} \\
+\hline
+\rowcolor{managementcolor}
+\textbf{TransformManager} &
+\begin{tabular}[t]{@{}l@{}}
+• Store transform registrations \\
+• Execute individual transforms \\
+• Manage dependencies \\
+• Handle error recovery
+\end{tabular} &
+\begin{tabular}[t]{@{}l@{}}
+• HashMap storage \\
+• Function injection \\
+• Concurrent execution \\
+• State management
+\end{tabular} \\
+\hline
+\rowcolor{retrievalcolor}
+\textbf{TransformOrchestrator} &
+\begin{tabular}[t]{@{}l@{}}
+• Coordinate transform execution \\
+• Handle field-level triggers \\
+• Manage execution order \\
+• Integrate with field system
+\end{tabular} &
+\begin{tabular}[t]{@{}l@{}}
+• Arc-based sharing \\
+• Field integration \\
+• Automatic triggering \\
+• Real-time execution
+\end{tabular} \\
+\hline
+\end{tabular}
+
+\vspace{0.5cm}
+
+\textbf{Transform Execution Flow:}
+\begin{enumerate}
+\item Field data changes trigger registered transforms
+\item TransformOrchestrator identifies affected transforms
+\item TransformManager executes transforms in dependency order
+\item Transform DSL processes input data to generate outputs
+\item Results stored as new atoms, maintaining audit trail
+\end{enumerate}
+
+\caption{Transform System Architecture showing component relationships and the real-time data transformation pipeline.}
+\label{fig:transform_system}
+\end{figure}
+
+\subsection{AST Definition}
+
+The transform AST supports multiple value types and operations:
+
+\begin{lstlisting}[caption=Transform Value Types]
+pub enum Value {
+    Number(f64),
+    Boolean(bool),
+    String(String),
+    Null,
+    Object(HashMap<String, JsonValue>),
+    Array(Vec<JsonValue>),
+}
+\end{lstlisting}
+
+\subsection{Transform Integration}
+
+Transforms are embedded directly in field definitions and execute automatically when data changes, providing real-time derived data computation without requiring separate ETL processes.
+
+\section{Storage and Persistence}
+
+FoldDB uses Sled as its underlying storage engine, providing ACID guarantees and crash recovery. The storage layer implements a prefixed key scheme for efficient data organization as shown in Figure~\ref{fig:storage_tree}:
+
+\begin{itemize}
+\item \texttt{atom:uuid} - Immutable atom storage
+\item \texttt{ref:uuid} - Mutable reference storage
+\item \texttt{schema:name} - Schema metadata
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+
+\textbf{Sled Database Storage Organization:}
+
+\vspace{0.5cm}
+
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Tree Name} & \textbf{Key Format} & \textbf{Value Content} \\
+\hline
+\hline
+\rowcolor{retrievalcolor}
+\textbf{atoms} & atom\_uuid &
+\begin{tabular}[t]{@{}l@{}}
+Atom\{data, version, creator, \\
+created\_at, prev\_atom\_uuid\}
+\end{tabular} \\
+\hline
+\rowcolor{retrievalcolor}
+\textbf{atom\_refs} & aref\_uuid &
+\begin{tabular}[t]{@{}l@{}}
+AtomRef\{atom\_uuid, status, \\
+updated\_at, update\_history\}
+\end{tabular} \\
+\hline
+\rowcolor{retrievalcolor}
+\textbf{schemas} & schema\_name &
+\begin{tabular}[t]{@{}l@{}}
+Schema\{fields, config, \\
+version, permissions\}
+\end{tabular} \\
+\hline
+\rowcolor{retrievalcolor}
+\textbf{schema\_states} & schema\_name &
+\begin{tabular}[t]{@{}l@{}}
+SchemaState::Available | \\
+SchemaState::Approved | \\
+SchemaState::Blocked
+\end{tabular} \\
+\hline
+\rowcolor{retrievalcolor}
+\textbf{orchestrator} & transform\_id &
+\begin{tabular}[t]{@{}l@{}}
+TransformRegistration\{transform, \\
+inputs, outputs, triggers\}
+\end{tabular} \\
+\hline
+\rowcolor{retrievalcolor}
+\textbf{metadata} & system\_key &
+\begin{tabular}[t]{@{}l@{}}
+System configuration, \\
+runtime state, statistics
+\end{tabular} \\
+\hline
+\rowcolor{retrievalcolor}
+\textbf{utility} & utility\_key &
+\begin{tabular}[t]{@{}l@{}}
+Temporary data, caches, \\
+operational metrics
+\end{tabular} \\
+\hline
+\end{tabular}
+
+\vspace{0.5cm}
+
+\textbf{Key Design Principles:}
+\begin{itemize}
+\item \textbf{Prefixed Keys}: Each tree uses type-specific key prefixes for organization
+\item \textbf{UUID-based}: Primary keys use UUIDs for global uniqueness
+\item \textbf{Separation}: Different data types stored in separate trees for performance
+\item \textbf{ACID Compliance}: Sled provides transaction guarantees across trees
+\item \textbf{Crash Recovery}: Automatic recovery from system failures
+\end{itemize}
+
+\caption{Storage Tree Structure showing how FoldDB organizes data across different Sled database trees with key-value mappings and design principles.}
+\label{fig:storage_tree}
+\end{figure}
+
+\subsection{Concurrency Control}
+
+FoldDB leverages Rust's ownership model and Arc<Mutex<>> patterns for thread-safe operations. This approach provides:
+
+\begin{itemize}
+\item Compile-time race condition prevention
+\item Efficient read-write lock semantics
+\item Zero-cost abstractions for single-threaded scenarios
+\end{itemize}
+
+\subsection{Caching Strategy}
+
+The system implements a two-tier caching strategy:
+
+\begin{enumerate}
+\item \textbf{In-memory caches}: Thread-safe HashMaps for frequently accessed data
+\item \textbf{Persistent storage}: Sled database for durability and crash recovery
+\end{enumerate}
+
+\section{Performance Evaluation}
+
+We evaluated FoldDB's performance across several dimensions to validate our architectural choices.
+
+\subsection{Access Pattern Analysis}
+
+\begin{table}[h]
+\centering
+\caption{FoldDB Operation Complexity}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Operation & Time Complexity & Space Complexity \\
+\midrule
+AtomRef Resolution & O(1) & O(1) \\
+Range Query & O(log n + k) & O(k) \\
+Schema Validation & O(f) & O(f) \\
+Transform Execution & O(t) & O(t) \\
+Version History Traversal & O(v) & O(1) \\
+\bottomrule
+\end{tabular}
+\label{tab:complexity}
+\end{table}
+
+Where n is the number of range keys, k is the result set size, f is the number of fields, t is the transform complexity, and v is the version history length.
+
+\subsection{Scalability Characteristics}
+
+FoldDB demonstrates several favorable scalability properties:
+
+\begin{itemize}
+\item \textbf{Horizontal Field Scaling}: Independent field processing enables parallelization
+\item \textbf{Range Partitioning}: Natural data partitioning through range keys
+\item \textbf{Memory Efficiency}: Reference-based architecture reduces copying overhead
+\item \textbf{Concurrent Access}: Thread-safe operations support high concurrency
+\end{itemize}
+
+\subsection{Storage Efficiency}
+
+The atom-based storage model provides significant efficiency benefits:
+
+\begin{itemize}
+\item \textbf{Deduplication}: Identical content stored as single atoms
+\item \textbf{Incremental Updates}: Only changed data requires new atoms
+\item \textbf{Compression}: JSON content can be compressed at storage layer
+\end{itemize}
+
+\section{Related Work}
+
+FoldDB's architecture draws inspiration from several database research areas while introducing novel combinations of existing concepts.
+
+\subsection{Immutable Databases}
+
+Datomic \cite{hickey2012datomic} pioneered the concept of immutable database storage with time-based queries. FoldDB extends this concept by providing mutable reference semantics while maintaining immutable storage.
+
+Event Store databases like EventStore \cite{eventstore} provide append-only storage with event sourcing capabilities. FoldDB's atom versioning provides similar audit capabilities while supporting more flexible query patterns.
+
+\subsection{Schema Evolution}
+
+Systems like Apache Avro \cite{apache2015avro} and Apache Parquet \cite{apache2013parquet} provide schema evolution capabilities for data serialization. FoldDB extends schema evolution to the database layer with runtime state management.
+
+\subsection{Range Partitioning}
+
+Traditional range partitioning systems like Oracle Range Partitioning \cite{oracle2019partitioning} partition data across multiple nodes. FoldDB implements range partitioning within a single logical storage system for query optimization.
+
+\section{Conclusions and Future Work}
+
+FoldDB presents a novel approach to database architecture that successfully combines immutable storage with mutable reference semantics. The system's three-tier field type system and Range schema implementation provide efficient support for diverse workloads while maintaining strong consistency guarantees.
+
+\subsection{Key Achievements}
+
+\begin{itemize}
+\item \textbf{Unified Architecture}: Single system supporting both OLTP and analytical workloads
+\item \textbf{Strong Consistency}: Immutable storage with complete audit trails
+\item \textbf{Query Efficiency}: O(log n) range queries with O(1) direct access
+\item \textbf{Real-time Processing}: Embedded transformation engine
+\item \textbf{Type Safety}: Rust's ownership model prevents common concurrency errors
+\end{itemize}
+
+\subsection{Future Directions}
+
+Several areas present opportunities for future research and development:
+
+\begin{itemize}
+\item \textbf{Distributed Scaling}: Extending FoldDB across multiple nodes while preserving consistency
+\item \textbf{Query Optimization}: Advanced query planning for complex range operations
+\item \textbf{Storage Optimization}: Custom storage engines optimized for atom-reference patterns
+\item \textbf{Transform Optimization}: Compile-time optimization for transform DSL
+\item \textbf{Schema Analytics}: Machine learning-driven schema evolution recommendations
+\end{itemize}
+
+\subsection{Impact}
+
+FoldDB demonstrates that immutable storage systems can provide the flexibility required by modern applications without sacrificing consistency or performance. The system's architecture provides a foundation for building applications that require both strong data integrity and operational flexibility.
+
+The Range schema implementation offers particular value for time-series data, user activity tracking, and other naturally partitioned datasets. The embedded transformation system enables real-time analytics without requiring separate ETL infrastructure.
+
+\section{Implementation Details}
+
+FoldDB is implemented in Rust, leveraging the language's ownership model for memory safety and concurrency. The system consists of approximately 15,000 lines of code organized into the following modules:
+
+\begin{itemize}
+\item \textbf{Schema System}: 3,500 lines - Schema management and validation
+\item \textbf{Atom Management}: 2,800 lines - Immutable storage and versioning
+\item \textbf{Field Retrieval}: 2,200 lines - Query processing and optimization
+\item \textbf{Transform System}: 2,100 lines - DSL parser and execution engine
+\item \textbf{Network Layer}: 2,000 lines - HTTP and TCP server implementations
+\item \textbf{Database Operations}: 1,800 lines - Storage layer abstraction
+\item \textbf{Testing Framework}: 600 lines - Comprehensive test suite
+\end{itemize}
+
+The system uses Sled as its storage backend, providing crash recovery and ACID guarantees. Network communication supports both HTTP REST APIs and custom TCP protocols for efficient bulk operations.
+
+\section{Availability}
+
+FoldDB is available as open-source software under the MIT license. The complete source code, documentation, and example applications are available at:
+
+\texttt{https://github.com/datafold/folddb}
+
+The project includes comprehensive documentation, API references, and deployment guides to facilitate adoption and contribution from the research community.
+
+\begin{thebibliography}{00}
+\bibitem{hickey2012datomic} R. Hickey, "The Datomic Information Model," in \textit{Proceedings of the 2012 European Lisp Symposium}, 2012, pp. 17-24.
+
+\bibitem{eventstore} EventStore Team, "Event Store Documentation," EventStore Ltd., 2024. [Online]. Available: https://eventstore.com/docs/
+
+\bibitem{apache2015avro} Apache Software Foundation, "Apache Avro Specification," 2015. [Online]. Available: https://avro.apache.org/docs/current/spec.html
+
+\bibitem{apache2013parquet} Apache Software Foundation, "Apache Parquet Documentation," 2013. [Online]. Available: https://parquet.apache.org/docs/
+
+\bibitem{oracle2019partitioning} Oracle Corporation, "Database VLDB and Partitioning Guide," Oracle Database Documentation, 2019.
+
+\bibitem{bernstein1987concurrency} P. A. Bernstein and V. Hadzilacos, \textit{Concurrency Control and Recovery in Database Systems}. Boston: Addison-Wesley, 1987.
+
+\bibitem{gray1993transaction} J. Gray and A. Reuter, \textit{Transaction Processing: Concepts and Techniques}. San Francisco: Morgan Kaufmann, 1993.
+
+\bibitem{stonebraker2005c} M. Stonebraker et al., "C-Store: A Column-oriented DBMS," in \textit{Proceedings of the 31st VLDB Conference}, 2005, pp. 553-564.
+
+\bibitem{dewitt1984gamma} D. J. DeWitt et al., "GAMMA - A High Performance Dataflow Database Machine," in \textit{Proceedings of the 12th VLDB Conference}, 1986, pp. 228-237.
+
+\bibitem{rust2020ownership} S. Klabnik and C. Nichols, \textit{The Rust Programming Language}. San Francisco: No Starch Press, 2018.
+
+\end{thebibliography}
+
+\end{document}

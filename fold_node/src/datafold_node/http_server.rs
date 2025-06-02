@@ -58,8 +58,12 @@ impl DataFoldHttpServer {
     /// Returns a `FoldDbError` if:
     /// * There is an error starting the HTTP server
     pub async fn new(node: DataFoldNode, bind_address: &str) -> FoldDbResult<Self> {
-        // Ensure the web logger is initialized so log routes have data
-        crate::web_logger::init().ok();
+        // Initialize the enhanced logging system
+        if let Err(e) = crate::logging::LoggingSystem::init_default().await {
+            log::warn!("Failed to initialize enhanced logging system, falling back to web logger: {}", e);
+            // Fall back to old web logger for backward compatibility
+            crate::web_logger::init().ok();
+        }
 
         Ok(Self {
             node: Arc::new(Mutex::new(node)),
@@ -146,6 +150,10 @@ impl DataFoldHttpServer {
                         // Log endpoints
                         .route("/logs", web::get().to(log_routes::list_logs))
                         .route("/logs/stream", web::get().to(log_routes::stream_logs))
+                        .route("/logs/config", web::get().to(log_routes::get_config))
+                        .route("/logs/config/reload", web::post().to(log_routes::reload_config))
+                        .route("/logs/features", web::get().to(log_routes::get_features))
+                        .route("/logs/level", web::put().to(log_routes::update_feature_level))
                         // System endpoints
                         .route("/system/status", web::get().to(system_routes::get_system_status))
                         // Network endpoints

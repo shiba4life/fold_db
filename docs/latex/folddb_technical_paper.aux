@@ -1,0 +1,77 @@
+\relax 
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.1}Motivation}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}Contributions}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}System Architecture}{2}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces FoldDB System Architecture organized by functional layers.}}{2}{}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:system_architecture}{{1}{2}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Core Components}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.1.1}Schema Management Layer}{2}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Schema Lifecycle showing states, descriptions, and valid transitions.}}{3}{}\protected@file@percent }
+\newlabel{fig:schema_lifecycle}{{2}{3}{}{}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.1.2}Atom Storage System}{3}{}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {1}{\ignorespaces Atom Structure Definition}}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.1.3}Reference Management}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.1.4}Field Type System}{3}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Atom Lifecycle and Versioning showing creation and update processes with component responsibilities.}}{4}{}\protected@file@percent }
+\newlabel{fig:atom_lifecycle}{{3}{4}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Field Type Hierarchy showing the three field types, their use cases, and common properties.}}{5}{}\protected@file@percent }
+\newlabel{fig:field_type_hierarchy}{{4}{5}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Data Flow Architecture}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Range Schema Implementation}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Range Schema Design}{5}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Complete Data Mutation Flow showing the four phases: validation, field processing, schema updates, and transform orchestration.}}{6}{}\protected@file@percent }
+\newlabel{fig:mutation_flow}{{5}{6}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}AtomRefRange Implementation}{6}{}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2}{\ignorespaces AtomRefRange Structure}}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Range Query Processing}{6}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Query Processing Flow showing the different paths for Range schemas versus Standard schemas, with specialized handling for range-based queries.}}{7}{}\protected@file@percent }
+\newlabel{fig:query_processing}{{6}{7}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}AtomRef Storage Patterns}{7}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Transform System}{7}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Transform DSL Architecture}{7}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces AtomRef Storage Patterns showing how different field types organize their data references and optimize for different access patterns.}}{8}{}\protected@file@percent }
+\newlabel{fig:atomref_storage}{{7}{8}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Transform System Architecture showing component relationships and the real-time data transformation pipeline.}}{9}{}\protected@file@percent }
+\newlabel{fig:transform_system}{{8}{9}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}AST Definition}{9}{}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3}{\ignorespaces Transform Value Types}}{9}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Transform Integration}{10}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Storage and Persistence}{10}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Storage Tree Structure showing how FoldDB organizes data across different Sled database trees with key-value mappings and design principles.}}{10}{}\protected@file@percent }
+\newlabel{fig:storage_tree}{{9}{10}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Concurrency Control}{11}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Caching Strategy}{11}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Performance Evaluation}{11}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Access Pattern Analysis}{11}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces FoldDB Operation Complexity}}{11}{}\protected@file@percent }
+\newlabel{tab:complexity}{{1}{11}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Scalability Characteristics}{11}{}\protected@file@percent }
+\citation{hickey2012datomic}
+\citation{eventstore}
+\citation{apache2015avro}
+\citation{apache2013parquet}
+\citation{oracle2019partitioning}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Storage Efficiency}{12}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Related Work}{12}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Immutable Databases}{12}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Schema Evolution}{12}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}Range Partitioning}{12}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8}Conclusions and Future Work}{12}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.1}Key Achievements}{12}{}\protected@file@percent }
+\bibcite{hickey2012datomic}{1}
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.2}Future Directions}{13}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.3}Impact}{13}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9}Implementation Details}{13}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {10}Availability}{13}{}\protected@file@percent }
+\bibcite{eventstore}{2}
+\bibcite{apache2015avro}{3}
+\bibcite{apache2013parquet}{4}
+\bibcite{oracle2019partitioning}{5}
+\bibcite{bernstein1987concurrency}{6}
+\bibcite{gray1993transaction}{7}
+\bibcite{stonebraker2005c}{8}
+\bibcite{dewitt1984gamma}{9}
+\bibcite{rust2020ownership}{10}
+\gdef \@abspage@last{14}
