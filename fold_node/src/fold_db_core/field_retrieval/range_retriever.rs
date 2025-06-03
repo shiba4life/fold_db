@@ -168,6 +168,14 @@ impl<'a> RangeFieldRetriever<'a> {
         let filter_result = range_field.apply_filter(&range_filter);
         info!("🔍 Filter result: {} matches", filter_result.matches.len());
 
+        // If no matches found, return empty result
+        if filter_result.matches.is_empty() {
+            return Ok(serde_json::json!({
+                "matches": {},
+                "total_count": 0
+            }));
+        }
+
         // Convert UUIDs back to actual atom content
         let mut content_matches = std::collections::HashMap::new();
         let mut grouped_by_original_key = std::collections::HashMap::<String, Vec<serde_json::Value>>::new();

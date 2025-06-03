@@ -154,13 +154,15 @@ impl FieldRetrievalService {
                         if let Some(range_content) = matches.get(&range_key_str) {
                             range_content.clone()
                         } else {
-                            serde_json::Value::Null
+                            // No content found for this range key, skip adding to result
+                            info!("⚠️  No content found for range key '{}' in field '{}'", range_key_str, field_name);
+                            continue;
                         }
                     } else {
                         field_value
                     };
                     
-                    // Ensure the range_key entry exists in result
+                    // Only create range_key entry if we have actual content
                     let range_entry = result.entry(range_key_str.clone()).or_default();
                     range_entry.insert(field_name.clone(), actual_content);
                     info!("✅ Added field '{}' to range key '{}'", field_name, range_key_str);
