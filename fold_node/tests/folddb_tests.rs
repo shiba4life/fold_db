@@ -14,6 +14,7 @@ fn create_default_payment_config() -> FieldPaymentConfig {
 
 mod test_data;
 use test_data::test_helpers::{cleanup_test_db, cleanup_tmp_dir, setup_test_db};
+use test_data::test_helpers::atom_ref_setup::setup_test_schema_atom_refs;
 
 // Clean up tmp directory after all tests
 #[cfg(test)]
@@ -105,6 +106,10 @@ fn test_write_and_query() {
         .expect("Failed to approve schema");
     db.allow_schema("test_schema")
         .expect("Failed to allow schema");
+
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut db, "test_schema")
+        .expect("Failed to setup atom_refs");
 
     // Test write
     let mutation = Mutation {

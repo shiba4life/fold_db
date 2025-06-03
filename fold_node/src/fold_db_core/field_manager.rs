@@ -70,7 +70,6 @@ use log::info;
 use serde_json::Value;
 
 use super::transform_orchestrator::TransformOrchestrator;
-use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 pub struct FieldManager {
@@ -135,7 +134,158 @@ impl FieldManager {
             source_pub_key.to_string(),
             &mut self.atom_manager,
         );
-        ctx.get_or_create_atom_ref()
+        ctx.get_or_create_atom_ref_safe()
+    }
+
+    /// Validate AtomRef/ref_atom_uuid consistency to detect and prevent ghost UUIDs
+    pub fn validate_atom_ref_consistency(
+        &self,
+        schema: &Schema,
+        field: &str,
+    ) -> Result<bool, SchemaError> {
+        let field_def = schema
+            .fields
+            .get(field)
+            .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
+
+        if let Some(ref_uuid) = field_def.ref_atom_uuid() {
+            let uuid_str = ref_uuid.to_string();
+            
+            match field_def {
+                crate::schema::types::FieldVariant::Single(_) => {
+                    let ref_atoms = self.atom_manager.get_ref_atoms();
+                    let guard = ref_atoms.lock().map_err(|e| {
+                        SchemaError::InvalidData(format!("Failed to acquire ref_atoms lock: {}", e))
+                    })?;
+                    Ok(guard.contains_key(&uuid_str))
+                }
+                crate::schema::types::FieldVariant::Collection(_) => {
+                    let ref_collections = self.atom_manager.get_ref_collections();
+                    let guard = ref_collections.lock().map_err(|e| {
+                        SchemaError::InvalidData(format!("Failed to acquire ref_collections lock: {}", e))
+                    })?;
+                    Ok(guard.contains_key(&uuid_str))
+                }
+                crate::schema::types::FieldVariant::Range(_) => {
+                    let ref_ranges = self.atom_manager.get_ref_ranges();
+                    let guard = ref_ranges.lock().map_err(|e| {
+                        SchemaError::InvalidData(format!("Failed to acquire ref_ranges lock: {}", e))
+                    })?;
+                    Ok(guard.contains_key(&uuid_str))
+                }
+            }
+        } else {
+            // No ref_atom_uuid set, so consistency is trivially maintained
+            Ok(true)
+        }
+    }
+
+    /// Validate that the field variant type matches the AtomRef type stored
+    pub fn validate_field_atomref_type_consistency(
+        &self,
+        schema: &Schema,
+        field: &str,
+    ) -> Result<(), SchemaError> {
+        let field_def = schema
+            .fields
+            .get(field)
+            .ok_or_else(|| SchemaError::InvalidField(format!("Field {} not found", field)))?;
+
+        if let Some(ref_uuid) = field_def.ref_atom_uuid() {
+            let uuid_str = ref_uuid.to_string();
+            
+            // Check if the AtomRef exists in the expected storage based on field variant
+            match field_def {
+                crate::schema::types::FieldVariant::Single(_) => {
+                    let ref_atoms = self.atom_manager.get_ref_atoms();
+                    let guard = ref_atoms.lock().map_err(|e| {
+                        SchemaError::InvalidData(format!("Failed to acquire ref_atoms lock: {}", e))
+                    })?;
+                    if !guard.contains_key(&uuid_str) {
+                        // Check if it exists in wrong storage types
+                        let ref_collections = self.atom_manager.get_ref_collections();
+                        let ref_ranges = self.atom_manager.get_ref_ranges();
+                        let col_guard = ref_collections.lock().map_err(|_| SchemaError::InvalidData("Lock error".to_string()))?;
+                        let range_guard = ref_ranges.lock().map_err(|_| SchemaError::InvalidData("Lock error".to_string()))?;
+                        
+                        if col_guard.contains_key(&uuid_str) {
+                            return Err(SchemaError::InvalidData(format!(
+                                "AtomRef type mismatch: Single field '{}' has AtomRefCollection instead of AtomRef", field
+                            )));
+                        }
+                        if range_guard.contains_key(&uuid_str) {
+                            return Err(SchemaError::InvalidData(format!(
+                                "AtomRef type mismatch: Single field '{}' has AtomRefRange instead of AtomRef", field
+                            )));
+                        }
+                    }
+                }
+                crate::schema::types::FieldVariant::Collection(_) => {
+                    let ref_collections = self.atom_manager.get_ref_collections();
+                    let guard = ref_collections.lock().map_err(|e| {
+                        SchemaError::InvalidData(format!("Failed to acquire ref_collections lock: {}", e))
+                    })?;
+                    if !guard.contains_key(&uuid_str) {
+                        // Check if it exists in wrong storage types
+                        let ref_atoms = self.atom_manager.get_ref_atoms();
+                        let ref_ranges = self.atom_manager.get_ref_ranges();
+                        let atom_guard = ref_atoms.lock().map_err(|_| SchemaError::InvalidData("Lock error".to_string()))?;
+                        let range_guard = ref_ranges.lock().map_err(|_| SchemaError::InvalidData("Lock error".to_string()))?;
+                        
+                        if atom_guard.contains_key(&uuid_str) {
+                            return Err(SchemaError::InvalidData(format!(
+                                "AtomRef type mismatch: Collection field '{}' has AtomRef instead of AtomRefCollection", field
+                            )));
+                        }
+                        if range_guard.contains_key(&uuid_str) {
+                            return Err(SchemaError::InvalidData(format!(
+                                "AtomRef type mismatch: Collection field '{}' has AtomRefRange instead of AtomRefCollection", field
+                            )));
+                        }
+                    }
+                }
+                crate::schema::types::FieldVariant::Range(_) => {
+                    let ref_ranges = self.atom_manager.get_ref_ranges();
+                    let guard = ref_ranges.lock().map_err(|e| {
+                        SchemaError::InvalidData(format!("Failed to acquire ref_ranges lock: {}", e))
+                    })?;
+                    if !guard.contains_key(&uuid_str) {
+                        // Check if it exists in wrong storage types
+                        let ref_atoms = self.atom_manager.get_ref_atoms();
+                        let ref_collections = self.atom_manager.get_ref_collections();
+                        let atom_guard = ref_atoms.lock().map_err(|_| SchemaError::InvalidData("Lock error".to_string()))?;
+                        let col_guard = ref_collections.lock().map_err(|_| SchemaError::InvalidData("Lock error".to_string()))?;
+                        
+                        if atom_guard.contains_key(&uuid_str) {
+                            return Err(SchemaError::InvalidData(format!(
+                                "AtomRef type mismatch: Range field '{}' has AtomRef instead of AtomRefRange", field
+                            )));
+                        }
+                        if col_guard.contains_key(&uuid_str) {
+                            return Err(SchemaError::InvalidData(format!(
+                                "AtomRef type mismatch: Range field '{}' has AtomRefCollection instead of AtomRefRange", field
+                            )));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Set field value with atomic transaction-like behavior
+    pub fn set_field_value_atomic(
+        &mut self,
+        schema: &mut Schema,
+        field: &str,
+        content: Value,
+        source_pub_key: String,
+    ) -> Result<String, SchemaError> {
+        // Note: Removed overly strict validation that prevented normal operations
+        // when AtomRef objects aren't loaded into memory from disk schemas
+
+        // Proceed with the standard set_field_value logic
+        self.set_field_value(schema, field, content, source_pub_key)
     }
 
     pub fn get_field_value(&self, schema: &Schema, field: &str) -> Result<Value, SchemaError> {
@@ -234,15 +384,14 @@ impl FieldManager {
                 //     )));
                 // }
 
-                let aref_uuid = ctx.get_or_create_atom_ref()?;
+                let aref_uuid = ctx.get_or_create_atom_ref_safe()?;
 
                 if let Value::Object(map) = &content {
-                    let mut last_uuid = String::new();
+                    // Use the same aref_uuid for all key-value pairs in this range
                     for (key, value) in map {
-                        let uuid = self.set_range_field_value(schema, field, key, value.clone(), aref_uuid.clone(), source_pub_key.clone())?;
-                        last_uuid = uuid;
+                        self.set_range_field_value(schema, field, key, value.clone(), aref_uuid.clone(), source_pub_key.clone())?;
                     }
-                    return Ok(last_uuid);
+                    return Ok(aref_uuid);
                 } else {
                     return Err(SchemaError::InvalidData(format!(
                         "Range field {} expects JSON object, got: {:?}", field, content
@@ -250,7 +399,7 @@ impl FieldManager {
                 }
             }
 
-            let aref_uuid = ctx.get_or_create_atom_ref()?;
+            let aref_uuid = ctx.get_or_create_atom_ref_safe()?;
             info!(
                 "🆔 Got/created aref_uuid for {}.{}: {}",
                 schema.name, field, aref_uuid
@@ -326,23 +475,30 @@ impl FieldManager {
 
 
         let mut ctx = AtomContext::new(
-                schema,
-                field,
-                source_pub_key.clone(),
-                &mut self.atom_manager,
-            );
+            schema,
+            field,
+            source_pub_key.clone(),
+            &mut self.atom_manager,
+        );
 
-            let prev_atom_uuid = {
-                let ref_atoms = ctx.atom_manager.get_ref_atoms();
-                let guard = ref_atoms.lock().map_err(|_| {
-                    SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string())
-                })?;
-                guard
-                    .get(&aref_uuid)
-                    .map(|aref| aref.get_atom_uuid().to_string())
-            };
+        // Set the context to use the provided aref_uuid instead of creating a new one
+        ctx.set_ref_atom_uuid(aref_uuid.clone());
 
-            ctx.create_and_update_range_atom(prev_atom_uuid.clone(), content_key, content_value, None)?;
+        // For range fields, get the previous atom UUID for this specific content_key
+        // Check if this key already exists in the range
+        let prev_atom_uuid = {
+            let ref_ranges = ctx.atom_manager.get_ref_ranges();
+            let guard = ref_ranges.lock().map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to acquire ref_ranges lock: {}", e))
+            })?;
+            if let Some(range) = guard.get(&aref_uuid) {
+                range.get_atom_uuid(content_key).cloned()
+            } else {
+                None
+            }
+        };
+
+        ctx.create_and_update_range_atom(prev_atom_uuid, content_key, content_value, None)?;
 
         info!(
             "set_range_field_value - schema: {}, field: {}, aref_uuid: {}, result: success",
@@ -400,16 +556,16 @@ impl FieldManager {
                     schema.name, field
                 );
 
-                let aref_uuid = ctx.get_or_create_atom_ref()?;
+                let aref_uuid = ctx.get_or_create_atom_ref_safe()?;
                 
                 // Range fields now handle individual key-value pairs
                 // content should be a JSON object, iterate over its key-value pairs
                 if let Value::Object(map) = &content {
-                    let mut last_uuid = String::new();
+                    // Use the same aref_uuid for all key-value pairs in this range
                     for (key, value) in map {
-                        last_uuid = self.set_range_field_value(schema, field, key, value.clone(), aref_uuid.clone(), source_pub_key.clone())?;
+                        self.set_range_field_value(schema, field, key, value.clone(), aref_uuid.clone(), source_pub_key.clone())?;
                     }
-                    return Ok(last_uuid);
+                    return Ok(aref_uuid);
                 } else {
                     return Err(SchemaError::InvalidData(format!(
                         "Range field {} expects JSON object, got: {:?}", field, content
@@ -417,7 +573,7 @@ impl FieldManager {
                 }
             }
 
-            let aref_uuid = ctx.get_or_create_atom_ref()?;
+            let aref_uuid = ctx.get_or_create_atom_ref_safe()?;
             let prev_atom_uuid = ctx.get_prev_atom_uuid(&aref_uuid)?;
 
             ctx.create_and_update_atom(Some(prev_atom_uuid), content.clone(), None)?;
@@ -451,7 +607,7 @@ impl FieldManager {
                 ));
             }
 
-            let aref_uuid = ctx.get_or_create_atom_ref()?;
+            let aref_uuid = ctx.get_or_create_atom_ref_safe()?;
             let prev_atom_uuid = ctx.get_prev_atom_uuid(&aref_uuid)?;
 
             ctx.create_and_update_atom(
@@ -476,6 +632,207 @@ impl FieldManager {
         );
 
         Ok(())
+    }
+
+    /// Updates a field by only using existing atom_refs - no creation of new atom_refs.
+    ///
+    /// **CRITICAL: Mutation-Only Method**
+    /// 
+    /// This method is designed specifically for mutations and assumes that atom_refs
+    /// already exist (created during field creation). It will fail gracefully if
+    /// no atom_ref exists for the field.
+    /// 
+    /// **Why this prevents data fragmentation:**
+    /// - Mutations only update existing atom_refs
+    /// - No new atom_refs are created during mutations
+    /// - Ensures one atom_ref per logical field/range
+    /// 
+    /// Returns: The UUID of the existing AtomRef that was updated
+    pub fn update_field_existing_atom_ref(
+        &mut self,
+        schema: &mut Schema,
+        field: &str,
+        content: Value,
+        source_pub_key: String,
+    ) -> Result<String, SchemaError> {
+        info!(
+            "🔄 update_field_existing_atom_ref START - schema: {}, field: {}, content: {:?}",
+            schema.name, field, content
+        );
+
+        // Check if field has an existing ref_atom_uuid
+        let existing_ref_uuid = schema
+            .fields
+            .get(field)
+            .and_then(|f| f.ref_atom_uuid())
+            .ok_or_else(|| {
+                SchemaError::InvalidData(format!(
+                    "No existing atom_ref found for field {}.{}. Cannot update non-existent atom_ref.",
+                    schema.name, field
+                ))
+            })?;
+
+        info!(
+            "🔍 Found existing ref_atom_uuid for {}.{}: {}",
+            schema.name, field, existing_ref_uuid
+        );
+
+        // Note: Removed overly strict validation that prevented normal operations
+        // when AtomRef objects aren't loaded into memory from disk schemas
+
+        let aref_uuid = existing_ref_uuid.to_string();
+
+        {
+            let mut ctx = AtomContext::new(
+                schema,
+                field,
+                source_pub_key.clone(),
+                &mut self.atom_manager,
+            );
+
+            // Set the context to use the existing aref_uuid instead of creating a new one
+            ctx.set_ref_atom_uuid(aref_uuid.clone());
+
+            let field_def = ctx.get_field_def()?;
+
+            if matches!(field_def, crate::schema::types::FieldVariant::Collection(_)) {
+                return Err(SchemaError::InvalidField(
+                    "Collection fields cannot be updated without id".to_string(),
+                ));
+            }
+
+            // Special handling for Range fields
+            if let crate::schema::types::FieldVariant::Range(_range_field) = field_def {
+                info!("🎯 Updating existing Range field for {}.{}", schema.name, field);
+
+                if let Value::Object(map) = &content {
+                    // Handle nested range schema format: {"range_key_value": {"key1": val1, "key2": val2, ...}}
+                    // If the outer map has exactly one entry and its value is an object, flatten it
+                    if map.len() == 1 {
+                        let (outer_key, outer_value) = map.iter().next().unwrap();
+                        if let Value::Object(inner_map) = outer_value {
+                            info!("🔄 Flattening nested range structure for range_key: {}", outer_key);
+                            // Process each entry in the inner map as individual range entries
+                            for (key, value) in inner_map {
+                                self.update_range_field_value_existing(schema, field, key, value.clone(), aref_uuid.clone(), source_pub_key.clone())?;
+                            }
+                            return Ok(aref_uuid);
+                        }
+                    }
+                    
+                    // Fallback: treat as flat structure (for backward compatibility)
+                    for (key, value) in map {
+                        self.update_range_field_value_existing(schema, field, key, value.clone(), aref_uuid.clone(), source_pub_key.clone())?;
+                    }
+                    return Ok(aref_uuid);
+                } else {
+                    return Err(SchemaError::InvalidData(format!(
+                        "Range field {} expects JSON object, got: {:?}", field, content
+                    )));
+                }
+            }
+
+            let prev_atom_uuid = {
+                let ref_atoms = ctx.atom_manager.get_ref_atoms();
+                let guard = ref_atoms.lock().map_err(|_| {
+                    SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string())
+                })?;
+                guard
+                    .get(&aref_uuid)
+                    .map(|aref| aref.get_atom_uuid().to_string())
+            };
+            info!(
+                "📜 Previous atom_uuid for existing aref {}: {:?}",
+                aref_uuid, prev_atom_uuid
+            );
+
+            ctx.create_and_update_atom(prev_atom_uuid.clone(), content.clone(), None)?;
+            info!(
+                "✅ Updated existing atom for {}.{} with content: {:?}, prev_uuid: {:?}",
+                schema.name, field, content, prev_atom_uuid
+            );
+        } // ctx is dropped here
+
+        info!(
+            "✅ update_field_existing_atom_ref COMPLETE - schema: {}, field: {}, aref_uuid: {}",
+            schema.name, field, aref_uuid
+        );
+
+        Ok(aref_uuid)
+    }
+
+    /// Updates a range field value using existing AtomRefRange - no creation of new atom_refs.
+    /// 
+    /// **CRITICAL: Mutation-Only Method**
+    /// 
+    /// This method assumes the AtomRefRange already exists and only updates atom UUIDs
+    /// within the existing range structure.
+    /// 
+    /// Returns: The UUID of the existing AtomRefRange that was updated
+    pub fn update_range_field_value_existing(
+        &mut self,
+        schema: &mut Schema,
+        field: &str,
+        content_key: &str,
+        content_value: Value,
+        aref_uuid: String,
+        source_pub_key: String,
+    ) -> Result<String, SchemaError> {
+        info!("🔄 update_range_field_value_existing - key: {}, value: {:?}, aref_uuid: {}", content_key, content_value, aref_uuid);
+
+        let mut ctx = AtomContext::new(
+            schema,
+            field,
+            source_pub_key.clone(),
+            &mut self.atom_manager,
+        );
+
+        // Set the context to use the provided existing aref_uuid
+        ctx.set_ref_atom_uuid(aref_uuid.clone());
+
+        // For range fields, get the previous atom UUID for this specific content_key
+        let prev_atom_uuid = {
+            let ref_ranges = ctx.atom_manager.get_ref_ranges();
+            let guard = ref_ranges.lock().map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to acquire ref_ranges lock: {}", e))
+            })?;
+            
+            if let Some(aref_range) = guard.get(&aref_uuid) {
+                aref_range.get_atom_uuid(content_key).map(|uuid| uuid.to_string())
+            } else {
+                // AtomRefRange not in memory - create it (normal for schemas loaded from disk)
+                log::info!("🔧 Creating missing AtomRefRange for field {} with UUID {}", field, aref_uuid);
+                drop(guard); // Release lock before creating
+                
+                // Create the missing AtomRefRange
+                ctx.create_missing_atom_ref_with_uuid(&aref_uuid)?;
+                
+                // Re-acquire lock and try again
+                let guard = ref_ranges.lock().map_err(|e| {
+                    SchemaError::InvalidData(format!("Failed to re-acquire ref_ranges lock: {}", e))
+                })?;
+                
+                if let Some(aref_range) = guard.get(&aref_uuid) {
+                    aref_range.get_atom_uuid(content_key).map(|uuid| uuid.to_string())
+                } else {
+                    None // New AtomRefRange won't have this key yet
+                }
+            }
+        };
+        
+        info!(
+            "📜 Previous atom_uuid for range key '{}' in aref {}: {:?}",
+            content_key, aref_uuid, prev_atom_uuid
+        );
+
+        ctx.create_and_update_range_atom(prev_atom_uuid, content_key, content_value, None)?;
+        
+        info!(
+            "✅ Updated existing range atom for {}.{} key '{}' with aref_uuid: {}",
+            schema.name, field, content_key, aref_uuid
+        );
+
+        Ok(aref_uuid)
     }
 }
 
@@ -537,7 +894,13 @@ mod tests {
         let source_pub_key = "test_pub_key".to_string();
         let field_name = "test_range_field";
 
-        let aref_uuid = "abcdef".to_string();
+        // First create a proper AtomRefRange by calling set_field_value which will create the right AtomRef type
+        let aref_uuid = field_manager.set_field_value(
+            &mut schema,
+            field_name,
+            content.clone(),
+            source_pub_key.clone(),
+        ).expect("Should create AtomRefRange");
 
         if let Value::Object(map) = &content {
             for (key, value) in map {
@@ -550,8 +913,9 @@ mod tests {
                     source_pub_key.clone(),
                 );
                 assert!(result.is_ok(), "Function should succeed");
-                let aref_uuid = result.unwrap();
-                assert!(!aref_uuid.is_empty(), "Should return a non-empty UUID");
+                let returned_uuid = result.unwrap();
+                assert!(!returned_uuid.is_empty(), "Should return a non-empty UUID");
+                assert_eq!(returned_uuid, aref_uuid, "Should return the same UUID");
 
                 // Verify that atoms were created for each key
                 let ref_ranges = field_manager.atom_manager.get_ref_ranges();

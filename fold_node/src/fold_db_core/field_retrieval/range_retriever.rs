@@ -156,13 +156,28 @@ impl<'a> RangeFieldRetriever<'a> {
                 range_field.atom_ref_range = Some(atom_ref_range);
             } else {
                 info!(
-                    "❌ No AtomRefRange found for ref_atom_uuid: {}",
+                    "🔧 AtomRefRange not in memory for ref_atom_uuid: {}, creating it (normal for schemas loaded from disk)",
                     ref_atom_uuid
                 );
-                return Ok(serde_json::json!({
-                    "matches": {},
-                    "total_count": 0
-                }));
+                
+                // Create missing AtomRefRange (same logic as mutations)
+                let new_range = crate::atom::AtomRefRange::new("system".to_string());
+                
+                // Store it in the AtomManager
+                match self.base.atom_manager.get_ref_ranges().lock() {
+                    Ok(mut ranges_guard) => {
+                        ranges_guard.insert(ref_atom_uuid.to_string(), new_range.clone());
+                        range_field.atom_ref_range = Some(new_range);
+                        info!("✅ Created missing AtomRefRange for ref_atom_uuid: {}", ref_atom_uuid);
+                    }
+                    Err(e) => {
+                        info!("❌ Failed to acquire ref_ranges lock for creation: {:?}", e);
+                        return Ok(serde_json::json!({
+                            "matches": {},
+                            "total_count": 0
+                        }));
+                    }
+                }
             }
         } else {
             info!("❌ No ref_atom_uuid found in RangeField");

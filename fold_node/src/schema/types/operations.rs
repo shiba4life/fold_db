@@ -141,14 +141,14 @@ impl Mutation {
     /// ## Transformation Examples
     ///
     /// **Range key field transformation:**
-    /// ```
+    /// ```text
     /// Input:  "user_id": "abc"
     /// Output: "user_id": {"abc": "abc"}
     /// Result: AtomRefRange key = "abc" (the range_key VALUE)
     /// ```
     ///
     /// **Non-range key field transformation:**
-    /// ```
+    /// ```text
     /// Input:  "score": {"test_id": "abc", "value": "123"}
     /// Output: "score": {"abc": {"test_id": "abc", "value": "123"}}
     /// Result: AtomRefRange key = "abc" (the range_key VALUE, not "score")

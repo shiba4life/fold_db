@@ -5,6 +5,9 @@ use fold_node::testing::*;
 use serde_json::json;
 use std::collections::HashMap;
 
+mod test_data;
+use test_data::test_helpers::atom_ref_setup::setup_test_schema_atom_refs;
+
 /// Create a test range schema with multiple range fields
 fn create_comprehensive_range_schema() -> Schema {
     let mut schema = Schema::new_range("UserScores".to_string(), "user_id".to_string());
@@ -139,6 +142,10 @@ fn test_range_schema_create_single_user_success() {
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
 
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut fold_db, "UserScores")
+        .expect("Failed to setup atom_refs");
+
     // Create mutation for single user
     let mutation = create_range_mutation_single_user("user_123");
 
@@ -160,6 +167,10 @@ fn test_range_schema_create_multiple_users() {
     let schema = create_comprehensive_range_schema();
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
+
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut fold_db, "UserScores")
+        .expect("Failed to setup atom_refs");
 
     // Create mutations for multiple users
     let users = ["user_123", "user_456", "user_789"];
@@ -187,6 +198,10 @@ fn test_range_schema_update_existing_user() {
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
 
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut fold_db, "UserScores")
+        .expect("Failed to setup atom_refs");
+
     // Create initial data
     let initial_mutation = create_range_mutation_single_user("user_123");
     fold_db.write_schema(initial_mutation).unwrap();
@@ -211,6 +226,10 @@ fn test_range_schema_different_data_types() {
     let schema = create_comprehensive_range_schema();
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
+
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut fold_db, "UserScores")
+        .expect("Failed to setup atom_refs");
 
     // Create mutation with various data types
     let mut fields = HashMap::new();
@@ -260,6 +279,10 @@ fn test_range_schema_large_dataset_mutation() {
     let schema = create_comprehensive_range_schema();
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
+
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut fold_db, "UserScores")
+        .expect("Failed to setup atom_refs");
 
     // Create large dataset mutation
     let mut game_scores = serde_json::Map::new();
@@ -367,6 +390,10 @@ fn test_range_schema_query_multiple_fields() {
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
 
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut fold_db, "UserScores")
+        .expect("Failed to setup atom_refs");
+
     let mutation = create_range_mutation_single_user("test_user");
     fold_db.write_schema(mutation).unwrap();
 
@@ -426,6 +453,10 @@ fn test_range_schema_query_single_field() {
     let schema = create_comprehensive_range_schema();
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
+
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut fold_db, "UserScores")
+        .expect("Failed to setup atom_refs");
 
     let mutation = create_range_mutation_single_user("single_field_user");
     fold_db.write_schema(mutation).unwrap();
@@ -487,6 +518,10 @@ fn test_range_schema_query_nonexistent_user() {
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
 
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut fold_db, "UserScores")
+        .expect("Failed to setup atom_refs");
+
     let mutation = create_range_mutation_single_user("existing_user");
     fold_db.write_schema(mutation).unwrap();
 
@@ -531,6 +566,10 @@ fn test_range_schema_query_after_update() {
     let schema = create_comprehensive_range_schema();
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
+
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut fold_db, "UserScores")
+        .expect("Failed to setup atom_refs");
 
     // Create initial data
     let initial_mutation = create_range_mutation_single_user("update_test_user");
@@ -679,6 +718,10 @@ fn test_range_schema_mutation_missing_range_key() {
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
 
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut fold_db, "UserScores")
+        .expect("Failed to setup atom_refs");
+
     // Create mutation without range_key
     let mut fields = HashMap::new();
     fields.insert(
@@ -720,6 +763,10 @@ fn test_range_schema_mutation_null_range_key() {
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
 
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut fold_db, "UserScores")
+        .expect("Failed to setup atom_refs");
+
     // Create mutation with null range_key
     let mut fields = HashMap::new();
     fields.insert("user_id".to_string(), json!(null));
@@ -760,6 +807,10 @@ fn test_range_schema_mutation_empty_string_range_key() {
     let schema = create_comprehensive_range_schema();
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
+
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut fold_db, "UserScores")
+        .expect("Failed to setup atom_refs");
 
     // Create mutation with empty string range_key
     let mut fields = HashMap::new();
@@ -884,6 +935,10 @@ fn test_range_schema_concurrent_mutations() {
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
 
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut fold_db, "UserScores")
+        .expect("Failed to setup atom_refs");
+
     // Simulate concurrent mutations for different users (using format similar to working tests)
     for i in 0..3 {
         let user_id = format!("user_12{}", i); // Use format like "user_120", "user_121", "user_122"
@@ -929,6 +984,11 @@ fn test_range_schema_stress_test_large_mutations() {
     let schema = create_comprehensive_range_schema();
     fold_db.add_schema_available(schema).unwrap();
     fold_db.approve_schema("UserScores").unwrap();
+
+    // IMPORTANT: All loaded schemas will have arefs
+    // In this test, we'll let the natural mutation flow create the AtomRefRanges
+    // for each field, which simulates how schemas work in production where
+    // they're loaded with proper AtomRef structures already established.
 
     // Create mutation with large amounts of data
     let mut large_game_scores = serde_json::Map::new();

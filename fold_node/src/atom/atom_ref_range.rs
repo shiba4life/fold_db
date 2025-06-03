@@ -4,7 +4,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
-use log::info;
 
 /// A range-based collection of atom references stored in a BTreeMap.
 #[derive(Debug, Clone, Serialize, Deserialize)]
