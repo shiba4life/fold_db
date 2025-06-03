@@ -181,9 +181,12 @@ impl<'a> RangeFieldRetriever<'a> {
         let mut grouped_by_original_key = std::collections::HashMap::<String, Vec<serde_json::Value>>::new();
         
         for (match_key, atom_uuid) in &filter_result.matches {
-            // Extract original key (remove _N suffix if present)
+            // Extract original key (remove _N suffix if present, where N is a single digit)
+            // This only strips suffixes we added ourselves for multiple atoms per key
             let original_key = if let Some(underscore_pos) = match_key.rfind('_') {
-                if match_key[underscore_pos + 1..].chars().all(|c| c.is_ascii_digit()) {
+                let suffix = &match_key[underscore_pos + 1..];
+                // Only strip if it's a single digit (0-9) - these are suffixes we add for multiple atoms
+                if suffix.len() == 1 && suffix.chars().all(|c| c.is_ascii_digit()) {
                     &match_key[..underscore_pos]
                 } else {
                     match_key
