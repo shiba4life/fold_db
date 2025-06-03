@@ -158,8 +158,33 @@ impl FieldRetrievalService {
             range_key, range_key_value
         );
 
+        // Extract the actual key value from the filter specification
+        // e.g., {"Key": "abc"} -> "abc", {"KeyPrefix": "abc"} -> "abc", etc.
+        let range_key_str = if let Some(obj) = range_key_value.as_object() {
+            if let Some(key_value) = obj.get("Key") {
+                key_value.as_str().unwrap_or("").to_string()
+            } else if let Some(prefix_value) = obj.get("KeyPrefix") {
+                prefix_value.as_str().unwrap_or("").to_string()
+            } else if let Some(pattern_value) = obj.get("KeyPattern") {
+                pattern_value.as_str().unwrap_or("").to_string()
+            } else {
+                // For other filter types or fallback, try to extract any string value
+                obj.values()
+                    .find_map(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string()
+            }
+        } else {
+            // If not an object, convert directly to string
+            range_key_value.to_string().trim_matches('"').to_string()
+        };
+
+        info!(
+            "🔍 Extracted range key string for lookup: '{}'",
+            range_key_str
+        );
+
         let mut result: HashMap<String, HashMap<String, Value>> = HashMap::new();
-        let range_key_str = range_key_value.to_string().trim_matches('"').to_string();
 
         // For each requested field, get its value with the range filter
         for field_name in fields {

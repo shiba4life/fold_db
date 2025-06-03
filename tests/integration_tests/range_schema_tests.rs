@@ -32,12 +32,7 @@ fn create_test_range_mutation() -> Mutation {
     // Range key field provides the raw value for to_range_schema_mutation()
     fields.insert("user_id".to_string(), json!(123));
     // Other range fields already have the range_key populated
-    fields.insert(
-        "score".to_string(),
-        json!({
-            "123": {"points": 42}
-        }),
-    );
+    fields.insert("score".to_string(), json!(42));
 
     Mutation::new(
         "user_scores".to_string(),
@@ -648,8 +643,10 @@ fn test_range_schema_multiple_mutations_same_key() {
 
     let user_data = &grouped_obj["123"];
 
-    // Extract the score field which should contain only the latest mutation
-    let score_data = user_data.get("score").expect("Should have score field");
+    // Extract the score field - after the fix, structure is: field_name -> range_key_value -> data
+    let score_field = user_data.get("score").expect("Should have score field");
+    let score_field_obj = score_field.as_object().unwrap();
+    let score_data = score_field_obj.get("123").expect("Should have data for range key 123");
 
     // With the new single-UUID-per-range-key behavior, only the last mutation should be stored
     if score_data.is_array() {
@@ -671,10 +668,11 @@ fn test_range_schema_multiple_mutations_same_key() {
         }
     } else {
         // If it's a single object, verify it's the latest mutation
-        if let Some(level) = score_data.get("level").and_then(|v| v.as_str()) {
+        let data_obj = score_data.as_object().unwrap();
+        if let Some(level) = data_obj.get("level").and_then(|v| v.as_str()) {
             assert_eq!(level, "advanced", "Should contain only the latest (advanced) mutation");
-            assert_eq!(score_data.get("points").and_then(|v| v.as_i64()), Some(100));
-            assert!(score_data.get("achievement").is_some());
+            assert_eq!(data_obj.get("points").and_then(|v| v.as_i64()), Some(100));
+            assert!(data_obj.get("achievement").is_some());
         } else {
             panic!("Expected level field in the mutation");
         }
@@ -820,17 +818,15 @@ fn test_user_scores_schema_complex_mutations() {
     assert!(user_data.contains_key("player_statistics"));
     assert!(user_data.contains_key("ranking_data"));
 
-    // Verify specific data integrity
-    let game_scores = user_data.get("game_scores").unwrap().as_object().unwrap();
-    assert_eq!(game_scores.get("tetris").unwrap().as_i64(), Some(95000));
+    // Verify specific data integrity - access through range_key value
+    let game_scores_field = user_data.get("game_scores").unwrap().as_object().unwrap();
+    let game_scores_data = game_scores_field.get("gamer_alice").unwrap().as_object().unwrap();
+    assert_eq!(game_scores_data.get("tetris").unwrap().as_i64(), Some(95000));
 
-    let stats = user_data
-        .get("player_statistics")
-        .unwrap()
-        .as_object()
-        .unwrap();
-    assert_eq!(stats.get("total_games").unwrap().as_i64(), Some(1247));
-    assert_eq!(stats.get("win_rate").unwrap().as_f64(), Some(0.78));
+    let stats_field = user_data.get("player_statistics").unwrap().as_object().unwrap();
+    let stats_data = stats_field.get("gamer_alice").unwrap().as_object().unwrap();
+    assert_eq!(stats_data.get("total_games").unwrap().as_i64(), Some(1247));
+    assert_eq!(stats_data.get("win_rate").unwrap().as_f64(), Some(0.78));
 }
 
 #[test]
@@ -1002,47 +998,51 @@ fn test_range_schema_different_data_types_comprehensive() {
         .unwrap()
         .as_object()
         .unwrap();
-    let game_scores = user_data.get("game_scores").unwrap().as_object().unwrap();
-
+    
+    // After the fix, the structure is: user_data.get("field_name").get("range_key_value") -> actual_data
+    let game_scores = user_data.get("game_scores").unwrap();
+    let game_scores_obj = game_scores.as_object().unwrap();
+    let data_obj = game_scores_obj.get("data_types_test").unwrap().as_object().unwrap();
+    
     // Verify all data types
     assert_eq!(
-        game_scores.get("integer_score").unwrap().as_i64(),
+        data_obj.get("integer_score").unwrap().as_i64(),
         Some(12345)
     );
     assert_eq!(
-        game_scores.get("float_score").unwrap().as_f64(),
+        data_obj.get("float_score").unwrap().as_f64(),
         Some(98.75)
     );
     assert_eq!(
-        game_scores.get("string_score").unwrap().as_str(),
+        data_obj.get("string_score").unwrap().as_str(),
         Some("SSS+")
     );
     assert_eq!(
-        game_scores.get("boolean_completed").unwrap().as_bool(),
+        data_obj.get("boolean_completed").unwrap().as_bool(),
         Some(true)
     );
     assert_eq!(
-        game_scores.get("false_boolean").unwrap().as_bool(),
+        data_obj.get("false_boolean").unwrap().as_bool(),
         Some(false)
     );
-    assert!(game_scores.get("null_value").unwrap().is_null());
-    assert_eq!(game_scores.get("zero_value").unwrap().as_i64(), Some(0));
+    assert!(data_obj.get("null_value").unwrap().is_null());
+    assert_eq!(data_obj.get("zero_value").unwrap().as_i64(), Some(0));
     assert_eq!(
-        game_scores.get("negative_value").unwrap().as_i64(),
+        data_obj.get("negative_value").unwrap().as_i64(),
         Some(-500)
     );
     assert_eq!(
-        game_scores.get("unicode_string").unwrap().as_str(),
+        data_obj.get("unicode_string").unwrap().as_str(),
         Some("🎮 Gaming Score! 日本語")
     );
-    assert_eq!(game_scores.get("empty_string").unwrap().as_str(), Some(""));
+    assert_eq!(data_obj.get("empty_string").unwrap().as_str(), Some(""));
 
     // Verify arrays
-    let array_simple = game_scores.get("array_simple").unwrap().as_array().unwrap();
+    let array_simple = data_obj.get("array_simple").unwrap().as_array().unwrap();
     assert_eq!(array_simple.len(), 3);
     assert_eq!(array_simple[0].as_i64(), Some(100));
 
-    let array_mixed = game_scores.get("array_mixed").unwrap().as_array().unwrap();
+    let array_mixed = data_obj.get("array_mixed").unwrap().as_array().unwrap();
     assert_eq!(array_mixed.len(), 5);
     assert_eq!(array_mixed[0].as_i64(), Some(1));
     assert_eq!(array_mixed[1].as_str(), Some("two"));
@@ -1051,7 +1051,7 @@ fn test_range_schema_different_data_types_comprehensive() {
     assert!(array_mixed[4].is_null());
 
     // Verify nested objects
-    let nested_obj = game_scores
+    let nested_obj = data_obj
         .get("object_nested")
         .unwrap()
         .as_object()
@@ -1061,13 +1061,13 @@ fn test_range_schema_different_data_types_comprehensive() {
     assert_eq!(skills.get("speed").unwrap().as_i64(), Some(95));
 
     // Verify empty containers
-    assert!(game_scores
+    assert!(data_obj
         .get("object_empty")
         .unwrap()
         .as_object()
         .unwrap()
         .is_empty());
-    assert!(game_scores
+    assert!(data_obj
         .get("array_empty")
         .unwrap()
         .as_array()
@@ -1310,13 +1310,14 @@ fn test_range_schema_query_isolation_between_users() {
 
         // Verify the correct data is returned
         let user_data = grouped_obj.get(*target_user).unwrap().as_object().unwrap();
-        let game_scores = user_data.get("game_scores").unwrap().as_object().unwrap();
+        let game_scores_field = user_data.get("game_scores").unwrap().as_object().unwrap();
+        let game_scores_data = game_scores_field.get(*target_user).unwrap().as_object().unwrap();
         assert_eq!(
-            game_scores.get("secret_score").unwrap().as_i64(),
+            game_scores_data.get("secret_score").unwrap().as_i64(),
             Some(*expected_score as i64)
         );
         assert_eq!(
-            game_scores.get("secret_data").unwrap().as_str(),
+            game_scores_data.get("secret_data").unwrap().as_str(),
             Some(*expected_secret)
         );
     }

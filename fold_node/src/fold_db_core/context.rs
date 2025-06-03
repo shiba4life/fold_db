@@ -11,6 +11,7 @@ pub struct AtomContext<'a> {
     schema: &'a Schema,
     field: &'a str,
     source_pub_key: String,
+    ref_atom_uuid: Option<String>,
     pub(super) atom_manager: &'a mut AtomManager,
 }
 
@@ -25,6 +26,7 @@ impl<'a> AtomContext<'a> {
             schema,
             field,
             source_pub_key,
+            ref_atom_uuid: None,
             atom_manager,
         }
     }
@@ -38,8 +40,13 @@ impl<'a> AtomContext<'a> {
 
     pub fn get_or_create_atom_ref(&mut self) -> Result<String, SchemaError> {
         let field_def = self.get_field_def()?;
+        if field_def.ref_atom_uuid().is_some() {
+            self.ref_atom_uuid = field_def.ref_atom_uuid().map(|uuid| uuid.to_string());
+            return Ok(self.ref_atom_uuid.clone().unwrap());
+        }
 
-        let aref_uuid = if let Some(uuid) = field_def.ref_atom_uuid() {
+        let aref_uuid = if let Some(uuid) = self.ref_atom_uuid.clone() {
+            println!("🔑 Using existing aref_uuid: {}", uuid);
             uuid.clone()
         } else {
             let aref_uuid = Uuid::new_v4().to_string();
@@ -73,6 +80,8 @@ impl<'a> AtomContext<'a> {
             }
             aref_uuid
         };
+
+        self.ref_atom_uuid = Some(aref_uuid.clone());
 
         Ok(aref_uuid)
     }
@@ -141,9 +150,6 @@ impl<'a> AtomContext<'a> {
         content: Value,
         status: Option<AtomStatus>,
     ) -> Result<(), SchemaError> {
-        // Clone content for Range field processing before moving it to create_atom
-        let content_for_range = content.clone();
-
         let atom = self
             .atom_manager
             .create_atom(
@@ -158,58 +164,44 @@ impl<'a> AtomContext<'a> {
         let aref_uuid = self.get_or_create_atom_ref()?;
         let field_def = self.get_field_def()?;
 
-        match field_def {
-            crate::schema::types::FieldVariant::Single(_) => {
-                self.atom_manager
-                    .update_atom_ref(
-                        &aref_uuid,
-                        atom.uuid().to_string(),
-                        self.source_pub_key.clone(),
-                    )
-                    .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
-            }
-            crate::schema::types::FieldVariant::Collection(_) => {
-                self.atom_manager
-                    .update_atom_ref_collection(
-                        &aref_uuid,
-                        atom.uuid().to_string(),
-                        "0".to_string(),
-                        self.source_pub_key.clone(),
-                    )
-                    .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
-            }
-            crate::schema::types::FieldVariant::Range(_) => {
-                // For Range fields, create separate atoms for each key-value pair
-                if let Some(obj) = content_for_range.as_object() {
-                    for (key, value) in obj {
-                        // Create a separate atom for each key-value pair
-                        let key_atom = self
-                            .atom_manager
-                            .create_atom(
-                                &self.schema.name,
-                                self.source_pub_key.clone(),
-                                None, // No previous atom for individual keys
-                                value.clone(),
-                                None,
-                            )
-                            .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+        self.atom_manager
+        .update_atom_ref(
+            &aref_uuid,
+            atom.uuid().to_string(),
+            self.source_pub_key.clone(),
+        )
+        .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+        Ok(())
+    }
 
-                        self.atom_manager
-                            .update_atom_ref_range(
-                                &aref_uuid,
-                                key_atom.uuid().to_string(),
-                                key.clone(),
-                                self.source_pub_key.clone(),
-                            )
-                            .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
-                    }
-                } else {
-                    return Err(SchemaError::InvalidData(
-                        "Range field data must be a JSON object with key-value pairs".to_string(),
-                    ));
-                }
-            }
-        }
+    pub fn create_and_update_range_atom(
+        &mut self,
+        prev_atom_uuid: Option<String>,
+        content_key: &str,
+        content_value: Value,
+        status: Option<AtomStatus>,
+    ) -> Result<(), SchemaError> {
+        let aref_uuid = self.get_or_create_atom_ref()?;
+
+        let atom = self
+        .atom_manager
+        .create_atom(
+            &self.schema.name,
+            self.source_pub_key.clone(),
+            prev_atom_uuid, // No previous atom for individual keys
+            content_value.clone(),
+            status,
+        )
+        .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
+
+        self.atom_manager
+            .update_atom_ref_range(
+                &aref_uuid,
+                atom.uuid().to_string(),
+                content_key.to_string(),
+                self.source_pub_key.clone(),
+            )
+            .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
 
         Ok(())
     }

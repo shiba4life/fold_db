@@ -92,33 +92,38 @@ impl<'a> RangeFieldRetriever<'a> {
             }
         };
 
-        // Convert range_filter to RangeFilter enum
-        let range_filter = if let Ok(range_filter) =
-            serde_json::from_value::<RangeFilter>(range_filter_value.clone())
-        {
-            range_filter
-        } else if let Some(obj) = range_filter_value.as_object() {
+        // For range schemas, extract the range_key value from the filter
+        // Format: {"range_filter": {"range_key_field": {"Key": "abc"}}} or {"range_filter": {"range_key_field": "abc"}}
+        let range_filter = if let Some(obj) = range_filter_value.as_object() {
             if obj.len() == 1 {
-                // Get the single key-value pair
-                let (_key, value) = obj.iter().next().unwrap();
+                // Get the single key-value pair (range_key_field -> filter_spec)
+                let (range_key_field, filter_spec) = obj.iter().next().unwrap();
+                info!("🔍 Range filter for field '{}': {:?}", range_key_field, filter_spec);
 
-                // Convert the value to string and create RangeFilter::Key
-                let value_str = match value {
-                    Value::String(s) => s.clone(),
-                    Value::Number(n) => n.to_string(),
-                    Value::Bool(b) => b.to_string(),
-                    _ => serde_json::to_string(value)
-                        .map_err(|e| {
-                            SchemaError::InvalidData(format!(
-                                "Failed to convert range filter value to string: {}",
-                                e
-                            ))
-                        })?
-                        .trim_matches('"')
-                        .to_string(), // Remove quotes from JSON strings
-                };
+                // Try to parse filter_spec as a RangeFilter (e.g., {"Key": "abc"})
+                if let Ok(range_filter) = serde_json::from_value::<RangeFilter>(filter_spec.clone()) {
+                    info!("✅ Parsed structured range filter: {:?}", range_filter);
+                    range_filter
+                } else {
+                    // Fallback: convert the filter_spec value to string and create RangeFilter::Key
+                    let value_str = match filter_spec {
+                        Value::String(s) => s.clone(),
+                        Value::Number(n) => n.to_string(),
+                        Value::Bool(b) => b.to_string(),
+                        _ => serde_json::to_string(filter_spec)
+                            .map_err(|e| {
+                                SchemaError::InvalidData(format!(
+                                    "Failed to convert range filter value to string: {}",
+                                    e
+                                ))
+                            })?
+                            .trim_matches('"')
+                            .to_string(), // Remove quotes from JSON strings
+                    };
 
-                RangeFilter::Key(value_str)
+                    info!("✅ Using fallback Key filter for range_key value: '{}'", value_str);
+                    RangeFilter::Key(value_str)
+                }
             } else {
                 return Err(SchemaError::InvalidData(format!(
                     "range_filter should contain exactly one key-value pair, found {} keys",
@@ -126,10 +131,13 @@ impl<'a> RangeFieldRetriever<'a> {
                 )));
             }
         } else {
-            return Err(SchemaError::InvalidData(format!(
-                "Invalid range filter format: expected object with single key-value pair or valid RangeFilter enum, got: {:?}", 
-                range_filter_value
-            )));
+            // Try direct parsing as RangeFilter
+            serde_json::from_value::<RangeFilter>(range_filter_value.clone()).map_err(|e| {
+                SchemaError::InvalidData(format!(
+                    "Invalid range filter format: expected object with range_key field or valid RangeFilter enum, got: {:?}, error: {}",
+                    range_filter_value, e
+                ))
+            })?
         };
 
         // Load AtomRefRange data into the RangeField before filtering

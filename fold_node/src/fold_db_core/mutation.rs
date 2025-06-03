@@ -222,12 +222,34 @@ impl FoldDB {
                     // 1. set_field_value creates AtomRef and returns UUID (does NOT set on field)
                     // 2. We use schema_manager to set and persist the UUID on the actual schema
                     // 3. This prevents "ghost ref_atom_uuid" where UUID exists but AtomRef doesn't
-                    let ref_atom_uuid = self.field_manager.set_field_value(
-                        &mut schema_clone,
-                        field_name,
-                        value.clone(),
-                        mutation.pub_key.clone(),
-                    )?;
+                    // For range schemas, pass the range_key value as context for primitive fields
+                    let ref_atom_uuid = if let Some(range_key) = schema.range_key() {
+                        
+                        if field_name == range_key {
+                            // Range key field - this is typically a primitive value, use set_field_value
+                            self.field_manager.set_field_value(
+                                &mut schema_clone,
+                                field_name,
+                                value.clone(),
+                                mutation.pub_key.clone(),
+                            )?
+                        } else {
+                            // Non-range key field - pass range_key value as context
+                            self.field_manager.set_field_value(
+                                &mut schema_clone,
+                                field_name,
+                                value.clone(),
+                                mutation.pub_key.clone(),
+                            )?
+                        }
+                    } else {
+                        self.field_manager.set_field_value(
+                            &mut schema_clone,
+                            field_name,
+                            value.clone(),
+                            mutation.pub_key.clone(),
+                        )?
+                    };
                     log::info!(
                         "✅ Field value set successfully for: {}.{} with ref_atom_uuid: {}",
                         mutation.schema_name,

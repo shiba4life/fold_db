@@ -7,6 +7,7 @@ pub mod range_schema_tests;
 pub mod schema_field_mapping_tests;
 pub mod schema_set_unloaded_tests;
 pub mod test_automatic_transform_trigger;
+pub mod test_range_key_field_fix;
 pub mod transform_orchestrator_tests;
 pub mod transform_output_schema_tests;
 pub mod transform_sample_execution_tests;
