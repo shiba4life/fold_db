@@ -81,8 +81,16 @@ impl RangeField {
 
         match filter {
             RangeFilter::Key(key) => {
-                if let Some(value) = atom_ref_range.get_atom_uuid(key) {
-                    matches.insert(key.clone(), value.clone());
+                if let Some(values) = atom_ref_range.get_atom_uuids(key) {
+                    // Return all atom UUIDs for this key, not just the first one
+                    for (i, atom_uuid) in values.iter().enumerate() {
+                        let match_key = if values.len() == 1 {
+                            key.clone()
+                        } else {
+                            format!("{}_{}", key, i)
+                        };
+                        matches.insert(match_key, atom_uuid.clone());
+                    }
                 }
             }
             RangeFilter::KeyPrefix(prefix) => {

@@ -168,8 +168,53 @@ impl<'a> RangeFieldRetriever<'a> {
         let filter_result = range_field.apply_filter(&range_filter);
         info!("🔍 Filter result: {} matches", filter_result.matches.len());
 
+        // Convert UUIDs back to actual atom content
+        let mut content_matches = std::collections::HashMap::new();
+        let mut grouped_by_original_key = std::collections::HashMap::<String, Vec<serde_json::Value>>::new();
+        
+        for (match_key, atom_uuid) in &filter_result.matches {
+            // Extract original key (remove _N suffix if present)
+            let original_key = if let Some(underscore_pos) = match_key.rfind('_') {
+                if match_key[underscore_pos + 1..].chars().all(|c| c.is_ascii_digit()) {
+                    &match_key[..underscore_pos]
+                } else {
+                    match_key
+                }
+            } else {
+                match_key
+            };
+            
+            // Load actual atom content
+            match self.base.atom_manager.get_atoms().lock() {
+                Ok(atoms_guard) => {
+                    if let Some(atom) = atoms_guard.get(atom_uuid) {
+                        grouped_by_original_key
+                            .entry(original_key.to_string())
+                            .or_default()
+                            .push(atom.content().clone());
+                        info!("✅ Loaded atom content for key: {} -> atom_uuid: {} -> content: {:?}",
+                              original_key, atom_uuid, atom.content());
+                    } else {
+                        info!("⚠️  Atom not found for UUID: {}", atom_uuid);
+                    }
+                }
+                Err(e) => {
+                    info!("⚠️  Failed to acquire atoms lock: {:?}", e);
+                }
+            }
+        }
+        
+        // Convert grouped content to the final format
+        for (key, contents) in grouped_by_original_key {
+            if contents.len() == 1 {
+                content_matches.insert(key, contents[0].clone());
+            } else {
+                content_matches.insert(key, serde_json::Value::Array(contents));
+            }
+        }
+
         Ok(serde_json::json!({
-            "matches": filter_result.matches,
+            "matches": content_matches,
             "total_count": filter_result.total_count
         }))
     }

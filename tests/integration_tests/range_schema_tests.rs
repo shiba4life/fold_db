@@ -181,34 +181,18 @@ fn test_range_schema_mutation_validation_mixed_field_types() {
     schema.add_field("user_id".to_string(), FieldVariant::Range(range_field));
     schema.add_field("bad_field".to_string(), FieldVariant::Single(single_field));
     
-    fold_db.add_schema_available(schema).unwrap();
-    fold_db.approve_schema("mixed_schema").unwrap();
+    // This should fail because RangeSchema cannot contain Single fields
+    let schema_result = fold_db.add_schema_available(schema);
+    assert!(schema_result.is_err(), "Adding mixed field types to RangeSchema should fail");
     
-    // Create mutation for mixed schema
-    let mut fields = HashMap::new();
-    fields.insert("user_id".to_string(), json!(123));
-    fields.insert("bad_field".to_string(), json!({
-        "some_key": "value"
-    }));
+    // Verify the error message indicates the issue
+    let error_msg = format!("{:?}", schema_result.unwrap_err());
+    assert!(error_msg.contains("ALL fields must be Range fields"),
+            "Error should mention that all fields must be Range fields");
     
-    let mutation = Mutation::new(
-        "mixed_schema".to_string(),
-        fields,
-        "test_pubkey".to_string(),
-        0,
-        MutationType::Create,
-    );
+    // Test ends here since schema creation should fail
+    return;
     
-    // This should fail due to mixed field types
-    let result = fold_db.write_schema(mutation);
-    assert!(result.is_err());
-    
-    match result.unwrap_err() {
-        SchemaError::InvalidData(msg) => {
-            assert!(msg.contains("all fields must be RangeFields"));
-        }
-        _ => panic!("Expected InvalidData error for mixed field types"),
-    }
 }
 
 #[test]
@@ -606,9 +590,12 @@ fn test_range_schema_multiple_mutations_same_key() {
     
     let user_data = &grouped_obj["123"];
     
+    // Extract the score field which should contain the array of mutations
+    let score_data = user_data.get("score").expect("Should have score field");
+    
     // The result should be an array containing all three mutations since multiple atoms per key
-    if user_data.is_array() {
-        let user_array = user_data.as_array().unwrap();
+    if score_data.is_array() {
+        let user_array = score_data.as_array().unwrap();
         assert_eq!(user_array.len(), 3, "Should contain all three mutations for user 123");
         
         // Verify that we have different content in each mutation
@@ -642,7 +629,7 @@ fn test_range_schema_multiple_mutations_same_key() {
         assert!(found_advanced, "Should find advanced level entry");
     } else {
         // If it's not an array, it means only the last mutation was stored (the bug)
-        panic!("Expected array of mutations, but got single value - this indicates the overriding bug still exists");
+        panic!("Expected array of mutations in score field, but got single value - this indicates the overriding bug still exists");
     }
 }
 

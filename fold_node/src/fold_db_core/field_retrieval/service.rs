@@ -149,9 +149,20 @@ impl FieldRetrievalService {
             // Get field value with the wrapped range filter
             match self.get_field_value_with_filter(atom_manager, schema, field_name, &wrapped_filter) {
                 Ok(field_value) => {
+                    // For range fields, extract the actual content from the filtered result
+                    let actual_content = if let Some(matches) = field_value.get("matches") {
+                        if let Some(range_content) = matches.get(&range_key_str) {
+                            range_content.clone()
+                        } else {
+                            serde_json::Value::Null
+                        }
+                    } else {
+                        field_value
+                    };
+                    
                     // Ensure the range_key entry exists in result
                     let range_entry = result.entry(range_key_str.clone()).or_default();
-                    range_entry.insert(field_name.clone(), field_value);
+                    range_entry.insert(field_name.clone(), actual_content);
                     info!("✅ Added field '{}' to range key '{}'", field_name, range_key_str);
                 }
                 Err(e) => {
