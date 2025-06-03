@@ -1,9 +1,9 @@
-use crate::network::error::{NetworkError, NetworkResult};
 use crate::network::connections;
+use crate::network::error::{NetworkError, NetworkResult};
 use crate::network::NetworkCore;
 use libp2p::PeerId;
+use log::{error, info, warn};
 use serde_json::Value;
-use log::{info, warn, error};
 
 impl NetworkCore {
     /// Forward a request to another node.
@@ -128,17 +128,15 @@ impl NetworkCore {
                             "simulated": true
                         }))
                     }
-                    _ => {
-                        Ok(serde_json::json!({
-                            "success": true,
-                            "operation": operation,
-                            "forwarded": true,
-                            "node_id": node_id,
-                            "peer_id": peer_id.to_string(),
-                            "message": "Request forwarding simulation",
-                            "simulated": true
-                        }))
-                    }
+                    _ => Ok(serde_json::json!({
+                        "success": true,
+                        "operation": operation,
+                        "forwarded": true,
+                        "node_id": node_id,
+                        "peer_id": peer_id.to_string(),
+                        "message": "Request forwarding simulation",
+                        "simulated": true
+                    })),
                 }
             }
         }

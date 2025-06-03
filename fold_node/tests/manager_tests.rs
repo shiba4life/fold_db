@@ -1,24 +1,14 @@
-use tempfile::tempdir;
 use serde_json::json;
 use std::collections::HashMap;
+use tempfile::tempdir;
 
 use fold_node::fold_db_core::{
-    atom_manager::AtomManager,
-    collection_manager::CollectionManager,
-    context::AtomContext,
+    atom_manager::AtomManager, collection_manager::CollectionManager, context::AtomContext,
     field_manager::FieldManager,
 };
 use fold_node::testing::{
-    CollectionField,
-    Field,
-    FieldPaymentConfig,
-    FieldType,
-    PermissionsPolicy,
-    Schema,
-    SingleField,
-    FieldVariant,
-    SchemaError,
-    TrustDistanceScaling,
+    CollectionField, Field, FieldPaymentConfig, FieldType, FieldVariant, PermissionsPolicy, Schema,
+    SchemaError, SingleField, TrustDistanceScaling,
 };
 use serde_json::Value;
 use uuid::Uuid;
@@ -70,14 +60,18 @@ fn test_field_manager_updates() {
     field_manager
         .update_field(&mut schema_clone, "name", json!("Bob"), "key".to_string())
         .unwrap();
-    let value = field_manager.get_field_value(&schema_clone, "name").unwrap();
+    let value = field_manager
+        .get_field_value(&schema_clone, "name")
+        .unwrap();
     assert_eq!(value, json!("Bob"));
 
     let mut schema_clone2 = schema_clone.clone();
     field_manager
         .delete_field(&mut schema_clone2, "name", "key".to_string())
         .unwrap();
-    let value = field_manager.get_field_value(&schema_clone2, "name").unwrap();
+    let value = field_manager
+        .get_field_value(&schema_clone2, "name")
+        .unwrap();
     assert_eq!(value, Value::Null);
 }
 
@@ -87,12 +81,8 @@ fn test_field_manager_collection_error() {
     let mut schema = Schema::new("test".to_string());
     schema.add_field("items".to_string(), create_collection_field());
 
-    let result = field_manager.set_field_value(
-        &mut schema,
-        "items",
-        json!("bad"),
-        "key".to_string(),
-    );
+    let result =
+        field_manager.set_field_value(&mut schema, "items", json!("bad"), "key".to_string());
     assert!(matches!(result, Err(SchemaError::InvalidField(_))));
 }
 
@@ -102,12 +92,7 @@ fn test_collection_manager_operations() {
 
     let mut schema = Schema::new("test".to_string());
     schema.add_field("items".to_string(), create_collection_field());
-    let aref_uuid = schema
-        .fields
-        .get("items")
-        .unwrap()
-        .ref_atom_uuid()
-        .unwrap();
+    let aref_uuid = schema.fields.get("items").unwrap().ref_atom_uuid().unwrap();
 
     collection_manager
         .add_collection_field_value(
@@ -136,7 +121,13 @@ fn test_collection_manager_operations() {
         col_ref.get_atom_uuid("1").unwrap().clone()
     };
     let atoms = atom_manager.get_atoms();
-    let atom = atoms.lock().unwrap().get(&atom_uuid).unwrap().content().clone();
+    let atom = atoms
+        .lock()
+        .unwrap()
+        .get(&atom_uuid)
+        .unwrap()
+        .content()
+        .clone();
     assert_eq!(atom, json!("v2"));
 
     collection_manager
@@ -150,7 +141,13 @@ fn test_collection_manager_operations() {
         col_ref.get_atom_uuid("1").unwrap().clone()
     };
     let atoms = atom_manager.get_atoms();
-    let atom = atoms.lock().unwrap().get(&atom_uuid).unwrap().content().clone();
+    let atom = atoms
+        .lock()
+        .unwrap()
+        .get(&atom_uuid)
+        .unwrap()
+        .content()
+        .clone();
     assert_eq!(atom, Value::Null);
 }
 
@@ -167,4 +164,3 @@ fn test_atom_context_type_validation() {
     assert!(ctx.validate_field_type(FieldType::Collection).is_err());
     assert!(ctx.validate_field_type(FieldType::Range).is_err());
 }
-

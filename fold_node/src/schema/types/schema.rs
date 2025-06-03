@@ -13,9 +13,7 @@ pub enum SchemaType {
 }
 
 pub fn default_schema_type() -> SchemaType {
-    SchemaType::Range {
-        range_key: "key".to_string(),
-    }
+    SchemaType::Single
 }
 
 /// Defines the structure, permissions, and payment requirements for a data collection.
@@ -85,6 +83,14 @@ impl Schema {
         }
     }
 
+    /// Returns the range_key if this schema is a Range schema, otherwise None.
+    pub fn range_key(&self) -> Option<&str> {
+        match &self.schema_type {
+            SchemaType::Range { range_key } => Some(range_key.as_str()),
+            _ => None,
+        }
+    }
+
     /// Sets the fields for this schema.
     ///
     /// This builder method allows setting all fields at once,
@@ -135,6 +141,55 @@ impl Schema {
     pub fn add_field(&mut self, field_name: String, field: FieldVariant) {
         self.fields.insert(field_name, field);
     }
+
+    /// Validates that queries against Range schemas include the correct range_key.
+    /// Returns error if wrong key is used or range_key is missing.
+    pub fn validate_range_filter(
+        &self,
+        filter: &serde_json::Value,
+    ) -> Result<(), crate::schema::types::SchemaError> {
+        use crate::schema::types::SchemaError;
+
+        // Only validate if this is a Range schema
+        if let Some(range_key) = self.range_key() {
+            // Filter must be an object
+            let filter_obj = filter.as_object().ok_or_else(|| {
+                SchemaError::InvalidData("Filter must be an object for Range schemas".to_string())
+            })?;
+
+            // Check if range_filter exists
+            let range_filter = filter_obj.get("range_filter").ok_or_else(|| {
+                SchemaError::InvalidData(format!(
+                    "Range schema '{}' requires a 'range_filter' in the query filter",
+                    self.name
+                ))
+            })?;
+
+            // Range filter must be an object
+            let range_filter_obj = range_filter.as_object().ok_or_else(|| {
+                SchemaError::InvalidData("range_filter must be an object".to_string())
+            })?;
+
+            // Check if the correct range_key is present
+            if !range_filter_obj.contains_key(range_key) {
+                return Err(SchemaError::InvalidData(format!(
+                    "Range schema '{}' requires filter key '{}' in range_filter, but it was not found",
+                    self.name, range_key
+                )));
+            }
+
+            // Validate that no unexpected keys are in range_filter (only range_key should be present)
+            if range_filter_obj.len() != 1 {
+                let found_keys: Vec<String> = range_filter_obj.keys().cloned().collect();
+                return Err(SchemaError::InvalidData(format!(
+                    "Range schema '{}' range_filter should only contain '{}', but found: {:?}",
+                    self.name, range_key, found_keys
+                )));
+            }
+        }
+        // For non-Range schemas, no validation needed
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -146,11 +201,8 @@ mod tests {
     use uuid::Uuid;
 
     fn create_field(policy: PermissionsPolicy) -> FieldVariant {
-        let mut single_field = SingleField::new(
-            policy,
-            create_default_payment_config(),
-            HashMap::new(),
-        );
+        let mut single_field =
+            SingleField::new(policy, create_default_payment_config(), HashMap::new());
         single_field.set_ref_atom_uuid(Uuid::new_v4().to_string());
         FieldVariant::Single(single_field)
     }
@@ -213,10 +265,7 @@ mod tests {
         // Verify field was added
         assert!(schema.fields.contains_key(&field_name));
         let stored_field = schema.fields.get(&field_name).unwrap();
-        assert_eq!(
-            stored_field.ref_atom_uuid(),
-            Some(&"test-uuid".to_string())
-        );
+        assert_eq!(stored_field.ref_atom_uuid(), Some(&"test-uuid".to_string()));
         assert!(stored_field.field_mappers().is_empty());
     }
 
@@ -336,12 +385,16 @@ mod tests {
             }
         }";
 
-        let schema: Schema = serde_json::from_str(json_input).expect("Failed to deserialize schema");
+        let schema: Schema =
+            serde_json::from_str(json_input).expect("Failed to deserialize schema");
 
         assert_eq!(schema.name, "test_schema_with_transforms");
         assert_eq!(schema.fields.len(), 1);
 
-        let calculated_field = schema.fields.get("calculated_field").expect("calculated_field not found");
+        let calculated_field = schema
+            .fields
+            .get("calculated_field")
+            .expect("calculated_field not found");
         assert!(calculated_field.transform().is_some());
         assert_eq!(calculated_field.transform().unwrap().logic, "return 1");
     }

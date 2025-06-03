@@ -1,10 +1,10 @@
-use fold_node::testing::{
-    ExplicitCounts, Field, FieldPaymentConfig, Mutation, MutationType, PermissionWrapper,
-    PermissionsPolicy, Query, Schema, SchemaCore, SingleField, FieldVariant, SchemaPaymentConfig, TrustDistance,
-    TrustDistanceScaling,
-};
 use fold_node::schema::types::schema::default_schema_type;
 use fold_node::schema::types::Transform;
+use fold_node::testing::{
+    ExplicitCounts, Field, FieldPaymentConfig, FieldVariant, Mutation, MutationType,
+    PermissionWrapper, PermissionsPolicy, Query, Schema, SchemaCore, SchemaPaymentConfig,
+    SingleField, TrustDistance, TrustDistanceScaling,
+};
 use serde_json::Value;
 use std::collections::HashMap;
 use tempfile::tempdir;
@@ -20,10 +20,7 @@ fn test_non_reversible_transform_not_writable() {
     let temp_dir = tempdir().unwrap();
     let schema_manager = SchemaCore::new_for_testing(temp_dir.path().to_str().unwrap()).unwrap();
 
-    let transform = Transform::new(
-        "1 + 1".to_string(),
-        "test_schema.calc".to_string(),
-    );
+    let transform = Transform::new("1 + 1".to_string(), "test_schema.calc".to_string());
     let mut field = SingleField::new(
         PermissionsPolicy::default(),
         create_default_payment_config(),
@@ -201,11 +198,7 @@ fn test_permission_wrapper_mutation() {
     policy.explicit_write_policy = Some(ExplicitCounts {
         counts_by_pub_key: explicit_counts,
     });
-    let mut field = SingleField::new(
-        policy,
-        create_default_payment_config(),
-        HashMap::new(),
-    );
+    let mut field = SingleField::new(policy, create_default_payment_config(), HashMap::new());
     field.set_ref_atom_uuid("test_ref".to_string());
     field.set_field_mappers(HashMap::new());
     fields.insert("test_field".to_string(), FieldVariant::Single(field));

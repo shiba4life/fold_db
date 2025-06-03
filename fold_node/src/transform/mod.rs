@@ -20,12 +20,12 @@
 //! 3. An executor that handles the integration with the schema system
 
 pub mod ast;
-pub mod parser;
-pub mod interpreter;
 pub mod executor;
+pub mod interpreter;
+pub mod parser;
 // Public re-exports
-pub use ast::{Expression, Value, Operator, UnaryOperator, TransformDeclaration};
+pub use crate::schema::types::Transform;
+pub use ast::{Expression, Operator, TransformDeclaration, UnaryOperator, Value};
+pub use executor::TransformExecutor;
 pub use interpreter::Interpreter;
 pub use parser::TransformParser;
-pub use executor::TransformExecutor;
-pub use crate::schema::types::Transform;

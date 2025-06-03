@@ -8,7 +8,7 @@ This document demonstrates how to use the ingestion module with the DataFold sys
 
 1. Set the required environment variables:
 ```bash
-export OPENROUTER_API_KEY="your-openrouter-api-key"
+export FOLD_OPENROUTER_API_KEY="your-openrouter-api-key"
 export INGESTION_ENABLED="true"
 export OPENROUTER_MODEL="anthropic/claude-3.5-sonnet"
 ```
@@ -308,7 +308,7 @@ The ingestion module provides detailed error information:
   "mutations_executed": 0,
   "errors": [
     "OpenRouter API error: Invalid API key",
-    "Configuration error: OPENROUTER_API_KEY environment variable not set"
+    "Configuration error: FOLD_OPENROUTER_API_KEY environment variable not set"
   ]
 }
 ```
@@ -317,7 +317,7 @@ The ingestion module provides detailed error information:
 
 Environment variables for configuration:
 
-- `OPENROUTER_API_KEY` - Your OpenRouter API key (required)
+- `FOLD_OPENROUTER_API_KEY` - Your OpenRouter API key (required)
 - `OPENROUTER_MODEL` - AI model to use (default: "anthropic/claude-3.5-sonnet")
 - `OPENROUTER_BASE_URL` - API base URL (default: "https://openrouter.ai/api/v1")
 - `INGESTION_ENABLED` - Enable/disable ingestion (default: "true")

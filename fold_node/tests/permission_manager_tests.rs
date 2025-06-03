@@ -26,7 +26,9 @@ fn read_permission_explicit_fallback() {
         read_policy: TrustDistance::Distance(1),
         write_policy: TrustDistance::Distance(0),
         explicit_write_policy: None,
-        explicit_read_policy: Some(ExplicitCounts { counts_by_pub_key: counts }),
+        explicit_read_policy: Some(ExplicitCounts {
+            counts_by_pub_key: counts,
+        }),
     };
 
     // exceeds trust distance but in explicit list
@@ -57,7 +59,9 @@ fn write_permission_explicit_fallback() {
     let policy = PermissionsPolicy {
         read_policy: TrustDistance::Distance(0),
         write_policy: TrustDistance::Distance(1),
-        explicit_write_policy: Some(ExplicitCounts { counts_by_pub_key: counts }),
+        explicit_write_policy: Some(ExplicitCounts {
+            counts_by_pub_key: counts,
+        }),
         explicit_read_policy: None,
     };
 

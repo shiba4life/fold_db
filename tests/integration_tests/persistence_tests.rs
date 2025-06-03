@@ -1,16 +1,11 @@
-use fold_node::testing::{
-    Field, FieldVariant, SingleField, Schema, Query,
-};
 use fold_node::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
 use fold_node::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 use fold_node::schema::types::Transform;
+use fold_node::testing::{Field, FieldVariant, Schema, SingleField};
 use fold_node::transform::parser::TransformParser;
-use fold_node::{DataFoldNode, NodeConfig};
-use crate::test_data::test_helpers::node_operations::{load_and_allow, insert_value, query_value};
-use serde_json::json;
 use std::collections::HashMap;
-use tempfile::tempdir;
 
+#[allow(dead_code)]
 fn create_persistence_schema() -> Schema {
     let mut schema = Schema::new("PersistSchema".to_string());
     // Input field
@@ -35,7 +30,10 @@ fn create_persistence_schema() -> Schema {
         HashMap::new(),
     );
     transform_field.set_transform(transform);
-    schema.add_field("transform_field".to_string(), FieldVariant::Single(transform_field));
+    schema.add_field(
+        "transform_field".to_string(),
+        FieldVariant::Single(transform_field),
+    );
 
     schema
 }

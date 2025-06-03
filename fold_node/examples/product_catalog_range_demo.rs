@@ -1,14 +1,14 @@
 //! Product Catalog Range Field Demo
-//! 
+//!
 //! This example demonstrates how to work with Range fields in a practical
 //! product catalog scenario, showing inventory management and product
 //! attribute querying using various range filter types.
 
-use fold_node::schema::types::field::{RangeField, RangeFilter, RangeFilterResult};
 use fold_node::fees::types::config::FieldPaymentConfig;
 use fold_node::permissions::types::policy::PermissionsPolicy;
-use std::collections::HashMap;
+use fold_node::schema::types::field::{RangeField, RangeFilter, RangeFilterResult};
 use serde_json::json;
+use std::collections::HashMap;
 
 fn main() {
     println!("=== Product Catalog Range Field Demo ===\n");
@@ -27,10 +27,10 @@ fn main() {
 
     // Demonstrate inventory queries
     demonstrate_inventory_queries(&inventory_field);
-    
+
     // Demonstrate attribute queries
     demonstrate_attribute_queries(&attributes_field);
-    
+
     // Demonstrate advanced filtering patterns
     demonstrate_advanced_patterns(&inventory_field, &attributes_field);
 }
@@ -41,7 +41,12 @@ fn create_inventory_field() -> RangeField {
     let field_mappers = HashMap::new();
     let source_pub_key = "inventory_manager".to_string();
 
-    RangeField::new_with_range(permission_policy, payment_config, field_mappers, source_pub_key)
+    RangeField::new_with_range(
+        permission_policy,
+        payment_config,
+        field_mappers,
+        source_pub_key,
+    )
 }
 
 fn create_attributes_field() -> RangeField {
@@ -50,7 +55,12 @@ fn create_attributes_field() -> RangeField {
     let field_mappers = HashMap::new();
     let source_pub_key = "product_manager".to_string();
 
-    RangeField::new_with_range(permission_policy, payment_config, field_mappers, source_pub_key)
+    RangeField::new_with_range(
+        permission_policy,
+        payment_config,
+        field_mappers,
+        source_pub_key,
+    )
 }
 
 fn populate_inventory_data(field: &mut RangeField) {
@@ -63,7 +73,7 @@ fn populate_inventory_data(field: &mut RangeField) {
         atom_ref_range.set_atom_uuid("store:downtown".to_string(), "5".to_string());
         atom_ref_range.set_atom_uuid("store:mall".to_string(), "8".to_string());
         atom_ref_range.set_atom_uuid("store:outlet".to_string(), "3".to_string());
-        
+
         // Additional locations for demonstration
         atom_ref_range.set_atom_uuid("distribution:center1".to_string(), "100".to_string());
         atom_ref_range.set_atom_uuid("distribution:center2".to_string(), "75".to_string());
@@ -85,8 +95,14 @@ fn populate_attributes_data(field: &mut RangeField) {
         atom_ref_range.set_atom_uuid("color".to_string(), "Black".to_string());
         atom_ref_range.set_atom_uuid("warranty".to_string(), "2 years".to_string());
         atom_ref_range.set_atom_uuid("connectivity:wifi".to_string(), "Wi-Fi 6E".to_string());
-        atom_ref_range.set_atom_uuid("connectivity:bluetooth".to_string(), "Bluetooth 5.2".to_string());
-        atom_ref_range.set_atom_uuid("connectivity:ports".to_string(), "USB-C, HDMI, USB-A".to_string());
+        atom_ref_range.set_atom_uuid(
+            "connectivity:bluetooth".to_string(),
+            "Bluetooth 5.2".to_string(),
+        );
+        atom_ref_range.set_atom_uuid(
+            "connectivity:ports".to_string(),
+            "USB-C, HDMI, USB-A".to_string(),
+        );
     }
 }
 
@@ -213,9 +229,14 @@ fn demonstrate_advanced_patterns(inventory_field: &RangeField, attributes_field:
 
     // Pattern 4: Utility functions
     println!("4. Utility Functions:");
-    println!("   All inventory keys: {:?}", inventory_field.get_all_keys());
-    println!("   Warehouse keys only: {:?}", 
-             inventory_field.get_keys_in_range("warehouse:", "warehouse:z"));
+    println!(
+        "   All inventory keys: {:?}",
+        inventory_field.get_all_keys()
+    );
+    println!(
+        "   Warehouse keys only: {:?}",
+        inventory_field.get_keys_in_range("warehouse:", "warehouse:z")
+    );
     println!("   Total inventory locations: {}", inventory_field.count());
     println!("   Total product attributes: {}", attributes_field.count());
 

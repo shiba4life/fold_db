@@ -1,3 +1,4 @@
+pub mod atom_ref_setup;
 pub mod operation_builder;
 pub mod schema_builder;
 

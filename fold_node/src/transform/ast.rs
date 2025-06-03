@@ -41,7 +41,9 @@ impl fmt::Display for Value {
 impl From<Value> for JsonValue {
     fn from(value: Value) -> Self {
         match value {
-            Value::Number(n) => JsonValue::Number(serde_json::Number::from_f64(n).unwrap_or(serde_json::Number::from(0))),
+            Value::Number(n) => JsonValue::Number(
+                serde_json::Number::from_f64(n).unwrap_or(serde_json::Number::from(0)),
+            ),
             Value::Boolean(b) => JsonValue::Bool(b),
             Value::String(s) => JsonValue::String(s),
             Value::Null => JsonValue::Null,
@@ -51,7 +53,7 @@ impl From<Value> for JsonValue {
                     map.insert(k, v);
                 }
                 JsonValue::Object(map)
-            },
+            }
             Value::Array(a) => JsonValue::Array(a),
         }
     }
@@ -70,7 +72,7 @@ impl From<JsonValue> for Value {
                     map.insert(k, v);
                 }
                 Value::Object(map)
-            },
+            }
             JsonValue::Array(a) => Value::Array(a),
         }
     }
@@ -150,10 +152,10 @@ impl fmt::Display for UnaryOperator {
 pub enum Expression {
     /// A literal value
     Literal(Value),
-    
+
     /// A variable reference
     Variable(String),
-    
+
     /// A field access expression (e.g., obj.field)
     FieldAccess {
         /// The object being accessed
@@ -161,7 +163,7 @@ pub enum Expression {
         /// The field name
         field: String,
     },
-    
+
     /// A binary operation (e.g., a + b)
     BinaryOp {
         /// The left operand
@@ -171,7 +173,7 @@ pub enum Expression {
         /// The right operand
         right: Box<Expression>,
     },
-    
+
     /// A unary operation (e.g., -a, !b)
     UnaryOp {
         /// The operator
@@ -179,7 +181,7 @@ pub enum Expression {
         /// The operand
         expr: Box<Expression>,
     },
-    
+
     /// A function call (e.g., min(a, b))
     FunctionCall {
         /// The function name
@@ -187,7 +189,7 @@ pub enum Expression {
         /// The function arguments
         args: Vec<Expression>,
     },
-    
+
     /// An if-else expression (e.g., if a > b then a else b)
     IfElse {
         /// The condition
@@ -197,7 +199,7 @@ pub enum Expression {
         /// The optional else branch
         else_branch: Option<Box<Expression>>,
     },
-    
+
     /// A let binding (e.g., let x = a + b; x * 2)
     LetBinding {
         /// The variable name
@@ -207,7 +209,7 @@ pub enum Expression {
         /// The body expression where the binding is in scope
         body: Box<Expression>,
     },
-    
+
     /// A return statement
     Return(Box<Expression>),
 }
@@ -218,7 +220,11 @@ impl fmt::Display for Expression {
             Expression::Literal(value) => write!(f, "{}", value),
             Expression::Variable(name) => write!(f, "{}", name),
             Expression::FieldAccess { object, field } => write!(f, "{}.{}", object, field),
-            Expression::BinaryOp { left, operator, right } => write!(f, "({} {} {})", left, operator, right),
+            Expression::BinaryOp {
+                left,
+                operator,
+                right,
+            } => write!(f, "({} {} {})", left, operator, right),
             Expression::UnaryOp { operator, expr } => write!(f, "{}({})", operator, expr),
             Expression::FunctionCall { name, args } => {
                 write!(f, "{}(", name)?;
@@ -229,17 +235,21 @@ impl fmt::Display for Expression {
                     write!(f, "{}", arg)?;
                 }
                 write!(f, ")")
-            },
-            Expression::IfElse { condition, then_branch, else_branch } => {
+            }
+            Expression::IfElse {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
                 write!(f, "if {} then {}", condition, then_branch)?;
                 if let Some(else_expr) = else_branch {
                     write!(f, " else {}", else_expr)?;
                 }
                 Ok(())
-            },
+            }
             Expression::LetBinding { name, value, body } => {
                 write!(f, "let {} = {}; {}", name, value, body)
-            },
+            }
             Expression::Return(expr) => write!(f, "return {}", expr),
         }
     }
@@ -250,13 +260,13 @@ impl fmt::Display for Expression {
 pub struct TransformDeclaration {
     /// The name of the transform
     pub name: String,
-    
+
     /// Whether the transform is reversible
     pub reversible: bool,
-    
+
     /// The signature for verification
     pub signature: Option<String>,
-    
+
     /// The transform logic
     pub logic: Vec<Expression>,
 }
@@ -265,17 +275,17 @@ impl fmt::Display for TransformDeclaration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "transform {} {{", self.name)?;
         writeln!(f, "  reversible: {}", self.reversible)?;
-        
+
         if let Some(sig) = &self.signature {
             writeln!(f, "  signature: {}", sig)?;
         }
-        
+
         writeln!(f, "  logic: {{")?;
         for expr in &self.logic {
             writeln!(f, "    {}", expr)?;
         }
         writeln!(f, "  }}")?;
-        
+
         write!(f, "}}")
     }
 }

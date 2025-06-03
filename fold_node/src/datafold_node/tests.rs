@@ -34,15 +34,18 @@ fn test_node_config_default() {
     let config = NodeConfig::default();
     assert_eq!(config.storage_path, std::path::PathBuf::from("data"));
     assert_eq!(config.default_trust_distance, 1);
-    assert_eq!(config.network_listen_address, "/ip4/0.0.0.0/tcp/0".to_string());
+    assert_eq!(
+        config.network_listen_address,
+        "/ip4/0.0.0.0/tcp/0".to_string()
+    );
 }
 
 #[tokio::test]
 async fn test_tcp_protocol_roundtrip() {
-    use tokio::net::{TcpListener, TcpStream};
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use crate::datafold_node::tcp_protocol::{read_request, send_response};
     use serde_json::json;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::{TcpListener, TcpStream};
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -51,7 +54,9 @@ async fn test_tcp_protocol_roundtrip() {
         let (mut socket, _) = listener.accept().await.unwrap();
         let req = read_request(&mut socket).await.unwrap().unwrap();
         assert_eq!(req["foo"], "bar");
-        send_response(&mut socket, &json!({"ok": true})).await.unwrap();
+        send_response(&mut socket, &json!({"ok": true}))
+            .await
+            .unwrap();
     });
 
     let mut client = TcpStream::connect(addr).await.unwrap();

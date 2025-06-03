@@ -1,12 +1,12 @@
 // Core database operations
-pub mod core;
 mod atom_operations;
+pub mod core;
+mod error_utils;
 mod metadata_operations;
+mod orchestrator_operations;
 mod schema_operations;
 mod transform_operations;
-mod orchestrator_operations;
 mod utility_operations;
-mod error_utils;
 
 // Tests module
 mod tests;

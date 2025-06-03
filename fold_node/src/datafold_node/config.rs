@@ -50,7 +50,10 @@ impl NodeConfig {
 /// If the file does not exist, a default [`NodeConfig`] is returned. When a
 /// `port` is provided in this case, the returned config will have its
 /// `network_listen_address` set to `"/ip4/0.0.0.0/tcp/<port>"`.
-pub fn load_node_config(path: Option<&str>, port: Option<u16>) -> Result<NodeConfig, std::io::Error> {
+pub fn load_node_config(
+    path: Option<&str>,
+    port: Option<u16>,
+) -> Result<NodeConfig, std::io::Error> {
     use std::fs;
 
     let config_path = path
@@ -73,7 +76,7 @@ pub fn load_node_config(path: Option<&str>, port: Option<u16>) -> Result<NodeCon
         }
     } else {
         let mut config = NodeConfig::default();
-        
+
         // Only use temporary directory for the specific CLI test case that was failing
         // due to database corruption when using the shared "data" directory
         if config_path.contains("nonexistent") {
@@ -86,7 +89,7 @@ pub fn load_node_config(path: Option<&str>, port: Option<u16>) -> Result<NodeCon
                 }
             }
         }
-        
+
         if let Some(p) = port {
             config.network_listen_address = format!("/ip4/0.0.0.0/tcp/{}", p);
         }

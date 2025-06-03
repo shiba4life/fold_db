@@ -18,4 +18,3 @@ pub enum SchemaResponse {
     /// Error response
     Error(String),
 }
-

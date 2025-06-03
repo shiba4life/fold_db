@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::fees::types::config::FieldPaymentConfig;
+use crate::impl_field;
 use crate::permissions::types::policy::PermissionsPolicy;
 use crate::schema::types::field::common::FieldCommon;
-use crate::impl_field;
 
 /// Field storing a single value.
 #[derive(Debug, Clone, Serialize, Deserialize)]

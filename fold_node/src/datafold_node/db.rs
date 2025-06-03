@@ -8,11 +8,14 @@ use crate::schema::SchemaError;
 use super::DataFoldNode;
 
 impl DataFoldNode {
-
     /// Executes an operation (query or mutation) on the database.
     pub fn execute_operation(&mut self, operation: Operation) -> FoldDbResult<Value> {
         match operation {
-            Operation::Query { schema, fields, filter } => {
+            Operation::Query {
+                schema,
+                fields,
+                filter,
+            } => {
                 let query = Query {
                     schema_name: schema,
                     fields,
@@ -27,7 +30,11 @@ impl DataFoldNode {
                     .collect();
                 Ok(serde_json::to_value(&unwrapped)?)
             }
-            Operation::Mutation { schema, data, mutation_type } => {
+            Operation::Mutation {
+                schema,
+                data,
+                mutation_type,
+            } => {
                 let fields_and_values = match data {
                     Value::Object(map) => map.into_iter().collect(),
                     _ => {
@@ -50,30 +57,35 @@ impl DataFoldNode {
         }
     }
 
-
     /// Executes a query against the database.
-    pub fn query(&mut self, mut query: Query) -> FoldDbResult<Vec<Result<Value, SchemaError>>> {
+    pub fn query(&mut self, query: Query) -> FoldDbResult<Vec<Result<Value, SchemaError>>> {
         // Check if schema exists first
         let schema_exists = {
-            let db = self.db.lock()
+            let db = self
+                .db
+                .lock()
                 .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-            db.schema_manager.schema_exists(&query.schema_name).unwrap_or(false)
+            db.schema_manager
+                .schema_exists(&query.schema_name)
+                .unwrap_or(false)
         };
-        
+
         if !schema_exists {
             return Err(FoldDbError::Config(format!(
                 "Schema '{}' does not exist. Please create the schema first.",
                 query.schema_name
             )));
         }
-        
+
         // Check if schema is approved for queries
         let can_query = {
-            let db = self.db.lock()
+            let db = self
+                .db
+                .lock()
                 .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
             db.can_query_schema(&query.schema_name)
         };
-        
+
         if !can_query {
             return Err(FoldDbError::Config(format!(
                 "Schema '{}' exists but is not approved for queries. Please approve the schema first using POST /api/schema/{}/approve",
@@ -87,9 +99,8 @@ impl DataFoldNode {
                 query.schema_name, self.node_id, current_perms
             )));
         }
-        if query.trust_distance == 0 {
-            query.trust_distance = self.config.default_trust_distance;
-        }
+        // Note: trust_distance 0 is a valid value meaning "maximum trust" for web UI access
+        // Do not override explicitly set trust_distance values
         let db = self
             .db
             .lock()
@@ -101,25 +112,31 @@ impl DataFoldNode {
     pub fn mutate(&mut self, mutation: Mutation) -> FoldDbResult<()> {
         // Check if schema exists first
         let schema_exists = {
-            let db = self.db.lock()
+            let db = self
+                .db
+                .lock()
                 .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-            db.schema_manager.schema_exists(&mutation.schema_name).unwrap_or(false)
+            db.schema_manager
+                .schema_exists(&mutation.schema_name)
+                .unwrap_or(false)
         };
-        
+
         if !schema_exists {
             return Err(FoldDbError::Config(format!(
                 "Schema '{}' does not exist. Please create the schema first.",
                 mutation.schema_name
             )));
         }
-        
+
         // Check if schema is approved for mutations
         let can_mutate = {
-            let db = self.db.lock()
+            let db = self
+                .db
+                .lock()
                 .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
             db.can_mutate_schema(&mutation.schema_name)
         };
-        
+
         if !can_mutate {
             return Err(FoldDbError::Config(format!(
                 "Schema '{}' exists but is not approved for mutations. Please approve the schema first using POST /api/schema/{}/approve",
@@ -154,7 +171,6 @@ impl DataFoldNode {
         Ok(history.into_iter().map(|a| a.content().clone()).collect())
     }
 
-
     /// List all registered transforms.
     pub fn list_transforms(&self) -> FoldDbResult<HashMap<String, Transform>> {
         let db = self
@@ -184,33 +200,27 @@ impl DataFoldNode {
     }
 
     /// Helper method to log and create permission denied errors
-    fn log_permission_denied(&self, schema_name: &str, operation_type: &str) -> FoldDbResult<Vec<String>> {
+    fn log_permission_denied(
+        &self,
+        schema_name: &str,
+        operation_type: &str,
+    ) -> FoldDbResult<Vec<String>> {
         let node_id = &self.node_id;
         let current_perms = {
-            let db = self.db.lock()
-                .map_err(|_| FoldDbError::Config("Cannot lock database mutex for permission details".into()))?;
+            let db = self.db.lock().map_err(|_| {
+                FoldDbError::Config("Cannot lock database mutex for permission details".into())
+            })?;
             db.get_schema_permissions(node_id)
         };
-        
-        log::error!("Permission denied for {} on schema '{}': Node '{}' permissions: {:?}",
-            operation_type, schema_name, node_id, current_perms);
-        
+
+        log::error!(
+            "Permission denied for {} on schema '{}': Node '{}' permissions: {:?}",
+            operation_type,
+            schema_name,
+            node_id,
+            current_perms
+        );
+
         Ok(current_perms)
-    }
-
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::datafold_node::config::NodeConfig;
-
-    fn create_node(path: &std::path::Path) -> DataFoldNode {
-        let config = NodeConfig {
-            storage_path: path.into(),
-            default_trust_distance: 1,
-            network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-        };
-        DataFoldNode::new(config).unwrap()
     }
 }

@@ -3,35 +3,37 @@ pub mod collection_manager;
 pub mod context;
 pub mod field_manager;
 pub mod field_retrieval;
+mod init;
+mod mutation;
+mod query;
+mod transform_management;
 pub mod transform_manager;
 pub mod transform_orchestrator;
-mod query;
-mod mutation;
-mod transform_management;
-mod init;
 
-use std::sync::Arc;
-use std::path::Path;
-use std::collections::HashMap;
-use log::info;
 use crate::atom::{Atom, AtomRefBehavior};
 use crate::db_operations::DbOperations;
 use crate::permissions::PermissionWrapper;
+use crate::schema::core::SchemaState;
 use crate::schema::SchemaCore;
 use crate::schema::{Schema, SchemaError};
-use crate::schema::core::SchemaState;
+use log::info;
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Arc;
 
 use self::atom_manager::AtomManager;
 use self::collection_manager::CollectionManager;
 use self::field_manager::FieldManager;
+use self::field_retrieval::service::FieldRetrievalService;
+use self::init::{build_closure_fns, init_orchestrator, init_transform_manager};
 use self::transform_manager::TransformManager;
 use self::transform_orchestrator::TransformOrchestrator;
-use self::init::{build_closure_fns, init_transform_manager, init_orchestrator};
 
 /// The main database coordinator that manages schemas, permissions, and data storage.
 pub struct FoldDB {
     pub(crate) atom_manager: AtomManager,
     pub(crate) field_manager: FieldManager,
+    pub(crate) field_retrieval_service: FieldRetrievalService,
     pub(crate) collection_manager: CollectionManager,
     pub(crate) schema_manager: Arc<SchemaCore>,
     pub(crate) transform_manager: Arc<TransformManager>,
@@ -44,24 +46,21 @@ pub struct FoldDB {
 impl FoldDB {
     /// Retrieves or generates and persists the node identifier.
     pub fn get_node_id(&self) -> Result<String, sled::Error> {
-        self
-            .db_ops
+        self.db_ops
             .get_node_id()
             .map_err(|e| sled::Error::Unsupported(e.to_string()))
     }
 
     /// Retrieves the list of permitted schemas for the given node.
     pub fn get_schema_permissions(&self, node_id: &str) -> Vec<String> {
-        self
-            .db_ops
+        self.db_ops
             .get_schema_permissions(node_id)
             .unwrap_or_default()
     }
 
     /// Sets the permitted schemas for the given node.
     pub fn set_schema_permissions(&self, node_id: &str, schemas: &[String]) -> sled::Result<()> {
-        self
-            .db_ops
+        self.db_ops
             .set_schema_permissions(node_id, schemas)
             .map_err(|e| sled::Error::Unsupported(e.to_string()))
     }
@@ -78,10 +77,10 @@ impl FoldDB {
             }
         };
 
-        let db_ops = DbOperations::new(db.clone())
-            .map_err(|e| sled::Error::Unsupported(e.to_string()))?;
+        let db_ops =
+            DbOperations::new(db.clone()).map_err(|e| sled::Error::Unsupported(e.to_string()))?;
         let orchestrator_tree = db_ops.orchestrator_tree.clone();
-        
+
         let atom_manager = AtomManager::new(db_ops.clone());
         let field_manager = FieldManager::new(atom_manager.clone());
         let collection_manager = CollectionManager::new(field_manager.clone());
@@ -91,7 +90,8 @@ impl FoldDB {
         );
         let closures = build_closure_fns(&atom_manager, &schema_manager);
         let transform_manager = init_transform_manager(Arc::new(db_ops.clone()), closures)?;
-        let orchestrator = init_orchestrator(&field_manager, transform_manager.clone(), orchestrator_tree)?;
+        let orchestrator =
+            init_orchestrator(&field_manager, transform_manager.clone(), orchestrator_tree)?;
 
         info!("Loading schema states from disk during FoldDB initialization");
         if let Err(e) = schema_manager.load_schema_states_from_disk() {
@@ -99,20 +99,30 @@ impl FoldDB {
         } else {
             // After loading schema states, we need to ensure AtomRefs are properly mapped and persisted
             // for all approved schemas
-            if let Ok(approved_schemas) = schema_manager.list_schemas_by_state(SchemaState::Approved) {
+            if let Ok(approved_schemas) =
+                schema_manager.list_schemas_by_state(SchemaState::Approved)
+            {
                 for schema_name in approved_schemas {
                     if let Ok(atom_refs) = schema_manager.map_fields(&schema_name) {
                         // Persist each atom ref
                         for atom_ref in atom_refs {
                             let aref_uuid = atom_ref.uuid().to_string();
                             let atom_uuid = atom_ref.get_atom_uuid().clone();
-                            
+
                             // Store the atom ref in the database
-                            if let Err(e) = atom_manager.update_atom_ref(&aref_uuid, atom_uuid, "system".to_string()) {
-                                info!("Failed to persist atom ref for schema '{}': {}", schema_name, e);
+                            if let Err(e) = atom_manager.update_atom_ref(
+                                &aref_uuid,
+                                atom_uuid,
+                                "system".to_string(),
+                            ) {
+                                info!(
+                                    "Failed to persist atom ref for schema '{}': {}",
+                                    schema_name, e
+                                );
                             }
                         }
                     }
+                    
                 }
             }
         }
@@ -120,6 +130,7 @@ impl FoldDB {
         Ok(Self {
             atom_manager,
             field_manager,
+            field_retrieval_service: FieldRetrievalService::new(),
             collection_manager,
             schema_manager,
             transform_manager,
@@ -129,9 +140,8 @@ impl FoldDB {
         })
     }
 
-
     // ========== CONSOLIDATED SCHEMA API - DELEGATES TO SCHEMA_CORE ==========
-    
+
     /// Fetch available schemas from files (example schemas directory)
     /// DEPRECATED: Use get_schema_status() instead
     pub fn fetch_available_schemas(&self) -> Result<Vec<String>, SchemaError> {
@@ -139,7 +149,9 @@ impl FoldDB {
     }
 
     /// Get comprehensive schema status (NEW UNIFIED METHOD)
-    pub fn get_schema_status(&self) -> Result<crate::schema::core::SchemaLoadingReport, SchemaError> {
+    pub fn get_schema_status(
+        &self,
+    ) -> Result<crate::schema::core::SchemaLoadingReport, SchemaError> {
         self.schema_manager.get_schema_status()
     }
 
@@ -170,7 +182,11 @@ impl FoldDB {
 
         // Get the updated schema with proper ARefs and register transforms
         if let Some(loaded_schema) = self.schema_manager.get_schema(schema_name)? {
-            info!("Registering transforms for approved schema '{}' with {} fields", schema_name, loaded_schema.fields.len());
+            info!(
+                "Registering transforms for approved schema '{}' with {} fields",
+                schema_name,
+                loaded_schema.fields.len()
+            );
             self.register_transforms_for_schema(&loaded_schema)?;
         }
 
@@ -205,7 +221,9 @@ impl FoldDB {
 
     /// Load schema from file (creates Available schema)
     pub fn load_schema_from_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), SchemaError> {
-        let path_str = path.as_ref().to_str()
+        let path_str = path
+            .as_ref()
+            .to_str()
             .ok_or_else(|| SchemaError::InvalidData("Invalid file path".to_string()))?;
         self.schema_manager.load_schema_from_file(path_str)
     }
@@ -246,7 +264,6 @@ impl FoldDB {
         Ok(())
     }
 
-
     pub fn get_atom_history(
         &self,
         aref_uuid: &str,
@@ -260,7 +277,10 @@ impl FoldDB {
     }
 
     /// Get a schema by name - public accessor for testing
-    pub fn get_schema(&self, schema_name: &str) -> Result<Option<crate::schema::Schema>, SchemaError> {
+    pub fn get_schema(
+        &self,
+        schema_name: &str,
+    ) -> Result<Option<crate::schema::Schema>, SchemaError> {
         self.schema_manager.get_schema(schema_name)
     }
 
@@ -292,5 +312,15 @@ impl FoldDB {
     /// Provides access to the underlying database operations
     pub fn db_ops(&self) -> Arc<DbOperations> {
         Arc::clone(&self.db_ops)
+    }
+
+    /// Provides access to the field retrieval service for testing
+    pub fn field_retrieval_service(&self) -> &FieldRetrievalService {
+        &self.field_retrieval_service
+    }
+
+    /// Provides access to the atom manager for testing
+    pub fn atom_manager(&self) -> &AtomManager {
+        &self.atom_manager
     }
 }

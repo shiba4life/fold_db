@@ -1,4 +1,4 @@
-use log::{Record, LevelFilter, Metadata, SetLoggerError};
+use log::{LevelFilter, Metadata, Record, SetLoggerError};
 use once_cell::sync::OnceCell;
 use std::collections::VecDeque;
 use std::sync::Mutex;

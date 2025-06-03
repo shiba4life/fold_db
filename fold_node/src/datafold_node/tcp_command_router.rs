@@ -3,10 +3,10 @@ use crate::error::{FoldDbError, FoldDbResult};
 use crate::schema::types::operations::MutationType;
 use crate::schema::Schema;
 use libp2p::PeerId;
+use log::info;
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use log::info;
 
 impl TcpServer {
     /// Process a request from a client.
@@ -31,7 +31,10 @@ impl TcpServer {
             };
 
             if target_node_id != local_node_id {
-                info!("Request targeted for node {}, forwarding...", target_node_id);
+                info!(
+                    "Request targeted for node {}, forwarding...",
+                    target_node_id
+                );
                 return Self::forward_request(request, target_node_id, node.clone()).await;
             }
         }
@@ -53,7 +56,9 @@ impl TcpServer {
                     .and_then(|v| v.get("schema_name"))
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        crate::error::FoldDbError::Config("Missing schema_name parameter".to_string())
+                        crate::error::FoldDbError::Config(
+                            "Missing schema_name parameter".to_string(),
+                        )
                     })?;
 
                 let node_guard = node.lock().await;
@@ -61,7 +66,10 @@ impl TcpServer {
 
                 match schema {
                     Some(s) => Ok(serde_json::to_value(s)?),
-                    None => Err(crate::error::FoldDbError::Config(format!("Schema not found: {}", schema_name))),
+                    None => Err(crate::error::FoldDbError::Config(format!(
+                        "Schema not found: {}",
+                        schema_name
+                    ))),
                 }
             }
             "create_schema" => {
@@ -97,7 +105,9 @@ impl TcpServer {
                     .and_then(|v| v.get("schema_name"))
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        crate::error::FoldDbError::Config("Missing schema_name parameter".to_string())
+                        crate::error::FoldDbError::Config(
+                            "Missing schema_name parameter".to_string(),
+                        )
                     })?;
 
                 let node_guard = node.lock().await;
@@ -164,7 +174,9 @@ impl TcpServer {
                     .and_then(|v| v.get("mutation_type"))
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        crate::error::FoldDbError::Config("Missing mutation_type parameter".to_string())
+                        crate::error::FoldDbError::Config(
+                            "Missing mutation_type parameter".to_string(),
+                        )
                     })?;
 
                 let mutation_type = match mutation_type_str {
@@ -237,7 +249,9 @@ impl TcpServer {
                     .and_then(|v| v.get("schema_name"))
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        crate::error::FoldDbError::Config("Missing schema_name parameter".to_string())
+                        crate::error::FoldDbError::Config(
+                            "Missing schema_name parameter".to_string(),
+                        )
                     })?;
 
                 let mut node_guard = node.lock().await;
@@ -255,7 +269,9 @@ impl TcpServer {
                     .and_then(|v| v.get("schema_name"))
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        crate::error::FoldDbError::Config("Missing schema_name parameter".to_string())
+                        crate::error::FoldDbError::Config(
+                            "Missing schema_name parameter".to_string(),
+                        )
                     })?;
 
                 let mut node_guard = node.lock().await;
@@ -273,7 +289,9 @@ impl TcpServer {
                     .and_then(|v| v.get("schema_name"))
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
-                        crate::error::FoldDbError::Config("Missing schema_name parameter".to_string())
+                        crate::error::FoldDbError::Config(
+                            "Missing schema_name parameter".to_string(),
+                        )
                     })?;
 
                 let node_guard = node.lock().await;
@@ -316,7 +334,10 @@ impl TcpServer {
                 }
                 Err(_) => {
                     let id = PeerId::random();
-                    info!("Using placeholder PeerId {} for node ID {}", id, target_node_id);
+                    info!(
+                        "Using placeholder PeerId {} for node ID {}",
+                        id, target_node_id
+                    );
                     network.register_node_id(target_node_id, id);
                     id
                 }
@@ -346,7 +367,10 @@ impl TcpServer {
             "unknown".to_string()
         };
 
-        info!("Assuming schema {} is available on target node", schema_name);
+        info!(
+            "Assuming schema {} is available on target node",
+            schema_name
+        );
         info!(
             "Forwarding request to node {} (peer {})",
             target_node_id, peer_id

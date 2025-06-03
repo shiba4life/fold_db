@@ -13,6 +13,8 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonSchemaDefinition {
     pub name: String,
+    #[serde(default = "crate::schema::types::schema::default_schema_type")]
+    pub schema_type: crate::schema::types::schema::SchemaType,
     pub fields: HashMap<String, JsonSchemaField>,
     pub payment_config: SchemaPaymentConfig,
     /// SHA256 hash of the schema content for integrity verification
@@ -173,14 +175,12 @@ impl JsonSchemaDefinition {
 
             // Parse transform logic using the DSL parser
             let parser = TransformParser::new();
-            parser
-                .parse_expression(&transform.logic)
-                .map_err(|e| {
-                    SchemaError::InvalidField(format!(
-                        "Error parsing transform for field {field_name}: {}",
-                        e
-                    ))
-                })?;
+            parser.parse_expression(&transform.logic).map_err(|e| {
+                SchemaError::InvalidField(format!(
+                    "Error parsing transform for field {field_name}: {}",
+                    e
+                ))
+            })?;
         }
 
         Ok(())

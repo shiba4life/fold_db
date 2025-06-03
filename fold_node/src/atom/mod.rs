@@ -3,18 +3,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-mod atom_ref_types;
-mod atom_ref_behavior;
 mod atom_ref;
+mod atom_ref_behavior;
 mod atom_ref_collection;
 mod atom_ref_range;
 mod atom_ref_tests;
+mod atom_ref_types;
 
-pub use atom_ref_types::{AtomRefStatus, AtomRefUpdate};
-pub use atom_ref_behavior::AtomRefBehavior;
 pub use atom_ref::AtomRef;
+pub use atom_ref_behavior::AtomRefBehavior;
 pub use atom_ref_collection::AtomRefCollection;
 pub use atom_ref_range::AtomRefRange;
+pub use atom_ref_types::{AtomRefStatus, AtomRefUpdate};
 
 /// An immutable data container that represents a single version of content in the database.
 ///
@@ -212,8 +212,8 @@ mod tests {
 
     #[test]
     fn test_atom_ref_creation_and_update() {
-        use crate::atom::AtomRefBehavior;
         use crate::atom::AtomRef;
+        use crate::atom::AtomRefBehavior;
 
         let atom = Atom::new(
             "test_schema".to_string(),

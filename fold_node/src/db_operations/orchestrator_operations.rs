@@ -1,15 +1,22 @@
+use super::core::DbOperations;
 use crate::schema::SchemaError;
 use serde::{de::DeserializeOwned, Serialize};
-use super::core::DbOperations;
 
 impl DbOperations {
     /// Stores orchestrator state using generic tree operations
-    pub fn store_orchestrator_state<T: Serialize>(&self, key: &str, state: &T) -> Result<(), SchemaError> {
+    pub fn store_orchestrator_state<T: Serialize>(
+        &self,
+        key: &str,
+        state: &T,
+    ) -> Result<(), SchemaError> {
         self.store_in_tree(&self.orchestrator_tree, key, state)
     }
 
     /// Gets orchestrator state using generic tree operations
-    pub fn get_orchestrator_state<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>, SchemaError> {
+    pub fn get_orchestrator_state<T: DeserializeOwned>(
+        &self,
+        key: &str,
+    ) -> Result<Option<T>, SchemaError> {
         self.get_from_tree(&self.orchestrator_tree, key)
     }
 

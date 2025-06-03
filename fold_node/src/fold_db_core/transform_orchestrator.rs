@@ -1,13 +1,13 @@
-use std::collections::{HashSet, VecDeque};
-use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 use sled::Tree;
+use std::collections::{HashSet, VecDeque};
+use std::sync::{Arc, Mutex};
 
+use log::{error, info};
 use serde_json::Value as JsonValue;
-use log::{info, error};
 
-use crate::schema::SchemaError;
 use super::transform_manager::types::TransformRunner;
+use crate::schema::SchemaError;
 
 /// Orchestrates execution of transforms sequentially.
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,19 +50,19 @@ impl TransformOrchestrator {
 
     fn persist_state(&self) -> Result<(), SchemaError> {
         let state = {
-            let q = self
-                .queue
-                .lock()
-                .map_err(|_| SchemaError::InvalidData("Failed to acquire queue lock".to_string()))?;
-            serde_json::to_vec(&*q)
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize state: {}", e)))?
+            let q = self.queue.lock().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire queue lock".to_string())
+            })?;
+            serde_json::to_vec(&*q).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize state: {}", e))
+            })?
         };
-        self.tree
-            .insert("state", state)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to persist orchestrator state: {}", e)))?;
-        self.tree
-            .flush()
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to flush orchestrator state: {}", e)))?;
+        self.tree.insert("state", state).map_err(|e| {
+            SchemaError::InvalidData(format!("Failed to persist orchestrator state: {}", e))
+        })?;
+        self.tree.flush().map_err(|e| {
+            SchemaError::InvalidData(format!("Failed to flush orchestrator state: {}", e))
+        })?;
         Ok(())
     }
 
@@ -73,7 +73,9 @@ impl TransformOrchestrator {
         field_name: &str,
         mutation_hash: &str,
     ) -> Result<(), SchemaError> {
-        let ids = self.manager.get_transforms_for_field(schema_name, field_name)?;
+        let ids = self
+            .manager
+            .get_transforms_for_field(schema_name, field_name)?;
         info!(
             "Transforms queued for {}.{}: {:?}",
             schema_name, field_name, ids
@@ -88,7 +90,10 @@ impl TransformOrchestrator {
         for id in ids {
             let key = format!("{}|{}", id, mutation_hash);
             if q.queued.insert(key.clone()) {
-                q.queue.push_back(QueueItem { id, mutation_hash: mutation_hash.to_string() });
+                q.queue.push_back(QueueItem {
+                    id,
+                    mutation_hash: mutation_hash.to_string(),
+                });
             }
         }
         drop(q);
@@ -97,15 +102,22 @@ impl TransformOrchestrator {
     }
 
     /// Add a transform directly to the queue by ID.
-    pub fn add_transform(&self, transform_id: &str, mutation_hash: &str) -> Result<(), SchemaError> {
+    pub fn add_transform(
+        &self,
+        transform_id: &str,
+        mutation_hash: &str,
+    ) -> Result<(), SchemaError> {
         info!("Attempting to add transform to queue: {}", transform_id);
-        
+
         // Verify the transform exists
         match self.manager.transform_exists(transform_id) {
             Ok(exists) => {
                 if !exists {
                     error!("Transform not found: {}", transform_id);
-                    return Err(SchemaError::InvalidData(format!("Transform '{}' not found", transform_id)));
+                    return Err(SchemaError::InvalidData(format!(
+                        "Transform '{}' not found",
+                        transform_id
+                    )));
                 }
             }
             Err(e) => {
@@ -114,18 +126,18 @@ impl TransformOrchestrator {
             }
         }
 
-        let mut q = self
-            .queue
-            .lock()
-            .map_err(|e| {
-                error!("Failed to acquire queue lock: {}", e);
-                SchemaError::InvalidData("Failed to acquire queue lock".to_string())
-            })?;
+        let mut q = self.queue.lock().map_err(|e| {
+            error!("Failed to acquire queue lock: {}", e);
+            SchemaError::InvalidData("Failed to acquire queue lock".to_string())
+        })?;
 
         info!("Adding transform {} to queue", transform_id);
         let key = format!("{}|{}", transform_id, mutation_hash);
         if q.queued.insert(key.clone()) {
-            q.queue.push_back(QueueItem { id: transform_id.to_string(), mutation_hash: mutation_hash.to_string() });
+            q.queue.push_back(QueueItem {
+                id: transform_id.to_string(),
+                mutation_hash: mutation_hash.to_string(),
+            });
         }
 
         // Log queue state
@@ -141,7 +153,7 @@ impl TransformOrchestrator {
     /// Process a single task from the queue.
     pub fn process_one(&self) -> Option<Result<JsonValue, SchemaError>> {
         info!("🔄 PROCESS_ONE START - checking queue for items to process");
-        
+
         let (transform_id, mutation_hash, already_processed) = {
             let mut q = self
                 .queue
@@ -151,16 +163,22 @@ impl TransformOrchestrator {
                     SchemaError::InvalidData("Failed to acquire queue lock".to_string())
                 })
                 .ok()?;
-            
-            info!("📋 Queue state - length: {}, items: {:?}", q.queue.len(), q.queue);
-            
+
+            info!(
+                "📋 Queue state - length: {}, items: {:?}",
+                q.queue.len(),
+                q.queue
+            );
+
             match q.queue.pop_front() {
                 Some(item) => {
                     let key = format!("{}|{}", item.id, item.mutation_hash);
                     let processed = q.processed.contains(&key);
                     q.queued.remove(&key);
-                    info!("📤 Popped item from queue: {} (mutation_hash: {}, already_processed: {})",
-                          item.id, item.mutation_hash, processed);
+                    info!(
+                        "📤 Popped item from queue: {} (mutation_hash: {}, already_processed: {})",
+                        item.id, item.mutation_hash, processed
+                    );
                     (item.id, item.mutation_hash, processed)
                 }
                 None => {
@@ -173,7 +191,9 @@ impl TransformOrchestrator {
         info!("💾 Persisting orchestrator state before processing");
         if let Err(e) = self.persist_state() {
             error!("❌ Failed to persist state: {:?}", e);
-            return Some(Err(SchemaError::InvalidData("Failed to persist state".to_string())));
+            return Some(Err(SchemaError::InvalidData(
+                "Failed to persist state".to_string(),
+            )));
         }
 
         if already_processed {
@@ -186,15 +206,19 @@ impl TransformOrchestrator {
 
         match &result {
             Ok(value) => {
-                info!("✅ Transform {} executed successfully: {:?}", transform_id, value);
-                let mut q = self
-                    .queue
-                    .lock()
-                    .expect("queue lock");
-                q.processed.insert(format!("{}|{}", transform_id, mutation_hash));
+                info!(
+                    "✅ Transform {} executed successfully: {:?}",
+                    transform_id, value
+                );
+                let mut q = self.queue.lock().expect("queue lock");
+                q.processed
+                    .insert(format!("{}|{}", transform_id, mutation_hash));
                 drop(q);
                 if let Err(e) = self.persist_state() {
-                    error!("❌ Failed to persist state after successful transform: {:?}", e);
+                    error!(
+                        "❌ Failed to persist state after successful transform: {:?}",
+                        e
+                    );
                     return Some(Err(e));
                 }
             }
@@ -202,8 +226,11 @@ impl TransformOrchestrator {
                 error!("❌ Transform {} failed: {:?}", transform_id, e);
             }
         }
-        
-        info!("🏁 PROCESS_ONE COMPLETE - transform: {}, result: {:?}", transform_id, result);
+
+        info!(
+            "🏁 PROCESS_ONE COMPLETE - transform: {}, result: {:?}",
+            transform_id, result
+        );
         Some(result)
     }
 
@@ -211,39 +238,39 @@ impl TransformOrchestrator {
     pub fn process_queue(&self) {
         info!("🔄 PROCESS_QUEUE START - beginning to process all queued transforms");
         let mut processed_count = 0;
-        
+
         while let Some(result) = self.process_one() {
             processed_count += 1;
             match result {
                 Ok(value) => info!("✅ Processed transform #{}: {:?}", processed_count, value),
-                Err(e) => error!("❌ Failed to process transform #{}: {:?}", processed_count, e),
+                Err(e) => error!(
+                    "❌ Failed to process transform #{}: {:?}",
+                    processed_count, e
+                ),
             }
         }
-        
-        info!("🏁 PROCESS_QUEUE COMPLETE - processed {} transforms", processed_count);
+
+        info!(
+            "🏁 PROCESS_QUEUE COMPLETE - processed {} transforms",
+            processed_count
+        );
     }
 
     /// List queued transform IDs without dequeuing or running them.
     pub fn list_queued_transforms(&self) -> Result<Vec<String>, SchemaError> {
-        let q = self
-            .queue
-            .lock()
-            .map_err(|e| {
-                error!("Failed to acquire queue lock: {}", e);
-                SchemaError::InvalidData("Failed to acquire queue lock".to_string())
-            })?;
+        let q = self.queue.lock().map_err(|e| {
+            error!("Failed to acquire queue lock: {}", e);
+            SchemaError::InvalidData("Failed to acquire queue lock".to_string())
+        })?;
         Ok(q.queue.iter().map(|item| item.id.clone()).collect())
     }
 
     /// Queue length, useful for tests.
     pub fn len(&self) -> Result<usize, SchemaError> {
-        let q = self
-            .queue
-            .lock()
-            .map_err(|e| {
-                error!("Failed to acquire queue lock: {}", e);
-                SchemaError::InvalidData("Failed to acquire queue lock".to_string())
-            })?;
+        let q = self.queue.lock().map_err(|e| {
+            error!("Failed to acquire queue lock: {}", e);
+            SchemaError::InvalidData("Failed to acquire queue lock".to_string())
+        })?;
         let length = q.queue.len();
         info!("Queue length: {}", length);
         Ok(length)
@@ -251,13 +278,10 @@ impl TransformOrchestrator {
 
     /// Returns true if the queue is empty.
     pub fn is_empty(&self) -> Result<bool, SchemaError> {
-        let q = self
-            .queue
-            .lock()
-            .map_err(|e| {
-                error!("Failed to acquire queue lock: {}", e);
-                SchemaError::InvalidData("Failed to acquire queue lock".to_string())
-            })?;
+        let q = self.queue.lock().map_err(|e| {
+            error!("Failed to acquire queue lock: {}", e);
+            SchemaError::InvalidData("Failed to acquire queue lock".to_string())
+        })?;
         let empty = q.queue.is_empty();
         info!("Queue is empty: {}", empty);
         Ok(empty)

@@ -228,4 +228,3 @@ fn test_reference_updates() {
         &range_atom1.uuid().to_string()
     );
 }
-

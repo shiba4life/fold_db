@@ -1,7 +1,7 @@
+use super::core::DbOperations;
 use crate::atom::{Atom, AtomRef, AtomRefCollection, AtomRefRange, AtomStatus};
 use crate::schema::SchemaError;
 use serde_json::Value;
-use super::core::DbOperations;
 
 impl DbOperations {
     /// Creates a new atom and stores it in the database

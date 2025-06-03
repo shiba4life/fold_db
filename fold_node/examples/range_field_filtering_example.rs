@@ -1,13 +1,13 @@
 //! Example demonstrating RangeField filtering functionality
-//! 
+//!
 //! This example shows how to use the new range filtering capabilities
 //! added to RangeField for querying and filtering range-based data.
 
-use fold_node::schema::types::field::{RangeField, RangeFilter, RangeFilterResult};
 use fold_node::fees::types::config::FieldPaymentConfig;
 use fold_node::permissions::types::policy::PermissionsPolicy;
-use std::collections::HashMap;
+use fold_node::schema::types::field::{RangeField, RangeFilter, RangeFilterResult};
 use serde_json::json;
+use std::collections::HashMap;
 
 fn main() {
     println!("=== RangeField Filtering Example ===\n");
@@ -101,8 +101,10 @@ fn main() {
     // Example 9: Utility functions
     println!("9. Utility functions:");
     println!("All keys: {:?}", range_field.get_all_keys());
-    println!("Keys in range 'user:' to 'user:z': {:?}", 
-             range_field.get_keys_in_range("user:", "user:z"));
+    println!(
+        "Keys in range 'user:' to 'user:z': {:?}",
+        range_field.get_keys_in_range("user:", "user:z")
+    );
     println!("Total count: {}", range_field.count());
 }
 

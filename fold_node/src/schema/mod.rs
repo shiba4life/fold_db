@@ -27,21 +27,20 @@
 
 // Internal modules
 pub mod core;
-pub mod types;
-pub mod hasher;
-pub mod file_operations;
 pub mod duplicate_detection;
-
+pub mod file_operations;
+pub mod hasher;
+pub mod types;
 
 // Public re-exports
 pub use core::{SchemaCore, SchemaState};
 pub use types::{errors::SchemaError, schema::Schema, Transform};
 pub mod validator;
-pub use validator::SchemaValidator;
-pub use hasher::SchemaHasher;
-pub use file_operations::SchemaFileOperations;
+pub use crate::{MutationType, Operation};
 pub use duplicate_detection::SchemaDuplicateDetector;
-pub use crate::{Operation, MutationType};
+pub use file_operations::SchemaFileOperations;
+pub use hasher::SchemaHasher;
+pub use validator::SchemaValidator;
 
 /// Public prelude module containing types needed by tests and external code
 pub mod prelude {

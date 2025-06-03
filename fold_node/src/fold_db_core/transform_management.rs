@@ -1,7 +1,7 @@
 use super::FoldDB;
+use crate::schema::types::field::common::Field;
 use crate::schema::types::{Transform, TransformRegistration};
 use crate::schema::{Schema, SchemaError};
-use crate::schema::types::field::common::Field;
 use log::{error, info};
 use regex::Regex;
 use serde_json::Value;
@@ -19,7 +19,10 @@ pub(super) struct TransformRegistrationParams {
 }
 
 impl FoldDB {
-    pub fn register_transform(&mut self, registration: TransformRegistration) -> Result<(), SchemaError> {
+    pub fn register_transform(
+        &mut self,
+        registration: TransformRegistration,
+    ) -> Result<(), SchemaError> {
         self.transform_manager.register_transform(registration)
     }
 
@@ -35,44 +38,78 @@ impl FoldDB {
             None => (schema.name.clone(), field_name.to_string()),
         };
 
-        info!("Parsing output field for transform with output: {} -> {}.{}",
-              transform.get_output(), out_schema_name, out_field_name);
+        info!(
+            "Parsing output field for transform with output: {} -> {}.{}",
+            transform.get_output(),
+            out_schema_name,
+            out_field_name
+        );
 
         if out_schema_name == schema.name && out_field_name == field_name {
-            info!("Output field matches current field: {}.{}", schema.name, field_name);
-            let aref = field.ref_atom_uuid().ok_or_else(|| {
-                error!("Field {}.{} missing atom reference", schema.name, field_name);
-                SchemaError::InvalidData(format!("Field {} missing atom reference", field_name))
-            })?.clone();
+            info!(
+                "Output field matches current field: {}.{}",
+                schema.name, field_name
+            );
+            let aref = field
+                .ref_atom_uuid()
+                .ok_or_else(|| {
+                    error!(
+                        "Field {}.{} missing atom reference",
+                        schema.name, field_name
+                    );
+                    SchemaError::InvalidData(format!("Field {} missing atom reference", field_name))
+                })?
+                .clone();
             info!("Found ARef for {}.{}: {}", schema.name, field_name, aref);
             Ok(aref)
         } else {
-            info!("Output field is different schema/field: {}.{}", out_schema_name, out_field_name);
+            info!(
+                "Output field is different schema/field: {}.{}",
+                out_schema_name, out_field_name
+            );
             match self
                 .schema_manager
                 .get_schema(&out_schema_name)?
                 .and_then(|s| s.fields.get(&out_field_name).cloned())
             {
                 Some(of) => {
-                    let aref = of.ref_atom_uuid().ok_or_else(|| {
-                        error!("Field {}.{} missing atom reference", out_schema_name, out_field_name);
-                        SchemaError::InvalidData(format!(
-                            "Field {}.{} missing atom reference",
-                            out_schema_name, out_field_name
-                        ))
-                    })?.clone();
-                    info!("Found ARef for {}.{}: {}", out_schema_name, out_field_name, aref);
+                    let aref = of
+                        .ref_atom_uuid()
+                        .ok_or_else(|| {
+                            error!(
+                                "Field {}.{} missing atom reference",
+                                out_schema_name, out_field_name
+                            );
+                            SchemaError::InvalidData(format!(
+                                "Field {}.{} missing atom reference",
+                                out_schema_name, out_field_name
+                            ))
+                        })?
+                        .clone();
+                    info!(
+                        "Found ARef for {}.{}: {}",
+                        out_schema_name, out_field_name, aref
+                    );
                     Ok(aref)
-                },
+                }
                 None => {
-                    info!("Output field {}.{} not found, using current field", out_schema_name, out_field_name);
-                    let aref = field.ref_atom_uuid().ok_or_else(|| {
-                        error!("Field {} missing atom reference", field_name);
-                        SchemaError::InvalidData(format!("Field {} missing atom reference", field_name))
-                    })?.clone();
+                    info!(
+                        "Output field {}.{} not found, using current field",
+                        out_schema_name, out_field_name
+                    );
+                    let aref = field
+                        .ref_atom_uuid()
+                        .ok_or_else(|| {
+                            error!("Field {} missing atom reference", field_name);
+                            SchemaError::InvalidData(format!(
+                                "Field {} missing atom reference",
+                                field_name
+                            ))
+                        })?
+                        .clone();
                     info!("Using ARef from current field {}: {}", field_name, aref);
                     Ok(aref)
-                },
+                }
             }
         }
     }
@@ -98,7 +135,10 @@ impl FoldDB {
                         if let Some(dep_field) = dep_schema.fields.get(field_dep) {
                             if let Some(dep_aref) = dep_field.ref_atom_uuid() {
                                 input_arefs.push(dep_aref.clone());
-                                input_pairs.push((dep_aref.clone(), format!("{}.{}", schema_name, field_dep)));
+                                input_pairs.push((
+                                    dep_aref.clone(),
+                                    format!("{}.{}", schema_name, field_dep),
+                                ));
                             }
                         }
                     }
@@ -114,7 +154,8 @@ impl FoldDB {
                     if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
                         if let Some(dep_aref) = dep_field.ref_atom_uuid() {
                             input_arefs.push(dep_aref.clone());
-                            input_pairs.push((dep_aref.clone(), format!("{}.{}", schema_name, field_dep)));
+                            input_pairs
+                                .push((dep_aref.clone(), format!("{}.{}", schema_name, field_dep)));
                         }
                     }
                 }
@@ -134,7 +175,8 @@ impl FoldDB {
                 if let Some(dep_field) = dep_schema.fields.get(&field_dep) {
                     if let Some(dep_aref) = dep_field.ref_atom_uuid() {
                         input_arefs.push(dep_aref.clone());
-                        input_pairs.push((dep_aref.clone(), format!("{}.{}", schema_name, field_dep)));
+                        input_pairs
+                            .push((dep_aref.clone(), format!("{}.{}", schema_name, field_dep)));
                     }
                 }
             }
@@ -168,7 +210,10 @@ impl FoldDB {
         Ok(())
     }
 
-    pub(super) fn register_transforms_for_schema(&self, schema: &Schema) -> Result<(), SchemaError> {
+    pub(super) fn register_transforms_for_schema(
+        &self,
+        schema: &Schema,
+    ) -> Result<(), SchemaError> {
         let cross_re = Regex::new(r"([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)").unwrap();
 
         for (field_name, field) in &schema.fields {

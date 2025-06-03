@@ -1,14 +1,13 @@
-use fold_node::testing::{
-    Field, FieldVariant, SingleField, Mutation, MutationType, Query, Schema,
-    Transform, TransformParser,
-};
+use crate::test_data::test_helpers::create_test_node_with_schema_permissions;
 use fold_node::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
 use fold_node::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+use fold_node::testing::{
+    Field, FieldVariant, Mutation, MutationType, Query, Schema, SingleField, Transform,
+    TransformParser,
+};
 use fold_node::transform::TransformExecutor;
-use crate::test_data::test_helpers::create_test_node_with_schema_permissions;
 use serde_json::json;
 use std::collections::HashMap;
-
 
 fn create_schema_a() -> Schema {
     let mut schema = Schema::new("SchemaA".to_string());
@@ -70,7 +69,7 @@ fn test_cross_schema_transform_manual_execution() {
     let transform = Transform::new_with_expr(
         "SchemaA.a_test_field + 5".to_string(),
         expr,
-        "SchemaB.b_test_field".to_string()
+        "SchemaB.b_test_field".to_string(),
     );
     let schema_b = create_schema_b(transform.clone());
     node.add_schema_available(schema_b).unwrap();
@@ -109,7 +108,7 @@ fn test_cross_schema_transform_with_inputs() {
     let mut transform = Transform::new_with_expr(
         "SchemaA.a_test_field + 5".to_string(),
         expr,
-        "SchemaB.b_test_field".to_string()
+        "SchemaB.b_test_field".to_string(),
     );
     transform.set_inputs(vec!["SchemaA.a_test_field".to_string()]);
     let schema_b = create_schema_b(transform);
@@ -184,11 +183,8 @@ fn test_transform_persists_to_output_field() {
 
     let parser = TransformParser::new();
     let expr = parser.parse_expression("a_in + 2").unwrap();
-    let mut transform = Transform::new_with_expr(
-        "a_in + 2".to_string(),
-        expr,
-        "SchemaB.b_out".to_string(),
-    );
+    let mut transform =
+        Transform::new_with_expr("a_in + 2".to_string(), expr, "SchemaB.b_out".to_string());
     transform.set_inputs(vec!["SchemaA.a_in".to_string()]);
     let mut t_field = SingleField::new(
         PermissionsPolicy::new(TrustDistance::Distance(1), TrustDistance::Distance(1)),
@@ -207,9 +203,7 @@ fn test_transform_persists_to_output_field() {
         schema_name: "SchemaA".to_string(),
         pub_key: "test_key".to_string(),
         trust_distance: 1,
-        fields_and_values: vec![("a_in".to_string(), json!(3))]
-            .into_iter()
-            .collect(),
+        fields_and_values: vec![("a_in".to_string(), json!(3))].into_iter().collect(),
     };
     node.mutate(mutation).unwrap();
 
@@ -226,4 +220,3 @@ fn test_transform_persists_to_output_field() {
     let results = node.query(query).unwrap();
     assert_eq!(results[0].as_ref().unwrap(), &json!(5.0));
 }
-

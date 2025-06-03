@@ -1,7 +1,7 @@
-use fold_node::testing::SchemaCore;
 use fold_node::db_operations::core::DbOperations;
-use tempfile::tempdir;
+use fold_node::testing::SchemaCore;
 use std::sync::Arc;
+use tempfile::tempdir;
 
 fn create_test_db_ops() -> Arc<DbOperations> {
     let db = sled::Config::new().temporary(true).open().unwrap();
@@ -40,7 +40,7 @@ fn test_invalid_schema_validation() {
             "min_payment_threshold": 0
         }
     }"#;
-    
+
     let temp_dir = tempdir().unwrap();
     let db_ops = create_test_db_ops();
     let core = SchemaCore::new(temp_dir.path().to_str().unwrap(), db_ops).unwrap();

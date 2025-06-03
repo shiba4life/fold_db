@@ -1,13 +1,13 @@
 //! HTTP route handlers for the ingestion API
 
-use crate::ingestion::{IngestionConfig, IngestionResponse};
+use crate::datafold_node::http_server::AppState;
 use crate::ingestion::core::IngestionRequest;
 use crate::ingestion::simple_service::SimpleIngestionService;
-use crate::datafold_node::http_server::AppState;
+use crate::ingestion::{IngestionConfig, IngestionResponse};
 use actix_web::{web, HttpResponse, Responder};
-use serde_json::json;
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
-use log::{info, error, warn};
+use serde_json::json;
 use std::fs;
 use std::path::Path;
 
@@ -24,7 +24,7 @@ pub async fn process_json(
         Err(e) => {
             error!("Failed to initialize ingestion service: {}", e);
             return HttpResponse::ServiceUnavailable().json(IngestionResponse::failure(vec![
-                format!("Ingestion service not available: {}", e)
+                format!("Ingestion service not available: {}", e),
             ]));
         }
     };
@@ -33,7 +33,10 @@ pub async fn process_json(
     let mut node = state.node.lock().await;
 
     // Process the ingestion request
-    match service.process_json_with_node(request.into_inner(), &mut *node).await {
+    match service
+        .process_json_with_node(request.into_inner(), &mut node)
+        .await
+    {
         Ok(response) => {
             if response.success {
                 info!("Ingestion completed successfully");
@@ -45,9 +48,10 @@ pub async fn process_json(
         }
         Err(e) => {
             error!("Ingestion processing failed: {}", e);
-            HttpResponse::InternalServerError().json(IngestionResponse::failure(vec![
-                format!("Processing failed: {}", e)
-            ]))
+            HttpResponse::InternalServerError().json(IngestionResponse::failure(vec![format!(
+                "Processing failed: {}",
+                e
+            )]))
         }
     }
 }
@@ -57,20 +61,18 @@ pub async fn get_status(_state: web::Data<AppState>) -> impl Responder {
     info!("Received ingestion status request");
 
     match create_simple_ingestion_service().await {
-        Ok(service) => {
-            match service.get_status() {
-                Ok(status) => {
-                    info!("Returning ingestion status");
-                    HttpResponse::Ok().json(status)
-                }
-                Err(e) => {
-                    error!("Failed to get ingestion status: {}", e);
-                    HttpResponse::InternalServerError().json(json!({
-                        "error": format!("Failed to get status: {}", e)
-                    }))
-                }
+        Ok(service) => match service.get_status() {
+            Ok(status) => {
+                info!("Returning ingestion status");
+                HttpResponse::Ok().json(status)
             }
-        }
+            Err(e) => {
+                error!("Failed to get ingestion status: {}", e);
+                HttpResponse::InternalServerError().json(json!({
+                    "error": format!("Failed to get status: {}", e)
+                }))
+            }
+        },
         Err(e) => {
             warn!("Ingestion service not available: {}", e);
             HttpResponse::ServiceUnavailable().json(json!({
@@ -86,13 +88,21 @@ pub async fn get_status(_state: web::Data<AppState>) -> impl Responder {
 pub async fn health_check(_state: web::Data<AppState>) -> impl Responder {
     match create_simple_ingestion_service().await {
         Ok(service) => {
-            let status = service.get_status().unwrap_or_else(|_| json!({
-                "enabled": false,
-                "configured": false
-            }));
+            let status = service.get_status().unwrap_or_else(|_| {
+                json!({
+                    "enabled": false,
+                    "configured": false
+                })
+            });
 
-            let is_healthy = status.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) &&
-                             status.get("configured").and_then(|v| v.as_bool()).unwrap_or(false);
+            let is_healthy = status
+                .get("enabled")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+                && status
+                    .get("configured")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
 
             if is_healthy {
                 HttpResponse::Ok().json(json!({
@@ -108,13 +118,11 @@ pub async fn health_check(_state: web::Data<AppState>) -> impl Responder {
                 }))
             }
         }
-        Err(e) => {
-            HttpResponse::ServiceUnavailable().json(json!({
-                "status": "unavailable",
-                "service": "ingestion",
-                "error": e.to_string()
-            }))
-        }
+        Err(e) => HttpResponse::ServiceUnavailable().json(json!({
+            "status": "unavailable",
+            "service": "ingestion",
+            "error": e.to_string()
+        })),
     }
 }
 
@@ -144,30 +152,26 @@ pub async fn validate_json(
     info!("Received JSON validation request");
 
     match create_simple_ingestion_service().await {
-        Ok(service) => {
-            match service.validate_input(&request.into_inner()) {
-                Ok(()) => {
-                    info!("JSON validation successful");
-                    HttpResponse::Ok().json(json!({
-                        "valid": true,
-                        "message": "JSON data is valid for ingestion"
-                    }))
-                }
-                Err(e) => {
-                    info!("JSON validation failed: {}", e);
-                    HttpResponse::BadRequest().json(json!({
-                        "valid": false,
-                        "error": format!("Validation failed: {}", e)
-                    }))
-                }
+        Ok(service) => match service.validate_input(&request.into_inner()) {
+            Ok(()) => {
+                info!("JSON validation successful");
+                HttpResponse::Ok().json(json!({
+                    "valid": true,
+                    "message": "JSON data is valid for ingestion"
+                }))
             }
-        }
-        Err(e) => {
-            HttpResponse::ServiceUnavailable().json(json!({
-                "valid": false,
-                "error": format!("Ingestion service not available: {}", e)
-            }))
-        }
+            Err(e) => {
+                info!("JSON validation failed: {}", e);
+                HttpResponse::BadRequest().json(json!({
+                    "valid": false,
+                    "error": format!("Validation failed: {}", e)
+                }))
+            }
+        },
+        Err(e) => HttpResponse::ServiceUnavailable().json(json!({
+            "valid": false,
+            "error": format!("Ingestion service not available: {}", e)
+        })),
     }
 }
 
@@ -190,7 +194,7 @@ pub async fn get_openrouter_config(_state: web::Data<AppState>) -> impl Responde
 
     // Use the allow_empty version to get current config without requiring API key
     let config = IngestionConfig::from_env_allow_empty();
-    
+
     // Don't return the actual API key for security, just indicate if it's set
     let response = json!({
         "api_key": if config.openrouter_api_key.is_empty() { "" } else { "***configured***" },
@@ -207,7 +211,7 @@ pub async fn save_openrouter_config(
     info!("Received OpenRouter config save request");
 
     let config = request.into_inner();
-    
+
     match save_openrouter_config_to_file(&config) {
         Ok(()) => {
             info!("OpenRouter configuration saved successfully");
@@ -229,7 +233,7 @@ pub async fn save_openrouter_config(
 /// Load OpenRouter configuration from file
 fn load_openrouter_config() -> Result<OpenRouterConfigResponse, Box<dyn std::error::Error>> {
     let config_path = get_config_file_path();
-    
+
     if !config_path.exists() {
         return Ok(OpenRouterConfigResponse {
             api_key: String::new(),
@@ -243,9 +247,11 @@ fn load_openrouter_config() -> Result<OpenRouterConfigResponse, Box<dyn std::err
 }
 
 /// Save OpenRouter configuration to file
-fn save_openrouter_config_to_file(config: &OpenRouterConfigRequest) -> Result<(), Box<dyn std::error::Error>> {
+fn save_openrouter_config_to_file(
+    config: &OpenRouterConfigRequest,
+) -> Result<(), Box<dyn std::error::Error>> {
     let config_path = get_config_file_path();
-    
+
     // Create directory if it doesn't exist
     if let Some(parent) = config_path.parent() {
         fs::create_dir_all(parent)?;
@@ -258,24 +264,25 @@ fn save_openrouter_config_to_file(config: &OpenRouterConfigRequest) -> Result<()
 
     let content = serde_json::to_string_pretty(&config_response)?;
     fs::write(&config_path, content)?;
-    
+
     info!("OpenRouter config saved to: {:?}", config_path);
     Ok(())
 }
 
 /// Get the path to the OpenRouter configuration file
 fn get_config_file_path() -> std::path::PathBuf {
-    let config_dir = std::env::var("DATAFOLD_CONFIG_DIR")
-        .unwrap_or_else(|_| "./config".to_string());
-    
+    let config_dir =
+        std::env::var("DATAFOLD_CONFIG_DIR").unwrap_or_else(|_| "./config".to_string());
+
     Path::new(&config_dir).join("openrouter_config.json")
 }
 
 /// Create a simple ingestion service with potentially updated config
-async fn create_simple_ingestion_service() -> Result<SimpleIngestionService, crate::ingestion::IngestionError> {
+async fn create_simple_ingestion_service(
+) -> Result<SimpleIngestionService, crate::ingestion::IngestionError> {
     // Try to load saved OpenRouter config and merge with environment
     let mut config = IngestionConfig::from_env()?;
-    
+
     if let Ok(saved_config) = load_openrouter_config() {
         // Override with saved config if API key is provided
         if !saved_config.api_key.is_empty() {
@@ -283,15 +290,15 @@ async fn create_simple_ingestion_service() -> Result<SimpleIngestionService, cra
         }
         config.openrouter_model = saved_config.model;
     }
-    
+
     SimpleIngestionService::new(config)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{test, App};
     use crate::datafold_node::{DataFoldNode, NodeConfig};
+    use actix_web::{test, App};
     use std::sync::Arc;
     use tempfile::tempdir;
 
@@ -311,8 +318,9 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(app_state)
-                .route("/status", web::get().to(get_status))
-        ).await;
+                .route("/status", web::get().to(get_status)),
+        )
+        .await;
 
         let req = test::TestRequest::get().uri("/status").to_request();
         let resp = test::call_service(&app, req).await;
@@ -326,8 +334,9 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(app_state)
-                .route("/health", web::get().to(health_check))
-        ).await;
+                .route("/health", web::get().to(health_check)),
+        )
+        .await;
 
         let req = test::TestRequest::get().uri("/health").to_request();
         let resp = test::call_service(&app, req).await;
@@ -340,8 +349,9 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(app_state)
-                .route("/config", web::get().to(get_config))
-        ).await;
+                .route("/config", web::get().to(get_config)),
+        )
+        .await;
 
         let req = test::TestRequest::get().uri("/config").to_request();
         let resp = test::call_service(&app, req).await;

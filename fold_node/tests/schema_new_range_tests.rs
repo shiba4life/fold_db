@@ -1,5 +1,5 @@
-use fold_node::testing::Schema;
 use fold_node::schema::types::SchemaType;
+use fold_node::testing::Schema;
 
 #[test]
 fn test_new_range_sets_range_key() {

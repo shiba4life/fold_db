@@ -11,15 +11,16 @@ pub async fn send_request_to_node(
     request: Value,
 ) -> NetworkResult<Value> {
     // Serialize the request
-    let request_bytes = serde_json::to_vec(&request).map_err(|e| {
-        NetworkError::ProtocolError(format!("Failed to serialize request: {}", e))
-    })?;
+    let request_bytes = serde_json::to_vec(&request)
+        .map_err(|e| NetworkError::ProtocolError(format!("Failed to serialize request: {}", e)))?;
 
     // Send the request length
     stream
         .write_u32(request_bytes.len() as u32)
         .await
-        .map_err(|e| NetworkError::ConnectionError(format!("Failed to send request length: {}", e)))?;
+        .map_err(|e| {
+            NetworkError::ConnectionError(format!("Failed to send request length: {}", e))
+        })?;
 
     // Send the request
     stream
@@ -28,11 +29,9 @@ pub async fn send_request_to_node(
         .map_err(|e| NetworkError::ConnectionError(format!("Failed to send request: {}", e)))?;
 
     // Read the response length
-    let response_len = stream
-        .read_u32()
-        .await
-        .map_err(|e| NetworkError::ConnectionError(format!("Failed to read response length: {}", e)))?
-        as usize;
+    let response_len = stream.read_u32().await.map_err(|e| {
+        NetworkError::ConnectionError(format!("Failed to read response length: {}", e))
+    })? as usize;
 
     // Read the response
     let mut response_bytes = vec![0u8; response_len];
@@ -62,7 +61,8 @@ impl NetworkCore {
 
     /// Register the listening address for a node ID
     pub fn register_node_address(&mut self, node_id: &str, address: String) {
-        self.node_to_address_map.insert(node_id.to_string(), address);
+        self.node_to_address_map
+            .insert(node_id.to_string(), address);
     }
 
     /// Get the listening address for a node ID

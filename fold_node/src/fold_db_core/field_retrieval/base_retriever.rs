@@ -7,8 +7,8 @@ use crate::schema::types::field::FieldVariant;
 use crate::schema::types::Field;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
-use serde_json::Value;
 use log::info;
+use serde_json::Value;
 
 /// Base retriever providing common functionality for all field retrievers
 pub struct BaseRetriever<'a> {
@@ -21,7 +21,11 @@ impl<'a> BaseRetriever<'a> {
     }
 
     /// Validates field exists and returns the field definition
-    pub fn get_field_def<'b>(&self, schema: &'b Schema, field: &str) -> Result<&'b FieldVariant, SchemaError> {
+    pub fn get_field_def<'b>(
+        &self,
+        schema: &'b Schema,
+        field: &str,
+    ) -> Result<&'b FieldVariant, SchemaError> {
         schema
             .fields
             .get(field)
@@ -29,27 +33,44 @@ impl<'a> BaseRetriever<'a> {
     }
 
     /// Validates field is of expected type
-    pub fn validate_field_type(&self, field_def: &FieldVariant, expected_type: &str, field: &str) -> Result<(), SchemaError> {
-        let matches = matches!((field_def, expected_type),
-            (FieldVariant::Single(_), "Single") |
-            (FieldVariant::Range(_), "Range") |
-            (FieldVariant::Collection(_), "Collection")
+    pub fn validate_field_type(
+        &self,
+        field_def: &FieldVariant,
+        expected_type: &str,
+        field: &str,
+    ) -> Result<(), SchemaError> {
+        let matches = matches!(
+            (field_def, expected_type),
+            (FieldVariant::Single(_), "Single")
+                | (FieldVariant::Range(_), "Range")
+                | (FieldVariant::Collection(_), "Collection")
         );
-        
+
         if !matches {
-            return Err(SchemaError::InvalidField(format!("Field {} is not a {} field", field, expected_type)));
+            return Err(SchemaError::InvalidField(format!(
+                "Field {} is not a {} field",
+                field, expected_type
+            )));
         }
-        
+
         Ok(())
     }
 
     /// Extracts ref_atom_uuid from field definition, handling empty strings as None
-    pub fn get_ref_atom_uuid(&self, field_def: &FieldVariant, schema_name: &str, field: &str) -> Option<String> {
+    pub fn get_ref_atom_uuid(
+        &self,
+        field_def: &FieldVariant,
+        schema_name: &str,
+        field: &str,
+    ) -> Option<String> {
         let ref_atom_uuid = match field_def.ref_atom_uuid() {
             Some(id) if id.is_empty() => None,
             other => other.map(|s| s.to_string()),
         };
-        info!("🆔 ref_atom_uuid for {}.{}: {:?}", schema_name, field, ref_atom_uuid);
+        info!(
+            "🆔 ref_atom_uuid for {}.{}: {:?}",
+            schema_name, field, ref_atom_uuid
+        );
         ref_atom_uuid
     }
 
@@ -67,18 +88,29 @@ impl<'a> BaseRetriever<'a> {
 
     /// Common logging for field retrieval start
     pub fn log_retrieval_start(&self, retriever_type: &str, schema_name: &str, field: &str) {
-        info!("🔍 {}::get_value - schema: {}, field: {}", retriever_type, schema_name, field);
+        info!(
+            "🔍 {}::get_value - schema: {}, field: {}",
+            retriever_type, schema_name, field
+        );
     }
 
     /// Common logging for missing ref_atom_uuid
     pub fn log_missing_ref_uuid(&self, field_type: &str, schema_name: &str, field: &str) {
-        info!("⚠️  No ref_atom_uuid for {} field {}.{}, using default", field_type, schema_name, field);
+        info!(
+            "⚠️  No ref_atom_uuid for {} field {}.{}, using default",
+            field_type, schema_name, field
+        );
     }
 
     /// Common logging for successful retrieval
     pub fn log_successful_retrieval(&self, schema_name: &str, field: &str, result: &Value) {
-        info!("✅ Retrieved {} field content for {}.{}: {:?}", 
-              self.get_field_type_name(schema_name, field), schema_name, field, result);
+        info!(
+            "✅ Retrieved {} field content for {}.{}: {:?}",
+            self.get_field_type_name(schema_name, field),
+            schema_name,
+            field,
+            result
+        );
     }
 
     /// Helper to get field type name for logging
@@ -99,23 +131,27 @@ impl<'a> BaseRetriever<'a> {
     where
         F: FnOnce(&str) -> Result<Value, SchemaError>,
     {
-        
         let field_def = self.get_field_def(schema, field)?;
         self.validate_field_type(field_def, field_type, field)?;
 
         let ref_atom_uuid = self.get_ref_atom_uuid(field_def, &schema.name, field);
 
         if let Some(ref_atom_uuid) = ref_atom_uuid {
-            info!("🔗 Fetching {} data for field {}.{} with ref_atom_uuid: {}",
-                  field_type, schema.name, field, ref_atom_uuid);
-            
+            info!(
+                "🔗 Fetching {} data for field {}.{} with ref_atom_uuid: {}",
+                field_type, schema.name, field, ref_atom_uuid
+            );
+
             match load_and_convert_fn(&ref_atom_uuid) {
                 Ok(result) => {
                     self.log_successful_retrieval(&schema.name, field, &result);
                     Ok(result)
                 }
                 Err(e) => {
-                    info!("❌ Failed to load {} data for {}.{}: {:?}, using default", field_type, schema.name, field, e);
+                    info!(
+                        "❌ Failed to load {} data for {}.{}: {:?}, using default",
+                        field_type, schema.name, field, e
+                    );
                     Ok(Value::Null)
                 }
             }

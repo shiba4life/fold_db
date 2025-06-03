@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use crate::atom::atom_ref_types::{AtomRefStatus, AtomRefUpdate};
+use chrono::{DateTime, Utc};
 
 /// A trait defining the common behavior for atom references.
 ///

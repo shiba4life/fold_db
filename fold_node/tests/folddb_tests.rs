@@ -1,8 +1,9 @@
-use fold_node::testing::{
-    ExplicitCounts, Field, FieldPaymentConfig, Mutation, MutationType, PermissionsPolicy,
-    Query, Schema, SingleField, FieldVariant, SchemaPaymentConfig, TrustDistance, TrustDistanceScaling,
-};
 use fold_node::schema::types::schema::default_schema_type;
+use fold_node::testing::{
+    ExplicitCounts, Field, FieldPaymentConfig, FieldVariant, Mutation, MutationType,
+    PermissionsPolicy, Query, Schema, SchemaPaymentConfig, SingleField, TrustDistance,
+    TrustDistanceScaling,
+};
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -13,6 +14,7 @@ fn create_default_payment_config() -> FieldPaymentConfig {
 
 mod test_data;
 use test_data::test_helpers::{cleanup_test_db, cleanup_tmp_dir, setup_test_db};
+use test_data::test_helpers::atom_ref_setup::setup_test_schema_atom_refs;
 
 // Clean up tmp directory after all tests
 #[cfg(test)]
@@ -98,10 +100,16 @@ fn test_write_and_query() {
         hash: None,
     };
 
-    db.add_schema_available(schema).expect("Failed to load schema");
-    db.approve_schema("test_schema").expect("Failed to approve schema");
+    db.add_schema_available(schema)
+        .expect("Failed to load schema");
+    db.approve_schema("test_schema")
+        .expect("Failed to approve schema");
     db.allow_schema("test_schema")
         .expect("Failed to allow schema");
+
+    // Setup atom_refs for all fields before mutation
+    setup_test_schema_atom_refs(&mut db, "test_schema")
+        .expect("Failed to setup atom_refs");
 
     // Test write
     let mutation = Mutation {
@@ -170,8 +178,10 @@ fn test_atom_history() {
         hash: None,
     };
 
-    db.add_schema_available(schema).expect("Failed to load schema");
-    db.approve_schema("test_schema").expect("Failed to approve schema");
+    db.add_schema_available(schema)
+        .expect("Failed to load schema");
+    db.approve_schema("test_schema")
+        .expect("Failed to approve schema");
     db.allow_schema("test_schema")
         .expect("Failed to allow schema");
 

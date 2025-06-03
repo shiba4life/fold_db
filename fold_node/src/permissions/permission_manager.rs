@@ -50,24 +50,46 @@ impl PermissionManager {
     ) -> bool {
         // Check trust distance first
         let trust_allowed = match permissions_policy.read_policy {
-            TrustDistance::NoRequirement => true,
-            TrustDistance::Distance(required_distance) => trust_distance <= required_distance,
+            TrustDistance::NoRequirement => {
+                info!(
+                    "READ PERMISSION: pub_key={} - NoRequirement policy, allowing access",
+                    pub_key
+                );
+                true
+            }
+            TrustDistance::Distance(required_distance) => {
+                let allowed = trust_distance <= required_distance;
+                info!(
+                    "READ PERMISSION: pub_key={} - Distance check: {} <= {} = {}",
+                    pub_key, trust_distance, required_distance, allowed
+                );
+                allowed
+            }
         };
 
         // If trust distance check passes, allow access
         if trust_allowed {
+            info!(
+                "READ PERMISSION: pub_key={} - Trust distance check PASSED",
+                pub_key
+            );
             return true;
         }
 
         // If trust distance check fails, check explicit permissions
+        warn!("READ PERMISSION: pub_key={} - Trust distance check FAILED, checking explicit permissions", pub_key);
         permissions_policy.explicit_read_policy.as_ref().map_or_else(
             || {
-                warn!("Trust distance failed and no explicit permissions for {pub_key}");
+                warn!("READ PERMISSION: pub_key={} - No explicit permissions configured, ACCESS DENIED", pub_key);
                 false
             },
             |explicit_policy| {
                 let allowed = explicit_policy.counts_by_pub_key.contains_key(pub_key);
-                warn!("Trust distance failed checking explicit permission for {pub_key}: {allowed}");
+                if allowed {
+                    info!("READ PERMISSION: pub_key={} - Explicit permission found, ACCESS GRANTED", pub_key);
+                } else {
+                    warn!("READ PERMISSION: pub_key={} - No explicit permission found, ACCESS DENIED", pub_key);
+                }
                 allowed
             }
         )

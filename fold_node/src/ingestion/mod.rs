@@ -25,19 +25,19 @@
 //! 6. Generate mutations to store the JSON data
 //! 7. Execute mutations to persist the data
 
-pub mod core;
-pub mod openrouter_service;
-pub mod schema_stripper;
-pub mod mutation_generator;
-pub mod error;
 pub mod config;
+pub mod core;
+pub mod error;
+pub mod mutation_generator;
+pub mod openrouter_service;
 pub mod routes;
+pub mod schema_stripper;
 pub mod simple_service;
 
 // Public re-exports
+pub use config::IngestionConfig;
 pub use core::IngestionCore;
 pub use error::IngestionError;
-pub use config::IngestionConfig;
 
 /// Result type for ingestion operations
 pub type IngestionResult<T> = Result<T, IngestionError>;

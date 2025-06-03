@@ -4,11 +4,11 @@ use std::collections::HashMap;
 
 use crate::atom::AtomRefRange;
 use crate::fees::types::config::FieldPaymentConfig;
+use crate::impl_field;
 use crate::permissions::types::policy::PermissionsPolicy;
 use crate::schema::types::field::common::FieldCommon;
-use crate::impl_field;
 
-use crate::schema::types::field::range_filter::{RangeFilter, RangeFilterResult, matches_pattern};
+use crate::schema::types::field::range_filter::{matches_pattern, RangeFilter, RangeFilterResult};
 /// Field storing a range of values.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RangeField {
@@ -81,28 +81,29 @@ impl RangeField {
 
         match filter {
             RangeFilter::Key(key) => {
-                if let Some(value) = atom_ref_range.get_atom_uuid(key) {
-                    matches.insert(key.clone(), value.clone());
+                if let Some(atom_uuid) = atom_ref_range.get_atom_uuid(key) {
+                    matches.insert(key.clone(), atom_uuid.clone());
                 }
             }
             RangeFilter::KeyPrefix(prefix) => {
-                for (key, value) in &atom_ref_range.atom_uuids {
+                for (key, atom_uuid) in &atom_ref_range.atom_uuids {
                     if key.starts_with(prefix) {
-                        matches.insert(key.clone(), value.clone());
+                        matches.insert(key.clone(), atom_uuid.clone());
                     }
                 }
             }
             RangeFilter::KeyRange { start, end } => {
-                for (key, value) in &atom_ref_range.atom_uuids {
+                for (key, atom_uuid) in &atom_ref_range.atom_uuids {
                     if key >= start && key < end {
-                        matches.insert(key.clone(), value.clone());
+                        matches.insert(key.clone(), atom_uuid.clone());
                     }
                 }
             }
             RangeFilter::Value(target_value) => {
-                for (key, value) in &atom_ref_range.atom_uuids {
-                    if value == target_value {
-                        matches.insert(key.clone(), value.clone());
+                for (key, atom_uuid) in &atom_ref_range.atom_uuids {
+                    // Check if the value matches the target
+                    if atom_uuid == target_value {
+                        matches.insert(key.clone(), atom_uuid.clone());
                     }
                 }
             }
@@ -114,9 +115,9 @@ impl RangeField {
                 }
             }
             RangeFilter::KeyPattern(pattern) => {
-                for (key, value) in &atom_ref_range.atom_uuids {
+                for (key, atom_uuid) in &atom_ref_range.atom_uuids {
                     if matches_pattern(key, pattern) {
-                        matches.insert(key.clone(), value.clone());
+                        matches.insert(key.clone(), atom_uuid.clone());
                     }
                 }
             }
@@ -150,7 +151,8 @@ impl RangeField {
             .map(|range| {
                 let start_string = start.to_string();
                 let end_string = end.to_string();
-                range.atom_uuids
+                range
+                    .atom_uuids
                     .keys()
                     .filter(|key| **key >= start_string && **key < end_string)
                     .cloned()
@@ -169,4 +171,3 @@ impl RangeField {
 }
 
 impl_field!(RangeField);
-

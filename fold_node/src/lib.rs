@@ -1,5 +1,5 @@
 //! # DataFold Node Library
-//! 
+//!
 //! This library implements the core functionality of the DataFold distributed data platform.
 //! It provides a schema-based data storage and query system with distributed networking capabilities.
 //!
@@ -33,26 +33,27 @@ pub mod error_handling;
 pub mod fees;
 pub mod fold_db_core;
 pub mod ingestion;
+pub mod logging;
 pub mod network;
 pub mod permissions;
 pub mod schema;
-pub mod transform;
 pub mod testing;
+pub mod transform;
 pub mod web_logger;
 
 // Re-export main types for convenience
-pub use datafold_node::config::NodeConfig;
 pub use datafold_node::config::load_node_config;
+pub use datafold_node::config::NodeConfig;
 pub use datafold_node::DataFoldNode;
 pub use error::{FoldDbError, FoldDbResult};
 pub use fold_db_core::FoldDB;
 pub use network::{NetworkConfig, NetworkCore, NetworkError, NetworkResult, PeerId, SchemaService};
 
 // Re-export schema types needed for CLI
-pub use schema::types::operation::Operation;
 pub use schema::core::SchemaState;
+pub use schema::types::operation::Operation;
 pub use schema::types::operations::MutationType;
 pub use schema::Schema;
 
 // Re-export ingestion types
-pub use ingestion::{IngestionCore, IngestionConfig, IngestionError, IngestionResponse};
+pub use ingestion::{IngestionConfig, IngestionCore, IngestionError, IngestionResponse};

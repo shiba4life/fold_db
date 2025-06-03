@@ -1,6 +1,6 @@
 use crate::network::config::NetworkConfig;
 use crate::network::error::NetworkResult;
-use crate::network::{NetworkCore, error::NetworkError};
+use crate::network::{error::NetworkError, NetworkCore};
 use libp2p::PeerId;
 use log::info;
 use std::collections::HashSet;
@@ -19,7 +19,10 @@ pub async fn discover_peers(
         return Ok(Vec::new());
     }
 
-    info!("Scanning for peers using mDNS on port {}", config.discovery_port);
+    info!(
+        "Scanning for peers using mDNS on port {}",
+        config.discovery_port
+    );
 
     // In a real implementation this would send mDNS queries and wait for responses.
     // For now we simulate peer discovery when the `simulate-peers` feature is enabled.
@@ -37,7 +40,6 @@ pub async fn discover_peers(
 
     Ok(known_peers.iter().cloned().collect())
 }
-
 
 impl NetworkCore {
     /// Check which schemas are available on a remote peer.

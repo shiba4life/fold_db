@@ -1,6 +1,6 @@
 import React from 'react'
 
-function MutationEditor({ fields, mutationType, mutationData, onFieldChange }) {
+function MutationEditor({ fields, mutationType, mutationData, onFieldChange, isRangeSchema }) {
   if (mutationType === 'Delete') {
     return (
       <div className="bg-gray-50 rounded-lg p-6">
@@ -62,6 +62,30 @@ function MutationEditor({ fields, mutationType, mutationData, onFieldChange }) {
         )
       }
       case 'Range': {
+        // For range schemas, treat Range fields as single value inputs
+        // The backend will handle converting single values to range format
+        if (isRangeSchema) {
+          return (
+            <div key={fieldName} className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {fieldName}
+                <span className="ml-2 text-xs text-gray-500">Single Value (Range Schema)</span>
+              </label>
+              <input
+                type="text"
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
+                value={value}
+                onChange={(e) => onFieldChange(fieldName, e.target.value)}
+                placeholder={`Enter ${fieldName} value`}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Enter a single value. The system will automatically handle range formatting.
+              </p>
+            </div>
+          )
+        }
+
+        // For non-range schemas, use the existing complex Range field UI
         let rangeValue = {}
         if (value) {
           try {
@@ -101,7 +125,7 @@ function MutationEditor({ fields, mutationType, mutationData, onFieldChange }) {
           <div key={fieldName} className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {fieldName}
-              <span className="ml-2 text-xs text-gray-500">Range</span>
+              <span className="ml-2 text-xs text-gray-500">Range (Complex)</span>
             </label>
             <div className="border border-gray-300 rounded-md p-4 bg-gray-50">
               <div className="space-y-3">
@@ -177,10 +201,22 @@ function MutationEditor({ fields, mutationType, mutationData, onFieldChange }) {
 
   return (
     <div className="bg-gray-50 rounded-lg p-6">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Schema Fields</h3>
+      <h3 className="text-lg font-medium text-gray-900 mb-4">
+        Schema Fields
+        {isRangeSchema && (
+          <span className="ml-2 text-sm text-blue-600 font-normal">
+            (Range Schema - Single Values)
+          </span>
+        )}
+      </h3>
       <div className="space-y-6">
         {Object.entries(fields).map(([name, field]) => renderField(name, field))}
       </div>
+      {isRangeSchema && Object.keys(fields).length === 0 && (
+        <p className="text-sm text-gray-500 italic">
+          No additional fields to configure. Only the range key is required for this schema.
+        </p>
+      )}
     </div>
   )
 }

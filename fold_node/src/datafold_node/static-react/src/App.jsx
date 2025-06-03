@@ -51,6 +51,7 @@ function App() {
               console.log(`Schema ${schema.name} data:`, schemaData)
               return {
                 ...schema,
+                ...schemaData, // Include the full schema data including schema_type
                 fields: schemaData.fields || {}
               }
             } else {

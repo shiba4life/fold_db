@@ -70,6 +70,13 @@ impl PermissionWrapper {
         field_name: &str,
         schema_manager: &SchemaCore,
     ) -> FieldPermissionResult {
+        use log::info;
+
+        info!(
+            "FIELD PERMISSION CHECK: schema={}, field={}, pub_key={}, trust_distance={}",
+            query.schema_name, field_name, query.pub_key, query.trust_distance
+        );
+
         let schema = match schema_manager.get_schema(&query.schema_name) {
             Ok(Some(s)) => s,
             Ok(None) => {
@@ -92,18 +99,35 @@ impl PermissionWrapper {
         };
 
         schema.fields.get(field_name).map_or_else(
-            || FieldPermissionResult {
-                field_name: field_name.to_string(),
-                allowed: false,
-                error: Some(SchemaError::InvalidField(format!(
-                    "Field {field_name} not found"
-                ))),
+            || {
+                info!(
+                    "FIELD PERMISSION CHECK: field {} not found in schema {}",
+                    field_name, query.schema_name
+                );
+                FieldPermissionResult {
+                    field_name: field_name.to_string(),
+                    allowed: false,
+                    error: Some(SchemaError::InvalidField(format!(
+                        "Field {field_name} not found"
+                    ))),
+                }
             },
             |field| {
+                let policy = field.permission_policy();
+                info!(
+                    "FIELD PERMISSION CHECK: field={}, policy={:?}",
+                    field_name, policy
+                );
+
                 let allowed = self.permission_manager.has_read_permission(
                     &query.pub_key,
-                    field.permission_policy(),
+                    policy,
                     query.trust_distance,
+                );
+
+                info!(
+                    "FIELD PERMISSION CHECK RESULT: field={}, allowed={}",
+                    field_name, allowed
                 );
 
                 FieldPermissionResult {

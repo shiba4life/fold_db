@@ -37,6 +37,12 @@ pest = "2.7"
 pest_derive = "2.7"
 log = "0.4"
 env_logger = "0.10"
+# Enhanced logging dependencies
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt", "chrono", "ansi"] }
+tracing-appender = "0.2"
+colored = "2.0"
+toml = "0.8"
 # P2P Networking
 libp2p = { version = "0.53", features = [
     "mdns",

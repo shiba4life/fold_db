@@ -195,6 +195,86 @@ See **datafold_api_examples/** for Python scripts that demonstrate:
 - Executing mutations
 - Updating records
 
+## Logging
+
+DataFold includes a comprehensive logging system with feature-specific filtering, multiple output formats, and runtime configuration management.
+
+### Quick Start
+
+```rust
+use fold_node::logging::LoggingSystem;
+use fold_node::{log_transform_info, log_network_debug, log_schema_error};
+
+// Initialize logging
+LoggingSystem::init_default().await?;
+
+// Use feature-specific logging
+log_transform_info!("Transform completed successfully");
+log_network_debug!("Peer connection established");
+log_schema_error!("Schema validation failed");
+```
+
+### Configuration
+
+Configure logging via [`config/logging.toml`](config/logging.toml) or environment variables:
+
+```bash
+# Set feature-specific log levels
+export DATAFOLD_LOG_FEATURE_TRANSFORM=DEBUG
+export DATAFOLD_LOG_FEATURE_NETWORK=INFO
+
+# Configure outputs
+export DATAFOLD_LOG_FILE_ENABLED=true
+export DATAFOLD_LOG_FILE_PATH=/var/log/datafold.log
+```
+
+### Runtime Management
+
+Adjust log levels via HTTP API without restarting:
+
+```bash
+# Update feature log level
+curl -X POST http://localhost:9001/api/logs/features \
+  -H "Content-Type: application/json" \
+  -d '{"feature": "transform", "level": "TRACE"}'
+
+# Stream logs in real-time
+curl http://localhost:9001/api/logs/stream
+
+# Reload configuration
+curl -X POST http://localhost:9001/api/logs/reload
+```
+
+### Available Features
+
+- **transform** - Data transformation and DSL execution
+- **network** - P2P networking and peer discovery
+- **schema** - Schema validation and management
+- **database** - Database operations and storage
+- **query** - Query execution and optimization
+- **mutation** - Data mutations and updates
+- **permissions** - Access control and authorization
+- **http_server** - HTTP API and web interface
+- **tcp_server** - TCP protocol and connections
+- **ingestion** - Data ingestion and processing
+
+### Migration
+
+Migrate existing code to use feature-specific logging:
+
+```bash
+# Analyze existing log statements
+python scripts/migrate_logging.py fold_node/src/ --report
+
+# Get detailed suggestions
+python scripts/migrate_logging.py fold_node/src/ --detailed
+
+# Generate migration guide
+python scripts/migrate_logging.py fold_node/src/ --output migration.md
+```
+
+For comprehensive documentation, see [`docs/LOGGING_GUIDE.md`](docs/LOGGING_GUIDE.md).
+
 ## Documentation
 
 In‑depth technical and architectural notes are in the **cline_docs/** directory:

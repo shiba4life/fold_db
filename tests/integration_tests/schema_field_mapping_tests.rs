@@ -1,12 +1,24 @@
+use crate::test_data::test_helpers::create_test_node_with_schema_permissions;
 use fold_node::schema::Schema;
 use fold_node::testing::Field;
-use crate::test_data::test_helpers::create_test_node_with_schema_permissions;
 use serde_json::json;
 
 #[test]
 fn test_field_mappers_share_aref_uuid() {
     // Create a new DataFoldNode
-    let mut node = create_test_node_with_schema_permissions(&["UserProfile", "UserProfile2", "BlogPost", "ProductCatalog", "SocialPost", "TransactionHistory", "TestSchema", "SchemaA", "SchemaB", "TransformBase", "TransformSchema"]);
+    let mut node = create_test_node_with_schema_permissions(&[
+        "UserProfile",
+        "UserProfile2",
+        "BlogPost",
+        "ProductCatalog",
+        "SocialPost",
+        "TransactionHistory",
+        "TestSchema",
+        "SchemaA",
+        "SchemaB",
+        "TransformBase",
+        "TransformSchema",
+    ]);
 
     // Create source schema (UserProfile)
     let source_schema_json = r#"{

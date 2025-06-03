@@ -1,8 +1,8 @@
 #[path = "test_data/test_helpers/mod.rs"]
 mod test_helpers;
-use test_helpers::create_test_node;
 use fold_node::network::{NetworkConfig, NetworkCore, SchemaService};
 use fold_node::schema::Schema;
+use test_helpers::create_test_node;
 
 #[tokio::test]
 async fn test_schema_service() {

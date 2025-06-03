@@ -1,9 +1,9 @@
 use crate::datafold_node::DataFoldNode;
 use crate::error::FoldDbResult;
+use log::{error, info};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
-use log::{info, error};
 
 /// TCP server for the DataFold node.
 ///
@@ -164,6 +164,4 @@ impl TcpServer {
             });
         }
     }
-
-
 }

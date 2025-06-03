@@ -10,26 +10,26 @@
 //! relationships defining how they share and access data.
 
 pub mod config;
+mod db;
 pub mod error;
 pub mod http_server;
-pub mod schema_routes;
-pub mod query_routes;
-pub mod network_routes;
-pub mod system_routes;
 pub mod log_routes;
-mod db;
-mod permissions;
-mod transform_queue;
+pub mod network_routes;
 pub mod node;
-pub mod tcp_server;
-pub mod tcp_protocol;
-pub mod tcp_connections;
+mod permissions;
+pub mod query_routes;
+pub mod schema_routes;
+pub mod system_routes;
 pub mod tcp_command_router;
+pub mod tcp_connections;
+pub mod tcp_protocol;
+pub mod tcp_server;
 pub mod tests;
+mod transform_queue;
 
 // Re-export the DataFoldNode struct for easier imports
-pub use config::NodeConfig;
 pub use config::load_node_config;
+pub use config::NodeConfig;
 pub use http_server::DataFoldHttpServer;
 pub use node::DataFoldNode;
 pub use tcp_server::TcpServer;
