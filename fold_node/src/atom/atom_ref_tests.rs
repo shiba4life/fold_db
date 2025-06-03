@@ -105,8 +105,8 @@ mod tests {
     }
 
     #[test]
-    fn test_atom_ref_range_multiple_atoms_per_key() {
-        let atoms: Vec<_> = (0..5)
+    fn test_atom_ref_range_single_atom_per_key() {
+        let atoms: Vec<_> = (0..3)
             .map(|i| {
                 Atom::new(
                     "test_schema".to_string(),
@@ -118,44 +118,39 @@ mod tests {
 
         let mut range = AtomRefRange::new("test_key".to_string());
 
-        // Add multiple atoms to the same key - this should accumulate, not override
+        // Add atoms to different keys - each key can only store one atom UUID
         range.set_atom_uuid("user_123".to_string(), atoms[0].uuid().to_string());
-        range.set_atom_uuid("user_123".to_string(), atoms[1].uuid().to_string());
-        range.set_atom_uuid("user_123".to_string(), atoms[2].uuid().to_string());
+        range.set_atom_uuid("user_456".to_string(), atoms[1].uuid().to_string());
+        range.set_atom_uuid("user_789".to_string(), atoms[2].uuid().to_string());
 
-        // Add atoms to different keys
-        range.set_atom_uuid("user_456".to_string(), atoms[3].uuid().to_string());
-        range.set_atom_uuid("user_789".to_string(), atoms[4].uuid().to_string());
-
-        // Verify that all atoms are stored for user_123
-        let user_123_uuids = range.get_atom_uuids("user_123").unwrap();
-        assert_eq!(user_123_uuids.len(), 3, "Should have 3 atoms for user_123");
-        assert!(user_123_uuids.contains(&atoms[0].uuid().to_string()));
-        assert!(user_123_uuids.contains(&atoms[1].uuid().to_string()));
-        assert!(user_123_uuids.contains(&atoms[2].uuid().to_string()));
-
-        // Verify backward compatibility with get_atom_uuid (returns first)
+        // Verify that each key stores exactly one atom UUID
         assert_eq!(
             range.get_atom_uuid("user_123"),
             Some(&atoms[0].uuid().to_string())
         );
+        assert_eq!(
+            range.get_atom_uuid("user_456"),
+            Some(&atoms[1].uuid().to_string())
+        );
+        assert_eq!(
+            range.get_atom_uuid("user_789"),
+            Some(&atoms[2].uuid().to_string())
+        );
 
-        // Verify other keys have single atoms
-        let user_456_uuids = range.get_atom_uuids("user_456").unwrap();
-        assert_eq!(user_456_uuids.len(), 1);
-        assert_eq!(user_456_uuids[0], atoms[3].uuid().to_string());
-
-        let user_789_uuids = range.get_atom_uuids("user_789").unwrap();
-        assert_eq!(user_789_uuids.len(), 1);
-        assert_eq!(user_789_uuids[0], atoms[4].uuid().to_string());
+        // Test overwriting a key (should replace the previous value)
+        range.set_atom_uuid("user_123".to_string(), atoms[1].uuid().to_string());
+        assert_eq!(
+            range.get_atom_uuid("user_123"),
+            Some(&atoms[1].uuid().to_string())
+        );
 
         // Test removal
-        let removed_uuids = range.remove_atom_uuids("user_123").unwrap();
-        assert_eq!(removed_uuids.len(), 3);
-        assert!(range.get_atom_uuids("user_123").is_none());
+        let removed_uuid = range.remove_atom_uuid("user_123");
+        assert_eq!(removed_uuid, Some(atoms[1].uuid().to_string()));
+        assert!(range.get_atom_uuid("user_123").is_none());
 
         // Verify other keys still exist
-        assert!(range.get_atom_uuids("user_456").is_some());
-        assert!(range.get_atom_uuids("user_789").is_some());
+        assert!(range.get_atom_uuid("user_456").is_some());
+        assert!(range.get_atom_uuid("user_789").is_some());
     }
 }

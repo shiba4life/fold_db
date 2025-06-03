@@ -350,9 +350,7 @@ impl FieldManager {
                         for (key, value) in obj {
                             // Find the latest atom UUID for this key to maintain atom chain
                             let prev_atom_uuid = if let Some(ref range) = existing_range {
-                                range
-                                    .get_atom_uuids(key)
-                                    .and_then(|uuids| uuids.last().cloned())
+                                range.get_atom_uuid(key).cloned()
                             } else {
                                 None
                             };
@@ -412,9 +410,7 @@ impl FieldManager {
                     for (key, value) in obj {
                         // Find the latest atom UUID for this key to maintain atom chain
                         let prev_atom_uuid = if let Some(ref range) = existing_range {
-                            range
-                                .get_atom_uuids(key)
-                                .and_then(|uuids| uuids.last().cloned())
+                            range.get_atom_uuid(key).cloned()
                         } else {
                             None
                         };

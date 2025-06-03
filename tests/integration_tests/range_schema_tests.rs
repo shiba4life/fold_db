@@ -549,6 +549,7 @@ fn test_range_schema_multiple_mutations_same_key() {
     fold_db.approve_schema("user_scores").unwrap();
 
     // 2. Create multiple mutations for the same range key (user_id: 123)
+    // With single-UUID-per-range-key behavior, only the latest mutation should be stored
 
     // First mutation - initial score
     let mut mutation1_fields = HashMap::new();
@@ -647,50 +648,36 @@ fn test_range_schema_multiple_mutations_same_key() {
 
     let user_data = &grouped_obj["123"];
 
-    // Extract the score field which should contain the array of mutations
+    // Extract the score field which should contain only the latest mutation
     let score_data = user_data.get("score").expect("Should have score field");
 
-    // The result should be an array containing all three mutations since multiple atoms per key
+    // With the new single-UUID-per-range-key behavior, only the last mutation should be stored
     if score_data.is_array() {
         let user_array = score_data.as_array().unwrap();
         assert_eq!(
             user_array.len(),
-            3,
-            "Should contain all three mutations for user 123"
+            1,
+            "Should contain only the latest mutation for user 123 (single UUID per range key behavior)"
         );
 
-        // Verify that we have different content in each mutation
-        let mut found_beginner = false;
-        let mut found_intermediate = false;
-        let mut found_advanced = false;
-
-        for item in user_array {
-            if let Some(level) = item.get("level").and_then(|v| v.as_str()) {
-                match level {
-                    "beginner" => {
-                        found_beginner = true;
-                        assert_eq!(item.get("points").and_then(|v| v.as_i64()), Some(42));
-                    }
-                    "intermediate" => {
-                        found_intermediate = true;
-                        assert_eq!(item.get("points").and_then(|v| v.as_i64()), Some(75));
-                    }
-                    "advanced" => {
-                        found_advanced = true;
-                        assert_eq!(item.get("points").and_then(|v| v.as_i64()), Some(100));
-                        assert!(item.get("achievement").is_some());
-                    }
-                    _ => {}
-                }
-            }
+        // Verify that we have the latest mutation (advanced level)
+        let item = &user_array[0];
+        if let Some(level) = item.get("level").and_then(|v| v.as_str()) {
+            assert_eq!(level, "advanced", "Should contain only the latest (advanced) mutation");
+            assert_eq!(item.get("points").and_then(|v| v.as_i64()), Some(100));
+            assert!(item.get("achievement").is_some());
+        } else {
+            panic!("Expected level field in the mutation");
         }
-
-        assert!(found_beginner, "Should find beginner level entry");
-        assert!(found_intermediate, "Should find intermediate level entry");
-        assert!(found_advanced, "Should find advanced level entry");
     } else {
-        // If it's not an array, it means only the last mutation was stored (the bug)
-        panic!("Expected array of mutations in score field, but got single value - this indicates the overriding bug still exists");
+        // If it's a single object, verify it's the latest mutation
+        if let Some(level) = score_data.get("level").and_then(|v| v.as_str()) {
+            assert_eq!(level, "advanced", "Should contain only the latest (advanced) mutation");
+            assert_eq!(score_data.get("points").and_then(|v| v.as_i64()), Some(100));
+            assert!(score_data.get("achievement").is_some());
+        } else {
+            panic!("Expected level field in the mutation");
+        }
     }
 }
 

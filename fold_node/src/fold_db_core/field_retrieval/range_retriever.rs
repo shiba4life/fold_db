@@ -48,58 +48,27 @@ impl<'a> RangeFieldRetriever<'a> {
     ) -> Result<Value, SchemaError> {
         let mut result_obj = serde_json::Map::new();
 
-        for (key, atom_uuids) in &atom_ref_range.atom_uuids {
-            info!("🔑 Processing key: {} -> atom_uuids: {:?}", key, atom_uuids);
+        for (key, atom_uuid) in &atom_ref_range.atom_uuids {
+            info!("🔑 Processing key: {} -> atom_uuid: {}", key, atom_uuid);
 
-            // Handle multiple atoms per key
-            match atom_uuids.len().cmp(&1) {
-                std::cmp::Ordering::Equal => {
-                    // Single atom - maintain backward compatibility by storing the content directly
-                    let atom_uuid = &atom_uuids[0];
-                    match self.base.atom_manager.get_atoms().lock() {
-                        Ok(atoms_guard) => {
-                            if let Some(atom) = atoms_guard.get(atom_uuid) {
-                                result_obj.insert(key.clone(), atom.content().clone());
-                                info!(
-                                    "✅ Added single atom content for key: {} -> value: {:?}",
-                                    key,
-                                    atom.content()
-                                );
-                            } else {
-                                info!("⚠️  Atom not found in atoms collection for key: {} -> atom_uuid: {}", key, atom_uuid);
-                            }
-                        }
-                        Err(e) => {
-                            info!("⚠️  Failed to acquire atoms lock for key {}: {:?}", key, e);
-                        }
+            // Single atom per key - store the content directly
+            match self.base.atom_manager.get_atoms().lock() {
+                Ok(atoms_guard) => {
+                    if let Some(atom) = atoms_guard.get(atom_uuid) {
+                        result_obj.insert(key.clone(), atom.content().clone());
+                        info!(
+                            "✅ Added atom content for key: {} -> value: {:?}",
+                            key,
+                            atom.content()
+                        );
+                    } else {
+                        info!("⚠️  Atom not found in atoms collection for key: {} -> atom_uuid: {}", key, atom_uuid);
                     }
                 }
-                std::cmp::Ordering::Greater => {
-                    // Multiple atoms - store as an array
-                    let mut atom_contents = Vec::new();
-                    match self.base.atom_manager.get_atoms().lock() {
-                        Ok(atoms_guard) => {
-                            for atom_uuid in atom_uuids {
-                                if let Some(atom) = atoms_guard.get(atom_uuid) {
-                                    atom_contents.push(atom.content().clone());
-                                    info!("✅ Added atom content for key: {} -> atom_uuid: {} -> value: {:?}", key, atom_uuid, atom.content());
-                                } else {
-                                    info!("⚠️  Atom not found in atoms collection for key: {} -> atom_uuid: {}", key, atom_uuid);
-                                }
-                            }
-                            result_obj.insert(key.clone(), serde_json::Value::Array(atom_contents));
-                            info!("✅ Added {} atoms for key: {}", atom_uuids.len(), key);
-                        }
-                        Err(e) => {
-                            info!("⚠️  Failed to acquire atoms lock for key {}: {:?}", key, e);
-                        }
-                    }
-                }
-                std::cmp::Ordering::Less => {
-                    // Empty atom_uuids - skip this key
+                Err(e) => {
+                    info!("⚠️  Failed to acquire atoms lock for key {}: {:?}", key, e);
                 }
             }
-            // If atom_uuids is empty, we skip this key (no content to add)
         }
 
         Ok(serde_json::Value::Object(result_obj))
