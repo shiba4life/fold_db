@@ -1,7 +1,7 @@
+use log::{error, info, warn};
 use serde_json::{json, Value};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use log::{error, info, warn};
 
 use crate::error::FoldDbResult;
 
@@ -38,7 +38,7 @@ pub async fn read_request(socket: &mut TcpStream) -> FoldDbResult<Option<Value>>
 
     let mut request_bytes = vec![0u8; request_len];
     match socket.read_exact(&mut request_bytes).await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
             error!("Error reading request: {}", e);
             if e.kind() == std::io::ErrorKind::UnexpectedEof {

@@ -4,11 +4,11 @@ use std::collections::HashMap;
 
 use crate::atom::AtomRefRange;
 use crate::fees::types::config::FieldPaymentConfig;
+use crate::impl_field;
 use crate::permissions::types::policy::PermissionsPolicy;
 use crate::schema::types::field::common::FieldCommon;
-use crate::impl_field;
 
-use crate::schema::types::field::range_filter::{RangeFilter, RangeFilterResult, matches_pattern};
+use crate::schema::types::field::range_filter::{matches_pattern, RangeFilter, RangeFilterResult};
 /// Field storing a range of values.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RangeField {
@@ -171,7 +171,8 @@ impl RangeField {
             .map(|range| {
                 let start_string = start.to_string();
                 let end_string = end.to_string();
-                range.atom_uuids
+                range
+                    .atom_uuids
                     .keys()
                     .filter(|key| **key >= start_string && **key < end_string)
                     .cloned()
@@ -190,4 +191,3 @@ impl RangeField {
 }
 
 impl_field!(RangeField);
-

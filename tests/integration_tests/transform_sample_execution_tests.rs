@@ -1,4 +1,6 @@
-use crate::test_data::test_helpers::{create_test_node_with_schema_permissions, load_and_approve_schema};
+use crate::test_data::test_helpers::{
+    create_test_node_with_schema_permissions, load_and_approve_schema,
+};
 use fold_node::testing::{Mutation, MutationType};
 use serde_json::json;
 
@@ -10,14 +12,16 @@ fn test_sample_transform_execution() {
     load_and_approve_schema(
         &mut node,
         "fold_node/src/datafold_node/samples/data/TransformBase.json",
-        "TransformBase"
-    ).unwrap();
-    
+        "TransformBase",
+    )
+    .unwrap();
+
     load_and_approve_schema(
         &mut node,
         "fold_node/src/datafold_node/samples/data/TransformSchema.json",
-        "TransformSchema"
-    ).unwrap();
+        "TransformSchema",
+    )
+    .unwrap();
 
     // Populate inputs
     for (field, val) in [("value1", json!(2)), ("value2", json!(3))] {
@@ -37,4 +41,3 @@ fn test_sample_transform_execution() {
     let result = node.run_transform("TransformSchema.result").unwrap();
     assert_eq!(result, json!(5.0));
 }
-

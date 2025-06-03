@@ -1,13 +1,10 @@
 use clap::{Parser, Subcommand};
-use fold_node::{
-    load_node_config, DataFoldNode, MutationType,
-    Operation, SchemaState,
-};
 use fold_node::schema::SchemaHasher;
+use fold_node::{load_node_config, DataFoldNode, MutationType, Operation, SchemaState};
+use log::info;
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
-use log::info;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -124,7 +121,10 @@ enum Commands {
     },
 }
 
-fn handle_load_schema(path: PathBuf, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_load_schema(
+    path: PathBuf,
+    node: &mut DataFoldNode,
+) -> Result<(), Box<dyn std::error::Error>> {
     info!("Loading schema from: {}", path.display());
     let path_str = path.to_str().ok_or("Invalid file path")?;
     node.load_schema_from_file(path_str)?;
@@ -135,45 +135,49 @@ fn handle_load_schema(path: PathBuf, node: &mut DataFoldNode) -> Result<(), Box<
 fn handle_add_schema(
     path: PathBuf,
     name: Option<String>,
-    node: &mut DataFoldNode
+    node: &mut DataFoldNode,
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("Adding schema from: {}", path.display());
-    
+
     // Read the schema file
-    let schema_content = fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read schema file: {}", e))?;
-    
+    let schema_content =
+        fs::read_to_string(&path).map_err(|e| format!("Failed to read schema file: {}", e))?;
+
     // Determine schema name from parameter or filename
     let custom_name = name.or_else(|| {
         path.file_stem()
             .and_then(|s| s.to_str())
             .map(|s| s.to_string())
     });
-    
+
     info!("Using database-level validation (always enabled)");
-    
+
     // Use the database-level method which includes full validation
-    let final_schema_name = node.add_schema_to_available_directory(&schema_content, custom_name)
+    let final_schema_name = node
+        .add_schema_to_available_directory(&schema_content, custom_name)
         .map_err(|e| format!("Schema validation failed: {}", e))?;
-    
+
     // Reload available schemas
     info!("Reloading available schemas...");
     node.refresh_schemas()
         .map_err(|e| format!("Failed to reload schemas: {}", e))?;
-    
-    info!("Schema '{}' is now available for approval and use", final_schema_name);
+
+    info!(
+        "Schema '{}' is now available for approval and use",
+        final_schema_name
+    );
     Ok(())
 }
 
 fn handle_hash_schemas(verify: bool) -> Result<(), Box<dyn std::error::Error>> {
     if verify {
         info!("Verifying schema hashes in available_schemas directory...");
-        
+
         match SchemaHasher::verify_available_schemas_directory() {
             Ok(results) => {
                 let mut all_valid = true;
                 info!("Hash verification results:");
-                
+
                 for (filename, is_valid) in results {
                     if is_valid {
                         info!("  ✅ {}: Valid hash", filename);
@@ -182,7 +186,7 @@ fn handle_hash_schemas(verify: bool) -> Result<(), Box<dyn std::error::Error>> {
                         all_valid = false;
                     }
                 }
-                
+
                 if all_valid {
                     info!("All schemas have valid hashes!");
                 } else {
@@ -195,15 +199,15 @@ fn handle_hash_schemas(verify: bool) -> Result<(), Box<dyn std::error::Error>> {
         }
     } else {
         info!("Adding/updating hashes for all schemas in available_schemas directory...");
-        
+
         match SchemaHasher::hash_available_schemas_directory() {
             Ok(results) => {
                 info!("Successfully processed {} schema files:", results.len());
-                
+
                 for (filename, hash) in results {
                     info!("  ✅ {}: {}", filename, hash);
                 }
-                
+
                 info!("All schemas have been updated with hashes!");
             }
             Err(e) => {
@@ -211,7 +215,7 @@ fn handle_hash_schemas(verify: bool) -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-    
+
     Ok(())
 }
 
@@ -224,7 +228,9 @@ fn handle_list_schemas(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-fn handle_list_available_schemas(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_list_available_schemas(
+    node: &mut DataFoldNode,
+) -> Result<(), Box<dyn std::error::Error>> {
     let names = node.list_available_schemas()?;
     info!("Available schemas:");
     for name in names {
@@ -233,31 +239,46 @@ fn handle_list_available_schemas(node: &mut DataFoldNode) -> Result<(), Box<dyn 
     Ok(())
 }
 
-fn handle_unload_schema(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_unload_schema(
+    name: String,
+    node: &mut DataFoldNode,
+) -> Result<(), Box<dyn std::error::Error>> {
     node.unload_schema(&name)?;
     info!("Schema '{}' unloaded", name);
     Ok(())
 }
 
-fn handle_allow_schema(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_allow_schema(
+    name: String,
+    node: &mut DataFoldNode,
+) -> Result<(), Box<dyn std::error::Error>> {
     node.allow_schema(&name)?;
     info!("Schema '{}' allowed", name);
     Ok(())
 }
 
-fn handle_approve_schema(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_approve_schema(
+    name: String,
+    node: &mut DataFoldNode,
+) -> Result<(), Box<dyn std::error::Error>> {
     node.approve_schema(&name)?;
     info!("Schema '{}' approved successfully", name);
     Ok(())
 }
 
-fn handle_block_schema(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_block_schema(
+    name: String,
+    node: &mut DataFoldNode,
+) -> Result<(), Box<dyn std::error::Error>> {
     node.block_schema(&name)?;
     info!("Schema '{}' blocked successfully", name);
     Ok(())
 }
 
-fn handle_get_schema_state(name: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_get_schema_state(
+    name: String,
+    node: &mut DataFoldNode,
+) -> Result<(), Box<dyn std::error::Error>> {
     let state = node.get_schema_state(&name)?;
     let state_str = match state {
         SchemaState::Available => "available",
@@ -268,14 +289,23 @@ fn handle_get_schema_state(name: String, node: &mut DataFoldNode) -> Result<(), 
     Ok(())
 }
 
-fn handle_list_schemas_by_state(state: String, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_list_schemas_by_state(
+    state: String,
+    node: &mut DataFoldNode,
+) -> Result<(), Box<dyn std::error::Error>> {
     let schema_state = match state.as_str() {
         "available" => SchemaState::Available,
         "approved" => SchemaState::Approved,
         "blocked" => SchemaState::Blocked,
-        _ => return Err(format!("Invalid state: {}. Use: available, approved, or blocked", state).into()),
+        _ => {
+            return Err(format!(
+                "Invalid state: {}. Use: available, approved, or blocked",
+                state
+            )
+            .into())
+        }
     };
-    
+
     let schemas = node.list_schemas_by_state(schema_state)?;
     info!("Schemas with state '{}':", state);
     for schema in schemas {
@@ -338,7 +368,10 @@ fn handle_mutate(
     Ok(())
 }
 
-fn handle_execute(path: PathBuf, node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_execute(
+    path: PathBuf,
+    node: &mut DataFoldNode,
+) -> Result<(), Box<dyn std::error::Error>> {
     info!("Executing operation from file: {}", path.display());
     let operation_str = fs::read_to_string(path)?;
     let operation: Operation = serde_json::from_str(&operation_str)?;

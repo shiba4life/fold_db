@@ -32,11 +32,7 @@ pub fn insert_value(
 }
 
 /// Query a single field from the node and return the value.
-pub fn query_value(
-    node: &mut DataFoldNode,
-    schema: &str,
-    field: &str,
-) -> FoldDbResult<Value> {
+pub fn query_value(node: &mut DataFoldNode, schema: &str, field: &str) -> FoldDbResult<Value> {
     let query = Query {
         schema_name: schema.to_string(),
         fields: vec![field.to_string()],
@@ -45,8 +41,5 @@ pub fn query_value(
         filter: None,
     };
     let mut results = node.query(query)?;
-    results
-        .remove(0)
-        .map_err(|e| e.into())
+    results.remove(0).map_err(|e| e.into())
 }
-

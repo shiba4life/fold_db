@@ -1,11 +1,15 @@
-use crate::schema::SchemaError;
+use super::core::DbOperations;
 use crate::schema::core::SchemaState;
 use crate::schema::Schema;
-use super::core::DbOperations;
+use crate::schema::SchemaError;
 
 impl DbOperations {
     /// Stores a schema state using generic tree operations
-    pub fn store_schema_state(&self, schema_name: &str, state: SchemaState) -> Result<(), SchemaError> {
+    pub fn store_schema_state(
+        &self,
+        schema_name: &str,
+        state: SchemaState,
+    ) -> Result<(), SchemaError> {
         self.store_in_tree(&self.schema_states_tree, schema_name, &state)
     }
 
@@ -15,8 +19,12 @@ impl DbOperations {
     }
 
     /// Lists all schemas with a specific state
-    pub fn list_schemas_by_state(&self, target_state: SchemaState) -> Result<Vec<String>, SchemaError> {
-        let all_states: Vec<(String, SchemaState)> = self.list_items_in_tree(&self.schema_states_tree)?;
+    pub fn list_schemas_by_state(
+        &self,
+        target_state: SchemaState,
+    ) -> Result<Vec<String>, SchemaError> {
+        let all_states: Vec<(String, SchemaState)> =
+            self.list_items_in_tree(&self.schema_states_tree)?;
         Ok(all_states
             .into_iter()
             .filter(|(_, state)| *state == target_state)
@@ -67,8 +75,11 @@ impl DbOperations {
     }
 
     /// Gets all schema states as a HashMap
-    pub fn get_all_schema_states(&self) -> Result<std::collections::HashMap<String, SchemaState>, SchemaError> {
-        let items: Vec<(String, SchemaState)> = self.list_items_in_tree(&self.schema_states_tree)?;
+    pub fn get_all_schema_states(
+        &self,
+    ) -> Result<std::collections::HashMap<String, SchemaState>, SchemaError> {
+        let items: Vec<(String, SchemaState)> =
+            self.list_items_in_tree(&self.schema_states_tree)?;
         Ok(items.into_iter().collect())
     }
 }

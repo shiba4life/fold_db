@@ -28,7 +28,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let config = NodeConfig::new(temp_dir.path().to_path_buf());
         let node = DataFoldNode::new(config).unwrap();
-        
+
         let state = web::Data::new(AppState {
             node: Arc::new(tokio::sync::Mutex::new(node)),
         });
@@ -37,5 +37,4 @@ mod tests {
         let resp = get_system_status(state).await.respond_to(&req);
         assert_eq!(resp.status(), 200);
     }
-
 }

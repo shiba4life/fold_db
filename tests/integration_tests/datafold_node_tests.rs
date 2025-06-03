@@ -1,10 +1,8 @@
+use crate::test_data::schema_test_data::create_basic_user_profile_schema;
+use crate::test_data::test_helpers::create_test_node;
+use crate::test_data::test_helpers::node_operations::{insert_value, load_and_allow, query_value};
 use fold_node::testing::{Field, Mutation, MutationType, Query};
 use serde_json::json;
-use crate::test_data::test_helpers::create_test_node;
-use crate::test_data::test_helpers::node_operations::{
-    load_and_allow, insert_value, query_value,
-};
-use crate::test_data::schema_test_data::create_basic_user_profile_schema;
 
 #[test]
 fn test_node_schema_operations() {
@@ -27,8 +25,13 @@ fn test_node_data_operations() {
 
     // Test mutation
     insert_value(&mut node, "user_profile", "name", json!("John Doe")).unwrap();
-    insert_value(&mut node, "user_profile", "email", json!("john@example.com"))
-        .unwrap();
+    insert_value(
+        &mut node,
+        "user_profile",
+        "email",
+        json!("john@example.com"),
+    )
+    .unwrap();
 
     // Test query
     let results = vec![

@@ -3,9 +3,9 @@
 //! This example demonstrates a more complex transform DSL with multiple expressions,
 //! including let statements and return statements.
 
-use fold_node::transform::{TransformParser, Interpreter, Value};
-use std::collections::HashMap;
+use fold_node::transform::{Interpreter, TransformParser, Value};
 use serde_json::json;
+use std::collections::HashMap;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Complex Transform DSL Example");
@@ -29,9 +29,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       }
     }
     "#;
-    
-    println!("\nComplex transform with let and return statements:\n{}", complex_transform);
-    
+
+    println!(
+        "\nComplex transform with let and return statements:\n{}",
+        complex_transform
+    );
+
     match parser.parse_transform(complex_transform) {
         Ok(transform) => {
             println!("Transform parsed successfully!");
@@ -41,32 +44,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("Signature: {}", sig);
             }
             println!("Logic statements: {}", transform.logic.len());
-            
+
             // Print each statement
             for (i, stmt) in transform.logic.iter().enumerate() {
-                println!("Statement {}: {:?}", i+1, stmt);
+                println!("Statement {}: {:?}", i + 1, stmt);
             }
-            
+
             // Create input object for evaluation
             let mut variables = HashMap::new();
             let mut input = HashMap::new();
-            input.insert("height".to_string(), json!(175));  // 175 cm
-            input.insert("weight".to_string(), json!(70));   // 70 kg
+            input.insert("height".to_string(), json!(175)); // 175 cm
+            input.insert("weight".to_string(), json!(70)); // 70 kg
             variables.insert("input".to_string(), Value::Object(input));
-            
+
             // Try to evaluate each logic statement
             let mut interpreter = Interpreter::with_variables(variables);
             for (i, stmt) in transform.logic.iter().enumerate() {
-                println!("\nEvaluating statement {}: {:?}", i+1, stmt);
+                println!("\nEvaluating statement {}: {:?}", i + 1, stmt);
                 match interpreter.evaluate(stmt) {
                     Ok(result) => println!("  Result: {:?}", result),
                     Err(e) => println!("  Evaluation error: {:?}", e),
                 }
             }
-        },
+        }
         Err(e) => println!("Parse error: {:?}", e),
     }
-    
+
     // Risk score transform with more complex logic
     let risk_score_transform = r#"
     transform calculate_risk_score {
@@ -84,15 +87,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       }
     }
     "#;
-    
-    println!("\nRisk score transform with complex logic:\n{}", risk_score_transform);
-    
+
+    println!(
+        "\nRisk score transform with complex logic:\n{}",
+        risk_score_transform
+    );
+
     match parser.parse_transform(risk_score_transform) {
         Ok(transform) => {
             println!("Transform parsed successfully!");
             println!("Transform name: {}", transform.name);
             println!("Logic statements: {}", transform.logic.len());
-            
+
             // Create input object for evaluation
             let mut variables = HashMap::new();
             let mut input = HashMap::new();
@@ -100,19 +106,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             input.insert("bmi".to_string(), json!(28));
             input.insert("systolic".to_string(), json!(130));
             variables.insert("input".to_string(), Value::Object(input));
-            
+
             // Try to evaluate each logic statement
             let mut interpreter = Interpreter::with_variables(variables);
             for (i, stmt) in transform.logic.iter().enumerate() {
-                println!("\nEvaluating statement {}: {:?}", i+1, stmt);
+                println!("\nEvaluating statement {}: {:?}", i + 1, stmt);
                 match interpreter.evaluate(stmt) {
                     Ok(result) => println!("  Result: {:?}", result),
                     Err(e) => println!("  Evaluation error: {:?}", e),
                 }
             }
-        },
+        }
         Err(e) => println!("Parse error: {:?}", e),
     }
-    
+
     Ok(())
 }

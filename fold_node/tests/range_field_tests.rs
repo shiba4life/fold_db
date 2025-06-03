@@ -1,7 +1,7 @@
-use fold_node::schema::types::field::{RangeField, RangeFilter, RangeFilterResult};
-use fold_node::schema::types::field::range_filter::matches_pattern;
 use fold_node::fees::types::config::FieldPaymentConfig;
 use fold_node::permissions::types::policy::PermissionsPolicy;
+use fold_node::schema::types::field::range_filter::matches_pattern;
+use fold_node::schema::types::field::{RangeField, RangeFilter, RangeFilterResult};
 use std::collections::HashMap;
 
 #[test]
@@ -30,8 +30,14 @@ fn test_range_field_with_atom_ref_range() {
 
     // Verify the data was set correctly
     if let Some(atom_ref_range) = range_field.atom_ref_range() {
-        assert_eq!(atom_ref_range.get_atom_uuid("key1"), Some(&"atom_uuid_1".to_string()));
-        assert_eq!(atom_ref_range.get_atom_uuid("key2"), Some(&"atom_uuid_2".to_string()));
+        assert_eq!(
+            atom_ref_range.get_atom_uuid("key1"),
+            Some(&"atom_uuid_1".to_string())
+        );
+        assert_eq!(
+            atom_ref_range.get_atom_uuid("key2"),
+            Some(&"atom_uuid_2".to_string())
+        );
     }
 }
 
@@ -57,7 +63,10 @@ fn test_range_field_ensure_atom_ref_range() {
     // Verify AtomRefRange is now present and contains data
     assert!(range_field.atom_ref_range().is_some());
     if let Some(atom_ref_range) = range_field.atom_ref_range() {
-        assert_eq!(atom_ref_range.get_atom_uuid("key1"), Some(&"atom_uuid_1".to_string()));
+        assert_eq!(
+            atom_ref_range.get_atom_uuid("key1"),
+            Some(&"atom_uuid_1".to_string())
+        );
     }
 }
 
@@ -70,7 +79,10 @@ fn test_range_filter_key() {
     let result = range_field.apply_filter(&filter);
 
     assert_eq!(result.total_count, 1);
-    assert_eq!(result.matches.get("user:123"), Some(&"atom_uuid_1".to_string()));
+    assert_eq!(
+        result.matches.get("user:123"),
+        Some(&"atom_uuid_1".to_string())
+    );
 }
 
 #[test]
@@ -113,7 +125,10 @@ fn test_range_filter_value() {
     let result = range_field.apply_filter(&filter);
 
     assert_eq!(result.total_count, 1);
-    assert_eq!(result.matches.get("user:123"), Some(&"atom_uuid_1".to_string()));
+    assert_eq!(
+        result.matches.get("user:123"),
+        Some(&"atom_uuid_1".to_string())
+    );
 }
 
 #[test]
@@ -252,7 +267,12 @@ fn create_test_range_field() -> RangeField {
     let field_mappers = HashMap::new();
     let source_pub_key = "test_key".to_string();
 
-    RangeField::new_with_range(permission_policy, payment_config, field_mappers, source_pub_key)
+    RangeField::new_with_range(
+        permission_policy,
+        payment_config,
+        field_mappers,
+        source_pub_key,
+    )
 }
 
 fn populate_test_data(range_field: &mut RangeField) {
@@ -376,7 +396,7 @@ fn test_json_filter_error_handling() {
 #[test]
 fn test_filter_with_special_characters() {
     let mut range_field = create_test_range_field();
-    
+
     if let Some(atom_ref_range) = range_field.atom_ref_range_mut() {
         atom_ref_range.set_atom_uuid("key:with:colons".to_string(), "value1".to_string());
         atom_ref_range.set_atom_uuid("key-with-dashes".to_string(), "value2".to_string());
@@ -404,7 +424,7 @@ fn test_filter_with_special_characters() {
 #[test]
 fn test_filter_performance_with_large_dataset() {
     let mut range_field = create_test_range_field();
-    
+
     // Populate with a larger dataset
     if let Some(atom_ref_range) = range_field.atom_ref_range_mut() {
         for i in 0..1000 {
@@ -457,7 +477,10 @@ fn test_filter_enum_serialization() {
     let filters = vec![
         RangeFilter::Key("test".to_string()),
         RangeFilter::KeyPrefix("prefix".to_string()),
-        RangeFilter::KeyRange { start: "a".to_string(), end: "z".to_string() },
+        RangeFilter::KeyRange {
+            start: "a".to_string(),
+            end: "z".to_string(),
+        },
         RangeFilter::Value("value".to_string()),
         RangeFilter::Keys(vec!["key1".to_string(), "key2".to_string()]),
         RangeFilter::KeyPattern("pattern*".to_string()),
@@ -466,7 +489,7 @@ fn test_filter_enum_serialization() {
     for filter in filters {
         let serialized = serde_json::to_string(&filter).unwrap();
         let deserialized: RangeFilter = serde_json::from_str(&serialized).unwrap();
-        
+
         // Compare the serialized forms since RangeFilter doesn't implement PartialEq
         let reserialized = serde_json::to_string(&deserialized).unwrap();
         assert_eq!(serialized, reserialized);

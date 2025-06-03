@@ -1,11 +1,11 @@
 //! OpenRouter API service for AI-powered schema analysis
 
-use crate::ingestion::{IngestionError, IngestionResult, IngestionConfig};
+use crate::ingestion::{IngestionConfig, IngestionError, IngestionResult};
+use log::{info, warn};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::Duration;
-use log::{info, warn};
 
 /// OpenRouter API service
 pub struct OpenRouterService {
@@ -79,7 +79,9 @@ impl OpenRouterService {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_seconds))
             .build()
-            .map_err(|e| IngestionError::openrouter_error(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| {
+                IngestionError::openrouter_error(format!("Failed to create HTTP client: {}", e))
+            })?;
 
         Ok(Self { client, config })
     }
@@ -90,24 +92,41 @@ impl OpenRouterService {
         sample_json: &Value,
         available_schemas: &Value,
     ) -> IngestionResult<AISchemaResponse> {
-        info!("Sample JSON data: {}", serde_json::to_string_pretty(sample_json).unwrap_or_else(|_| "Invalid JSON".to_string()));
-        info!("Available schemas: {}", serde_json::to_string_pretty(available_schemas).unwrap_or_else(|_| "{}".to_string()));
-        
+        info!(
+            "Sample JSON data: {}",
+            serde_json::to_string_pretty(sample_json)
+                .unwrap_or_else(|_| "Invalid JSON".to_string())
+        );
+        info!(
+            "Available schemas: {}",
+            serde_json::to_string_pretty(available_schemas).unwrap_or_else(|_| "{}".to_string())
+        );
+
         let prompt = self.create_prompt(sample_json, available_schemas);
-        
-        info!("Sending request to OpenRouter API with model: {}", self.config.openrouter_model);
-        info!("AI Request Prompt (length: {} chars): {}", prompt.len(),
-              if prompt.len() > 1000 {
-                  format!("{}...[truncated]", &prompt[..1000])
-              } else {
-                  prompt.clone()
-              });
-        
+
+        info!(
+            "Sending request to OpenRouter API with model: {}",
+            self.config.openrouter_model
+        );
+        info!(
+            "AI Request Prompt (length: {} chars): {}",
+            prompt.len(),
+            if prompt.len() > 1000 {
+                format!("{}...[truncated]", &prompt[..1000])
+            } else {
+                prompt.clone()
+            }
+        );
+
         let response = self.call_openrouter_api(&prompt).await?;
         info!("=== FULL AI RESPONSE ===");
-        info!("AI Response (length: {} chars):\n{}", response.len(), response);
+        info!(
+            "AI Response (length: {} chars):\n{}",
+            response.len(),
+            response
+        );
         info!("=== END AI RESPONSE ===");
-        
+
         self.parse_ai_response(&response)
     }
 
@@ -137,7 +156,8 @@ Please analyze the sample data and either:
 2. If no existing schemas match, create a new schema definition in new_schemas and provide mutation_mappers
 
 The response must be valid JSON."#,
-            serde_json::to_string_pretty(sample_json).unwrap_or_else(|_| "Invalid JSON".to_string()),
+            serde_json::to_string_pretty(sample_json)
+                .unwrap_or_else(|_| "Invalid JSON".to_string()),
             serde_json::to_string_pretty(available_schemas).unwrap_or_else(|_| "{}".to_string())
         )
     }
@@ -155,10 +175,13 @@ The response must be valid JSON."#,
         };
 
         let mut last_error = None;
-        
+
         for attempt in 1..=self.config.max_retries {
-            info!("OpenRouter API attempt {} of {}", attempt, self.config.max_retries);
-            
+            info!(
+                "OpenRouter API attempt {} of {}",
+                attempt, self.config.max_retries
+            );
+
             match self.make_api_request(&request).await {
                 Ok(response) => {
                     info!("OpenRouter API call successful on attempt {}", attempt);
@@ -167,7 +190,7 @@ The response must be valid JSON."#,
                 Err(e) => {
                     warn!("OpenRouter API attempt {} failed: {}", attempt, e);
                     last_error = Some(e);
-                    
+
                     if attempt < self.config.max_retries {
                         // Exponential backoff
                         let delay = Duration::from_secs(2_u64.pow(attempt - 1));
@@ -178,19 +201,21 @@ The response must be valid JSON."#,
             }
         }
 
-        Err(last_error.unwrap_or_else(|| {
-            IngestionError::openrouter_error("All API attempts failed")
-        }))
+        Err(last_error
+            .unwrap_or_else(|| IngestionError::openrouter_error("All API attempts failed")))
     }
 
     /// Make a single API request
     async fn make_api_request(&self, request: &OpenRouterRequest) -> IngestionResult<String> {
         let url = format!("{}/chat/completions", self.config.openrouter_base_url);
-        
+
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.config.openrouter_api_key))
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.config.openrouter_api_key),
+            )
             .header("Content-Type", "application/json")
             .header("HTTP-Referer", "https://github.com/datafold/datafold")
             .header("X-Title", "DataFold Ingestion")
@@ -200,7 +225,10 @@ The response must be valid JSON."#,
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(IngestionError::openrouter_error(format!(
                 "API request failed with status {}: {}",
                 status, error_text
@@ -208,14 +236,16 @@ The response must be valid JSON."#,
         }
 
         let openrouter_response: OpenRouterResponse = response.json().await?;
-        
+
         if let Some(usage) = &openrouter_response.usage {
             info!("OpenRouter API usage - Prompt tokens: {:?}, Completion tokens: {:?}, Total tokens: {:?}",
                   usage.prompt_tokens, usage.completion_tokens, usage.total_tokens);
         }
 
         if openrouter_response.choices.is_empty() {
-            return Err(IngestionError::openrouter_error("No choices in API response"));
+            return Err(IngestionError::openrouter_error(
+                "No choices in API response",
+            ));
         }
 
         Ok(openrouter_response.choices[0].message.content.clone())
@@ -225,28 +255,41 @@ The response must be valid JSON."#,
     fn parse_ai_response(&self, response_text: &str) -> IngestionResult<AISchemaResponse> {
         info!("=== PARSING AI RESPONSE ===");
         info!("Raw AI response text: {}", response_text);
-        
+
         // Try to extract JSON from the response
         let json_str = self.extract_json_from_response(response_text)?;
         info!("Extracted JSON string: {}", json_str);
-        
-        // Parse the JSON
-        let parsed: Value = serde_json::from_str(&json_str)
-            .map_err(|e| IngestionError::ai_response_validation_error(format!(
-                "Failed to parse AI response as JSON: {}. Response: {}", e, json_str
-            )))?;
 
-        info!("Parsed JSON value: {}", serde_json::to_string_pretty(&parsed).unwrap_or_else(|_| "Invalid JSON".to_string()));
+        // Parse the JSON
+        let parsed: Value = serde_json::from_str(&json_str).map_err(|e| {
+            IngestionError::ai_response_validation_error(format!(
+                "Failed to parse AI response as JSON: {}. Response: {}",
+                e, json_str
+            ))
+        })?;
+
+        info!(
+            "Parsed JSON value: {}",
+            serde_json::to_string_pretty(&parsed).unwrap_or_else(|_| "Invalid JSON".to_string())
+        );
 
         // Validate and convert to AISchemaResponse
         let result = self.validate_and_convert_response(parsed)?;
-        
+
         info!("=== FINAL PARSED AI RESPONSE ===");
         info!("Existing schemas: {:?}", result.existing_schemas);
-        info!("New schemas: {}", result.new_schemas.as_ref().map(|s| serde_json::to_string_pretty(s).unwrap_or_else(|_| "Invalid JSON".to_string())).unwrap_or_else(|| "None".to_string()));
+        info!(
+            "New schemas: {}",
+            result
+                .new_schemas
+                .as_ref()
+                .map(|s| serde_json::to_string_pretty(s)
+                    .unwrap_or_else(|_| "Invalid JSON".to_string()))
+                .unwrap_or_else(|| "None".to_string())
+        );
         info!("Mutation mappers: {:?}", result.mutation_mappers);
         info!("=== END PARSED AI RESPONSE ===");
-        
+
         Ok(result)
     }
 
@@ -282,17 +325,18 @@ The response must be valid JSON."#,
 
         // Parse existing_schemas
         let existing_schemas = match obj.get("existing_schemas") {
-            Some(Value::Array(arr)) => {
-                arr.iter()
-                    .map(|v| v.as_str().unwrap_or("").to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect()
-            }
+            Some(Value::Array(arr)) => arr
+                .iter()
+                .map(|v| v.as_str().unwrap_or("").to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
             Some(Value::String(s)) => vec![s.clone()],
             Some(Value::Null) | None => vec![],
-            _ => return Err(IngestionError::ai_response_validation_error(
-                "existing_schemas must be an array of strings or null"
-            )),
+            _ => {
+                return Err(IngestionError::ai_response_validation_error(
+                    "existing_schemas must be an array of strings or null",
+                ))
+            }
         };
 
         // Parse new_schemas
@@ -310,9 +354,11 @@ The response must be valid JSON."#,
                 result
             }
             Some(Value::Null) | None => std::collections::HashMap::new(),
-            _ => return Err(IngestionError::ai_response_validation_error(
-                "mutation_mappers must be an object with string values"
-            )),
+            _ => {
+                return Err(IngestionError::ai_response_validation_error(
+                    "mutation_mappers must be an object with string values",
+                ))
+            }
         };
 
         Ok(AISchemaResponse {
@@ -337,13 +383,14 @@ mod tests {
 {"existing_schemas": ["test"], "new_schemas": null, "mutation_mappers": {}}
 ```
 That should work."#;
-        
+
         let result = service.extract_json_from_response(response_with_markers);
         assert!(result.is_ok());
         assert!(result.unwrap().contains("existing_schemas"));
 
         // Test with direct JSON
-        let response_direct = r#"{"existing_schemas": ["test"], "new_schemas": null, "mutation_mappers": {}}"#;
+        let response_direct =
+            r#"{"existing_schemas": ["test"], "new_schemas": null, "mutation_mappers": {}}"#;
         let result = service.extract_json_from_response(response_direct);
         assert!(result.is_ok());
     }
@@ -351,7 +398,7 @@ That should work."#;
     #[test]
     fn test_validate_and_convert_response() {
         let service = create_test_service();
-        
+
         let test_json = serde_json::json!({
             "existing_schemas": ["schema1", "schema2"],
             "new_schemas": null,
@@ -363,7 +410,7 @@ That should work."#;
 
         let result = service.validate_and_convert_response(test_json);
         assert!(result.is_ok());
-        
+
         let response = result.unwrap();
         assert_eq!(response.existing_schemas.len(), 2);
         assert_eq!(response.mutation_mappers.len(), 2);

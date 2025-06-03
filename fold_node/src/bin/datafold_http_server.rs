@@ -1,5 +1,5 @@
-use fold_node::datafold_node::{load_node_config, DataFoldNode, DataFoldHttpServer};
 use clap::Parser;
+use fold_node::datafold_node::{load_node_config, DataFoldHttpServer, DataFoldNode};
 use log::info;
 
 /// Command line options for the HTTP server binary.

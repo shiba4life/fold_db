@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use tempfile::tempdir;
 
 use fold_node::testing::{
-    FieldPaymentConfig, Mutation, MutationType, PermissionsPolicy, Schema, SingleField, FieldVariant,
-    TrustDistance,
+    FieldPaymentConfig, FieldVariant, Mutation, MutationType, PermissionsPolicy, Schema,
+    SingleField, TrustDistance,
 };
 use fold_node::{datafold_node::config::NodeConfig, DataFoldNode};
 
@@ -27,7 +27,10 @@ fn setup_test_node() -> DataFoldNode {
         FieldPaymentConfig::default(),
         HashMap::new(),
     );
-    test_schema.add_field(String::from("username"), FieldVariant::Single(username_field));
+    test_schema.add_field(
+        String::from("username"),
+        FieldVariant::Single(username_field),
+    );
 
     // Add age field
     let age_field = SingleField::new(
@@ -181,9 +184,11 @@ fn test_schema_validation() {
 #[test]
 #[ignore = "Test needs further investigation - range schema functionality is working based on integration tests"]
 fn test_range_schema_mutation_enforcement() {
-    use fold_node::schema::types::field::{RangeField, FieldVariant};
+    use fold_node::schema::types::field::{FieldVariant, RangeField};
     use fold_node::schema::types::Schema;
-    use fold_node::testing::{Mutation, MutationType, PermissionsPolicy, FieldPaymentConfig, TrustDistance};
+    use fold_node::testing::{
+        FieldPaymentConfig, Mutation, MutationType, PermissionsPolicy, TrustDistance,
+    };
     use std::collections::HashMap;
 
     // Setup node
@@ -199,22 +204,28 @@ fn test_range_schema_mutation_enforcement() {
     range_schema.add_field("user_id".to_string(), FieldVariant::Range(user_id_field));
     range_schema.add_field("field1".to_string(), FieldVariant::Range(rf1));
     range_schema.add_field("field2".to_string(), FieldVariant::Range(rf2));
-    
+
     let schema_result = node.add_schema_available(range_schema.clone());
     if let Err(e) = &schema_result {
         println!("Failed to add schema: {:?}", e);
         panic!("Schema creation failed: {:?}", e);
     }
     schema_result.unwrap();
-    
+
     // Approve the schema so it can be used for mutations
     node.approve_schema("RangeTest").unwrap();
 
     // Valid mutation: all fields have the same range_key value
     let mut valid_fields = HashMap::new();
     valid_fields.insert("user_id".to_string(), serde_json::json!(42));
-    valid_fields.insert("field1".to_string(), serde_json::json!({"42": {"value": 100}}));
-    valid_fields.insert("field2".to_string(), serde_json::json!({"42": {"value": 200}}));
+    valid_fields.insert(
+        "field1".to_string(),
+        serde_json::json!({"42": {"value": 100}}),
+    );
+    valid_fields.insert(
+        "field2".to_string(),
+        serde_json::json!({"42": {"value": 200}}),
+    );
     let valid_mutation = Mutation {
         schema_name: "RangeTest".to_string(),
         fields_and_values: valid_fields,
@@ -231,7 +242,10 @@ fn test_range_schema_mutation_enforcement() {
     // Invalid mutation: one field missing the range_key
     let mut missing_key_fields = HashMap::new();
     missing_key_fields.insert("user_id".to_string(), serde_json::json!(42));
-    missing_key_fields.insert("field1".to_string(), serde_json::json!({"42": {"value": 100}}));
+    missing_key_fields.insert(
+        "field1".to_string(),
+        serde_json::json!({"42": {"value": 100}}),
+    );
     missing_key_fields.insert("field2".to_string(), serde_json::json!({"value": 200}));
     let missing_key_mutation = Mutation {
         schema_name: "RangeTest".to_string(),
@@ -245,8 +259,14 @@ fn test_range_schema_mutation_enforcement() {
     // Invalid mutation: range_key values differ
     let mut diff_key_fields = HashMap::new();
     diff_key_fields.insert("user_id".to_string(), serde_json::json!(42));
-    diff_key_fields.insert("field1".to_string(), serde_json::json!({"42": {"value": 100}}));
-    diff_key_fields.insert("field2".to_string(), serde_json::json!({"99": {"value": 200}}));
+    diff_key_fields.insert(
+        "field1".to_string(),
+        serde_json::json!({"42": {"value": 100}}),
+    );
+    diff_key_fields.insert(
+        "field2".to_string(),
+        serde_json::json!({"99": {"value": 200}}),
+    );
     let diff_key_mutation = Mutation {
         schema_name: "RangeTest".to_string(),
         fields_and_values: diff_key_fields,
@@ -258,8 +278,22 @@ fn test_range_schema_mutation_enforcement() {
 
     // Invalid mutation: one field is not a rangeField
     let mut mixed_schema = Schema::new_range("MixedTest".to_string(), "user_id".to_string());
-    mixed_schema.add_field("user_id".to_string(), FieldVariant::Range(RangeField::new(policy.clone(), payment.clone(), HashMap::new())));
-    mixed_schema.add_field("field1".to_string(), FieldVariant::Range(RangeField::new(policy.clone(), payment.clone(), HashMap::new())));
+    mixed_schema.add_field(
+        "user_id".to_string(),
+        FieldVariant::Range(RangeField::new(
+            policy.clone(),
+            payment.clone(),
+            HashMap::new(),
+        )),
+    );
+    mixed_schema.add_field(
+        "field1".to_string(),
+        FieldVariant::Range(RangeField::new(
+            policy.clone(),
+            payment.clone(),
+            HashMap::new(),
+        )),
+    );
     // Add a single field (not a rangeField)
     use fold_node::schema::types::field::SingleField;
     let single = SingleField::new(policy, payment, HashMap::new());
@@ -269,8 +303,14 @@ fn test_range_schema_mutation_enforcement() {
 
     let mut mixed_fields = HashMap::new();
     mixed_fields.insert("user_id".to_string(), serde_json::json!(42));
-    mixed_fields.insert("field1".to_string(), serde_json::json!({"42": {"value": 100}}));
-    mixed_fields.insert("field2".to_string(), serde_json::json!({"42": {"value": 200}}));
+    mixed_fields.insert(
+        "field1".to_string(),
+        serde_json::json!({"42": {"value": 100}}),
+    );
+    mixed_fields.insert(
+        "field2".to_string(),
+        serde_json::json!({"42": {"value": 200}}),
+    );
     let mixed_mutation = Mutation {
         schema_name: "MixedTest".to_string(),
         fields_and_values: mixed_fields,

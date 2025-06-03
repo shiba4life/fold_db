@@ -51,20 +51,28 @@ impl PermissionManager {
         // Check trust distance first
         let trust_allowed = match permissions_policy.read_policy {
             TrustDistance::NoRequirement => {
-                info!("READ PERMISSION: pub_key={} - NoRequirement policy, allowing access", pub_key);
+                info!(
+                    "READ PERMISSION: pub_key={} - NoRequirement policy, allowing access",
+                    pub_key
+                );
                 true
-            },
+            }
             TrustDistance::Distance(required_distance) => {
                 let allowed = trust_distance <= required_distance;
-                info!("READ PERMISSION: pub_key={} - Distance check: {} <= {} = {}",
-                      pub_key, trust_distance, required_distance, allowed);
+                info!(
+                    "READ PERMISSION: pub_key={} - Distance check: {} <= {} = {}",
+                    pub_key, trust_distance, required_distance, allowed
+                );
                 allowed
-            },
+            }
         };
 
         // If trust distance check passes, allow access
         if trust_allowed {
-            info!("READ PERMISSION: pub_key={} - Trust distance check PASSED", pub_key);
+            info!(
+                "READ PERMISSION: pub_key={} - Trust distance check PASSED",
+                pub_key
+            );
             return true;
         }
 

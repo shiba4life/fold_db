@@ -1,8 +1,8 @@
+use crate::atom::atom_ref_behavior::AtomRefBehavior;
+use crate::atom::atom_ref_types::{AtomRefStatus, AtomRefUpdate};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::atom::atom_ref_types::{AtomRefStatus, AtomRefUpdate};
-use crate::atom::atom_ref_behavior::AtomRefBehavior;
 
 /// A reference to a single atom version.
 #[derive(Debug, Clone, Serialize, Deserialize)]

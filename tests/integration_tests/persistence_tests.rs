@@ -1,9 +1,7 @@
-use fold_node::testing::{
-    Field, FieldVariant, SingleField, Schema,
-};
 use fold_node::fees::types::{FieldPaymentConfig, TrustDistanceScaling};
 use fold_node::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 use fold_node::schema::types::Transform;
+use fold_node::testing::{Field, FieldVariant, Schema, SingleField};
 use fold_node::transform::parser::TransformParser;
 use std::collections::HashMap;
 
@@ -32,7 +30,10 @@ fn create_persistence_schema() -> Schema {
         HashMap::new(),
     );
     transform_field.set_transform(transform);
-    schema.add_field("transform_field".to_string(), FieldVariant::Single(transform_field));
+    schema.add_field(
+        "transform_field".to_string(),
+        FieldVariant::Single(transform_field),
+    );
 
     schema
 }

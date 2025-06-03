@@ -1,4 +1,7 @@
-use fold_node::transform::{ast::{Expression, Value}, Interpreter};
+use fold_node::transform::{
+    ast::{Expression, Value},
+    Interpreter,
+};
 
 #[test]
 fn evaluate_min_function() {

@@ -1,7 +1,7 @@
-use fold_node::schema::SchemaCore;
 use fold_node::db_operations::core::DbOperations;
-use tempfile::NamedTempFile;
+use fold_node::schema::SchemaCore;
 use std::sync::Arc;
+use tempfile::NamedTempFile;
 
 fn create_test_db_ops() -> Arc<DbOperations> {
     let db = sled::Config::new().temporary(true).open().unwrap();

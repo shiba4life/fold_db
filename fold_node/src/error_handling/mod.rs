@@ -1,11 +1,11 @@
 //! Comprehensive error handling utilities for the DataFold system.
-//! 
+//!
 //! This module provides utilities to eliminate unsafe `.unwrap()` calls
 //! and implement robust error handling patterns across the codebase.
 
+pub mod iterator_utils;
 pub mod parser_utils;
 pub mod regex_utils;
-pub mod iterator_utils;
 pub mod string_utils;
 
 use crate::schema::types::SchemaError;
@@ -33,22 +33,16 @@ pub struct SafeIterator;
 
 impl SafeIterator {
     /// Safely get the next item from an iterator with context
-    pub fn next_with_context<T, I>(
-        iter: &mut I, 
-        context: &str
-    ) -> Result<T, SchemaError>
+    pub fn next_with_context<T, I>(iter: &mut I, context: &str) -> Result<T, SchemaError>
     where
         I: Iterator<Item = T>,
     {
         iter.next()
             .ok_or_else(|| SchemaError::InvalidData(format!("Iterator exhausted: {}", context)))
     }
-    
+
     /// Safely get the first item from an iterator with context
-    pub fn first_with_context<T, I>(
-        mut iter: I, 
-        context: &str
-    ) -> Result<T, SchemaError>
+    pub fn first_with_context<T, I>(mut iter: I, context: &str) -> Result<T, SchemaError>
     where
         I: Iterator<Item = T>,
     {
@@ -67,7 +61,7 @@ impl SafeString {
             .next()
             .ok_or_else(|| SchemaError::InvalidData(format!("Empty string: {}", context)))
     }
-    
+
     /// Safely check if string starts with numeric character
     pub fn starts_with_numeric(s: &str) -> bool {
         s.chars().next().is_some_and(|c| c.is_numeric())
@@ -82,20 +76,23 @@ mod tests {
     fn test_safe_unwrap_option() {
         let some_val: Option<i32> = Some(42);
         let none_val: Option<i32> = None;
-        
+
         assert_eq!(some_val.safe_unwrap("test context").unwrap(), 42);
         assert!(none_val.safe_unwrap("test context").is_err());
     }
-    
+
     #[test]
     fn test_safe_iterator() {
         let mut iter = vec![1, 2, 3].into_iter();
-        assert_eq!(SafeIterator::next_with_context(&mut iter, "test").unwrap(), 1);
-        
+        assert_eq!(
+            SafeIterator::next_with_context(&mut iter, "test").unwrap(),
+            1
+        );
+
         let empty_iter = std::iter::empty::<i32>();
         assert!(SafeIterator::first_with_context(empty_iter, "test").is_err());
     }
-    
+
     #[test]
     fn test_safe_string() {
         assert_eq!(SafeString::first_char("hello", "test").unwrap(), 'h');

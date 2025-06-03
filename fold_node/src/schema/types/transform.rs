@@ -1,6 +1,6 @@
+use crate::transform::ast::TransformDeclaration;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use crate::transform::ast::TransformDeclaration;
 
 /// Represents a transformation that can be applied to field values.
 ///
@@ -28,8 +28,7 @@ use crate::transform::ast::TransformDeclaration;
 /// );
 /// ```
 /// Parameters for registering a transform
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransformRegistration {
     /// The ID of the transform
     pub transform_id: String,
@@ -77,21 +76,26 @@ impl<'de> serde::Deserialize<'de> for Transform {
         #[serde(untagged)]
         enum Helper {
             Str(String),
-            Struct { inputs: Option<Vec<String>>, logic: String, output: String },
+            Struct {
+                inputs: Option<Vec<String>>,
+                logic: String,
+                output: String,
+            },
         }
 
         match Helper::deserialize(deserializer)? {
             Helper::Str(s) => {
                 let parser = crate::transform::parser::TransformParser::new();
-                let decl = parser
-                    .parse_transform(&s)
-                    .map_err(|e| serde::de::Error::custom(format!(
-                        "Failed to parse transform DSL: {}",
-                        e
-                    )))?;
+                let decl = parser.parse_transform(&s).map_err(|e| {
+                    serde::de::Error::custom(format!("Failed to parse transform DSL: {}", e))
+                })?;
                 Ok(Self::from_declaration(decl))
             }
-            Helper::Struct { inputs, logic, output } => Ok(Self {
+            Helper::Struct {
+                inputs,
+                logic,
+                output,
+            } => Ok(Self {
                 inputs: inputs.unwrap_or_default(),
                 logic,
                 output,
@@ -147,7 +151,7 @@ impl Transform {
     pub fn get_output(&self) -> &str {
         &self.output
     }
-    
+
     /// Analyzes the transform logic to extract variable names that might be input dependencies.
     ///
     /// This is a simple implementation that just looks for identifiers in the logic.
@@ -158,19 +162,19 @@ impl Transform {
     /// A set of potential input dependencies
     pub fn analyze_dependencies(&self) -> HashSet<String> {
         let mut dependencies = HashSet::new();
-        
+
         // Split by dots to handle schema.field format
         for part in self.logic.split(|c: char| !c.is_alphanumeric() && c != '.') {
             if part.is_empty() || part.chars().next().unwrap().is_numeric() {
                 continue;
             }
-            
+
             // Skip keywords and operators
             match part {
                 "let" | "if" | "else" | "return" | "true" | "false" | "null" => continue,
                 _ => {}
             }
-            
+
             // If it contains a dot, it's a schema.field reference
             if part.contains('.') {
                 let parts: Vec<&str> = part.split('.').collect();
@@ -183,7 +187,7 @@ impl Transform {
                 dependencies.insert(part.to_string());
             }
         }
-        
+
         dependencies
     }
     /// Creates a new Transform from a TransformDeclaration.
@@ -215,8 +219,6 @@ impl Transform {
             parsed_expression: None,
         }
     }
-
-    
 }
 #[cfg(test)]
 mod tests {
@@ -227,13 +229,11 @@ mod tests {
     fn test_transform_from_declaration() {
         let declaration = TransformDeclaration {
             name: "test_transform".to_string(),
-            logic: vec![
-                Expression::Return(Box::new(Expression::BinaryOp {
-                    left: Box::new(Expression::Variable("field1".to_string())),
-                    operator: Operator::Add,
-                    right: Box::new(Expression::Variable("field2".to_string())),
-                })),
-            ],
+            logic: vec![Expression::Return(Box::new(Expression::BinaryOp {
+                left: Box::new(Expression::Variable("field1".to_string())),
+                operator: Operator::Add,
+                right: Box::new(Expression::Variable("field2".to_string())),
+            }))],
             reversible: false,
             signature: None,
         };
@@ -247,10 +247,7 @@ mod tests {
 
     #[test]
     fn test_output_field() {
-        let transform = Transform::new(
-            "return x + 1".to_string(),
-            "test.number".to_string(),
-        );
+        let transform = Transform::new("return x + 1".to_string(), "test.number".to_string());
 
         assert_eq!(transform.get_output(), "test.number");
     }

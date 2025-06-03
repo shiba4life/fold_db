@@ -1,9 +1,9 @@
+use crate::atom::atom_ref_behavior::AtomRefBehavior;
+use crate::atom::atom_ref_types::{AtomRefStatus, AtomRefUpdate};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
-use crate::atom::atom_ref_types::{AtomRefStatus, AtomRefUpdate};
-use crate::atom::atom_ref_behavior::AtomRefBehavior;
 
 /// A range-based collection of atom references stored in a BTreeMap.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,10 +35,7 @@ impl AtomRefRange {
     /// Updates or adds a reference at the specified key.
     /// If the key already exists, the atom_uuid is appended to the vector.
     pub fn set_atom_uuid(&mut self, key: String, atom_uuid: String) {
-        self.atom_uuids
-            .entry(key)
-            .or_default()
-            .push(atom_uuid);
+        self.atom_uuids.entry(key).or_default().push(atom_uuid);
         self.updated_at = Utc::now();
     }
 
@@ -67,7 +64,8 @@ impl AtomRefRange {
     /// Removes the reference at the specified key.
     /// This method provides backward compatibility by removing all UUIDs and returning the first one.
     pub fn remove_atom_uuid(&mut self, key: &str) -> Option<String> {
-        self.remove_atom_uuids(key).and_then(|vec| vec.into_iter().next())
+        self.remove_atom_uuids(key)
+            .and_then(|vec| vec.into_iter().next())
     }
 }
 

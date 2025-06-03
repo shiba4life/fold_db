@@ -5,14 +5,14 @@
 //! - Converting AtomRefRange to JSON format
 //! - Delegating filtering to RangeField's native apply_filter method
 
-use super::{FieldRetriever, BaseRetriever};
+use super::{BaseRetriever, FieldRetriever};
 use crate::fold_db_core::atom_manager::AtomManager;
-use crate::schema::types::field::FieldVariant;
 use crate::schema::types::field::range_filter::RangeFilter;
+use crate::schema::types::field::FieldVariant;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
-use serde_json::Value;
 use log::info;
+use serde_json::Value;
 
 pub struct RangeFieldRetriever<'a> {
     base: BaseRetriever<'a>,
@@ -26,25 +26,31 @@ impl<'a> RangeFieldRetriever<'a> {
     }
 
     /// Loads AtomRefRange data from the AtomManager
-    fn load_atom_ref_range(&self, ref_atom_uuid: &str) -> Result<Option<crate::atom::AtomRefRange>, SchemaError> {
+    fn load_atom_ref_range(
+        &self,
+        ref_atom_uuid: &str,
+    ) -> Result<Option<crate::atom::AtomRefRange>, SchemaError> {
         match self.base.atom_manager.get_ref_ranges().lock() {
-            Ok(ranges_guard) => {
-                Ok(ranges_guard.get(ref_atom_uuid).cloned())
-            }
+            Ok(ranges_guard) => Ok(ranges_guard.get(ref_atom_uuid).cloned()),
             Err(e) => {
                 info!("❌ Failed to acquire ref_ranges lock: {:?}", e);
-                Err(SchemaError::InvalidData("Failed to access range data".to_string()))
+                Err(SchemaError::InvalidData(
+                    "Failed to access range data".to_string(),
+                ))
             }
         }
     }
 
     /// Converts AtomRefRange to JSON format by loading actual atom content
-    fn convert_range_to_json(&self, atom_ref_range: &crate::atom::AtomRefRange) -> Result<Value, SchemaError> {
+    fn convert_range_to_json(
+        &self,
+        atom_ref_range: &crate::atom::AtomRefRange,
+    ) -> Result<Value, SchemaError> {
         let mut result_obj = serde_json::Map::new();
-        
+
         for (key, atom_uuids) in &atom_ref_range.atom_uuids {
             info!("🔑 Processing key: {} -> atom_uuids: {:?}", key, atom_uuids);
-            
+
             // Handle multiple atoms per key
             match atom_uuids.len().cmp(&1) {
                 std::cmp::Ordering::Equal => {
@@ -54,7 +60,11 @@ impl<'a> RangeFieldRetriever<'a> {
                         Ok(atoms_guard) => {
                             if let Some(atom) = atoms_guard.get(atom_uuid) {
                                 result_obj.insert(key.clone(), atom.content().clone());
-                                info!("✅ Added single atom content for key: {} -> value: {:?}", key, atom.content());
+                                info!(
+                                    "✅ Added single atom content for key: {} -> value: {:?}",
+                                    key,
+                                    atom.content()
+                                );
                             } else {
                                 info!("⚠️  Atom not found in atoms collection for key: {} -> atom_uuid: {}", key, atom_uuid);
                             }
@@ -91,12 +101,16 @@ impl<'a> RangeFieldRetriever<'a> {
             }
             // If atom_uuids is empty, we skip this key (no content to add)
         }
-        
+
         Ok(serde_json::Value::Object(result_obj))
     }
 
     /// Applies range filter using RangeField's native filtering
-    fn apply_range_filter(&self, range_field: &mut crate::schema::types::field::RangeField, filter: &Value) -> Result<Value, SchemaError> {
+    fn apply_range_filter(
+        &self,
+        range_field: &mut crate::schema::types::field::RangeField,
+        filter: &Value,
+    ) -> Result<Value, SchemaError> {
         // Check if the filter contains range_filter - if not, return empty result
         let range_filter_value = match filter.get("range_filter") {
             Some(value) => value,
@@ -108,29 +122,37 @@ impl<'a> RangeFieldRetriever<'a> {
                 }));
             }
         };
-        
+
         // Convert range_filter to RangeFilter enum
-        let range_filter = if let Ok(range_filter) = serde_json::from_value::<RangeFilter>(range_filter_value.clone()) {
+        let range_filter = if let Ok(range_filter) =
+            serde_json::from_value::<RangeFilter>(range_filter_value.clone())
+        {
             range_filter
         } else if let Some(obj) = range_filter_value.as_object() {
             if obj.len() == 1 {
                 // Get the single key-value pair
                 let (_key, value) = obj.iter().next().unwrap();
-                
+
                 // Convert the value to string and create RangeFilter::Key
                 let value_str = match value {
                     Value::String(s) => s.clone(),
                     Value::Number(n) => n.to_string(),
                     Value::Bool(b) => b.to_string(),
                     _ => serde_json::to_string(value)
-                        .map_err(|e| SchemaError::InvalidData(format!("Failed to convert range filter value to string: {}", e)))?
-                        .trim_matches('"').to_string(), // Remove quotes from JSON strings
+                        .map_err(|e| {
+                            SchemaError::InvalidData(format!(
+                                "Failed to convert range filter value to string: {}",
+                                e
+                            ))
+                        })?
+                        .trim_matches('"')
+                        .to_string(), // Remove quotes from JSON strings
                 };
-                
+
                 RangeFilter::Key(value_str)
             } else {
                 return Err(SchemaError::InvalidData(format!(
-                    "range_filter should contain exactly one key-value pair, found {} keys", 
+                    "range_filter should contain exactly one key-value pair, found {} keys",
                     obj.len()
                 )));
             }
@@ -143,14 +165,23 @@ impl<'a> RangeFieldRetriever<'a> {
 
         // Load AtomRefRange data into the RangeField before filtering
         if let Some(ref_atom_uuid) = &range_field.inner.ref_atom_uuid {
-            info!("🔍 Loading AtomRefRange data for ref_atom_uuid: {}", ref_atom_uuid);
-            
+            info!(
+                "🔍 Loading AtomRefRange data for ref_atom_uuid: {}",
+                ref_atom_uuid
+            );
+
             if let Some(atom_ref_range) = self.load_atom_ref_range(ref_atom_uuid)? {
-                info!("✅ Found AtomRefRange with {} keys", atom_ref_range.atom_uuids.len());
+                info!(
+                    "✅ Found AtomRefRange with {} keys",
+                    atom_ref_range.atom_uuids.len()
+                );
                 // Populate the RangeField's atom_ref_range
                 range_field.atom_ref_range = Some(atom_ref_range);
             } else {
-                info!("❌ No AtomRefRange found for ref_atom_uuid: {}", ref_atom_uuid);
+                info!(
+                    "❌ No AtomRefRange found for ref_atom_uuid: {}",
+                    ref_atom_uuid
+                );
                 return Ok(serde_json::json!({
                     "matches": {},
                     "total_count": 0
@@ -178,8 +209,9 @@ impl<'a> RangeFieldRetriever<'a> {
 
         // Convert UUIDs back to actual atom content
         let mut content_matches = std::collections::HashMap::new();
-        let mut grouped_by_original_key = std::collections::HashMap::<String, Vec<serde_json::Value>>::new();
-        
+        let mut grouped_by_original_key =
+            std::collections::HashMap::<String, Vec<serde_json::Value>>::new();
+
         for (match_key, atom_uuid) in &filter_result.matches {
             // Extract original key (remove _N suffix if present, where N is a single digit)
             // This only strips suffixes we added ourselves for multiple atoms per key
@@ -194,7 +226,7 @@ impl<'a> RangeFieldRetriever<'a> {
             } else {
                 match_key
             };
-            
+
             // Load actual atom content
             match self.base.atom_manager.get_atoms().lock() {
                 Ok(atoms_guard) => {
@@ -203,8 +235,12 @@ impl<'a> RangeFieldRetriever<'a> {
                             .entry(original_key.to_string())
                             .or_default()
                             .push(atom.content().clone());
-                        info!("✅ Loaded atom content for key: {} -> atom_uuid: {} -> content: {:?}",
-                              original_key, atom_uuid, atom.content());
+                        info!(
+                            "✅ Loaded atom content for key: {} -> atom_uuid: {} -> content: {:?}",
+                            original_key,
+                            atom_uuid,
+                            atom.content()
+                        );
                     } else {
                         info!("⚠️  Atom not found for UUID: {}", atom_uuid);
                     }
@@ -214,7 +250,7 @@ impl<'a> RangeFieldRetriever<'a> {
                 }
             }
         }
-        
+
         // Convert grouped content to the final format
         for (key, contents) in grouped_by_original_key {
             if contents.len() == 1 {
@@ -238,14 +274,14 @@ impl<'a> RangeFieldRetriever<'a> {
 
 impl FieldRetriever for RangeFieldRetriever<'_> {
     fn get_value(&self, schema: &Schema, field: &str) -> Result<Value, SchemaError> {
-        self.base.retrieve_field_value(
-            schema,
-            field,
-            "Range",
-            |ref_atom_uuid| {
+        self.base
+            .retrieve_field_value(schema, field, "Range", |ref_atom_uuid| {
                 match self.load_atom_ref_range(ref_atom_uuid)? {
                     Some(atom_ref_range) => {
-                        info!("🔍 Found AtomRefRange with {} entries", atom_ref_range.atom_uuids.len());
+                        info!(
+                            "🔍 Found AtomRefRange with {} entries",
+                            atom_ref_range.atom_uuids.len()
+                        );
                         self.convert_range_to_json(&atom_ref_range)
                     }
                     None => {
@@ -253,19 +289,29 @@ impl FieldRetriever for RangeFieldRetriever<'_> {
                         Ok(Self::default_range_value())
                     }
                 }
-            },
-        )
+            })
     }
 
-    fn get_value_with_filter(&self, schema: &Schema, field: &str, filter: &Value) -> Result<Value, SchemaError> {
-        info!("🔄 RangeFieldRetriever::get_value_with_filter - field: {}", field);
-        
+    fn get_value_with_filter(
+        &self,
+        schema: &Schema,
+        field: &str,
+        filter: &Value,
+    ) -> Result<Value, SchemaError> {
+        info!(
+            "🔄 RangeFieldRetriever::get_value_with_filter - field: {}",
+            field
+        );
+
         let field_def = self.base.get_field_def(schema, field)?;
         self.base.validate_field_type(field_def, "Range", field)?;
 
         // Get a mutable copy for filtering
         let FieldVariant::Range(range_field) = field_def else {
-            return Err(SchemaError::InvalidField(format!("Field {} is not a Range field", field)));
+            return Err(SchemaError::InvalidField(format!(
+                "Field {} is not a Range field",
+                field
+            )));
         };
 
         let mut range_field_with_data = range_field.clone();

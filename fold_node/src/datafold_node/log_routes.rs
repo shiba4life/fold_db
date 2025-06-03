@@ -1,9 +1,9 @@
+use crate::logging::LoggingSystem;
+use crate::web_logger;
 use actix_web::{web, HttpResponse, Responder, Result};
 use futures_util::stream::StreamExt;
-use tokio_stream::wrappers::BroadcastStream;
 use serde::{Deserialize, Serialize};
-use crate::logging::LoggingSystem;
-use crate::web_logger; // Keep for backward compatibility
+use tokio_stream::wrappers::BroadcastStream; // Keep for backward compatibility
 
 #[derive(Serialize, Deserialize)]
 pub struct LogLevelUpdate {
@@ -30,9 +30,9 @@ pub async fn stream_logs() -> impl Responder {
     };
     let stream = BroadcastStream::new(rx).filter_map(|msg| async move {
         match msg {
-            Ok(line) => Some(Ok::<web::Bytes, actix_web::Error>(
-                web::Bytes::from(format!("data: {}\n\n", line)),
-            )),
+            Ok(line) => Some(Ok::<web::Bytes, actix_web::Error>(web::Bytes::from(
+                format!("data: {}\n\n", line),
+            ))),
             Err(_) => None,
         }
     });
@@ -51,7 +51,7 @@ pub async fn get_config() -> Result<impl Responder> {
         let current_level = log::max_level().to_string();
         Ok(HttpResponse::Ok().json(LogConfigResponse {
             message: "Basic logging configuration".to_string(),
-            current_level
+            current_level,
         }))
     }
 }
@@ -85,17 +85,13 @@ pub async fn update_feature_level(
 /// Reload logging configuration from file
 pub async fn reload_config() -> Result<impl Responder> {
     match LoggingSystem::reload_config_from_file("config/logging.toml").await {
-        Ok(_) => {
-            Ok(HttpResponse::Ok().json(serde_json::json!({
-                "success": true,
-                "message": "Configuration reloaded successfully"
-            })))
-        }
-        Err(e) => {
-            Ok(HttpResponse::BadRequest().json(serde_json::json!({
-                "error": format!("Failed to reload configuration: {}", e)
-            })))
-        }
+        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({
+            "success": true,
+            "message": "Configuration reloaded successfully"
+        }))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(serde_json::json!({
+            "error": format!("Failed to reload configuration: {}", e)
+        }))),
     }
 }
 

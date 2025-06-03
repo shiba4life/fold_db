@@ -2,10 +2,10 @@ use std::sync::{Arc, Mutex};
 
 use fold_node::fold_db_core::transform_manager::types::TransformRunner;
 use fold_node::fold_db_core::transform_orchestrator::TransformOrchestrator;
-use tempfile::tempdir;
-use sled;
 use fold_node::schema::SchemaError;
 use serde_json::json;
+use sled;
+use tempfile::tempdir;
 
 use std::collections::{HashMap, HashSet};
 
@@ -25,7 +25,9 @@ impl MockTransformManager {
     }
 }
 
-fn create_orchestrator(manager: Arc<MockTransformManager>) -> (TransformOrchestrator, tempfile::TempDir) {
+fn create_orchestrator(
+    manager: Arc<MockTransformManager>,
+) -> (TransformOrchestrator, tempfile::TempDir) {
     let dir = tempdir().unwrap();
     let db = sled::open(dir.path()).unwrap();
     let tree = db.open_tree("orchestrator").unwrap();
@@ -42,23 +44,32 @@ impl TransformRunner for MockTransformManager {
         Ok(true)
     }
 
-    fn get_transforms_for_field(&self, schema_name: &str, field_name: &str) -> Result<HashSet<String>, SchemaError> {
-        self.lookup.lock().unwrap().push((schema_name.to_string(), field_name.to_string()));
-        Ok(
-            self.field_map
-                .get(&format!("{}.{}", schema_name, field_name))
-                .cloned()
-                .unwrap_or_default()
-                .into_iter()
-                .collect(),
-        )
+    fn get_transforms_for_field(
+        &self,
+        schema_name: &str,
+        field_name: &str,
+    ) -> Result<HashSet<String>, SchemaError> {
+        self.lookup
+            .lock()
+            .unwrap()
+            .push((schema_name.to_string(), field_name.to_string()));
+        Ok(self
+            .field_map
+            .get(&format!("{}.{}", schema_name, field_name))
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .collect())
     }
 }
 
 #[test]
 fn field_update_adds_to_queue() {
     let mut mgr = MockTransformManager::new();
-    mgr.field_map.insert("SchemaA.field1".to_string(), vec!["SchemaA.field1".to_string()]);
+    mgr.field_map.insert(
+        "SchemaA.field1".to_string(),
+        vec!["SchemaA.field1".to_string()],
+    );
     let manager = Arc::new(mgr);
     let (orchestrator, _dir) = create_orchestrator(manager.clone());
 
@@ -73,9 +84,12 @@ fn field_update_adds_to_queue() {
 #[test]
 fn sequential_processing_of_tasks() {
     let mut mgr = MockTransformManager::new();
-    mgr.field_map.insert("Schema.a".to_string(), vec!["Schema.a".to_string()]);
-    mgr.field_map.insert("Schema.b".to_string(), vec!["Schema.b".to_string()]);
-    mgr.field_map.insert("Schema.c".to_string(), vec!["Schema.c".to_string()]);
+    mgr.field_map
+        .insert("Schema.a".to_string(), vec!["Schema.a".to_string()]);
+    mgr.field_map
+        .insert("Schema.b".to_string(), vec!["Schema.b".to_string()]);
+    mgr.field_map
+        .insert("Schema.c".to_string(), vec!["Schema.c".to_string()]);
     let manager = Arc::new(mgr);
     let (orchestrator, _dir) = create_orchestrator(manager.clone());
 
@@ -96,7 +110,10 @@ fn sequential_processing_of_tasks() {
 #[test]
 fn mapping_adds_specific_transform() {
     let mut mgr = MockTransformManager::new();
-    mgr.field_map.insert("SchemaA.field".to_string(), vec!["SchemaB.other".to_string()]);
+    mgr.field_map.insert(
+        "SchemaA.field".to_string(),
+        vec!["SchemaB.other".to_string()],
+    );
     let manager = Arc::new(mgr);
     let (orchestrator, _dir) = create_orchestrator(manager.clone());
 

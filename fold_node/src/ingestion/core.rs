@@ -1,17 +1,17 @@
 //! Core ingestion orchestrator
 
-use crate::ingestion::{
-    IngestionError, IngestionResult, IngestionConfig, IngestionResponse,
-    openrouter_service::{OpenRouterService, AISchemaResponse},
-    schema_stripper::SchemaStripper,
-    mutation_generator::MutationGenerator,
-};
-use crate::schema::{SchemaCore, Schema};
-use crate::schema::types::{Mutation, JsonSchemaDefinition};
 use crate::fold_db_core::FoldDB;
+use crate::ingestion::{
+    mutation_generator::MutationGenerator,
+    openrouter_service::{AISchemaResponse, OpenRouterService},
+    schema_stripper::SchemaStripper,
+    IngestionConfig, IngestionError, IngestionResponse, IngestionResult,
+};
+use crate::schema::types::{JsonSchemaDefinition, Mutation};
+use crate::schema::{Schema, SchemaCore};
+use log::{error, info};
 use serde_json::Value;
 use std::sync::Arc;
-use log::{info, error};
 
 /// Core ingestion service that orchestrates the entire ingestion process
 pub struct IngestionCore {
@@ -58,12 +58,15 @@ impl IngestionCore {
     }
 
     /// Process JSON ingestion request
-    pub async fn process_json_ingestion(&self, request: IngestionRequest) -> IngestionResult<IngestionResponse> {
+    pub async fn process_json_ingestion(
+        &self,
+        request: IngestionRequest,
+    ) -> IngestionResult<IngestionResponse> {
         info!("Starting JSON ingestion process");
 
         if !self.config.is_ready() {
             return Ok(IngestionResponse::failure(vec![
-                "Ingestion module is not properly configured or disabled".to_string()
+                "Ingestion module is not properly configured or disabled".to_string(),
             ]));
         }
 
@@ -77,10 +80,14 @@ impl IngestionCore {
         info!("Retrieved {} available schemas", schema_count);
 
         // Step 2: Get AI recommendation
-        let ai_response = self.get_ai_schema_recommendation(&request.data, &available_schemas).await?;
-        info!("Received AI recommendation: {} existing schemas, new schema: {}",
-              ai_response.existing_schemas.len(),
-              ai_response.new_schemas.is_some());
+        let ai_response = self
+            .get_ai_schema_recommendation(&request.data, &available_schemas)
+            .await?;
+        info!(
+            "Received AI recommendation: {} existing schemas, new schema: {}",
+            ai_response.existing_schemas.len(),
+            ai_response.new_schemas.is_some()
+        );
 
         // Step 3: Determine schema to use
         let schema_name = self.determine_schema_to_use(&ai_response).await?;
@@ -91,21 +98,30 @@ impl IngestionCore {
             &schema_name,
             &request.data,
             &ai_response.mutation_mappers,
-            request.trust_distance.unwrap_or(self.config.default_trust_distance),
+            request
+                .trust_distance
+                .unwrap_or(self.config.default_trust_distance),
             request.pub_key.unwrap_or_else(|| "default".to_string()),
         )?;
 
         info!("Generated {} mutations", mutations.len());
 
         // Step 5: Execute mutations if requested
-        let mutations_executed = if request.auto_execute.unwrap_or(self.config.auto_execute_mutations) {
+        let mutations_executed = if request
+            .auto_execute
+            .unwrap_or(self.config.auto_execute_mutations)
+        {
             self.execute_mutations(&mutations).await?
         } else {
             0
         };
 
-        info!("Ingestion completed successfully: schema '{}', {} mutations generated, {} executed",
-              schema_name, mutations.len(), mutations_executed);
+        info!(
+            "Ingestion completed successfully: schema '{}', {} mutations generated, {} executed",
+            schema_name,
+            mutations.len(),
+            mutations_executed
+        );
 
         Ok(IngestionResponse::success(
             schema_name,
@@ -118,7 +134,9 @@ impl IngestionCore {
     /// Get available schemas stripped of payment and permission data
     async fn get_stripped_available_schemas(&self) -> IngestionResult<Value> {
         // Get all available schemas from SchemaCore
-        let available_schema_names = self.schema_core.list_available_schemas()
+        let available_schema_names = self
+            .schema_core
+            .list_available_schemas()
             .map_err(IngestionError::SchemaSystemError)?;
 
         let mut schemas = Vec::new();
@@ -129,7 +147,8 @@ impl IngestionCore {
         }
 
         // Strip payment and permission data
-        self.schema_stripper.create_ai_schema_representation(&schemas)
+        self.schema_stripper
+            .create_ai_schema_representation(&schemas)
     }
 
     /// Get AI schema recommendation
@@ -138,11 +157,16 @@ impl IngestionCore {
         json_data: &Value,
         available_schemas: &Value,
     ) -> IngestionResult<AISchemaResponse> {
-        self.openrouter_service.get_schema_recommendation(json_data, available_schemas).await
+        self.openrouter_service
+            .get_schema_recommendation(json_data, available_schemas)
+            .await
     }
 
     /// Determine which schema to use based on AI response
-    async fn determine_schema_to_use(&self, ai_response: &AISchemaResponse) -> IngestionResult<String> {
+    async fn determine_schema_to_use(
+        &self,
+        ai_response: &AISchemaResponse,
+    ) -> IngestionResult<String> {
         // If existing schemas were recommended, use the first one
         if !ai_response.existing_schemas.is_empty() {
             let schema_name = &ai_response.existing_schemas[0];
@@ -158,7 +182,7 @@ impl IngestionCore {
         }
 
         Err(IngestionError::ai_response_validation_error(
-            "AI response contains neither existing schemas nor new schema definition"
+            "AI response contains neither existing schemas nor new schema definition",
         ))
     }
 
@@ -171,11 +195,13 @@ impl IngestionCore {
         let schema_name = schema.name.clone();
 
         // Load the schema into SchemaCore
-        self.schema_core.load_schema_internal(schema)
+        self.schema_core
+            .load_schema_internal(schema)
             .map_err(IngestionError::SchemaSystemError)?;
 
         // Set the schema to approved state
-        self.schema_core.approve_schema(&schema_name)
+        self.schema_core
+            .approve_schema(&schema_name)
             .map_err(IngestionError::SchemaSystemError)?;
 
         info!("New schema '{}' created and approved", schema_name);
@@ -190,8 +216,11 @@ impl IngestionCore {
         }
 
         // Try to parse as JsonSchemaDefinition
-        if let Ok(json_schema) = serde_json::from_value::<JsonSchemaDefinition>(schema_def.clone()) {
-            return self.schema_core.interpret_schema(json_schema)
+        if let Ok(json_schema) = serde_json::from_value::<JsonSchemaDefinition>(schema_def.clone())
+        {
+            return self
+                .schema_core
+                .interpret_schema(json_schema)
                 .map_err(IngestionError::SchemaSystemError);
         }
 
@@ -205,7 +234,8 @@ impl IngestionCore {
             IngestionError::schema_parsing_error("Schema definition must be an object")
         })?;
 
-        let name = obj.get("name")
+        let name = obj
+            .get("name")
             .and_then(|v| v.as_str())
             .ok_or_else(|| IngestionError::schema_parsing_error("Schema must have a name"))?;
 
@@ -224,10 +254,13 @@ impl IngestionCore {
     }
 
     /// Create a basic field from definition
-    fn create_basic_field_from_definition(&self, _field_def: &Value) -> IngestionResult<crate::schema::types::field::FieldVariant> {
-        use crate::schema::types::field::{FieldVariant, SingleField};
-        use crate::permissions::types::policy::PermissionsPolicy;
+    fn create_basic_field_from_definition(
+        &self,
+        _field_def: &Value,
+    ) -> IngestionResult<crate::schema::types::field::FieldVariant> {
         use crate::fees::types::FieldPaymentConfig;
+        use crate::permissions::types::policy::PermissionsPolicy;
+        use crate::schema::types::field::{FieldVariant, SingleField};
         use std::collections::HashMap;
 
         // Create a basic single field with default permissions and payment config
@@ -266,10 +299,16 @@ impl IngestionCore {
             match self.execute_single_mutation(mutation).await {
                 Ok(()) => {
                     executed_count += 1;
-                    info!("Successfully executed mutation for schema '{}'", mutation.schema_name);
+                    info!(
+                        "Successfully executed mutation for schema '{}'",
+                        mutation.schema_name
+                    );
                 }
                 Err(e) => {
-                    error!("Failed to execute mutation for schema '{}': {}", mutation.schema_name, e);
+                    error!(
+                        "Failed to execute mutation for schema '{}': {}",
+                        mutation.schema_name, e
+                    );
                     // Continue with other mutations even if one fails
                 }
             }
@@ -280,8 +319,9 @@ impl IngestionCore {
 
     /// Execute a single mutation
     async fn execute_single_mutation(&self, mutation: &Mutation) -> IngestionResult<()> {
-        let mut db = self.fold_db.lock()
-            .map_err(|_| IngestionError::DatabaseError("Failed to acquire database lock".to_string()))?;
+        let mut db = self.fold_db.lock().map_err(|_| {
+            IngestionError::DatabaseError("Failed to acquire database lock".to_string())
+        })?;
 
         db.write_schema(mutation.clone())
             .map_err(IngestionError::SchemaSystemError)?;
@@ -308,7 +348,7 @@ impl IngestionCore {
 
         if !data.is_object() && !data.is_array() {
             return Err(IngestionError::invalid_input(
-                "Input data must be a JSON object or array"
+                "Input data must be a JSON object or array",
             ));
         }
 
@@ -319,8 +359,8 @@ impl IngestionCore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::SchemaCore;
     use crate::fold_db_core::FoldDB;
+    use crate::schema::SchemaCore;
     use std::sync::{Arc, Mutex};
     use tempfile::TempDir;
 
@@ -331,9 +371,10 @@ mod tests {
         config.enabled = true;
 
         // Create temporary directory for each test to avoid conflicts
-        let temp_dir = TempDir::new().map_err(|e| IngestionError::configuration_error(e.to_string()))?;
+        let temp_dir =
+            TempDir::new().map_err(|e| IngestionError::configuration_error(e.to_string()))?;
         let test_path = temp_dir.path().to_string_lossy().to_string();
-        
+
         // Create test schema core and fold db
         let schema_core = Arc::new(SchemaCore::new_for_testing(&test_path).unwrap());
         let fold_db = Arc::new(Mutex::new(FoldDB::new(&test_path).unwrap()));
@@ -352,8 +393,12 @@ mod tests {
         config.enabled = true;
 
         let temp_dir = TempDir::new().unwrap();
-        let test_path = temp_dir.path().join("test_validate").to_string_lossy().to_string();
-        
+        let test_path = temp_dir
+            .path()
+            .join("test_validate")
+            .to_string_lossy()
+            .to_string();
+
         // Try to create components with better error handling
         let schema_core = match SchemaCore::new_for_testing(&test_path) {
             Ok(core) => Arc::new(core),
@@ -362,7 +407,7 @@ mod tests {
                 return;
             }
         };
-        
+
         let fold_db = match FoldDB::new(&test_path) {
             Ok(db) => Arc::new(Mutex::new(db)),
             Err(_) => {
@@ -380,7 +425,9 @@ mod tests {
         };
 
         // Valid inputs
-        assert!(core.validate_input(&serde_json::json!({"key": "value"})).is_ok());
+        assert!(core
+            .validate_input(&serde_json::json!({"key": "value"}))
+            .is_ok());
         assert!(core.validate_input(&serde_json::json!([1, 2, 3])).is_ok());
 
         // Invalid inputs
@@ -397,8 +444,12 @@ mod tests {
         config.enabled = true;
 
         let temp_dir = TempDir::new().unwrap();
-        let test_path = temp_dir.path().join("test_schema_def").to_string_lossy().to_string();
-        
+        let test_path = temp_dir
+            .path()
+            .join("test_schema_def")
+            .to_string_lossy()
+            .to_string();
+
         // Try to create components with better error handling
         let schema_core = match SchemaCore::new_for_testing(&test_path) {
             Ok(core) => Arc::new(core),
@@ -407,11 +458,13 @@ mod tests {
                 return;
             }
         };
-        
+
         let fold_db = match FoldDB::new(&test_path) {
             Ok(db) => Arc::new(Mutex::new(db)),
             Err(_) => {
-                eprintln!("Skipping test_create_basic_schema_from_definition: Could not create database");
+                eprintln!(
+                    "Skipping test_create_basic_schema_from_definition: Could not create database"
+                );
                 return;
             }
         };
@@ -423,7 +476,7 @@ mod tests {
                 return;
             }
         };
-        
+
         let schema_def = serde_json::json!({
             "name": "TestSchema",
             "fields": {
@@ -434,7 +487,7 @@ mod tests {
 
         let result = core.create_basic_schema_from_definition(&schema_def);
         assert!(result.is_ok());
-        
+
         let schema = result.unwrap();
         assert_eq!(schema.name, "TestSchema");
         assert_eq!(schema.fields.len(), 2);

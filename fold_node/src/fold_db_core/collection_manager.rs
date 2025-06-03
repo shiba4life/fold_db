@@ -4,8 +4,8 @@ use crate::atom::AtomStatus;
 use crate::schema::types::field::FieldType;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
-use serde_json::Value;
 use log::info;
+use serde_json::Value;
 
 pub struct CollectionManager {
     pub(super) field_manager: FieldManager,
@@ -64,7 +64,12 @@ impl CollectionManager {
         let aref_uuid = ctx.get_or_create_atom_ref()?;
         let prev_atom_uuid = ctx.get_prev_collection_atom_uuid(&aref_uuid, &id)?;
 
-        ctx.create_and_update_collection_atom(Some(prev_atom_uuid), content.clone(), None, id.clone())?;
+        ctx.create_and_update_collection_atom(
+            Some(prev_atom_uuid),
+            content.clone(),
+            None,
+            id.clone(),
+        )?;
 
         info!(
             "update_collection_field_value - schema: {}, field: {}, id: {}, aref_uuid: {}, result: success",

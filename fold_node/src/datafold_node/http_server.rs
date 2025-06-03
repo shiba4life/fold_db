@@ -1,7 +1,7 @@
+use super::log_routes;
+use super::{network_routes, query_routes, schema_routes, system_routes};
 use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
-use super::{schema_routes, query_routes, network_routes, system_routes};
-use super::log_routes;
 use crate::ingestion::routes as ingestion_routes;
 
 use actix_cors::Cors;
@@ -31,7 +31,6 @@ pub struct DataFoldHttpServer {
     bind_address: String,
 }
 
-
 /// Shared application state for the HTTP server.
 pub struct AppState {
     /// The DataFold node
@@ -60,7 +59,10 @@ impl DataFoldHttpServer {
     pub async fn new(node: DataFoldNode, bind_address: &str) -> FoldDbResult<Self> {
         // Initialize the enhanced logging system
         if let Err(e) = crate::logging::LoggingSystem::init_default().await {
-            log::warn!("Failed to initialize enhanced logging system, falling back to web logger: {}", e);
+            log::warn!(
+                "Failed to initialize enhanced logging system, falling back to web logger: {}",
+                e
+            );
             // Fall back to old web logger for backward compatibility
             crate::web_logger::init().ok();
         }
@@ -110,52 +112,142 @@ impl DataFoldHttpServer {
                     web::scope("/api")
                         // Schema endpoints
                         .route("/schemas", web::get().to(schema_routes::list_schemas))
-                        .route("/schemas/status", web::get().to(schema_routes::get_schema_status))
-                        .route("/schemas/refresh", web::post().to(schema_routes::refresh_schemas))
-                        .route("/schemas/available", web::get().to(schema_routes::list_available_schemas))
-                        .route("/schemas/available/add", web::post().to(schema_routes::add_schema_to_available))
-                        .route("/schemas/by-state/{state}", web::get().to(schema_routes::list_schemas_by_state))
+                        .route(
+                            "/schemas/status",
+                            web::get().to(schema_routes::get_schema_status),
+                        )
+                        .route(
+                            "/schemas/refresh",
+                            web::post().to(schema_routes::refresh_schemas),
+                        )
+                        .route(
+                            "/schemas/available",
+                            web::get().to(schema_routes::list_available_schemas),
+                        )
+                        .route(
+                            "/schemas/available/add",
+                            web::post().to(schema_routes::add_schema_to_available),
+                        )
+                        .route(
+                            "/schemas/by-state/{state}",
+                            web::get().to(schema_routes::list_schemas_by_state),
+                        )
                         .route("/schema/{name}", web::get().to(schema_routes::get_schema))
                         .route("/schema", web::post().to(schema_routes::create_schema))
-                        .route("/schema/{name}", web::put().to(schema_routes::update_schema))
-                        .route("/schema/{name}", web::delete().to(schema_routes::unload_schema_route))
-                        .route("/schema/{name}/load", web::post().to(schema_routes::load_schema_route))
-                        .route("/schema/{name}/approve", web::post().to(schema_routes::approve_schema))
-                        .route("/schema/{name}/block", web::post().to(schema_routes::block_schema))
-                        .route("/schema/{name}/state", web::get().to(schema_routes::get_schema_state))
+                        .route(
+                            "/schema/{name}",
+                            web::put().to(schema_routes::update_schema),
+                        )
+                        .route(
+                            "/schema/{name}",
+                            web::delete().to(schema_routes::unload_schema_route),
+                        )
+                        .route(
+                            "/schema/{name}/load",
+                            web::post().to(schema_routes::load_schema_route),
+                        )
+                        .route(
+                            "/schema/{name}/approve",
+                            web::post().to(schema_routes::approve_schema),
+                        )
+                        .route(
+                            "/schema/{name}/block",
+                            web::post().to(schema_routes::block_schema),
+                        )
+                        .route(
+                            "/schema/{name}/state",
+                            web::get().to(schema_routes::get_schema_state),
+                        )
                         // Operation endpoints
                         .route("/execute", web::post().to(query_routes::execute_operation))
                         .route("/query", web::post().to(query_routes::execute_query))
                         .route("/mutation", web::post().to(query_routes::execute_mutation))
                         // Ingestion endpoints
-                        .route("/ingestion/process", web::post().to(ingestion_routes::process_json))
-                        .route("/ingestion/status", web::get().to(ingestion_routes::get_status))
-                        .route("/ingestion/health", web::get().to(ingestion_routes::health_check))
-                        .route("/ingestion/config", web::get().to(ingestion_routes::get_config))
-                        .route("/ingestion/validate", web::post().to(ingestion_routes::validate_json))
-                        .route("/ingestion/openrouter-config", web::get().to(ingestion_routes::get_openrouter_config))
-                        .route("/ingestion/openrouter-config", web::post().to(ingestion_routes::save_openrouter_config))
+                        .route(
+                            "/ingestion/process",
+                            web::post().to(ingestion_routes::process_json),
+                        )
+                        .route(
+                            "/ingestion/status",
+                            web::get().to(ingestion_routes::get_status),
+                        )
+                        .route(
+                            "/ingestion/health",
+                            web::get().to(ingestion_routes::health_check),
+                        )
+                        .route(
+                            "/ingestion/config",
+                            web::get().to(ingestion_routes::get_config),
+                        )
+                        .route(
+                            "/ingestion/validate",
+                            web::post().to(ingestion_routes::validate_json),
+                        )
+                        .route(
+                            "/ingestion/openrouter-config",
+                            web::get().to(ingestion_routes::get_openrouter_config),
+                        )
+                        .route(
+                            "/ingestion/openrouter-config",
+                            web::post().to(ingestion_routes::save_openrouter_config),
+                        )
                         // Sample endpoints
-                        .route("/samples/schemas", web::get().to(query_routes::list_schema_samples))
-                        .route("/samples/queries", web::get().to(query_routes::list_query_samples))
-                        .route("/samples/mutations", web::get().to(query_routes::list_mutation_samples))
-                        .route("/samples/schema/{name}", web::get().to(query_routes::get_schema_sample))
-                        .route("/samples/query/{name}", web::get().to(query_routes::get_query_sample))
-                        .route("/samples/mutation/{name}", web::get().to(query_routes::get_mutation_sample))
+                        .route(
+                            "/samples/schemas",
+                            web::get().to(query_routes::list_schema_samples),
+                        )
+                        .route(
+                            "/samples/queries",
+                            web::get().to(query_routes::list_query_samples),
+                        )
+                        .route(
+                            "/samples/mutations",
+                            web::get().to(query_routes::list_mutation_samples),
+                        )
+                        .route(
+                            "/samples/schema/{name}",
+                            web::get().to(query_routes::get_schema_sample),
+                        )
+                        .route(
+                            "/samples/query/{name}",
+                            web::get().to(query_routes::get_query_sample),
+                        )
+                        .route(
+                            "/samples/mutation/{name}",
+                            web::get().to(query_routes::get_mutation_sample),
+                        )
                         // Transform endpoints
                         .route("/transforms", web::get().to(query_routes::list_transforms))
-                        .route("/transform/{id}/run", web::post().to(query_routes::run_transform))
-                        .route("/transforms/queue", web::get().to(query_routes::get_transform_queue))
-                        .route("/transforms/queue/{id}", web::post().to(query_routes::add_to_transform_queue))
+                        .route(
+                            "/transform/{id}/run",
+                            web::post().to(query_routes::run_transform),
+                        )
+                        .route(
+                            "/transforms/queue",
+                            web::get().to(query_routes::get_transform_queue),
+                        )
+                        .route(
+                            "/transforms/queue/{id}",
+                            web::post().to(query_routes::add_to_transform_queue),
+                        )
                         // Log endpoints
                         .route("/logs", web::get().to(log_routes::list_logs))
                         .route("/logs/stream", web::get().to(log_routes::stream_logs))
                         .route("/logs/config", web::get().to(log_routes::get_config))
-                        .route("/logs/config/reload", web::post().to(log_routes::reload_config))
+                        .route(
+                            "/logs/config/reload",
+                            web::post().to(log_routes::reload_config),
+                        )
                         .route("/logs/features", web::get().to(log_routes::get_features))
-                        .route("/logs/level", web::put().to(log_routes::update_feature_level))
+                        .route(
+                            "/logs/level",
+                            web::put().to(log_routes::update_feature_level),
+                        )
                         // System endpoints
-                        .route("/system/status", web::get().to(system_routes::get_system_status))
+                        .route(
+                            "/system/status",
+                            web::get().to(system_routes::get_system_status),
+                        )
                         // Network endpoints
                         .service(
                             web::scope("/network")
@@ -165,12 +257,14 @@ impl DataFoldHttpServer {
                                 .route("/status", web::get().to(network_routes::get_network_status))
                                 .route("/connect", web::post().to(network_routes::connect_to_node))
                                 .route("/discover", web::post().to(network_routes::discover_nodes))
-                                .route("/nodes", web::get().to(network_routes::list_nodes))
+                                .route("/nodes", web::get().to(network_routes::list_nodes)),
                         ),
                 )
                 // Serve the built React UI if it exists
-                .service(Files::new("/", "src/datafold_node/static-react/dist").index_file("index.html"))
-       })
+                .service(
+                    Files::new("/", "src/datafold_node/static-react/dist").index_file("index.html"),
+                )
+        })
         .bind(&self.bind_address)
         .map_err(|e| FoldDbError::Config(format!("Failed to bind HTTP server: {}", e)))?
         .run();
@@ -216,19 +310,21 @@ mod tests {
         // Test new unified schema status endpoint
         let client = reqwest::Client::new();
         let url = format!("http://{}/api/schemas/status", bind_addr);
-        
-        let response = client.get(&url)
+
+        let response = client
+            .get(&url)
             .timeout(std::time::Duration::from_secs(5))
             .send()
             .await
             .expect("Failed to connect to server");
-        
+
         assert!(response.status().is_success());
-        
-        let json_value: serde_json::Value = response.json()
+
+        let json_value: serde_json::Value = response
+            .json()
             .await
             .expect("Failed to parse JSON response");
-        
+
         // Verify response structure
         assert!(json_value.get("data").is_some());
 
@@ -274,7 +370,4 @@ mod tests {
         handle.abort();
         let _ = handle.await;
     }
-
 }
-
-

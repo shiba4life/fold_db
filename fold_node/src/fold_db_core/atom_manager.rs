@@ -61,10 +61,9 @@ impl AtomManager {
 
     pub fn get_latest_atom(&self, aref_uuid: &str) -> Result<Atom, Box<dyn std::error::Error>> {
         // Try in-memory cache first
-        let ref_atoms = self
-            .ref_atoms
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
+        let ref_atoms = self.ref_atoms.lock().map_err(|_| {
+            SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string())
+        })?;
         let atoms = self
             .atoms
             .lock()
@@ -125,8 +124,7 @@ impl AtomManager {
             content,
             status,
         )?;
-        self
-            .atoms
+        self.atoms
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire atoms lock".to_string()))?
             .insert(atom.uuid().to_string(), atom.clone());
@@ -142,12 +140,11 @@ impl AtomManager {
         let aref = self
             .db_ops
             .update_atom_ref(aref_uuid, atom_uuid, source_pub_key)?;
-        self
-            .ref_atoms
+        self.ref_atoms
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?
             .insert(aref_uuid.to_string(), aref.clone());
-        
+
         Ok(aref)
     }
 
@@ -161,10 +158,11 @@ impl AtomManager {
         let collection =
             self.db_ops
                 .update_atom_ref_collection(aref_uuid, atom_uuid, id, source_pub_key)?;
-        self
-            .ref_collections
+        self.ref_collections
             .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string()))?
+            .map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string())
+            })?
             .insert(aref_uuid.to_string(), collection.clone());
         Ok(collection)
     }
@@ -179,8 +177,7 @@ impl AtomManager {
         let range = self
             .db_ops
             .update_atom_ref_range(aref_uuid, atom_uuid, key, source_pub_key)?;
-        self
-            .ref_ranges
+        self.ref_ranges
             .lock()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_ranges lock".to_string()))?
             .insert(aref_uuid.to_string(), range.clone());
@@ -202,7 +199,6 @@ impl AtomManager {
     pub fn get_atoms(&self) -> Arc<Mutex<HashMap<String, Atom>>> {
         Arc::clone(&self.atoms)
     }
-
 }
 
 impl Clone for AtomManager {

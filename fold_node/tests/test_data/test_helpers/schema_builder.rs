@@ -1,6 +1,6 @@
 use fold_node::testing::{
-    ExplicitCounts, Field, FieldPaymentConfig, PermissionsPolicy, Schema, SingleField, FieldVariant,
-    SchemaPaymentConfig, TrustDistance,
+    ExplicitCounts, Field, FieldPaymentConfig, FieldVariant, PermissionsPolicy, Schema,
+    SchemaPaymentConfig, SingleField, TrustDistance,
 };
 use std::collections::HashMap;
 

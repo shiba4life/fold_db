@@ -121,7 +121,10 @@ impl Mutation {
     /// - The mutation contains the required range_key field
     /// - The range_key value is valid (not null or empty)
     /// - All non-range_key fields that are objects get the range_key value applied
-    pub fn to_range_schema_mutation(&self, schema: &crate::schema::types::Schema) -> Result<Self, crate::schema::types::SchemaError> {
+    pub fn to_range_schema_mutation(
+        &self,
+        schema: &crate::schema::types::Schema,
+    ) -> Result<Self, crate::schema::types::SchemaError> {
         use serde_json::Value;
         if let Some(range_key) = schema.range_key() {
             // MANDATORY: Get the value for the range_key field from the mutation
@@ -157,7 +160,7 @@ impl Mutation {
                 if field_name == range_key {
                     continue;
                 }
-                
+
                 // Only update if the value is an object
                 if let Value::Object(obj) = value {
                     obj.insert(range_key.to_string(), range_key_value.clone());
@@ -183,21 +186,29 @@ impl Mutation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::types::Schema;
     use crate::schema::types::field::{FieldVariant, RangeField};
     use crate::schema::types::operations::MutationType;
+    use crate::schema::types::Schema;
     use crate::schema::types::SchemaError;
     use crate::testing::{FieldPaymentConfig, PermissionsPolicy};
-    use std::collections::HashMap;
     use serde_json::json;
+    use std::collections::HashMap;
 
     #[test]
     fn test_to_range_schema_mutation_populates_range_key() {
         // Create a RangeSchema with range_key "user_id" and two fields
         let mut schema = Schema::new_range("TestRange".to_string(), "user_id".to_string());
-        let rf = RangeField::new(PermissionsPolicy::default(), FieldPaymentConfig::default(), HashMap::new());
-        schema.fields.insert("user_id".to_string(), FieldVariant::Range(rf.clone()));
-        schema.fields.insert("score".to_string(), FieldVariant::Range(rf));
+        let rf = RangeField::new(
+            PermissionsPolicy::default(),
+            FieldPaymentConfig::default(),
+            HashMap::new(),
+        );
+        schema
+            .fields
+            .insert("user_id".to_string(), FieldVariant::Range(rf.clone()));
+        schema
+            .fields
+            .insert("score".to_string(), FieldVariant::Range(rf));
 
         // Create a mutation with user_id and score fields
         let mut fields_and_values = HashMap::new();
@@ -217,16 +228,27 @@ mod tests {
         let score_val = result.fields_and_values.get("score").unwrap();
         assert_eq!(score_val.get("user_id").unwrap(), &json!(123));
         // The user_id field should remain as 123 (not an object, so not changed)
-        assert_eq!(result.fields_and_values.get("user_id").unwrap(), &json!(123));
+        assert_eq!(
+            result.fields_and_values.get("user_id").unwrap(),
+            &json!(123)
+        );
     }
 
     #[test]
     fn test_to_range_schema_mutation_missing_key() {
         // Create a RangeSchema with range_key "user_id"
         let mut schema = Schema::new_range("TestRange".to_string(), "user_id".to_string());
-        let rf = RangeField::new(PermissionsPolicy::default(), FieldPaymentConfig::default(), HashMap::new());
-        schema.fields.insert("user_id".to_string(), FieldVariant::Range(rf.clone()));
-        schema.fields.insert("score".to_string(), FieldVariant::Range(rf));
+        let rf = RangeField::new(
+            PermissionsPolicy::default(),
+            FieldPaymentConfig::default(),
+            HashMap::new(),
+        );
+        schema
+            .fields
+            .insert("user_id".to_string(), FieldVariant::Range(rf.clone()));
+        schema
+            .fields
+            .insert("score".to_string(), FieldVariant::Range(rf));
 
         // Create a mutation missing the user_id field
         let mut fields_and_values = HashMap::new();
@@ -242,7 +264,7 @@ mod tests {
 
         let result = mutation.to_range_schema_mutation(&schema);
         assert!(matches!(result, Err(SchemaError::InvalidData(_))));
-        
+
         // Verify the error message mentions the missing range_key requirement
         if let Err(SchemaError::InvalidData(msg)) = result {
             assert!(msg.contains("missing required range_key field"));
@@ -254,9 +276,17 @@ mod tests {
     fn test_to_range_schema_mutation_null_range_key() {
         // Create a RangeSchema with range_key "user_id"
         let mut schema = Schema::new_range("TestRange".to_string(), "user_id".to_string());
-        let rf = RangeField::new(PermissionsPolicy::default(), FieldPaymentConfig::default(), HashMap::new());
-        schema.fields.insert("user_id".to_string(), FieldVariant::Range(rf.clone()));
-        schema.fields.insert("score".to_string(), FieldVariant::Range(rf));
+        let rf = RangeField::new(
+            PermissionsPolicy::default(),
+            FieldPaymentConfig::default(),
+            HashMap::new(),
+        );
+        schema
+            .fields
+            .insert("user_id".to_string(), FieldVariant::Range(rf.clone()));
+        schema
+            .fields
+            .insert("score".to_string(), FieldVariant::Range(rf));
 
         // Create a mutation with null user_id field
         let mut fields_and_values = HashMap::new();
@@ -273,7 +303,7 @@ mod tests {
 
         let result = mutation.to_range_schema_mutation(&schema);
         assert!(matches!(result, Err(SchemaError::InvalidData(_))));
-        
+
         // Verify the error message mentions null value
         if let Err(SchemaError::InvalidData(msg)) = result {
             assert!(msg.contains("null value for range_key field"));
@@ -284,9 +314,17 @@ mod tests {
     fn test_to_range_schema_mutation_empty_string_range_key() {
         // Create a RangeSchema with range_key "user_id"
         let mut schema = Schema::new_range("TestRange".to_string(), "user_id".to_string());
-        let rf = RangeField::new(PermissionsPolicy::default(), FieldPaymentConfig::default(), HashMap::new());
-        schema.fields.insert("user_id".to_string(), FieldVariant::Range(rf.clone()));
-        schema.fields.insert("score".to_string(), FieldVariant::Range(rf));
+        let rf = RangeField::new(
+            PermissionsPolicy::default(),
+            FieldPaymentConfig::default(),
+            HashMap::new(),
+        );
+        schema
+            .fields
+            .insert("user_id".to_string(), FieldVariant::Range(rf.clone()));
+        schema
+            .fields
+            .insert("score".to_string(), FieldVariant::Range(rf));
 
         // Create a mutation with empty string user_id field
         let mut fields_and_values = HashMap::new();
@@ -303,7 +341,7 @@ mod tests {
 
         let result = mutation.to_range_schema_mutation(&schema);
         assert!(matches!(result, Err(SchemaError::InvalidData(_))));
-        
+
         // Verify the error message mentions empty string value
         if let Err(SchemaError::InvalidData(msg)) = result {
             assert!(msg.contains("empty string value for range_key field"));

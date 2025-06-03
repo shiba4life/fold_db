@@ -1,5 +1,5 @@
 //! Integration tests for Product Catalog Range Field functionality
-//! 
+//!
 //! This test suite demonstrates comprehensive usage of Range fields
 //! in a practical product catalog scenario.
 
@@ -13,117 +13,142 @@ mod tests {
 
     fn create_product_catalog_schema() -> Schema {
         let mut schema = create_test_schema("ProductCatalog");
-        
+
         // Add regular fields
         let name_field = FieldVariant::Single(SingleField::new(
             PermissionsPolicy::default(),
             FieldPaymentConfig::default(),
             HashMap::new(),
         ));
-        
+
         let category_field = FieldVariant::Single(SingleField::new(
             PermissionsPolicy::default(),
             FieldPaymentConfig::default(),
             HashMap::new(),
         ));
-        
+
         let price_field = FieldVariant::Single(SingleField::new(
             PermissionsPolicy::default(),
             FieldPaymentConfig::default(),
             HashMap::new(),
         ));
-        
+
         // Add range fields
         let inventory_field = FieldVariant::Range(RangeField::new(
             PermissionsPolicy::default(),
             FieldPaymentConfig::default(),
             HashMap::new(),
         ));
-        
+
         let attributes_field = FieldVariant::Range(RangeField::new(
             PermissionsPolicy::default(),
             FieldPaymentConfig::default(),
             HashMap::new(),
         ));
-        
+
         schema.fields.insert("name".to_string(), name_field);
         schema.fields.insert("category".to_string(), category_field);
         schema.fields.insert("price".to_string(), price_field);
-        schema.fields.insert("inventory_by_location".to_string(), inventory_field);
-        schema.fields.insert("attributes".to_string(), attributes_field);
-        
+        schema
+            .fields
+            .insert("inventory_by_location".to_string(), inventory_field);
+        schema
+            .fields
+            .insert("attributes".to_string(), attributes_field);
+
         schema
     }
 
     fn create_sample_product_data() -> HashMap<String, Value> {
         let mut data = HashMap::new();
-        
+
         data.insert("name".to_string(), json!("Gaming Laptop"));
         data.insert("category".to_string(), json!("Electronics"));
         data.insert("price".to_string(), json!("1299.99"));
-        
+
         // Inventory by location (Range field)
-        data.insert("inventory_by_location".to_string(), json!({
-            "warehouse:north": "25",
-            "warehouse:south": "18",
-            "warehouse:east": "32",
-            "warehouse:west": "12",
-            "store:downtown": "5",
-            "store:mall": "8",
-            "store:outlet": "3"
-        }));
-        
+        data.insert(
+            "inventory_by_location".to_string(),
+            json!({
+                "warehouse:north": "25",
+                "warehouse:south": "18",
+                "warehouse:east": "32",
+                "warehouse:west": "12",
+                "store:downtown": "5",
+                "store:mall": "8",
+                "store:outlet": "3"
+            }),
+        );
+
         // Product attributes (Range field)
-        data.insert("attributes".to_string(), json!({
-            "brand": "TechCorp",
-            "model": "GX-2024",
-            "cpu": "Intel i7-13700H",
-            "gpu": "RTX 4060",
-            "ram": "16GB DDR5",
-            "storage": "1TB NVMe SSD",
-            "display": "15.6 inch 144Hz",
-            "weight": "2.3kg",
-            "color": "Black",
-            "warranty": "2 years",
-            "connectivity:wifi": "Wi-Fi 6E",
-            "connectivity:bluetooth": "Bluetooth 5.2",
-            "connectivity:ports": "USB-C, HDMI, USB-A"
-        }));
-        
+        data.insert(
+            "attributes".to_string(),
+            json!({
+                "brand": "TechCorp",
+                "model": "GX-2024",
+                "cpu": "Intel i7-13700H",
+                "gpu": "RTX 4060",
+                "ram": "16GB DDR5",
+                "storage": "1TB NVMe SSD",
+                "display": "15.6 inch 144Hz",
+                "weight": "2.3kg",
+                "color": "Black",
+                "warranty": "2 years",
+                "connectivity:wifi": "Wi-Fi 6E",
+                "connectivity:bluetooth": "Bluetooth 5.2",
+                "connectivity:ports": "USB-C, HDMI, USB-A"
+            }),
+        );
+
         data
     }
 
     #[test]
     fn test_product_catalog_schema_creation() {
         let schema = create_product_catalog_schema();
-        
+
         assert_eq!(schema.name, "ProductCatalog");
         assert_eq!(schema.fields.len(), 5);
-        
+
         // Verify field types
-        assert!(matches!(schema.fields.get("name"), Some(FieldVariant::Single(_))));
-        assert!(matches!(schema.fields.get("category"), Some(FieldVariant::Single(_))));
-        assert!(matches!(schema.fields.get("price"), Some(FieldVariant::Single(_))));
-        assert!(matches!(schema.fields.get("inventory_by_location"), Some(FieldVariant::Range(_))));
-        assert!(matches!(schema.fields.get("attributes"), Some(FieldVariant::Range(_))));
+        assert!(matches!(
+            schema.fields.get("name"),
+            Some(FieldVariant::Single(_))
+        ));
+        assert!(matches!(
+            schema.fields.get("category"),
+            Some(FieldVariant::Single(_))
+        ));
+        assert!(matches!(
+            schema.fields.get("price"),
+            Some(FieldVariant::Single(_))
+        ));
+        assert!(matches!(
+            schema.fields.get("inventory_by_location"),
+            Some(FieldVariant::Range(_))
+        ));
+        assert!(matches!(
+            schema.fields.get("attributes"),
+            Some(FieldVariant::Range(_))
+        ));
     }
 
     #[test]
     fn test_range_field_data_structure() {
         let data = create_sample_product_data();
-        
+
         // Verify inventory data structure
         let inventory = data.get("inventory_by_location").unwrap();
         assert!(inventory.is_object());
-        
+
         let inventory_obj = inventory.as_object().unwrap();
         assert_eq!(inventory_obj.get("warehouse:north").unwrap(), "25");
         assert_eq!(inventory_obj.get("store:downtown").unwrap(), "5");
-        
+
         // Verify attributes data structure
         let attributes = data.get("attributes").unwrap();
         assert!(attributes.is_object());
-        
+
         let attributes_obj = attributes.as_object().unwrap();
         assert_eq!(attributes_obj.get("brand").unwrap(), "TechCorp");
         assert_eq!(attributes_obj.get("warranty").unwrap(), "2 years");
@@ -132,7 +157,7 @@ mod tests {
     #[test]
     fn test_range_filter_queries() {
         // Test various range filter query structures
-        
+
         // 1. Key filter
         let key_filter_query = json!({
             "type": "query",
@@ -145,7 +170,7 @@ mod tests {
                 }
             }
         });
-        
+
         assert!(key_filter_query.is_object());
         let filter = key_filter_query.get("filter").unwrap();
         let range_filter = filter.get("range_filter").unwrap();
@@ -163,7 +188,7 @@ mod tests {
                 }
             }
         });
-        
+
         let filter = prefix_filter_query.get("filter").unwrap();
         let range_filter = filter.get("range_filter").unwrap();
         assert_eq!(range_filter.get("KeyPrefix").unwrap(), "warehouse:");
@@ -183,7 +208,7 @@ mod tests {
                 }
             }
         });
-        
+
         let filter = range_filter_query.get("filter").unwrap();
         let range_filter = filter.get("range_filter").unwrap();
         let key_range = range_filter.get("KeyRange").unwrap();
@@ -206,7 +231,7 @@ mod tests {
                 }
             }
         });
-        
+
         let filter = keys_filter_query.get("filter").unwrap();
         let range_filter = filter.get("range_filter").unwrap();
         let keys = range_filter.get("Keys").unwrap().as_array().unwrap();
@@ -225,7 +250,7 @@ mod tests {
                 }
             }
         });
-        
+
         let filter = pattern_filter_query.get("filter").unwrap();
         let range_filter = filter.get("range_filter").unwrap();
         assert_eq!(range_filter.get("KeyPattern").unwrap(), "store:*");
@@ -242,7 +267,7 @@ mod tests {
                 }
             }
         });
-        
+
         let filter = value_filter_query.get("filter").unwrap();
         let range_filter = filter.get("range_filter").unwrap();
         assert_eq!(range_filter.get("Value").unwrap(), "TechCorp");
@@ -282,18 +307,18 @@ mod tests {
         });
 
         assert!(mutation_data.is_object());
-        
+
         let data = mutation_data.get("data").unwrap();
         let inventory = data.get("inventory_by_location").unwrap();
         let attributes = data.get("attributes").unwrap();
-        
+
         assert!(inventory.is_object());
         assert!(attributes.is_object());
-        
+
         // Verify range field data
         let inventory_obj = inventory.as_object().unwrap();
         assert_eq!(inventory_obj.len(), 7); // 7 locations
-        
+
         let attributes_obj = attributes.as_object().unwrap();
         assert_eq!(attributes_obj.get("brand").unwrap(), "AudioMax");
         assert_eq!(attributes_obj.get("warranty").unwrap(), "1 year");
@@ -396,7 +421,7 @@ mod tests {
 
         let inventory = empty_range_data.get("inventory_by_location").unwrap();
         let attributes = empty_range_data.get("attributes").unwrap();
-        
+
         assert!(inventory.as_object().unwrap().is_empty());
         assert!(attributes.as_object().unwrap().is_empty());
 

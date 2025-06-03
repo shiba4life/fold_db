@@ -1,8 +1,11 @@
 use super::http_server::AppState;
+use crate::schema::types::{
+    operations::{Mutation, Query},
+    Operation,
+};
 use actix_web::{web, HttpResponse, Responder};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use crate::schema::types::{Operation, operations::{Query, Mutation}};
 
 /// Execute an operation (query or mutation).
 #[derive(Deserialize)]
@@ -19,7 +22,8 @@ pub async fn execute_operation(
     let operation: Operation = match serde_json::from_str(operation_str) {
         Ok(op) => op,
         Err(e) => {
-            return HttpResponse::BadRequest().json(json!({"error": format!("Failed to parse operation: {}", e)}));
+            return HttpResponse::BadRequest()
+                .json(json!({"error": format!("Failed to parse operation: {}", e)}));
         }
     };
 
@@ -27,34 +31,50 @@ pub async fn execute_operation(
 
     match node_guard.execute_operation(operation) {
         Ok(result) => HttpResponse::Ok().json(json!({"data": result})),
-        Err(e) => HttpResponse::InternalServerError().json(json!({"error": format!("Failed to execute operation: {}", e)})),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({"error": format!("Failed to execute operation: {}", e)})),
     }
 }
 
 /// Execute a query.
 pub async fn execute_query(query: web::Json<Value>, state: web::Data<AppState>) -> impl Responder {
     let query_value = query.into_inner();
-    log::info!("Received query request: {}", serde_json::to_string(&query_value).unwrap_or_else(|_| "Invalid JSON".to_string()));
-    
+    log::info!(
+        "Received query request: {}",
+        serde_json::to_string(&query_value).unwrap_or_else(|_| "Invalid JSON".to_string())
+    );
+
     // Parse the simple web UI operation
     let web_operation = match serde_json::from_value::<Operation>(query_value) {
         Ok(op) => match op {
             Operation::Query { .. } => op,
-            _ => return HttpResponse::BadRequest().json(json!({"error": "Expected a query operation"})),
+            _ => {
+                return HttpResponse::BadRequest()
+                    .json(json!({"error": "Expected a query operation"}))
+            }
         },
-        Err(e) => return HttpResponse::BadRequest().json(json!({"error": format!("Failed to parse query: {}", e)})),
+        Err(e) => {
+            return HttpResponse::BadRequest()
+                .json(json!({"error": format!("Failed to parse query: {}", e)}))
+        }
     };
 
     // Convert to full internal query with default trust_distance=0 and pub_key="web-ui"
     let internal_query = match web_operation {
-        Operation::Query { schema, fields, filter } => Query {
+        Operation::Query {
+            schema,
+            fields,
+            filter,
+        } => Query {
             schema_name: schema,
             fields,
             pub_key: "web-ui".to_string(),
             trust_distance: 0,
             filter,
         },
-        _ => return HttpResponse::BadRequest().json(json!({"error": "Expected a query operation"})),
+        _ => {
+            return HttpResponse::BadRequest().json(json!({"error": "Expected a query operation"}))
+        }
     };
 
     let mut node_guard = state.node.lock().await;
@@ -68,37 +88,57 @@ pub async fn execute_query(query: web::Json<Value>, state: web::Data<AppState>) 
                 .map(|r| r.unwrap_or_else(|e| serde_json::json!({"error": e.to_string()})))
                 .collect();
             HttpResponse::Ok().json(json!({"data": unwrapped}))
-        },
+        }
         Err(e) => {
             log::error!("Query execution failed: {}", e);
-            HttpResponse::InternalServerError().json(json!({"error": format!("Failed to execute query: {}", e)}))
-        },
+            HttpResponse::InternalServerError()
+                .json(json!({"error": format!("Failed to execute query: {}", e)}))
+        }
     }
 }
 
 /// Execute a mutation.
-pub async fn execute_mutation(mutation: web::Json<Value>, state: web::Data<AppState>) -> impl Responder {
+pub async fn execute_mutation(
+    mutation: web::Json<Value>,
+    state: web::Data<AppState>,
+) -> impl Responder {
     let mutation_value = mutation.into_inner();
-    log::info!("Received mutation request: {}", serde_json::to_string(&mutation_value).unwrap_or_else(|_| "Invalid JSON".to_string()));
-    
+    log::info!(
+        "Received mutation request: {}",
+        serde_json::to_string(&mutation_value).unwrap_or_else(|_| "Invalid JSON".to_string())
+    );
+
     // Parse the simple web UI operation
     let web_operation = match serde_json::from_value::<Operation>(mutation_value) {
         Ok(op) => match op {
             Operation::Mutation { .. } => op,
-            _ => return HttpResponse::BadRequest().json(json!({"error": "Expected a mutation operation"})),
+            _ => {
+                return HttpResponse::BadRequest()
+                    .json(json!({"error": "Expected a mutation operation"}))
+            }
         },
-        Err(e) => return HttpResponse::BadRequest().json(json!({"error": format!("Failed to parse mutation: {}", e)})),
+        Err(e) => {
+            return HttpResponse::BadRequest()
+                .json(json!({"error": format!("Failed to parse mutation: {}", e)}))
+        }
     };
 
     // Convert to full internal mutation with default trust_distance=0 and pub_key="web-ui"
     let internal_mutation = match web_operation {
-        Operation::Mutation { schema, data, mutation_type } => {
+        Operation::Mutation {
+            schema,
+            data,
+            mutation_type,
+        } => {
             // Convert data Value to fields_and_values HashMap
             let fields_and_values = match data {
                 Value::Object(map) => map.into_iter().collect(),
-                _ => return HttpResponse::BadRequest().json(json!({"error": "Mutation data must be an object"})),
+                _ => {
+                    return HttpResponse::BadRequest()
+                        .json(json!({"error": "Mutation data must be an object"}))
+                }
             };
-            
+
             Mutation {
                 schema_name: schema,
                 fields_and_values,
@@ -106,8 +146,11 @@ pub async fn execute_mutation(mutation: web::Json<Value>, state: web::Data<AppSt
                 trust_distance: 0,
                 mutation_type,
             }
-        },
-        _ => return HttpResponse::BadRequest().json(json!({"error": "Expected a mutation operation"})),
+        }
+        _ => {
+            return HttpResponse::BadRequest()
+                .json(json!({"error": "Expected a mutation operation"}))
+        }
     };
 
     let mut node_guard = state.node.lock().await;
@@ -116,11 +159,12 @@ pub async fn execute_mutation(mutation: web::Json<Value>, state: web::Data<AppSt
         Ok(_) => {
             log::info!("Mutation executed successfully");
             HttpResponse::Ok().json(json!({"success": true}))
-        },
+        }
         Err(e) => {
             log::error!("Mutation execution failed: {}", e);
-            HttpResponse::InternalServerError().json(json!({"error": format!("Failed to execute mutation: {}", e)}))
-        },
+            HttpResponse::InternalServerError()
+                .json(json!({"error": format!("Failed to execute mutation: {}", e)}))
+        }
     }
 }
 
@@ -140,19 +184,32 @@ pub async fn list_mutation_samples(_state: web::Data<AppState>) -> impl Responde
 }
 
 /// Get a sample schema by name (DEPRECATED - samples removed).
-pub async fn get_schema_sample(path: web::Path<String>, _state: web::Data<AppState>) -> impl Responder {
+pub async fn get_schema_sample(
+    path: web::Path<String>,
+    _state: web::Data<AppState>,
+) -> impl Responder {
     let name = path.into_inner();
-    HttpResponse::NotFound().json(json!({"error": format!("Sample schema '{}' not found - samples have been removed", name)}))
+    HttpResponse::NotFound().json(
+        json!({"error": format!("Sample schema '{}' not found - samples have been removed", name)}),
+    )
 }
 
 /// Get a sample query by name (DEPRECATED - samples removed).
-pub async fn get_query_sample(path: web::Path<String>, _state: web::Data<AppState>) -> impl Responder {
+pub async fn get_query_sample(
+    path: web::Path<String>,
+    _state: web::Data<AppState>,
+) -> impl Responder {
     let name = path.into_inner();
-    HttpResponse::NotFound().json(json!({"error": format!("Sample query '{}' not found - samples have been removed", name)}))
+    HttpResponse::NotFound().json(
+        json!({"error": format!("Sample query '{}' not found - samples have been removed", name)}),
+    )
 }
 
 /// Get a sample mutation by name (DEPRECATED - samples removed).
-pub async fn get_mutation_sample(path: web::Path<String>, _state: web::Data<AppState>) -> impl Responder {
+pub async fn get_mutation_sample(
+    path: web::Path<String>,
+    _state: web::Data<AppState>,
+) -> impl Responder {
     let name = path.into_inner();
     HttpResponse::NotFound().json(json!({"error": format!("Sample mutation '{}' not found - samples have been removed", name)}))
 }
@@ -161,7 +218,8 @@ pub async fn list_transforms(state: web::Data<AppState>) -> impl Responder {
     let node = state.node.lock().await;
     match node.list_transforms() {
         Ok(map) => HttpResponse::Ok().json(json!({ "data": map })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": format!("Failed to list transforms: {}", e) })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "error": format!("Failed to list transforms: {}", e) })),
     }
 }
 
@@ -170,11 +228,15 @@ pub async fn run_transform(path: web::Path<String>, state: web::Data<AppState>) 
     let mut node = state.node.lock().await;
     match node.run_transform(&id) {
         Ok(val) => HttpResponse::Ok().json(json!({ "data": val })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": format!("Failed to run transform: {}", e) })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "error": format!("Failed to run transform: {}", e) })),
     }
 }
 
-pub async fn add_to_transform_queue(path: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
+pub async fn add_to_transform_queue(
+    path: web::Path<String>,
+    state: web::Data<AppState>,
+) -> impl Responder {
     let transform_id = path.into_inner();
     let node = state.node.lock().await;
 
@@ -184,7 +246,10 @@ pub async fn add_to_transform_queue(path: web::Path<String>, state: web::Data<Ap
                 return HttpResponse::NotFound().json(json!({"error": format!("Transform '{}' not found. Available transforms: {:?}", transform_id, transforms.keys().collect::<Vec<_>>())}));
             }
         }
-        Err(e) => return HttpResponse::InternalServerError().json(json!({"error": format!("Failed to verify transform: {}", e)})),
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(json!({"error": format!("Failed to verify transform: {}", e)}))
+        }
     }
 
     match node.add_transform_to_queue(&transform_id) {
@@ -197,14 +262,15 @@ pub async fn get_transform_queue(state: web::Data<AppState>) -> impl Responder {
     let node = state.node.lock().await;
     match node.get_transform_queue_info() {
         Ok(info) => HttpResponse::Ok().json(info),
-        Err(e) => HttpResponse::InternalServerError().json(json!({ "error": format!("Failed to get transform queue info: {}", e) })),
+        Err(e) => HttpResponse::InternalServerError()
+            .json(json!({ "error": format!("Failed to get transform queue info: {}", e) })),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datafold_node::{DataFoldNode, config::NodeConfig};
+    use crate::datafold_node::{config::NodeConfig, DataFoldNode};
     use actix_web::web;
     use tempfile::tempdir;
 
@@ -222,4 +288,3 @@ mod tests {
         assert_eq!(resp.status(), 200);
     }
 }
-

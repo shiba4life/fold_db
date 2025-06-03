@@ -1,5 +1,5 @@
-use crate::error::{FoldDbError, FoldDbResult};
 use super::DataFoldNode;
+use crate::error::{FoldDbError, FoldDbResult};
 
 impl DataFoldNode {
     /// Add a transform to the queue
@@ -8,7 +8,8 @@ impl DataFoldNode {
             .db
             .lock()
             .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.transform_orchestrator.add_transform(transform_id, "manual")?;
+        db.transform_orchestrator
+            .add_transform(transform_id, "manual")?;
         Ok(())
     }
 
@@ -32,9 +33,9 @@ impl DataFoldNode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use crate::datafold_node::config::NodeConfig;
     use serde_json::json;
+    use tempfile::tempdir;
 
     #[test]
     fn queue_info_works() {
@@ -59,18 +60,15 @@ mod tests {
         };
         let mut node = DataFoldNode::new(config).unwrap();
 
-        node.load_schema_from_file(
-            "src/datafold_node/samples/data/TransformBase.json",
-        )
-        .unwrap();
+        node.load_schema_from_file("src/datafold_node/samples/data/TransformBase.json")
+            .unwrap();
         node.approve_schema("TransformBase").unwrap();
-        node.load_schema_from_file(
-            "src/datafold_node/samples/data/TransformSchema.json",
-        )
-        .unwrap();
+        node.load_schema_from_file("src/datafold_node/samples/data/TransformSchema.json")
+            .unwrap();
         node.approve_schema("TransformSchema").unwrap();
 
-        node.add_transform_to_queue("TransformSchema.result").unwrap();
+        node.add_transform_to_queue("TransformSchema.result")
+            .unwrap();
         let initial_len = {
             let db = node.db.lock().unwrap();
             db.transform_orchestrator.len().unwrap()

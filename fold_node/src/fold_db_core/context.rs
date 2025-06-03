@@ -29,9 +29,7 @@ impl<'a> AtomContext<'a> {
         }
     }
 
-    pub fn get_field_def(
-        &self,
-    ) -> Result<&'a crate::schema::types::FieldVariant, SchemaError> {
+    pub fn get_field_def(&self) -> Result<&'a crate::schema::types::FieldVariant, SchemaError> {
         self.schema
             .fields
             .get(self.field)
@@ -49,25 +47,27 @@ impl<'a> AtomContext<'a> {
                 crate::schema::types::FieldVariant::Single(_) => {
                     let aref = AtomRef::new(aref_uuid.clone(), self.source_pub_key.clone());
                     let ref_atoms = self.atom_manager.get_ref_atoms();
-                    let mut guard = ref_atoms
-                        .lock()
-                        .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
+                    let mut guard = ref_atoms.lock().map_err(|_| {
+                        SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string())
+                    })?;
                     guard.insert(aref_uuid.clone(), aref);
                 }
                 crate::schema::types::FieldVariant::Collection(_) => {
                     let collection = AtomRefCollection::new(self.source_pub_key.clone());
                     let ref_collections = self.atom_manager.get_ref_collections();
-                    let mut guard = ref_collections
-                        .lock()
-                        .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string()))?;
+                    let mut guard = ref_collections.lock().map_err(|_| {
+                        SchemaError::InvalidData(
+                            "Failed to acquire ref_collections lock".to_string(),
+                        )
+                    })?;
                     guard.insert(aref_uuid.clone(), collection);
                 }
                 crate::schema::types::FieldVariant::Range(_) => {
                     let range = AtomRefRange::new(self.source_pub_key.clone());
                     let ref_ranges = self.atom_manager.get_ref_ranges();
-                    let mut guard = ref_ranges
-                        .lock()
-                        .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_ranges lock".to_string()))?;
+                    let mut guard = ref_ranges.lock().map_err(|_| {
+                        SchemaError::InvalidData("Failed to acquire ref_ranges lock".to_string())
+                    })?;
                     guard.insert(aref_uuid.clone(), range);
                 }
             }
@@ -79,13 +79,13 @@ impl<'a> AtomContext<'a> {
 
     pub fn get_prev_atom_uuid(&self, aref_uuid: &str) -> Result<String, SchemaError> {
         let field_def = self.get_field_def()?;
-        
+
         match field_def {
             crate::schema::types::FieldVariant::Single(_) => {
                 let ref_atoms = self.atom_manager.get_ref_atoms();
-                let guard = ref_atoms
-                    .lock()
-                    .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string()))?;
+                let guard = ref_atoms.lock().map_err(|_| {
+                    SchemaError::InvalidData("Failed to acquire ref_atoms lock".to_string())
+                })?;
                 let aref = guard
                     .get(aref_uuid)
                     .ok_or_else(|| SchemaError::InvalidData("AtomRef not found".to_string()))?;
@@ -93,24 +93,24 @@ impl<'a> AtomContext<'a> {
             }
             crate::schema::types::FieldVariant::Collection(_) => {
                 let ref_collections = self.atom_manager.get_ref_collections();
-                let guard = ref_collections
-                    .lock()
-                    .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string()))?;
-                let _collection = guard
-                    .get(aref_uuid)
-                    .ok_or_else(|| SchemaError::InvalidData("AtomRefCollection not found".to_string()))?;
+                let guard = ref_collections.lock().map_err(|_| {
+                    SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string())
+                })?;
+                let _collection = guard.get(aref_uuid).ok_or_else(|| {
+                    SchemaError::InvalidData("AtomRefCollection not found".to_string())
+                })?;
                 // For collections, we need to get the latest atom UUID - this might need adjustment
                 // For now, return empty string to indicate no previous atom
                 Ok(String::new())
             }
             crate::schema::types::FieldVariant::Range(_) => {
                 let ref_ranges = self.atom_manager.get_ref_ranges();
-                let guard = ref_ranges
-                    .lock()
-                    .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_ranges lock".to_string()))?;
-                let _range = guard
-                    .get(aref_uuid)
-                    .ok_or_else(|| SchemaError::InvalidData("AtomRefRange not found".to_string()))?;
+                let guard = ref_ranges.lock().map_err(|_| {
+                    SchemaError::InvalidData("Failed to acquire ref_ranges lock".to_string())
+                })?;
+                let _range = guard.get(aref_uuid).ok_or_else(|| {
+                    SchemaError::InvalidData("AtomRefRange not found".to_string())
+                })?;
                 // For ranges, we need to get the latest atom UUID - this might need adjustment
                 // For now, return empty string to indicate no previous atom
                 Ok(String::new())
@@ -124,9 +124,9 @@ impl<'a> AtomContext<'a> {
         id: &str,
     ) -> Result<String, SchemaError> {
         let ref_collections = self.atom_manager.get_ref_collections();
-        let guard = ref_collections
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string()))?;
+        let guard = ref_collections.lock().map_err(|_| {
+            SchemaError::InvalidData("Failed to acquire ref_collections lock".to_string())
+        })?;
         let aref = guard
             .get(aref_uuid)
             .ok_or_else(|| SchemaError::InvalidData("AtomRefCollection not found".to_string()))?;
@@ -143,7 +143,7 @@ impl<'a> AtomContext<'a> {
     ) -> Result<(), SchemaError> {
         // Clone content for Range field processing before moving it to create_atom
         let content_for_range = content.clone();
-        
+
         let atom = self
             .atom_manager
             .create_atom(
@@ -193,8 +193,7 @@ impl<'a> AtomContext<'a> {
                                 None,
                             )
                             .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
-                        
-                        
+
                         self.atom_manager
                             .update_atom_ref_range(
                                 &aref_uuid,
@@ -206,7 +205,7 @@ impl<'a> AtomContext<'a> {
                     }
                 } else {
                     return Err(SchemaError::InvalidData(
-                        "Range field data must be a JSON object with key-value pairs".to_string()
+                        "Range field data must be a JSON object with key-value pairs".to_string(),
                     ));
                 }
             }
@@ -249,12 +248,20 @@ impl<'a> AtomContext<'a> {
 
     pub fn validate_field_type(&self, expected_type: FieldType) -> Result<(), SchemaError> {
         let field_def = self.get_field_def()?;
-        let matches = matches!((field_def, &expected_type),
-            (crate::schema::types::FieldVariant::Single(_), &FieldType::Single) |
-            (crate::schema::types::FieldVariant::Collection(_), &FieldType::Collection) |
-            (crate::schema::types::FieldVariant::Range(_), &FieldType::Range)
+        let matches = matches!(
+            (field_def, &expected_type),
+            (
+                crate::schema::types::FieldVariant::Single(_),
+                &FieldType::Single
+            ) | (
+                crate::schema::types::FieldVariant::Collection(_),
+                &FieldType::Collection
+            ) | (
+                crate::schema::types::FieldVariant::Range(_),
+                &FieldType::Range
+            )
         );
-        
+
         if !matches {
             let msg = match &expected_type {
                 FieldType::Single => "Collection fields cannot be updated without id",

@@ -1,4 +1,7 @@
-use super::{core::SchemaCore, types::{Field, Schema, SchemaError, JsonSchemaDefinition}};
+use super::{
+    core::SchemaCore,
+    types::{Field, JsonSchemaDefinition, Schema, SchemaError},
+};
 use crate::schema::types::field::FieldType;
 use crate::transform::TransformExecutor;
 
@@ -67,10 +70,11 @@ impl<'a> SchemaValidator<'a> {
 
                 // Validate inputs
                 for input in &transform.inputs {
-                    let (sname, fname) = input.split_once('.')
-                        .ok_or_else(|| SchemaError::InvalidTransform(format!(
+                    let (sname, fname) = input.split_once('.').ok_or_else(|| {
+                        SchemaError::InvalidTransform(format!(
                             "Invalid input format {input} for field {field_name}",
-                        )))?;
+                        ))
+                    })?;
 
                     if sname == schema.name {
                         if fname == field_name {
@@ -84,14 +88,11 @@ impl<'a> SchemaValidator<'a> {
                             )));
                         }
                     } else {
-                        let src_schema = self
-                            .core
-                            .get_schema(sname)?
-                            .ok_or_else(|| {
-                                SchemaError::InvalidTransform(format!(
-                                    "Schema {sname} not found for input {input}",
-                                ))
-                            })?;
+                        let src_schema = self.core.get_schema(sname)?.ok_or_else(|| {
+                            SchemaError::InvalidTransform(format!(
+                                "Schema {sname} not found for input {input}",
+                            ))
+                        })?;
 
                         if !src_schema.fields.contains_key(fname) {
                             return Err(SchemaError::InvalidTransform(format!(
@@ -102,11 +103,13 @@ impl<'a> SchemaValidator<'a> {
                 }
 
                 // Validate output
-                let (out_schema, out_field) = transform.output.split_once('.')
-                    .ok_or_else(|| SchemaError::InvalidTransform(format!(
-                        "Invalid output format {} for field {field_name}",
-                        transform.output
-                    )))?;
+                let (out_schema, out_field) =
+                    transform.output.split_once('.').ok_or_else(|| {
+                        SchemaError::InvalidTransform(format!(
+                            "Invalid output format {} for field {field_name}",
+                            transform.output
+                        ))
+                    })?;
 
                 if out_schema == schema.name {
                     if out_field != field_name {
@@ -143,7 +146,11 @@ impl<'a> SchemaValidator<'a> {
     /// 3. Consistent field structure across the entire RangeSchema
     ///
     /// This validation prevents data corruption and ensures proper range semantics.
-    fn validate_range_field_consistency(&self, schema: &Schema, range_key: &str) -> Result<(), SchemaError> {
+    fn validate_range_field_consistency(
+        &self,
+        schema: &Schema,
+        range_key: &str,
+    ) -> Result<(), SchemaError> {
         // First ensure the range_key field itself is a Range field
         match schema.fields.get(range_key) {
             Some(crate::schema::types::field::FieldVariant::Range(_)) => {
@@ -215,7 +222,11 @@ impl<'a> SchemaValidator<'a> {
     /// 3. No mixing of field types within a RangeSchema
     ///
     /// This prevents invalid schemas from being created via JSON definitions.
-    fn validate_json_range_field_consistency(&self, schema: &JsonSchemaDefinition, range_key: &str) -> Result<(), SchemaError> {
+    fn validate_json_range_field_consistency(
+        &self,
+        schema: &JsonSchemaDefinition,
+        range_key: &str,
+    ) -> Result<(), SchemaError> {
         // Ensure the range_key field exists in the schema
         let range_key_field = schema.fields.get(range_key)
             .ok_or_else(|| SchemaError::InvalidField(format!(
@@ -322,7 +333,10 @@ impl<'a> SchemaValidator<'a> {
         if let Some(range_key) = schema.range_key() {
             // 1. Ensure all fields are rangeFields
             for (field_name, field_def) in &schema.fields {
-                if !matches!(field_def, crate::schema::types::field::FieldVariant::Range(_)) {
+                if !matches!(
+                    field_def,
+                    crate::schema::types::field::FieldVariant::Range(_)
+                ) {
                     return Err(crate::schema::types::SchemaError::InvalidData(format!(
                         "All fields in a RangeSchema must be rangeFields. Field '{}' is not a rangeField.",
                         field_name
@@ -333,12 +347,18 @@ impl<'a> SchemaValidator<'a> {
             let mut found_range_key_value: Option<&serde_json::Value> = None;
             for (field_name, value) in mutation.fields_and_values.iter() {
                 // Value must be an object containing the range_key
-                let obj = value.as_object().ok_or_else(|| crate::schema::types::SchemaError::InvalidData(format!(
-                    "Value for field '{}' must be an object containing the range_key '{}'.", field_name, range_key
-                )))?;
-                let key_val = obj.get(range_key).ok_or_else(|| crate::schema::types::SchemaError::InvalidData(format!(
-                    "Value for field '{}' must contain the range_key '{}'.", field_name, range_key
-                )))?;
+                let obj = value.as_object().ok_or_else(|| {
+                    crate::schema::types::SchemaError::InvalidData(format!(
+                        "Value for field '{}' must be an object containing the range_key '{}'.",
+                        field_name, range_key
+                    ))
+                })?;
+                let key_val = obj.get(range_key).ok_or_else(|| {
+                    crate::schema::types::SchemaError::InvalidData(format!(
+                        "Value for field '{}' must contain the range_key '{}'.",
+                        field_name, range_key
+                    ))
+                })?;
                 if let Some(existing) = &found_range_key_value {
                     if existing != &key_val {
                         return Err(crate::schema::types::SchemaError::InvalidData(format!(
@@ -353,4 +373,3 @@ impl<'a> SchemaValidator<'a> {
         Ok(())
     }
 }
-

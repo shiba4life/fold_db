@@ -4,7 +4,7 @@ use fold_node::{
 };
 
 use clap::Parser;
-use log::{info, error};
+use log::{error, info};
 
 /// Command line options for the datafold node binary.
 #[derive(Parser, Debug)]
@@ -110,7 +110,7 @@ mod tests {
 
     #[test]
     fn defaults() {
-        let cli = Cli::parse_from(["test"]); 
+        let cli = Cli::parse_from(["test"]);
         assert_eq!(cli.port, 9000);
         assert_eq!(cli.tcp_port, 9000);
     }

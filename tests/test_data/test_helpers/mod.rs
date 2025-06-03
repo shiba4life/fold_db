@@ -1,17 +1,17 @@
 #![allow(dead_code)]
+pub mod node_operations;
 pub mod operation_builder;
 pub mod schema_builder;
-pub mod node_operations;
 
 // Re-export testing utilities for all tests
 use fold_node::FoldDB;
 use fold_node::{DataFoldNode, NodeConfig};
-use tempfile::tempdir;
 use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
+use tempfile::tempdir;
 use uuid::Uuid;
 
 static CLEANUP_LOCK: Mutex<()> = Mutex::new(());
@@ -146,15 +146,20 @@ pub fn create_test_node_with_schema_permissions(schema_names: &[&str]) -> DataFo
     let node = create_test_node();
     let node_id = node.get_node_id().to_string();
     let schema_strings: Vec<String> = schema_names.iter().map(|s| s.to_string()).collect();
-    
+
     // Set schema permissions
-    node.set_schema_permissions(&node_id, &schema_strings).unwrap();
-    
+    node.set_schema_permissions(&node_id, &schema_strings)
+        .unwrap();
+
     node
 }
 
 /// Helper function to load and approve a schema for testing
-pub fn load_and_approve_schema(node: &mut DataFoldNode, schema_path: &str, schema_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn load_and_approve_schema(
+    node: &mut DataFoldNode,
+    schema_path: &str,
+    schema_name: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     node.load_schema_from_file(schema_path)?;
     node.approve_schema(schema_name)?;
     Ok(())

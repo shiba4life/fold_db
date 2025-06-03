@@ -1,6 +1,8 @@
-use crate::test_data::test_helpers::{create_test_node_with_schema_permissions, load_and_approve_schema};
+use crate::test_data::test_helpers::{
+    create_test_node_with_schema_permissions, load_and_approve_schema,
+};
+use fold_node::schema::types::Query;
 use fold_node::testing::{Mutation, MutationType};
-use fold_node::schema::types::{Query};
 use serde_json::json;
 
 #[test]
@@ -8,8 +10,18 @@ fn test_automatic_transform_trigger() {
     let mut node = create_test_node_with_schema_permissions(&["TransformBase", "TransformSchema"]);
 
     // Load and approve sample schemas
-    load_and_approve_schema(&mut node, "fold_node/src/datafold_node/samples/data/TransformBase.json", "TransformBase").unwrap();
-    load_and_approve_schema(&mut node, "fold_node/src/datafold_node/samples/data/TransformSchema.json", "TransformSchema").unwrap();
+    load_and_approve_schema(
+        &mut node,
+        "fold_node/src/datafold_node/samples/data/TransformBase.json",
+        "TransformBase",
+    )
+    .unwrap();
+    load_and_approve_schema(
+        &mut node,
+        "fold_node/src/datafold_node/samples/data/TransformSchema.json",
+        "TransformSchema",
+    )
+    .unwrap();
 
     // Mutate TransformBase.value1 - this should automatically trigger and execute TransformSchema.result transform
     let mut fields = std::collections::HashMap::new();
@@ -47,11 +59,15 @@ fn test_automatic_transform_trigger() {
     );
     let query_results = node.query(query).unwrap();
     println!("Query results: {:?}", query_results);
-    
+
     // The transform should have been executed automatically, resulting in 2 + 3 = 5
     assert!(!query_results.is_empty(), "Query should return results");
     if let Ok(result_value) = &query_results[0] {
-        assert_eq!(*result_value, json!(5.0), "Transform should have calculated 2 + 3 = 5 automatically");
+        assert_eq!(
+            *result_value,
+            json!(5.0),
+            "Transform should have calculated 2 + 3 = 5 automatically"
+        );
     } else {
         panic!("Query result should be Ok, got: {:?}", query_results[0]);
     }

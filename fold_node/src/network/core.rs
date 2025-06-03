@@ -3,8 +3,8 @@ use crate::network::error::NetworkResult;
 use crate::network::schema_protocol::SCHEMA_PROTOCOL_NAME;
 use crate::network::schema_service::SchemaService;
 use libp2p::PeerId;
-use std::collections::{HashMap, HashSet};
 use log::info;
+use std::collections::{HashMap, HashSet};
 
 /// Core network component for P2P communication between DataFold nodes.
 ///
@@ -80,7 +80,6 @@ impl NetworkCore {
             mdns_handle: None,
         })
     }
-
 
     /// Get the local peer ID
     pub fn local_peer_id(&self) -> PeerId {
@@ -164,5 +163,4 @@ impl NetworkCore {
             handle.abort();
         }
     }
-
 }

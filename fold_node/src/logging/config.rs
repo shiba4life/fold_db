@@ -133,7 +133,6 @@ impl Default for GeneralConfig {
     }
 }
 
-
 impl Default for ConsoleConfig {
     fn default() -> Self {
         Self {
@@ -189,15 +188,14 @@ impl Default for StructuredConfig {
 impl LogConfig {
     /// Load configuration from a TOML file
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, ConfigError> {
-        let content = std::fs::read_to_string(path.as_ref())
-            .map_err(ConfigError::Io)?;
-        
-        let mut config: LogConfig = toml::from_str(&content)
-            .map_err(|e| ConfigError::Parse(e.to_string()))?;
+        let content = std::fs::read_to_string(path.as_ref()).map_err(ConfigError::Io)?;
+
+        let mut config: LogConfig =
+            toml::from_str(&content).map_err(|e| ConfigError::Parse(e.to_string()))?;
 
         // Apply environment variable overrides
         config.apply_env_overrides()?;
-        
+
         Ok(config)
     }
 
@@ -258,14 +256,14 @@ impl LogConfig {
 
     /// Save configuration to a TOML file
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), ConfigError> {
-        let content = toml::to_string_pretty(self)
-            .map_err(|e| ConfigError::Serialize(e.to_string()))?;
-        
+        let content =
+            toml::to_string_pretty(self).map_err(|e| ConfigError::Serialize(e.to_string()))?;
+
         // Create parent directories if they don't exist
         if let Some(parent) = path.as_ref().parent() {
             std::fs::create_dir_all(parent).map_err(ConfigError::Io)?;
         }
-        
+
         std::fs::write(path, content).map_err(ConfigError::Io)?;
         Ok(())
     }
@@ -290,13 +288,17 @@ impl LogConfig {
     pub fn validate(&self) -> Result<(), ConfigError> {
         // Validate log levels
         let valid_levels = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"];
-        
+
         if !valid_levels.contains(&self.general.default_level.as_str()) {
-            return Err(ConfigError::InvalidLevel(self.general.default_level.clone()));
+            return Err(ConfigError::InvalidLevel(
+                self.general.default_level.clone(),
+            ));
         }
 
         if !valid_levels.contains(&self.outputs.console.level.as_str()) {
-            return Err(ConfigError::InvalidLevel(self.outputs.console.level.clone()));
+            return Err(ConfigError::InvalidLevel(
+                self.outputs.console.level.clone(),
+            ));
         }
 
         if !valid_levels.contains(&self.outputs.file.level.as_str()) {
@@ -308,13 +310,18 @@ impl LogConfig {
         }
 
         if !valid_levels.contains(&self.outputs.structured.level.as_str()) {
-            return Err(ConfigError::InvalidLevel(self.outputs.structured.level.clone()));
+            return Err(ConfigError::InvalidLevel(
+                self.outputs.structured.level.clone(),
+            ));
         }
 
         // Validate feature levels
         for (feature, level) in &self.features {
             if !valid_levels.contains(&level.as_str()) {
-                return Err(ConfigError::InvalidFeatureLevel(feature.clone(), level.clone()));
+                return Err(ConfigError::InvalidFeatureLevel(
+                    feature.clone(),
+                    level.clone(),
+                ));
             }
         }
 
@@ -329,21 +336,31 @@ impl LogConfig {
     /// Parse file size string (e.g., "10MB", "1GB") to bytes
     fn parse_file_size(&self, size_str: &str) -> Result<u64, ConfigError> {
         let size_str = size_str.to_uppercase();
-        
+
         if let Some(num_str) = size_str.strip_suffix("GB") {
-            let num: u64 = num_str.parse().map_err(|_| ConfigError::InvalidFileSize(size_str.clone()))?;
+            let num: u64 = num_str
+                .parse()
+                .map_err(|_| ConfigError::InvalidFileSize(size_str.clone()))?;
             Ok(num * 1024 * 1024 * 1024)
         } else if let Some(num_str) = size_str.strip_suffix("MB") {
-            let num: u64 = num_str.parse().map_err(|_| ConfigError::InvalidFileSize(size_str.clone()))?;
+            let num: u64 = num_str
+                .parse()
+                .map_err(|_| ConfigError::InvalidFileSize(size_str.clone()))?;
             Ok(num * 1024 * 1024)
         } else if let Some(num_str) = size_str.strip_suffix("KB") {
-            let num: u64 = num_str.parse().map_err(|_| ConfigError::InvalidFileSize(size_str.clone()))?;
+            let num: u64 = num_str
+                .parse()
+                .map_err(|_| ConfigError::InvalidFileSize(size_str.clone()))?;
             Ok(num * 1024)
         } else if let Some(num_str) = size_str.strip_suffix("B") {
-            num_str.parse().map_err(|_| ConfigError::InvalidFileSize(size_str.clone()))
+            num_str
+                .parse()
+                .map_err(|_| ConfigError::InvalidFileSize(size_str.clone()))
         } else {
             // Default to bytes if no suffix
-            size_str.parse().map_err(|_| ConfigError::InvalidFileSize(size_str.clone()))
+            size_str
+                .parse()
+                .map_err(|_| ConfigError::InvalidFileSize(size_str.clone()))
         }
     }
 }

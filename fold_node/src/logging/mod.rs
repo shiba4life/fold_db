@@ -1,15 +1,15 @@
 //! # Enhanced Logging System
 //!
 //! This module provides enhanced logging capabilities for the datafold project.
-//! It extends the existing web_logger with configuration management and 
+//! It extends the existing web_logger with configuration management and
 //! feature-specific logging support.
 
 pub mod config;
 pub mod features;
 
 use config::LogConfig;
-use std::sync::Arc;
 use once_cell::sync::OnceCell;
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 /// Global logging configuration instance
@@ -40,7 +40,8 @@ impl LoggingSystem {
 
         // Store configuration globally
         let config_arc = Arc::new(RwLock::new(config));
-        LOGGING_CONFIG.set(config_arc.clone())
+        LOGGING_CONFIG
+            .set(config_arc.clone())
             .map_err(|_| LoggingError::AlreadyInitialized)?;
 
         // Initialize the existing web logger for backward compatibility
@@ -63,8 +64,10 @@ impl LoggingSystem {
     pub async fn update_feature_level(feature: &str, level: &str) -> Result<(), LoggingError> {
         if let Some(config_arc) = LOGGING_CONFIG.get() {
             let mut config_guard = config_arc.write().await;
-            config_guard.features.insert(feature.to_string(), level.to_string());
-            
+            config_guard
+                .features
+                .insert(feature.to_string(), level.to_string());
+
             // Update global log level if this affects the general level
             let level_filter = match level {
                 "TRACE" => log::LevelFilter::Trace,
@@ -72,13 +75,20 @@ impl LoggingSystem {
                 "INFO" => log::LevelFilter::Info,
                 "WARN" => log::LevelFilter::Warn,
                 "ERROR" => log::LevelFilter::Error,
-                _ => return Err(LoggingError::Config(format!("Invalid log level: {}", level))),
+                _ => {
+                    return Err(LoggingError::Config(format!(
+                        "Invalid log level: {}",
+                        level
+                    )))
+                }
             };
             log::set_max_level(level_filter);
-            
+
             Ok(())
         } else {
-            Err(LoggingError::Config("Logging system not initialized".to_string()))
+            Err(LoggingError::Config(
+                "Logging system not initialized".to_string(),
+            ))
         }
     }
 
@@ -96,13 +106,15 @@ impl LoggingSystem {
     pub async fn reload_config_from_file(path: &str) -> Result<(), LoggingError> {
         let new_config = LogConfig::from_file(path)
             .map_err(|e| LoggingError::Config(format!("Failed to load config: {}", e)))?;
-        
+
         if let Some(config_arc) = LOGGING_CONFIG.get() {
             let mut config_guard = config_arc.write().await;
             *config_guard = new_config;
             Ok(())
         } else {
-            Err(LoggingError::Config("Logging system not initialized".to_string()))
+            Err(LoggingError::Config(
+                "Logging system not initialized".to_string(),
+            ))
         }
     }
 }

@@ -1,5 +1,6 @@
 use fold_node::testing::{
-    FieldPaymentConfig, PermissionsPolicy, Schema, FieldVariant, SingleField, TrustDistance, TrustDistanceScaling,
+    FieldPaymentConfig, FieldVariant, PermissionsPolicy, Schema, SingleField, TrustDistance,
+    TrustDistanceScaling,
 };
 use std::collections::HashMap;
 
@@ -50,40 +51,38 @@ pub fn create_user_profile_schema() -> Schema {
     // Public fields - basic profile info
     schema.add_field(
         "username".to_string(),
-        FieldVariant::Single(
-            SingleField::new(
-                PermissionsPolicy::default(),
-                create_default_payment_config(),
-                HashMap::new(),
-            )
-        )
+        FieldVariant::Single(SingleField::new(
+            PermissionsPolicy::default(),
+            create_default_payment_config(),
+            HashMap::new(),
+        )),
     );
 
     // Protected fields - contact info
     schema.add_field(
         "email".to_string(),
-        FieldVariant::Single(
-            SingleField::new(
+        FieldVariant::Single(SingleField::new(
             PermissionsPolicy::new(
                 TrustDistance::Distance(1), // Limited read access
                 TrustDistance::Distance(1), // Limited write access
             ),
             create_default_payment_config(),
             HashMap::new(),
-        )));
+        )),
+    );
 
     // Private fields - sensitive info
     schema.add_field(
         "payment_info".to_string(),
-        FieldVariant::Single(
-            SingleField::new(
+        FieldVariant::Single(SingleField::new(
             PermissionsPolicy::new(
                 TrustDistance::Distance(3), // Restricted read access
                 TrustDistance::Distance(3), // Restricted write access
             ),
             create_default_payment_config(),
             HashMap::new(),
-        )));
+        )),
+    );
 
     schema
 }
@@ -107,12 +106,11 @@ pub fn create_multi_field_schema() -> Schema {
     for (name, policy) in fields {
         schema.add_field(
             name.to_string(),
-            FieldVariant::Single(
-                SingleField::new(
+            FieldVariant::Single(SingleField::new(
                 policy,
                 create_default_payment_config(),
                 HashMap::new(),
-            ))
+            )),
         );
     }
 

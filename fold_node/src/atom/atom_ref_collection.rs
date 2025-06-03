@@ -1,9 +1,9 @@
+use crate::atom::atom_ref_behavior::AtomRefBehavior;
+use crate::atom::atom_ref_types::{AtomRefStatus, AtomRefUpdate};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-use crate::atom::atom_ref_types::{AtomRefStatus, AtomRefUpdate};
-use crate::atom::atom_ref_behavior::AtomRefBehavior;
 
 /// A collection of atom references, each identified by a key.
 #[derive(Debug, Clone, Serialize, Deserialize)]

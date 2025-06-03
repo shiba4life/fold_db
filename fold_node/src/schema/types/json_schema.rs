@@ -175,14 +175,12 @@ impl JsonSchemaDefinition {
 
             // Parse transform logic using the DSL parser
             let parser = TransformParser::new();
-            parser
-                .parse_expression(&transform.logic)
-                .map_err(|e| {
-                    SchemaError::InvalidField(format!(
-                        "Error parsing transform for field {field_name}: {}",
-                        e
-                    ))
-                })?;
+            parser.parse_expression(&transform.logic).map_err(|e| {
+                SchemaError::InvalidField(format!(
+                    "Error parsing transform for field {field_name}: {}",
+                    e
+                ))
+            })?;
         }
 
         Ok(())

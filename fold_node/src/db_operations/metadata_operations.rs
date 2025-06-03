@@ -1,12 +1,15 @@
-use crate::schema::SchemaError;
 use super::core::DbOperations;
+use crate::schema::SchemaError;
 use uuid::Uuid;
 
 impl DbOperations {
     /// Retrieves or generates and persists the node identifier
     pub fn get_node_id(&self) -> Result<String, SchemaError> {
-        if let Some(bytes) = self.metadata_tree.get("node_id")
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to get node_id: {}", e)))? {
+        if let Some(bytes) = self
+            .metadata_tree
+            .get("node_id")
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to get node_id: {}", e)))?
+        {
             let id = String::from_utf8(bytes.to_vec()).unwrap_or_else(|_| String::new());
             if !id.is_empty() {
                 return Ok(id);
@@ -19,9 +22,11 @@ impl DbOperations {
 
     /// Sets the node identifier
     pub fn set_node_id(&self, node_id: &str) -> Result<(), SchemaError> {
-        self.metadata_tree.insert("node_id", node_id.as_bytes())
+        self.metadata_tree
+            .insert("node_id", node_id.as_bytes())
             .map_err(|e| SchemaError::InvalidData(format!("Failed to set node_id: {}", e)))?;
-        self.metadata_tree.flush()
+        self.metadata_tree
+            .flush()
             .map_err(|e| SchemaError::InvalidData(format!("Failed to flush metadata: {}", e)))?;
         Ok(())
     }
@@ -33,7 +38,11 @@ impl DbOperations {
     }
 
     /// Sets the permitted schemas for the given node using generic operations
-    pub fn set_schema_permissions(&self, node_id: &str, schemas: &[String]) -> Result<(), SchemaError> {
+    pub fn set_schema_permissions(
+        &self,
+        node_id: &str,
+        schemas: &[String],
+    ) -> Result<(), SchemaError> {
         let schemas_vec: Vec<String> = schemas.to_vec();
         self.store_in_tree(&self.permissions_tree, node_id, &schemas_vec)
     }
