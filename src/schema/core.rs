@@ -158,6 +158,39 @@ impl SchemaCore {
         }
     }
 
+    /// Auto-register field transforms with TransformManager during schema loading
+    fn register_schema_transforms(&self, schema: &Schema) -> Result<(), SchemaError> {
+        info!("🔧 Auto-registering transforms for schema: {}", schema.name);
+        
+        for (field_name, field) in &schema.fields {
+            if let Some(transform) = field.transform() {
+                info!(
+                    "📋 Found transform on field {}.{}: inputs={:?}, logic={}, output={}",
+                    schema.name, field_name, transform.get_inputs(), transform.logic, transform.get_output()
+                );
+                
+                // For now, store transform registration information in database for later processing
+                // This ensures transforms are discovered and can be registered when TransformManager is available
+                let transform_id = format!("{}.{}", schema.name, field_name);
+                
+                // Store the transform in the database so it can be loaded by TransformManager
+                if let Err(e) = self.db_ops.store_transform(&transform_id, transform) {
+                    log::error!(
+                        "Failed to store transform {}: {}",
+                        transform_id, e
+                    );
+                } else {
+                    info!(
+                        "✅ Stored transform {} for auto-registration",
+                        transform_id
+                    );
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
     /// Load a schema into memory and persist it to disk.
     /// This preserves existing schema state if it exists, otherwise defaults to Available.
     pub fn load_schema_internal(&self, mut schema: Schema) -> Result<(), SchemaError> {
@@ -197,6 +230,9 @@ impl SchemaCore {
 
         // Ensure any transforms on fields have the correct output schema
         self.fix_transform_outputs(&mut schema);
+        
+        // Auto-register field transforms with TransformManager
+        self.register_schema_transforms(&schema)?;
         info!(
             "After fix_transform_outputs, schema '{}' has {} fields: {:?}",
             schema.name,
@@ -336,6 +372,10 @@ impl SchemaCore {
                 );
             }
         }
+
+        // Transforms are already registered during initial schema loading
+        // TransformManager will auto-reload transforms when it receives the SchemaChanged event
+        info!("✅ Transform registration handled by event-driven TransformManager reload");
 
         // Publish SchemaLoaded event for approval
         use crate::fold_db_core::infrastructure::message_bus::SchemaLoaded;

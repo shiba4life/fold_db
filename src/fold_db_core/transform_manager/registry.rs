@@ -3,18 +3,8 @@ use crate::schema::types::{SchemaError, Transform, TransformRegistration};
 use log::info;
 
 impl TransformManager {
-    /// Registers a transform and tracks its input and output atom references
-    /// internally.  The provided `input_arefs` are used only for dependency
-    /// tracking and are not persisted on the [`Transform`] itself.
-    /// UNIFIED: Register transform using event-driven database operations
-    /// This replaces both register_transform() and register_transform_event_driven()
-    pub fn register_transform(
-        &self,
-        registration: TransformRegistration,
-    ) -> Result<(), SchemaError> {
-        // Delegate to event-driven implementation
-        self.register_transform_event_driven(registration)
-    }
+    // Removed redundant register_transform() wrapper - callers should use register_transform_event_driven() directly
+    // This eliminates duplicate registration pathways and simplifies the API
 
     /// Registers a transform with automatic input dependency detection.
     pub fn register_transform_auto(
@@ -33,7 +23,7 @@ impl TransformManager {
         let inputs_len = dependencies.len();
         let output_field = format!("{}.{}", schema_name, field_name);
         let tid = transform_id.clone();
-        self.register_transform(TransformRegistration {
+        self.register_transform_event_driven(TransformRegistration {
             transform_id,
             transform,
             input_arefs: dependencies,

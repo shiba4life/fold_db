@@ -156,7 +156,11 @@ fn demonstrate_individual_components(db_path: &str) -> Result<(), Box<dyn std::e
     let atom_manager = AtomManager::new(db_ops.clone(), Arc::clone(&message_bus));
     
     println!("  🔧 Component 2: FieldManager (event-driven via message bus)");
-    let field_manager = FieldManager::new(Arc::clone(&message_bus));
+    // Create SchemaCore for FieldManager
+    let schema_core = Arc::new(
+        fold_node::schema::SchemaCore::new(db_path, Arc::new(db_ops.clone()), Arc::clone(&message_bus))?
+    );
+    let field_manager = FieldManager::new(Arc::clone(&message_bus), Arc::clone(&schema_core));
     
     println!("  🔧 Component 3: EventDrivenSchemaManager (pure event-driven)");
     let schema_manager = EventDrivenSchemaManager::new(
@@ -458,7 +462,11 @@ mod tests {
         let db_ops = DbOperations::new(db).unwrap();
         
         let _atom_manager = AtomManager::new(db_ops.clone(), Arc::clone(&message_bus));
-        let _field_manager = FieldManager::new(Arc::clone(&message_bus));
+        // Create SchemaCore for FieldManager
+        let schema_core = Arc::new(
+            fold_node::schema::SchemaCore::new(db_path, Arc::new(db_ops.clone()), Arc::clone(&message_bus)).unwrap()
+        );
+        let _field_manager = FieldManager::new(Arc::clone(&message_bus), Arc::clone(&schema_core));
         let _schema_manager = EventDrivenSchemaManager::new(
             db_path,
             Arc::new(db_ops),

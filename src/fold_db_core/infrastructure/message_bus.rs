@@ -146,6 +146,38 @@ pub struct TransformTriggered {
     pub transform_id: String,
 }
 
+/// Request to register a transform with the TransformManager
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransformRegistrationRequest {
+    /// The transform registration details
+    pub registration: crate::schema::types::TransformRegistration,
+    /// Correlation ID for tracking the request
+    pub correlation_id: String,
+}
+
+/// Response to transform registration request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransformRegistrationResponse {
+    /// Correlation ID for tracking the request
+    pub correlation_id: String,
+    /// Whether the registration was successful
+    pub success: bool,
+    /// Error message if registration failed
+    pub error: Option<String>,
+}
+
+impl EventType for TransformRegistrationRequest {
+    fn type_id() -> &'static str {
+        "TransformRegistrationRequest"
+    }
+}
+
+impl EventType for TransformRegistrationResponse {
+    fn type_id() -> &'static str {
+        "TransformRegistrationResponse"
+    }
+}
+
 /// Event indicating that a query has been executed
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct QueryExecuted {

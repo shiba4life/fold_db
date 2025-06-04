@@ -275,8 +275,27 @@ impl TransformOrchestrator {
             return Some(Ok(JsonValue::Null));
         }
 
-        info!("🚀 EXECUTING TRANSFORM: {}", transform_id);
-        let result = self.manager.execute_transform_now(&transform_id);
+        info!("🚀 DELEGATING TRANSFORM EXECUTION to TransformManager via event: {}", transform_id);
+        
+        // Publish TransformTriggered instead of TransformExecutionRequest to avoid duplicate execution paths
+        // This follows the proper event flow: FieldValueSet -> TransformTriggered -> TransformExecutionRequest
+        let triggered_event = crate::fold_db_core::infrastructure::message_bus::TransformTriggered::new(&transform_id);
+        
+        let result = match self.message_bus.publish(triggered_event) {
+            Ok(_) => {
+                info!("📢 Published TransformTriggered for {} - letting TransformManager handle execution", transform_id);
+                // Return a placeholder result indicating the event was published
+                Ok(serde_json::json!({
+                    "status": "triggered_for_execution",
+                    "transform_id": transform_id,
+                    "method": "event_chain"
+                }))
+            }
+            Err(e) => {
+                error!("❌ Failed to publish TransformTriggered for {}: {}", transform_id, e);
+                Err(SchemaError::InvalidData(format!("Failed to trigger transform: {}", e)))
+            }
+        };
 
         match &result {
             Ok(value) => {

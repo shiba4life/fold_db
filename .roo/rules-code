@@ -1,0 +1,16 @@
+Always read the README file at the root of the directory to see how to use the project. Always read the DOCs directory to understand the project.
+
+When building a feature:
+1. Create a new branch for this feature.
+2. Understand the architecture first.
+3. Only make minimal changes needed.
+4. Check for duplicate code paths.
+5. Keep things DRY
+6. Break down big files
+7. Break down big functions
+8. Write tests to validate.
+9. Make sure all test pass
+10. Make sure all linting errors are resolved.
+11. Start back at step 3 until it meets all the requirements.
+12. Commit the code
+13. Push the branch and create a Pull Request.

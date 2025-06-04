@@ -1,13 +1,8 @@
-use super::types::{CreateAtomFn, GetAtomFn, GetFieldFn, TransformRunner, UpdateAtomRefFn};
+use super::types::TransformRunner;
 use crate::db_operations::DbOperations;
-use crate::fold_db_core::infrastructure::message_bus::{
-    MessageBus, TransformTriggered, TransformExecuted,
-    TransformTriggerRequest, TransformTriggerResponse,
-    TransformExecutionRequest, TransformExecutionResponse
-};
-use crate::schema::types::{SchemaError, Transform, TransformRegistration};
-use crate::transform::TransformExecutor;
-use log::{info, error};
+use crate::fold_db_core::infrastructure::message_bus::MessageBus;
+use crate::schema::types::{SchemaError, Transform};
+use log::info;
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
@@ -20,10 +15,7 @@ pub(super) const FIELD_TO_TRANSFORMS_KEY: &str = "map_field_to_transforms";
 pub(super) const TRANSFORM_TO_FIELDS_KEY: &str = "map_transform_to_fields";
 pub(super) const TRANSFORM_OUTPUTS_KEY: &str = "map_transform_outputs";
 
-#[allow(dead_code)]
 pub struct TransformManager {
-    /// Tree for storing transforms (legacy)
-    pub(super) transforms_tree: sled::Tree,
     /// Direct database operations (consistent with other components)
     pub(super) db_ops: Arc<DbOperations>,
     /// In-memory cache of registered transforms
@@ -40,14 +32,6 @@ pub struct TransformManager {
     pub(super) transform_to_fields: RwLock<HashMap<String, HashSet<String>>>,
     /// Maps transform IDs to their output atom reference UUIDs
     pub(super) transform_outputs: RwLock<HashMap<String, String>>,
-    /// Callback for getting an atom by its reference UUID
-    pub(super) get_atom_fn: GetAtomFn,
-    /// Callback for creating a new atom
-    pub(super) create_atom_fn: CreateAtomFn,
-    /// Callback for updating an atom reference
-    pub(super) update_atom_ref_fn: UpdateAtomRefFn,
-    /// Callback for retrieving field values
-    pub(super) get_field_fn: GetFieldFn,
     /// Message bus for event-driven communication
     pub(super) message_bus: Arc<MessageBus>,
     /// Thread handle for monitoring TransformTriggered events
@@ -56,23 +40,16 @@ pub struct TransformManager {
     pub(super) _transform_trigger_request_thread: Option<thread::JoinHandle<()>>,
     /// Thread handle for processing TransformExecutionRequest events
     pub(super) _transform_execution_request_thread: Option<thread::JoinHandle<()>>,
+    /// Thread handle for monitoring SchemaChanged events
+    pub(super) _schema_changed_consumer_thread: Option<thread::JoinHandle<()>>,
 }
 
 impl TransformManager {
     /// Creates a new TransformManager instance with unified database operations
     pub fn new(
         db_ops: std::sync::Arc<crate::db_operations::DbOperations>,
-        get_atom_fn: GetAtomFn,
-        create_atom_fn: CreateAtomFn,
-        update_atom_ref_fn: UpdateAtomRefFn,
-        get_field_fn: GetFieldFn,
         message_bus: Arc<MessageBus>,
     ) -> Result<Self, SchemaError> {
-        // Create a legacy tree for backward compatibility with existing code
-        let transforms_tree = db_ops.db().open_tree("transforms").map_err(|e| {
-            SchemaError::InvalidData(format!("Failed to open transforms tree: {}", e))
-        })?;
-
         // Load any persisted transforms using direct database operations
         let mut registered_transforms = HashMap::new();
         
@@ -81,6 +58,10 @@ impl TransformManager {
         for transform_id in transform_ids {
             match db_ops.get_transform(&transform_id) {
                 Ok(Some(transform)) => {
+                    info!(
+                        "📋 Loading transform '{}' with inputs: {:?}, output: {}",
+                        transform_id, transform.get_inputs(), transform.get_output()
+                    );
                     registered_transforms.insert(transform_id, transform);
                 }
                 Ok(None) => {
@@ -110,34 +91,30 @@ impl TransformManager {
             transform_outputs,
         ) = Self::load_persisted_mappings_direct(&db_ops)?;
 
+        // Field mappings will be auto-registered during reload_transforms()
+        // which is triggered by SchemaChanged events, avoiding duplicate registration
+
         // Set up monitoring of TransformTriggered events for orchestrated execution
         let transform_triggered_consumer_thread = Self::setup_transform_triggered_monitoring(
             Arc::clone(&message_bus),
-            get_atom_fn.clone(),
-            create_atom_fn.clone(),
-            update_atom_ref_fn.clone(),
-            get_field_fn.clone(),
         );
 
         // Set up request/response processing threads
         let transform_trigger_request_thread = Self::setup_transform_trigger_request_processing(
             Arc::clone(&message_bus),
-            get_atom_fn.clone(),
-            create_atom_fn.clone(),
-            update_atom_ref_fn.clone(),
-            get_field_fn.clone(),
         );
 
         let transform_execution_request_thread = Self::setup_transform_execution_request_processing(
             Arc::clone(&message_bus),
-            get_atom_fn.clone(),
-            create_atom_fn.clone(),
-            update_atom_ref_fn.clone(),
-            get_field_fn.clone(),
+        );
+
+        // Set up monitoring of SchemaChanged events to reload transforms
+        let schema_changed_consumer_thread = Self::setup_schema_changed_monitoring(
+            Arc::clone(&message_bus),
+            Arc::clone(&db_ops),
         );
 
         Ok(Self {
-            transforms_tree,
             db_ops,
             registered_transforms: RwLock::new(registered_transforms),
             aref_to_transforms: RwLock::new(aref_to_transforms),
@@ -146,200 +123,11 @@ impl TransformManager {
             field_to_transforms: RwLock::new(field_to_transforms),
             transform_to_fields: RwLock::new(transform_to_fields),
             transform_outputs: RwLock::new(transform_outputs),
-            get_atom_fn,
-            create_atom_fn,
-            update_atom_ref_fn,
-            get_field_fn,
             message_bus,
             _transform_triggered_consumer_thread: Some(transform_triggered_consumer_thread),
             _transform_trigger_request_thread: Some(transform_trigger_request_thread),
             _transform_execution_request_thread: Some(transform_execution_request_thread),
-        })
-    }
-
-    /// Set up monitoring of TransformTriggered events for direct execution
-    fn setup_transform_triggered_monitoring(
-        message_bus: Arc<MessageBus>,
-        get_atom_fn: GetAtomFn,
-        create_atom_fn: CreateAtomFn,
-        update_atom_ref_fn: UpdateAtomRefFn,
-        get_field_fn: GetFieldFn,
-    ) -> thread::JoinHandle<()> {
-        let mut transform_triggered_consumer = message_bus.subscribe::<TransformTriggered>();
-        let message_bus_for_publish = Arc::clone(&message_bus);
-        
-        thread::spawn(move || {
-            info!("🔍 TransformManager: Starting monitoring and execution of TransformTriggered events");
-            
-            loop {
-                match transform_triggered_consumer.recv_timeout(std::time::Duration::from_millis(100)) {
-                    Ok(event) => {
-                        info!(
-                            "🎯 TransformManager: TransformTriggered event received for transform: {}",
-                            event.transform_id
-                        );
-                        
-                        // Execute the transform directly in response to the event
-                        // This implements proper event-driven architecture where components
-                        // handle events they subscribe to
-                        Self::execute_transform_from_event(
-                            &event.transform_id,
-                            &get_atom_fn,
-                            &create_atom_fn,
-                            &update_atom_ref_fn,
-                            &get_field_fn,
-                            &message_bus_for_publish,
-                        );
-                    }
-                    Err(_) => continue, // Timeout or channel disconnected
-                }
-            }
-        })
-    }
-    
-    /// Execute a transform in response to a TransformTriggered event
-    fn execute_transform_from_event(
-        transform_id: &str,
-        _get_atom_fn: &GetAtomFn,
-        _create_atom_fn: &CreateAtomFn,
-        _update_atom_ref_fn: &UpdateAtomRefFn,
-        _get_field_fn: &GetFieldFn,
-        message_bus: &Arc<MessageBus>,
-    ) {
-        info!("🚀 TransformManager: Executing transform from event: {}", transform_id);
-        
-        // Note: This is a simplified event-driven execution. In a full implementation,
-        // this would need access to the TransformManager instance to use the proper
-        // execution methods from executor.rs. For now, we publish a TransformExecuted
-        // event to maintain event-driven consistency.
-        
-        let result = "placeholder_execution"; // This would be actual execution result
-        
-        // Publish TransformExecuted event to maintain event-driven patterns
-        let executed_event = TransformExecuted {
-            transform_id: transform_id.to_string(),
-            result: result.to_string(),
-        };
-        
-        match message_bus.publish(executed_event) {
-            Ok(_) => {
-                info!(
-                    "📢 TransformManager: Published TransformExecuted event for {}",
-                    transform_id
-                );
-            }
-            Err(e) => {
-                error!(
-                    "❌ TransformManager: Failed to publish TransformExecuted event for {}: {}",
-                    transform_id, e
-                );
-            }
-        }
-    }
-
-    /// Set up processing of TransformTriggerRequest events
-    fn setup_transform_trigger_request_processing(
-        message_bus: Arc<MessageBus>,
-        _get_atom_fn: GetAtomFn,
-        _create_atom_fn: CreateAtomFn,
-        _update_atom_ref_fn: UpdateAtomRefFn,
-        _get_field_fn: GetFieldFn,
-    ) -> thread::JoinHandle<()> {
-        let mut consumer = message_bus.subscribe::<TransformTriggerRequest>();
-        let message_bus_for_publish = Arc::clone(&message_bus);
-        
-        thread::spawn(move || {
-            info!("🔍 TransformManager: Starting processing of TransformTriggerRequest events");
-            
-            loop {
-                match consumer.recv_timeout(std::time::Duration::from_millis(100)) {
-                    Ok(request) => {
-                        info!(
-                            "🎯 TransformManager: TransformTriggerRequest received - correlation_id: {}, schema: {}, field: {}",
-                            request.correlation_id, request.schema_name, request.field_name
-                        );
-                        
-                        // Process the trigger request - this should trigger transforms for the field
-                        let success = true; // This would be actual processing logic
-                        
-                        let response = TransformTriggerResponse {
-                            correlation_id: request.correlation_id.clone(),
-                            success,
-                            error: None,
-                        };
-                        
-                        match message_bus_for_publish.publish(response) {
-                            Ok(_) => {
-                                info!(
-                                    "📢 TransformManager: Published TransformTriggerResponse for correlation_id: {}",
-                                    request.correlation_id
-                                );
-                            }
-                            Err(e) => {
-                                error!(
-                                    "❌ TransformManager: Failed to publish TransformTriggerResponse for {}: {}",
-                                    request.correlation_id, e
-                                );
-                            }
-                        }
-                    }
-                    Err(_) => continue, // Timeout or channel disconnected
-                }
-            }
-        })
-    }
-
-    /// Set up processing of TransformExecutionRequest events
-    fn setup_transform_execution_request_processing(
-        message_bus: Arc<MessageBus>,
-        _get_atom_fn: GetAtomFn,
-        _create_atom_fn: CreateAtomFn,
-        _update_atom_ref_fn: UpdateAtomRefFn,
-        _get_field_fn: GetFieldFn,
-    ) -> thread::JoinHandle<()> {
-        let mut consumer = message_bus.subscribe::<TransformExecutionRequest>();
-        let message_bus_for_publish = Arc::clone(&message_bus);
-        
-        thread::spawn(move || {
-            info!("🔍 TransformManager: Starting processing of TransformExecutionRequest events");
-            
-            loop {
-                match consumer.recv_timeout(std::time::Duration::from_millis(100)) {
-                    Ok(request) => {
-                        info!(
-                            "🎯 TransformManager: TransformExecutionRequest received - correlation_id: {}",
-                            request.correlation_id
-                        );
-                        
-                        // Process the execution request - this should execute queued transforms
-                        let transforms_executed = 0; // This would be actual execution logic
-                        let success = true;
-                        
-                        let response = TransformExecutionResponse {
-                            correlation_id: request.correlation_id.clone(),
-                            success,
-                            transforms_executed,
-                            error: None,
-                        };
-                        
-                        match message_bus_for_publish.publish(response) {
-                            Ok(_) => {
-                                info!(
-                                    "📢 TransformManager: Published TransformExecutionResponse for correlation_id: {}",
-                                    request.correlation_id
-                                );
-                            }
-                            Err(e) => {
-                                error!(
-                                    "❌ TransformManager: Failed to publish TransformExecutionResponse for {}: {}",
-                                    request.correlation_id, e
-                                );
-                            }
-                        }
-                    }
-                    Err(_) => continue, // Timeout or channel disconnected
-                }
-            }
+            _schema_changed_consumer_thread: Some(schema_changed_consumer_thread),
         })
     }
 
@@ -404,269 +192,34 @@ impl TransformManager {
         })?;
         Ok(field_to_transforms.get(&key).cloned().unwrap_or_default())
     }
-
-    /// Register transform using event-driven database operations only
-    pub fn register_transform_event_driven(
-        &self,
-        registration: TransformRegistration,
-    ) -> Result<(), SchemaError> {
-        let TransformRegistration {
-            transform_id,
-            mut transform,
-            input_arefs,
-            input_names,
-            trigger_fields,
-            output_aref,
-            schema_name,
-            field_name,
-        } = registration;
-
-        // Validate the transform
-        TransformExecutor::validate_transform(&transform)?;
-
-        // Set transform output field
-        let output_field = format!("{}.{}", schema_name, field_name);
-        let inputs_len = input_arefs.len();
-        transform.set_output(output_field.clone());
-
-        // Store transform using direct database operations
-        self.db_ops.store_transform(&transform_id, &transform)?;
-
-        // Update in-memory cache
-        {
-            let mut registered_transforms = self.registered_transforms.write().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire registered_transforms lock".to_string())
-            })?;
-            registered_transforms.insert(transform_id.clone(), transform);
-        }
-
-        // Register the output atom reference
-        {
-            let mut transform_outputs = self.transform_outputs.write().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire transform_outputs lock".to_string())
-            })?;
-            transform_outputs.insert(transform_id.clone(), output_aref.clone());
-        }
-
-        // Register the input atom references
-        {
-            let mut transform_to_arefs = self.transform_to_arefs.write().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire transform_to_arefs lock".to_string())
-            })?;
-            let mut aref_set = HashSet::new();
-            for aref_uuid in &input_arefs {
-                aref_set.insert(aref_uuid.clone());
-            }
-            transform_to_arefs.insert(transform_id.clone(), aref_set);
-        }
-
-        // Store mapping of input names to refs
-        {
-            let mut transform_input_names = self.transform_input_names.write().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire transform_input_names lock".to_string())
-            })?;
-            let mut map = HashMap::new();
-            for (aref_uuid, name) in input_arefs.iter().zip(input_names.iter()) {
-                map.insert(aref_uuid.clone(), name.clone());
-            }
-            transform_input_names.insert(transform_id.clone(), map);
-        }
-
-        // Register the fields that trigger this transform
-        {
-            let mut transform_to_fields = self.transform_to_fields.write().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire transform_to_fields lock".to_string())
-            })?;
-            let mut field_to_transforms = self.field_to_transforms.write().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire field_to_transforms lock".to_string())
-            })?;
-
-            let mut field_set = HashSet::new();
-            for field_key in &trigger_fields {
-                field_set.insert(field_key.clone());
-                let set = field_to_transforms.entry(field_key.clone()).or_default();
-                set.insert(transform_id.clone());
-            }
-
-            transform_to_fields.insert(transform_id.clone(), field_set);
-        }
-
-        // Update the reverse mapping (aref -> transforms)
-        {
-            let mut aref_to_transforms = self.aref_to_transforms.write().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire aref_to_transforms lock".to_string())
-            })?;
-
-            for aref_uuid in input_arefs {
-                let transform_set = aref_to_transforms.entry(aref_uuid).or_default();
-                transform_set.insert(transform_id.clone());
-            }
-        }
-
-        info!(
-            "Registered transform {} output {} with {} input references using unified operations",
-            transform_id, output_field, inputs_len
-        );
-
-        // Persist mappings using event-driven operations only
-        self.persist_mappings_direct()?;
-        Ok(())
-    }
-
-    /// Persist mappings using event-driven operations only
-    pub fn persist_mappings_direct(&self) -> Result<(), SchemaError> {
-        // Store aref_to_transforms mapping
-        {
-            let map = self.aref_to_transforms.read().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire aref_to_transforms lock".to_string())
-            })?;
-            let json = serde_json::to_vec(&*map).map_err(|e| {
-                SchemaError::InvalidData(format!("Failed to serialize aref_to_transforms: {}", e))
-            })?;
-            self.db_ops.store_transform_mapping(AREF_TO_TRANSFORMS_KEY, &json)?;
-        }
-
-        // Store transform_to_arefs mapping
-        {
-            let map = self.transform_to_arefs.read().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire transform_to_arefs lock".to_string())
-            })?;
-            let json = serde_json::to_vec(&*map).map_err(|e| {
-                SchemaError::InvalidData(format!("Failed to serialize transform_to_arefs: {}", e))
-            })?;
-            self.db_ops.store_transform_mapping(TRANSFORM_TO_AREFS_KEY, &json)?;
-        }
-
-        // Store transform_input_names mapping
-        {
-            let map = self.transform_input_names.read().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire transform_input_names lock".to_string())
-            })?;
-            let json = serde_json::to_vec(&*map).map_err(|e| {
-                SchemaError::InvalidData(format!(
-                    "Failed to serialize transform_input_names: {}",
-                    e
-                ))
-            })?;
-            self.db_ops.store_transform_mapping(TRANSFORM_INPUT_NAMES_KEY, &json)?;
-        }
-
-        // Store field_to_transforms mapping
-        {
-            let map = self.field_to_transforms.read().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire field_to_transforms lock".to_string())
-            })?;
-            let json = serde_json::to_vec(&*map).map_err(|e| {
-                SchemaError::InvalidData(format!("Failed to serialize field_to_transforms: {}", e))
-            })?;
-            self.db_ops.store_transform_mapping(FIELD_TO_TRANSFORMS_KEY, &json)?;
-        }
-
-        // Store transform_to_fields mapping
-        {
-            let map = self.transform_to_fields.read().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire transform_to_fields lock".to_string())
-            })?;
-            let json = serde_json::to_vec(&*map).map_err(|e| {
-                SchemaError::InvalidData(format!("Failed to serialize transform_to_fields: {}", e))
-            })?;
-            self.db_ops.store_transform_mapping(TRANSFORM_TO_FIELDS_KEY, &json)?;
-        }
-
-        // Store transform_outputs mapping
-        {
-            let map = self.transform_outputs.read().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire transform_outputs lock".to_string())
-            })?;
-            let json = serde_json::to_vec(&*map).map_err(|e| {
-                SchemaError::InvalidData(format!("Failed to serialize transform_outputs: {}", e))
-            })?;
-            self.db_ops.store_transform_mapping(TRANSFORM_OUTPUTS_KEY, &json)?;
-        }
-
-        Ok(())
-    }
-
-    /// Load persisted mappings using direct database operations
-    #[allow(clippy::type_complexity)]
-    fn load_persisted_mappings_direct(
-        db_ops: &Arc<DbOperations>,
-    ) -> Result<
-        (
-            HashMap<String, HashSet<String>>,
-            HashMap<String, HashSet<String>>,
-            HashMap<String, HashMap<String, String>>,
-            HashMap<String, HashSet<String>>,
-            HashMap<String, HashSet<String>>,
-            HashMap<String, String>,
-        ),
-        SchemaError,
-    > {
-        // Load aref_to_transforms
-        let aref_to_transforms =
-            if let Some(data) = db_ops.get_transform_mapping(AREF_TO_TRANSFORMS_KEY)? {
-                serde_json::from_slice(&data).unwrap_or_default()
-            } else {
-                HashMap::new()
-            };
-
-        // Load transform_to_arefs
-        let transform_to_arefs =
-            if let Some(data) = db_ops.get_transform_mapping(TRANSFORM_TO_AREFS_KEY)? {
-                serde_json::from_slice(&data).unwrap_or_default()
-            } else {
-                HashMap::new()
-            };
-
-        // Load transform_input_names
-        let transform_input_names =
-            if let Some(data) = db_ops.get_transform_mapping(TRANSFORM_INPUT_NAMES_KEY)? {
-                serde_json::from_slice(&data).unwrap_or_default()
-            } else {
-                HashMap::new()
-            };
-
-        // Load field_to_transforms
-        let field_to_transforms =
-            if let Some(data) = db_ops.get_transform_mapping(FIELD_TO_TRANSFORMS_KEY)? {
-                serde_json::from_slice(&data).unwrap_or_default()
-            } else {
-                HashMap::new()
-            };
-
-        // Load transform_to_fields
-        let transform_to_fields =
-            if let Some(data) = db_ops.get_transform_mapping(TRANSFORM_TO_FIELDS_KEY)? {
-                serde_json::from_slice(&data).unwrap_or_default()
-            } else {
-                HashMap::new()
-            };
-
-        // Load transform_outputs
-        let transform_outputs =
-            if let Some(data) = db_ops.get_transform_mapping(TRANSFORM_OUTPUTS_KEY)? {
-                serde_json::from_slice(&data).unwrap_or_default()
-            } else {
-                HashMap::new()
-            };
-
-        Ok((
-            aref_to_transforms,
-            transform_to_arefs,
-            transform_input_names,
-            field_to_transforms,
-            transform_to_fields,
-            transform_outputs,
-        ))
-    }
-
 }
 
 impl TransformRunner for TransformManager {
+    /// Legacy method maintained for API compatibility - redirects to event-driven execution
+    /// This method publishes a TransformExecutionRequest event instead of direct execution
     fn execute_transform_now(&self, transform_id: &str) -> Result<JsonValue, SchemaError> {
-        // Delegate to the real implementation in executor.rs
-        // The real execute_transform_now method is implemented in the main TransformManager impl block
-        TransformManager::execute_transform_now(self, transform_id)
+        log::info!("🔄 execute_transform_now called for {} - using event-driven execution", transform_id);
+        
+        // Publish a TransformExecutionRequest event
+        let execution_request = crate::fold_db_core::infrastructure::message_bus::TransformExecutionRequest {
+            correlation_id: format!("api_request_{}", transform_id),
+        };
+        
+        match self.message_bus.publish(execution_request) {
+            Ok(_) => {
+                log::info!("📢 Published TransformExecutionRequest for {}", transform_id);
+                // Return a placeholder indicating the event was published
+                Ok(serde_json::json!({
+                    "status": "execution_requested",
+                    "transform_id": transform_id,
+                    "method": "event_driven"
+                }))
+            }
+            Err(e) => {
+                log::error!("❌ Failed to publish TransformExecutionRequest for {}: {}", transform_id, e);
+                Err(SchemaError::InvalidData(format!("Failed to request transform execution: {}", e)))
+            }
+        }
     }
 
     fn transform_exists(&self, transform_id: &str) -> Result<bool, SchemaError> {

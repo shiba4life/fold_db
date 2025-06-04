@@ -33,7 +33,8 @@ use infrastructure::message_bus::{
     MutationExecuted,
     SystemInitializationRequest
 };
-use infrastructure::init::{build_closure_fns, init_orchestrator, init_transform_manager};
+use crate::fold_db_core::transform_manager::types::TransformRunner;
+use infrastructure::init::{init_orchestrator, init_transform_manager};
 
 // External dependencies
 use crate::atom::{Atom, AtomRefBehavior};
@@ -167,8 +168,7 @@ impl FoldDB {
         let collection_manager = CollectionManager::new(field_manager.clone(), Arc::clone(&message_bus));
         
         // Use standard initialization but with deprecated closures that recommend events
-        let closures = build_closure_fns(&atom_manager, &schema_manager);
-        let transform_manager = init_transform_manager(Arc::new(db_ops.clone()), closures, Arc::clone(&message_bus))?;
+        let transform_manager = init_transform_manager(Arc::new(db_ops.clone()), Arc::clone(&message_bus))?;
         let orchestrator =
             init_orchestrator(&field_manager, transform_manager.clone(), orchestrator_tree, Arc::clone(&message_bus))?;
 
@@ -587,9 +587,13 @@ impl FoldDB {
         self.transform_manager.list_transforms()
     }
 
-    /// Execute a transform by ID
+    /// Execute a transform by ID using event-driven architecture
+    /// This publishes a TransformExecutionRequest event and returns immediately
     pub fn run_transform(&self, transform_id: &str) -> Result<Value, SchemaError> {
-        match self.transform_manager.execute_transform_now(transform_id) {
+        log::info!("🔄 run_transform called for {} - using event-driven execution", transform_id);
+        
+        // Use the event-driven execution method which publishes TransformExecutionRequest
+        match TransformRunner::execute_transform_now(&*self.transform_manager, transform_id) {
             Ok(result) => Ok(result),
             Err(e) => Err(SchemaError::InvalidData(e.to_string())),
         }
