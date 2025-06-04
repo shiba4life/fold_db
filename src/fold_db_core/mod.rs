@@ -1,0 +1,606 @@
+//! FoldDB Core - Event-driven database system
+//! 
+//! This module contains the core components of the FoldDB system organized
+//! into logical groups for better maintainability and understanding:
+//! 
+//! - **managers/**: Core managers for different aspects of data management
+//! - **services/**: Service layer components for operations
+//! - **infrastructure/**: Foundation components (message bus, initialization, etc.)
+//! - **orchestration/**: Coordination and orchestration components
+//! - **shared/**: Common utilities and shared components
+//! - **transform_manager/**: Transform system (already well-organized)
+
+// Organized module declarations
+pub mod managers;
+pub mod services;
+pub mod infrastructure;
+pub mod orchestration;
+pub mod shared;
+pub mod transform_manager;
+
+// Re-export key components for backwards compatibility
+pub use managers::{AtomManager, FieldManager, CollectionManager};
+pub use services::field_retrieval::service::FieldRetrievalService;
+pub use infrastructure::{MessageBus, EventMonitor};
+pub use orchestration::TransformOrchestrator;
+pub use transform_manager::TransformManager;
+pub use shared::*;
+
+// Import infrastructure components that are used internally
+use infrastructure::message_bus::{
+    FieldValueSetResponse, FieldUpdateResponse, SchemaLoadResponse, SchemaApprovalResponse, AtomCreateResponse, AtomRefCreateResponse,
+    AtomRefUpdateRequest,
+    MutationExecuted,
+    SystemInitializationRequest
+};
+use infrastructure::init::{build_closure_fns, init_orchestrator, init_transform_manager};
+
+// External dependencies
+use crate::atom::{Atom, AtomRefBehavior};
+use crate::db_operations::DbOperations;
+use crate::permissions::PermissionWrapper;
+use crate::schema::core::SchemaState;
+use crate::schema::SchemaCore;
+use crate::schema::{Schema, SchemaError};
+use log::{info, warn};
+use serde_json::Value;
+use std::sync::mpsc;
+use std::time::Instant;
+use crate::schema::types::{Mutation, Query};
+use uuid::Uuid;
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Arc;
+use sha2::Digest;
+
+/// Response tracker for correlating requests with responses
+#[derive(Debug)]
+#[allow(dead_code)]
+struct PendingOperationRequest {
+    correlation_id: String,
+    created_at: Instant,
+    response_sender: mpsc::Sender<OperationResponse>,
+}
+
+/// Unified response type for all operations
+#[derive(Debug, Clone)]
+pub enum OperationResponse {
+    FieldValueSetResponse(FieldValueSetResponse),
+    FieldUpdateResponse(FieldUpdateResponse),
+    SchemaLoadResponse(SchemaLoadResponse),
+    SchemaApprovalResponse(SchemaApprovalResponse),
+    AtomCreateResponse(AtomCreateResponse),
+    AtomRefCreateResponse(AtomRefCreateResponse),
+    Error(String),
+    Timeout,
+}
+
+/// The main database coordinator that manages schemas, permissions, and data storage.
+#[allow(dead_code)]
+pub struct FoldDB {
+    pub(crate) atom_manager: AtomManager,
+    pub(crate) field_manager: FieldManager,
+    pub(crate) field_retrieval_service: FieldRetrievalService,
+    pub(crate) collection_manager: CollectionManager,
+    pub(crate) schema_manager: Arc<SchemaCore>,
+    pub(crate) transform_manager: Arc<TransformManager>,
+    pub(crate) transform_orchestrator: Arc<TransformOrchestrator>,
+    /// Shared database operations
+    pub(crate) db_ops: Arc<DbOperations>,
+    permission_wrapper: PermissionWrapper,
+    /// Message bus for event-driven communication
+    pub(crate) message_bus: Arc<MessageBus>,
+    /// Event monitor for system-wide observability
+    pub(crate) event_monitor: Arc<infrastructure::event_monitor::EventMonitor>,
+    /// Statistics tracking for event-driven operations
+    event_driven_stats: Arc<std::sync::Mutex<EventDrivenFoldDBStats>>,
+    /// Pending operation tracking for event-driven responses
+    pending_operations: Arc<std::sync::Mutex<HashMap<String, PendingOperationRequest>>>,
+}
+
+impl FoldDB {
+    /// Retrieves or generates and persists the node identifier.
+    pub fn get_node_id(&self) -> Result<String, sled::Error> {
+        self.db_ops
+            .get_node_id()
+            .map_err(|e| sled::Error::Unsupported(e.to_string()))
+    }
+
+    /// Retrieves the list of permitted schemas for the given node.
+    pub fn get_schema_permissions(&self, node_id: &str) -> Vec<String> {
+        self.db_ops
+            .get_schema_permissions(node_id)
+            .unwrap_or_default()
+    }
+
+    /// Sets the permitted schemas for the given node.
+    pub fn set_schema_permissions(&self, node_id: &str, schemas: &[String]) -> sled::Result<()> {
+        self.db_ops
+            .set_schema_permissions(node_id, schemas)
+            .map_err(|e| sled::Error::Unsupported(e.to_string()))
+    }
+    /// Creates a new FoldDB instance with the specified storage path.
+    pub fn new(path: &str) -> sled::Result<Self> {
+        let db = match sled::open(path) {
+            Ok(db) => db,
+            Err(e) => {
+                if e.to_string().contains("No such file or directory") {
+                    sled::open(path)?
+                } else {
+                    return Err(e);
+                }
+            }
+        };
+
+        let db_ops =
+            DbOperations::new(db.clone()).map_err(|e| sled::Error::Unsupported(e.to_string()))?;
+        let orchestrator_tree = db_ops.orchestrator_tree.clone();
+
+        // Initialize message bus
+        let message_bus = Arc::new(MessageBus::new());
+
+        // Initialize components via event-driven system initialization
+        let correlation_id = Uuid::new_v4().to_string();
+        let init_request = SystemInitializationRequest {
+            correlation_id: correlation_id.clone(),
+            db_path: path.to_string(),
+            orchestrator_config: None, // TODO: Add orchestrator config if needed
+        };
+
+        // Send system initialization request via message bus
+        if let Err(e) = message_bus.publish(init_request) {
+            return Err(sled::Error::Unsupported(format!(
+                "Failed to initialize system via events: {}",
+                e
+            )));
+        }
+
+        // Create managers using event-driven initialization only
+        let atom_manager = AtomManager::new(db_ops.clone(), Arc::clone(&message_bus));
+        let field_manager = FieldManager::new(Arc::clone(&message_bus));
+        let collection_manager = CollectionManager::new(field_manager.clone(), Arc::clone(&message_bus));
+        let schema_manager = Arc::new(
+            SchemaCore::new(path, Arc::new(db_ops.clone()), Arc::clone(&message_bus))
+                .map_err(|e| sled::Error::Unsupported(e.to_string()))?,
+        );
+        
+        // Use standard initialization but with deprecated closures that recommend events
+        let closures = build_closure_fns(&atom_manager, &schema_manager);
+        let transform_manager = init_transform_manager(Arc::new(db_ops.clone()), closures, Arc::clone(&message_bus))?;
+        let orchestrator =
+            init_orchestrator(&field_manager, transform_manager.clone(), orchestrator_tree, Arc::clone(&message_bus))?;
+
+        info!("Loading schema states from disk during FoldDB initialization");
+        if let Err(e) = schema_manager.load_schema_states_from_disk() {
+            info!("Failed to load schema states: {}", e);
+        } else {
+            // After loading schema states, we need to ensure AtomRefs are properly mapped and persisted
+            // for all approved schemas
+            if let Ok(approved_schemas) =
+                schema_manager.list_schemas_by_state(SchemaState::Approved)
+            {
+                for schema_name in approved_schemas {
+                    if let Ok(atom_refs) = schema_manager.map_fields(&schema_name) {
+                        // Persist each atom ref using event-driven communication
+                        for atom_ref in atom_refs {
+                            let aref_uuid = atom_ref.uuid().to_string();
+                            let atom_uuid = atom_ref.get_atom_uuid().clone();
+
+                            // Send AtomRefUpdateRequest via message bus
+                            let correlation_id = Uuid::new_v4().to_string();
+                            let update_request = AtomRefUpdateRequest {
+                                correlation_id: correlation_id.clone(),
+                                aref_uuid: aref_uuid.clone(),
+                                atom_uuid,
+                                source_pub_key: "system".to_string(),
+                                aref_type: "Single".to_string(), // Default type for schema initialization
+                                additional_data: None,
+                            };
+
+                            if let Err(e) = message_bus.publish(update_request) {
+                                info!(
+                                    "Failed to publish AtomRefUpdateRequest for schema '{}': {}",
+                                    schema_name, e
+                                );
+                            }
+                        }
+                    }
+                    
+                }
+            }
+        }
+
+        // Create and start EventMonitor for system-wide observability
+        let event_monitor = Arc::new(infrastructure::event_monitor::EventMonitor::new(&message_bus));
+        info!("Started EventMonitor for system-wide event tracking");
+
+        // AtomManager operates via direct method calls, not event consumption.
+        // Event-driven components:
+        // - EventMonitor: System observability and statistics
+        // - TransformOrchestrator: Automatic transform triggering based on field changes
+
+        Ok(Self {
+            atom_manager,
+            field_manager,
+            field_retrieval_service: FieldRetrievalService::new(Arc::clone(&message_bus)),
+            collection_manager,
+            schema_manager,
+            transform_manager,
+            transform_orchestrator: orchestrator,
+            db_ops: Arc::new(db_ops.clone()),
+            permission_wrapper: PermissionWrapper::new(),
+            message_bus,
+            event_monitor,
+            event_driven_stats: Arc::new(std::sync::Mutex::new(EventDrivenFoldDBStats::new())),
+            pending_operations: Arc::new(std::sync::Mutex::new(HashMap::new())),
+        })
+    }
+
+    // ========== CONSOLIDATED SCHEMA API - DELEGATES TO SCHEMA_CORE ==========
+
+
+    /// Get comprehensive schema status (NEW UNIFIED METHOD)
+    pub fn get_schema_status(
+        &self,
+    ) -> Result<crate::schema::core::SchemaLoadingReport, SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Refresh schemas from all sources (NEW UNIFIED METHOD)
+    pub fn refresh_schemas(&self) -> Result<crate::schema::core::SchemaLoadingReport, SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaDiscoveryRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaDiscoveryRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Approve a schema for queries and mutations
+    pub fn approve_schema(&mut self, _schema_name: &str) -> Result<(), SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaApprovalRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaApprovalRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Block a schema from queries and mutations
+    pub fn block_schema(&mut self, _schema_name: &str) -> Result<(), SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaApprovalRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaApprovalRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Load schema state from sled
+    pub fn load_schema_state(&self) -> Result<HashMap<String, SchemaState>, SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Initialize schema system (NEW UNIFIED METHOD)
+    pub fn initialize_schema_system(&self) -> Result<(), SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaDiscoveryRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaDiscoveryRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Load schema from JSON string (creates Available schema)
+    pub fn load_schema_from_json(&mut self, _json_str: &str) -> Result<(), SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaLoadRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaLoadRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Load schema from file (creates Available schema)
+    pub fn load_schema_from_file<P: AsRef<Path>>(&mut self, _path: P) -> Result<(), SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaLoadRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaLoadRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Check if a schema can be queried (must be Approved)
+    pub fn can_query_schema(&self, _schema_name: &str) -> bool {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
+        false
+    }
+
+    /// Check if a schema can be mutated (must be Approved)
+    pub fn can_mutate_schema(&self, _schema_name: &str) -> bool {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
+        false
+    }
+
+    /// Get schemas by state
+    pub fn list_schemas_by_state(&self, _state: SchemaState) -> Result<Vec<String>, SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Get all available schemas (any state)
+    pub fn list_all_schemas(&self) -> Result<Vec<String>, SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Legacy method - now creates Available schema
+    pub fn add_schema_available(&mut self, _schema: Schema) -> Result<(), SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaLoadRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaLoadRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    pub fn allow_schema(&mut self, _schema_name: &str) -> Result<(), SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// DEPRECATED: This method violated event-driven architecture principles.
+    /// Use the event-driven API with AtomHistoryRequest/AtomHistoryResponse events instead.
+    /// Direct method calls between components are no longer supported.
+    pub fn get_atom_history(
+        &self,
+        _aref_uuid: &str,
+    ) -> Result<Vec<Atom>, Box<dyn std::error::Error>> {
+        Err("Method deprecated: Use event-driven AtomHistoryRequest via message bus instead of direct method calls".into())
+    }
+
+    /// Mark a schema as unloaded without removing transforms.
+    pub fn unload_schema(&self, schema_name: &str) -> Result<(), SchemaError> {
+        self.schema_manager.unload_schema(schema_name)
+    }
+
+    /// Get a schema by name - public accessor for testing
+    pub fn get_schema(
+        &self,
+        schema_name: &str,
+    ) -> Result<Option<crate::schema::Schema>, SchemaError> {
+        self.schema_manager.get_schema(schema_name)
+    }
+
+    /// List all loaded (approved) schemas
+    pub fn list_loaded_schemas(&self) -> Result<Vec<String>, SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// List all available schemas (any state)
+    pub fn list_available_schemas(&self) -> Result<Vec<String>, SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Get the current state of a schema
+    pub fn get_schema_state(&self, _schema_name: &str) -> Option<SchemaState> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
+        None
+    }
+
+    /// Check if a schema exists
+    pub fn schema_exists(&self, _schema_name: &str) -> Result<bool, SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// List all schemas with their states
+    pub fn list_schemas_with_state(&self) -> Result<HashMap<String, SchemaState>, SchemaError> {
+        self.load_schema_state()
+    }
+
+    /// Provides access to the underlying database operations
+    pub fn db_ops(&self) -> Arc<DbOperations> {
+        Arc::clone(&self.db_ops)
+    }
+
+    /// Provides access to the field retrieval service for testing
+    pub fn field_retrieval_service(&self) -> &FieldRetrievalService {
+        &self.field_retrieval_service
+    }
+
+    /// Provides access to the atom manager for testing
+    pub fn atom_manager(&self) -> &AtomManager {
+        &self.atom_manager
+    }
+
+    /// Provides access to the event monitor for observability
+    pub fn event_monitor(&self) -> Arc<infrastructure::event_monitor::EventMonitor> {
+        Arc::clone(&self.event_monitor)
+    }
+
+    /// Get current event statistics from the event monitor
+    pub fn get_event_statistics(&self) -> infrastructure::event_monitor::EventStatistics {
+        self.event_monitor.get_statistics()
+    }
+
+    /// Log a summary of all system activity since FoldDB was created
+    pub fn log_event_summary(&self) {
+        self.event_monitor.log_summary()
+    }
+
+    /// Get the message bus for publishing events (for testing)
+    pub fn message_bus(&self) -> Arc<MessageBus> {
+        Arc::clone(&self.message_bus)
+    }
+
+    // ========== EVENT-DRIVEN API METHODS ==========
+
+    /// Write schema operation - main orchestration method for mutations
+    pub fn write_schema(&mut self, mutation: Mutation) -> Result<(), SchemaError> {
+        let start_time = Instant::now();
+        let fields_count = mutation.fields_and_values.len();
+        let operation_type = format!("{:?}", mutation.mutation_type);
+        let schema_name = mutation.schema_name.clone();
+        
+        log::info!(
+            "Starting mutation execution for schema: {}",
+            mutation.schema_name
+        );
+        log::info!("Mutation type: {:?}", mutation.mutation_type);
+        log::info!(
+            "Fields to mutate: {:?}",
+            mutation.fields_and_values.keys().collect::<Vec<_>>()
+        );
+
+        if mutation.fields_and_values.is_empty() {
+            return Err(SchemaError::InvalidData("No fields to write".to_string()));
+        }
+
+        // 1. Prepare mutation and validate schema
+        let (schema, processed_mutation, mutation_hash) = self.prepare_mutation_and_schema(mutation)?;
+
+        // 2. Create mutation service and delegate field updates
+        let mutation_service = services::mutation::MutationService::new(Arc::clone(&self.message_bus));
+        let result = self.process_field_mutations_via_service(&mutation_service, &schema, &processed_mutation, &mutation_hash);
+        
+        // 3. Publish MutationExecuted event
+        let execution_time_ms = start_time.elapsed().as_millis() as u64;
+        let mutation_event = MutationExecuted::new(
+            operation_type,
+            schema_name,
+            execution_time_ms,
+            fields_count,
+        );
+
+        if let Err(e) = self.message_bus.publish(mutation_event) {
+            warn!("Failed to publish MutationExecuted event: {}", e);
+        }
+
+        result
+    }
+
+    /// Prepare mutation and schema - extract and validate components
+    fn prepare_mutation_and_schema(
+        &self,
+        mutation: Mutation,
+    ) -> Result<(Schema, Mutation, String), SchemaError> {
+        // Get schema
+        let schema = match self.schema_manager.get_schema(&mutation.schema_name)? {
+            Some(schema) => schema,
+            None => {
+                return Err(SchemaError::InvalidData(format!(
+                    "Schema '{}' not found",
+                    mutation.schema_name
+                )));
+            }
+        };
+
+        // Check permissions - simplified for now
+        // if !self.permission_wrapper.can_mutate(&mutation.schema_name) {
+        //     return Err(SchemaError::InvalidData(
+        //         "No mutation permission for schema".to_string(),
+        //     ));
+        // }
+
+        // Generate mutation hash for tracking
+        let mut hasher = <sha2::Sha256 as Digest>::new();
+        hasher.update(format!("{:?}", mutation).as_bytes());
+        let mutation_hash = format!("{:x}", hasher.finalize());
+
+        Ok((schema, mutation, mutation_hash))
+    }
+
+    /// Process field mutations via service delegation
+    fn process_field_mutations_via_service(
+        &self,
+        mutation_service: &services::mutation::MutationService,
+        schema: &Schema,
+        mutation: &Mutation,
+        mutation_hash: &str,
+    ) -> Result<(), SchemaError> {
+        for (field_name, field_value) in &mutation.fields_and_values {
+            // Get field definition
+            let _field = schema.fields.get(field_name).ok_or_else(|| {
+                SchemaError::InvalidData(format!("Field '{}' not found in schema", field_name))
+            })?;
+
+            // Handle range fields differently
+            if let Some(range_key_value) = field_value.get("range_key") {
+                let _range_key_str = match range_key_value {
+                    Value::String(s) => s.clone(),
+                    Value::Number(n) => n.to_string(),
+                    _ => {
+                        return Err(SchemaError::InvalidData(
+                            "Range key must be string or number".to_string(),
+                        ));
+                    }
+                };
+            }
+
+            // Delegate to mutation service
+            mutation_service.update_field_value(schema, field_name.as_str(), field_value, mutation_hash)?;
+        }
+
+        Ok(())
+    }
+
+    /// Register a transform with the system
+    pub fn register_transform(
+        &self,
+        _transform: crate::schema::types::Transform,
+    ) -> Result<(), SchemaError> {
+        // For now, return error since TransformRegistration is expected, not Transform
+        Err(SchemaError::InvalidData(
+            "Transform registration not yet implemented - needs TransformRegistration type".to_string()
+        ))
+    }
+
+    /// List all registered transforms
+    pub fn list_transforms(&self) -> Result<HashMap<String, crate::schema::types::Transform>, SchemaError> {
+        self.transform_manager.list_transforms()
+    }
+
+    /// Execute a transform by ID
+    pub fn run_transform(&self, transform_id: &str) -> Result<Value, SchemaError> {
+        match self.transform_manager.execute_transform_now(transform_id) {
+            Ok(result) => Ok(result),
+            Err(e) => Err(SchemaError::InvalidData(e.to_string())),
+        }
+    }
+
+    /// Process any pending transforms in the queue
+    pub fn process_transform_queue(&self) {
+        // Transform orchestrator processing is handled automatically by events
+        // self.transform_orchestrator.process_pending_transforms();
+    }
+
+    /// Query a Range schema and return grouped results by range_key
+    pub fn query_range_schema(&self, _query: Query) -> Result<Value, SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaLoadRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaLoadRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Query multiple fields from a schema
+    pub fn query(&self, _query: Query) -> Result<Value, SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Direct schema_manager access bypasses event system
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaLoadRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Query a schema (compatibility method)
+    pub fn query_schema(&self, query: Query) -> Vec<Result<Value, SchemaError>> {
+        // For compatibility, delegate to the main query method and wrap in Vec
+        vec![self.query(query)]
+    }
+}

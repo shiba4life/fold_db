@@ -19,33 +19,25 @@ if git diff --cached --name-only | grep -q '\.rs$'; then
     echo "Running clippy..."
     cargo clippy -- -D warnings || { echo "Clippy failed!"; exit 1; }
     
-    # Run main project tests
-    echo "Running main project unit tests..."
-    cargo test --lib || { echo "Main project unit tests failed!"; exit 1; }
+    # Run unit tests
+    echo "Running unit tests..."
+    cargo test --lib || { echo "Unit tests failed!"; exit 1; }
     
-    echo "Running main project integration tests..."
-    cargo test --test mod || { echo "Main project integration tests failed!"; exit 1; }
+    # Run integration tests
+    echo "Running integration tests..."
+    cargo test --test '*' || { echo "Integration tests failed!"; exit 1; }
     
-    echo "Running network tests..."
-    cargo test --test network_tests || { echo "Network tests failed!"; exit 1; }
+    # Run doc tests
+    echo "Running doc tests..."
+    cargo test --doc || { echo "Doc tests failed!"; exit 1; }
     
+    # Run binary tests
+    echo "Running binary tests..."
+    cargo test --bins || { echo "Binary tests failed!"; exit 1; }
     
-    # Run all tests across the entire workspace
-    echo "Running all workspace tests..."
-    cargo test --workspace || { echo "Workspace tests failed!"; exit 1; }
-    
-    echo "All tests passed!"
-
-    # Run fold_node examples for sanity
-    echo "Running fold_node examples..."
-    cargo run --manifest-path fold_node/Cargo.toml --example auto_transform_demo || { echo "auto_transform_demo example failed!"; exit 1; }
-    cargo run --manifest-path fold_node/Cargo.toml --example complex_transform_dsl || { echo "complex_transform_dsl example failed!"; exit 1; }
-    cargo run --manifest-path fold_node/Cargo.toml --example transform_dsl_samples || { echo "transform_dsl_samples example failed!"; exit 1; }
-    cargo run --manifest-path fold_node/Cargo.toml --example transform_logic_test || { echo "transform_logic_test example failed!"; exit 1; }
-    echo "Fold_node examples passed!"
-
+    echo "All Rust tests passed!"
 else
-    echo "No Rust files in commit, skipping tests."
+    echo "No Rust files in commit, skipping Rust tests."
 fi
 
 # Check if there are any JavaScript or TypeScript files being committed

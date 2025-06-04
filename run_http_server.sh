@@ -18,9 +18,6 @@ cleanup_locks() {
     echo "Cleaned up existing processes."
 }
 
-# Navigate to the fold_node directory
-cd fold_node
-
 # Clean up any existing locks and processes
 cleanup_locks
 
@@ -34,7 +31,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Go back to fold_node directory
+# Go back to root directory
 cd ../../..
 
 # Build the Rust project
@@ -48,7 +45,7 @@ fi
 
 # Run the HTTP server in the background
 echo "Starting the HTTP server on port 9001 in the background..."
-nohup cargo run --bin datafold_http_server -- --port 9001 > ../server.log 2>&1 &
+nohup cargo run --bin datafold_http_server -- --port 9001 > server.log 2>&1 &
 
 # Get the process ID
 SERVER_PID=$!
@@ -59,10 +56,10 @@ sleep 3
 # Check if the process is still running
 if kill -0 $SERVER_PID 2>/dev/null; then
     echo "HTTP server started successfully with PID: $SERVER_PID"
-    echo "Server logs are being written to: ../server.log"
+    echo "Server logs are being written to: server.log"
     echo "To stop the server, run: kill $SERVER_PID"
-    echo "To view logs, run: tail -f ../server.log"
+    echo "To view logs, run: tail -f server.log"
 else
-    echo "Failed to start HTTP server. Check ../server.log for details."
+    echo "Failed to start HTTP server. Check server.log for details."
     exit 1
 fi
