@@ -11,7 +11,7 @@
 //! - Event publishing (belongs to FoldDB)
 //! - Schema validation (belongs to FoldDB)
 
-use crate::fold_db_core::infrastructure::message_bus::{MessageBus, TransformTriggerRequest, CollectionUpdateRequest};
+use crate::fold_db_core::infrastructure::message_bus::{MessageBus, TransformTriggerRequest, CollectionUpdateRequest, FieldValueSetRequest};
 use crate::schema::types::field::FieldVariant;
 use crate::schema::types::schema::Schema;
 use crate::schema::types::Mutation;
@@ -126,15 +126,31 @@ impl MutationService {
         schema: &Schema,
         field_name: &str,
         _single_field: &crate::schema::types::field::single_field::SingleField,
-        _value: &Value,
+        value: &Value,
         mutation_hash: &str,
     ) -> Result<(), SchemaError> {
         log::info!("🔧 Updating single field: {}.{}", schema.name, field_name);
         
-        // Send TransformTriggerRequest for this field
-        let correlation_id = Uuid::new_v4().to_string();
+        // First, send FieldValueSetRequest to store the actual field value as an Atom
+        let value_correlation_id = Uuid::new_v4().to_string();
+        let field_value_request = FieldValueSetRequest::new(
+            value_correlation_id.clone(),
+            schema.name.clone(),
+            field_name.to_string(),
+            value.clone(),
+            "mutation_service".to_string(),
+        );
+
+        if let Err(e) = self.message_bus.publish(field_value_request) {
+            log::error!("❌ Failed to send field value set request for {}.{}: {:?}", schema.name, field_name, e);
+            return Err(SchemaError::InvalidData(format!("Failed to set field value: {}", e)));
+        }
+        log::info!("✅ Field value set request sent for {}.{}", schema.name, field_name);
+        
+        // Then send TransformTriggerRequest for this field (for any transforms)
+        let transform_correlation_id = Uuid::new_v4().to_string();
         let transform_request = TransformTriggerRequest {
-            correlation_id: correlation_id.clone(),
+            correlation_id: transform_correlation_id.clone(),
             schema_name: schema.name.clone(),
             field_name: field_name.to_string(),
             mutation_hash: mutation_hash.to_owned(),

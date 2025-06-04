@@ -116,7 +116,8 @@ impl DataFoldNode {
                 .db
                 .lock()
                 .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-            db.schema_manager.initialize_schema_system().map_err(|e| {
+            // Initialize schema system via SchemaCore
+            db.schema_manager.discover_and_load_all_schemas().map_err(|e| {
                 FoldDbError::Config(format!("Failed to initialize schema system: {}", e))
             })?;
         }
@@ -506,9 +507,7 @@ impl DataFoldNode {
             .db
             .lock()
             .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
-        let states = db.load_schema_state().map_err(|e| {
-            crate::error::FoldDbError::Config(format!("Failed to load schema states: {}", e))
-        })?;
+        let states = db.schema_manager.load_states();
         Ok(states)
     }
 
@@ -535,13 +534,31 @@ impl DataFoldNode {
 
     /// Approve a schema for queries and mutations
     pub fn approve_schema(&mut self, schema_name: &str) -> crate::error::FoldDbResult<()> {
-        let mut db = self
+        // First approve the schema
+        {
+            let db = self
+                .db
+                .lock()
+                .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+            db.schema_manager.approve_schema(schema_name).map_err(|e| {
+                crate::error::FoldDbError::Config(format!("Failed to approve schema: {}", e))
+            })?;
+        }
+        
+        // Then grant permission for this schema to this node
+        let db = self
             .db
             .lock()
             .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.approve_schema(schema_name).map_err(|e| {
-            crate::error::FoldDbError::Config(format!("Failed to approve schema: {}", e))
-        })
+        
+        let mut current_perms = db.get_schema_permissions(&self.node_id);
+        if !current_perms.contains(&schema_name.to_string()) {
+            current_perms.push(schema_name.to_string());
+            db.set_schema_permissions(&self.node_id, &current_perms)
+                .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to set permissions: {}", e)))?;
+        }
+        
+        Ok(())
     }
 
     /// Unload a schema (set to available state)
@@ -572,6 +589,8 @@ impl DataFoldNode {
             .db
             .lock()
             .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+        
+        // Use schema_manager (which is Arc<SchemaCore>) to get available schemas
         db.schema_manager.list_available_schemas().map_err(|e| {
             crate::error::FoldDbError::Config(format!("Failed to list available schemas: {}", e))
         })
@@ -610,7 +629,7 @@ impl DataFoldNode {
             .db
             .lock()
             .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.list_schemas_by_state(state).map_err(|e| {
+        db.schema_manager.list_schemas_by_state(state).map_err(|e| {
             crate::error::FoldDbError::Config(format!("Failed to list schemas by state: {}", e))
         })
     }
@@ -625,11 +644,11 @@ impl DataFoldNode {
             )));
         }
 
-        let mut db = self
+        let db = self
             .db
             .lock()
             .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.block_schema(schema_name).map_err(|e| {
+        db.schema_manager.block_schema(schema_name).map_err(|e| {
             crate::error::FoldDbError::Config(format!("Failed to block schema: {}", e))
         })
     }
@@ -657,9 +676,7 @@ impl DataFoldNode {
         }
 
         // Get state from schema manager
-        let states = db.load_schema_state().map_err(|e| {
-            crate::error::FoldDbError::Config(format!("Failed to load schema states: {}", e))
-        })?;
+        let states = db.schema_manager.load_states();
 
         Ok(states
             .get(schema_name)

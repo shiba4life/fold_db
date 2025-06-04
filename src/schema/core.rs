@@ -1,5 +1,5 @@
 use super::validator::SchemaValidator;
-use crate::atom::AtomRef;
+use crate::atom::{AtomRef, AtomRefCollection, AtomRefRange};
 use crate::fold_db_core::infrastructure::message_bus::MessageBus;
 use crate::schema::types::{
     Field, FieldVariant, JsonSchemaDefinition, JsonSchemaField, Schema, SchemaError, SingleField,
@@ -168,6 +168,21 @@ impl SchemaCore {
             schema.fields.keys().collect::<Vec<_>>()
         );
 
+        // Check if there's already a persisted schema in the database
+        // If so, use that instead of the JSON version to preserve field assignments
+        if let Ok(Some(persisted_schema)) = self.db_ops.get_schema(&schema.name) {
+            info!(
+                "📂 Found persisted schema for '{}' in database, using persisted version with field assignments",
+                schema.name
+            );
+            schema = persisted_schema;
+        } else {
+            info!(
+                "📋 No persisted schema found for '{}', using JSON version",
+                schema.name
+            );
+        }
+
         // Log ref_atom_uuid values for each field
         for (field_name, field) in &schema.fields {
             let ref_uuid = field
@@ -189,14 +204,22 @@ impl SchemaCore {
             schema.fields.keys().collect::<Vec<_>>()
         );
 
-        // Persist the updated schema
-        self.persist_schema(&schema)?;
-        info!(
-            "After persist_schema, schema '{}' has {} fields: {:?}",
-            schema.name,
-            schema.fields.len(),
-            schema.fields.keys().collect::<Vec<_>>()
-        );
+        // Only persist if we're using the JSON version (don't overwrite good database version)
+        let should_persist = schema.fields.values().all(|field| field.ref_atom_uuid().is_none());
+        if should_persist {
+            self.persist_schema(&schema)?;
+            info!(
+                "After persist_schema, schema '{}' has {} fields: {:?}",
+                schema.name,
+                schema.fields.len(),
+                schema.fields.keys().collect::<Vec<_>>()
+            );
+        } else {
+            info!(
+                "Skipping persist_schema for '{}' - using persisted version with field assignments",
+                schema.name
+            );
+        }
 
         // Check for existing schema state, preserve it if it exists
         let name = schema.name.clone();
@@ -281,8 +304,38 @@ impl SchemaCore {
         // Persist the state change immediately
         self.persist_states()?;
 
-        // Ensure fields have proper ARefs assigned
-        let _ = self.map_fields(schema_name);
+        // Ensure fields have proper ARefs assigned (persistence happens in map_fields)
+        match self.map_fields(schema_name) {
+            Ok(atom_refs) => {
+                info!(
+                    "Schema '{}' field mapping successful: created {} atom references with proper types",
+                    schema_name, atom_refs.len()
+                );
+                
+                // CRITICAL: Persist the schema with field assignments to sled
+                match self.get_schema(schema_name) {
+                    Ok(Some(updated_schema)) => {
+                        if let Err(e) = self.persist_schema(&updated_schema) {
+                            log::warn!("Failed to persist schema '{}' with field assignments: {}", schema_name, e);
+                        } else {
+                            info!("✅ Schema '{}' with field assignments persisted to sled database", schema_name);
+                        }
+                    }
+                    Ok(None) => {
+                        log::warn!("Schema '{}' not found after field mapping", schema_name);
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to retrieve schema '{}' for persistence: {}", schema_name, e);
+                    }
+                }
+            }
+            Err(e) => {
+                info!(
+                    "Schema '{}' field mapping failed: {}. Schema approved but fields may not work correctly.",
+                    schema_name, e
+                );
+            }
+        }
 
         // Publish SchemaLoaded event for approval
         use crate::fold_db_core::infrastructure::message_bus::SchemaLoaded;
@@ -299,6 +352,57 @@ impl SchemaCore {
         }
 
         info!("Schema '{}' approved successfully", schema_name);
+        Ok(())
+    }
+
+    /// Ensures an approved schema is present in the schemas HashMap for field mapping
+    /// This is used during initialization to fix the issue where approved schemas
+    /// loaded from disk remain in 'available' but map_fields() only looks in 'schemas'
+    pub fn ensure_approved_schema_in_schemas(&self, schema_name: &str) -> Result<(), SchemaError> {
+        info!("Ensuring approved schema '{}' is available in schemas HashMap", schema_name);
+
+        // Check if schema is already in schemas HashMap
+        {
+            let schemas = self.schemas.lock().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire schema lock".to_string())
+            })?;
+            if schemas.contains_key(schema_name) {
+                info!("Schema '{}' already in schemas HashMap", schema_name);
+                return Ok(());
+            }
+        }
+
+        // Get the schema from available HashMap and verify it's approved
+        let schema_to_move = {
+            let available = self.available.lock().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire schema lock".to_string())
+            })?;
+            
+            if let Some((schema, state)) = available.get(schema_name) {
+                if *state == SchemaState::Approved {
+                    Some(schema.clone())
+                } else {
+                    return Err(SchemaError::InvalidData(
+                        format!("Schema '{}' is not in Approved state", schema_name)
+                    ));
+                }
+            } else {
+                return Err(SchemaError::NotFound(
+                    format!("Schema '{}' not found in available schemas", schema_name)
+                ));
+            }
+        };
+
+        // Move the schema to schemas HashMap
+        if let Some(schema) = schema_to_move {
+            let mut schemas = self.schemas.lock().map_err(|_| {
+                SchemaError::InvalidData("Failed to acquire schema lock".to_string())
+            })?;
+            
+            schemas.insert(schema_name.to_string(), schema);
+            info!("Successfully moved approved schema '{}' to schemas HashMap for field mapping", schema_name);
+        }
+
         Ok(())
     }
 
@@ -454,18 +558,30 @@ impl SchemaCore {
                 .collect::<std::collections::HashSet<String>>()
         };
 
-        // 1. Discover from available_schemas/ directory
+        // 1. FIRST: Load existing schema states from sled persistence
+        info!("📋 Loading existing schema states from persistence first");
+        let schema_states = self.load_states();
+        for schema_name in schema_states.keys() {
+            loading_sources.insert(schema_name.clone(), SchemaSource::Persistence);
+            info!("Loaded persisted schema state for '{}'", schema_name);
+        }
+
+        // 2. SECOND: Discover from available_schemas/ directory (without overwriting states)
         match self.discover_available_schemas() {
             Ok(schemas) => {
                 for schema in schemas {
                     let schema_name = schema.name.clone();
                     discovered_schemas.push(schema_name.clone());
-                    loading_sources.insert(schema_name.clone(), SchemaSource::AvailableDirectory);
+                    
+                    // Only update loading source if not already loaded from persistence
+                    if !loading_sources.contains_key(&schema_name) {
+                        loading_sources.insert(schema_name.clone(), SchemaSource::AvailableDirectory);
+                    }
 
                     // Only load if not already in memory
                     if !current_schemas.contains(&schema_name) {
                         info!(
-                            "Loading new schema '{}' from available_schemas/",
+                            "Loading new schema '{}' from available_schemas/ (preserving persisted state)",
                             schema_name
                         );
                         if let Err(e) = self.load_schema_internal(schema) {
@@ -484,18 +600,22 @@ impl SchemaCore {
             }
         }
 
-        // 2. Discover from data/schemas/ directory
+        // 3. THIRD: Discover from data/schemas/ directory (without overwriting states)
         match self.discover_schemas_from_files() {
             Ok(schemas) => {
                 for schema in schemas {
                     let schema_name = schema.name.clone();
                     if !discovered_schemas.contains(&schema_name) {
                         discovered_schemas.push(schema_name.clone());
-                        loading_sources.insert(schema_name.clone(), SchemaSource::DataDirectory);
+                        
+                        // Only update loading source if not already loaded from persistence
+                        if !loading_sources.contains_key(&schema_name) {
+                            loading_sources.insert(schema_name.clone(), SchemaSource::DataDirectory);
+                        }
 
                         // Only load if not already in memory
                         if !current_schemas.contains(&schema_name) {
-                            info!("Loading new schema '{}' from data/schemas/", schema_name);
+                            info!("Loading new schema '{}' from data/schemas/ (preserving persisted state)", schema_name);
                             if let Err(e) = self.load_schema_internal(schema) {
                                 failed_schemas.push((schema_name, e.to_string()));
                             }
@@ -510,14 +630,6 @@ impl SchemaCore {
             }
             Err(e) => {
                 info!("Failed to discover schemas from data/schemas/: {}", e);
-            }
-        }
-
-        // 3. Load existing states from persistence
-        let schema_states = self.load_states();
-        for schema_name in schema_states.keys() {
-            if !loading_sources.contains_key(schema_name) {
-                loading_sources.insert(schema_name.clone(), SchemaSource::Persistence);
             }
         }
 
@@ -978,9 +1090,18 @@ impl SchemaCore {
         Ok(())
     }
 
-    /// Legacy method - now sets schema to Available state
+    /// Unload schema from active memory and set to Available state (preserving field assignments)
     pub fn unload_schema(&self, schema_name: &str) -> Result<(), SchemaError> {
-        self.set_available(schema_name)
+        info!("Unloading schema '{}' from active memory and setting to Available", schema_name);
+        let mut schemas = self
+            .schemas
+            .lock()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire schema lock".to_string()))?;
+        schemas.remove(schema_name);
+        drop(schemas);
+        self.set_schema_state(schema_name, SchemaState::Available)?;
+        info!("Schema '{}' unloaded and marked as Available", schema_name);
+        Ok(())
     }
 
     /// Loads all schema files from both the schemas directory and available_schemas directory and restores their states.
@@ -1195,6 +1316,8 @@ impl SchemaCore {
     /// Maps fields between schemas based on their defined relationships.
     /// Returns a list of AtomRefs that need to be persisted in FoldDB.
     pub fn map_fields(&self, schema_name: &str) -> Result<Vec<AtomRef>, SchemaError> {
+        info!("🔧 Starting field mapping for schema '{}'", schema_name);
+        
         let schemas = self
             .schemas
             .lock()
@@ -1247,23 +1370,45 @@ impl SchemaCore {
             if needs_new_aref {
                 let ref_atom_uuid = Uuid::new_v4().to_string();
 
-                // Create a new AtomRef for this field
-                let atom_ref = match field {
+                // Create and store the appropriate atom reference type based on field type
+                let key = format!("ref:{}", ref_atom_uuid);
+                
+                match field {
                     FieldVariant::Collection(_) => {
-                        // For collection fields, we'll create a placeholder AtomRef
-                        // The actual collection will be created when data is added
-                        AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
+                        // For collection fields, create AtomRefCollection
+                        let atom_ref_collection = AtomRefCollection::new(ref_atom_uuid.clone());
+                        if let Err(e) = self.db_ops.store_item(&key, &atom_ref_collection) {
+                            info!("Failed to persist AtomRefCollection '{}': {}", ref_atom_uuid, e);
+                        } else {
+                            info!("✅ Persisted AtomRefCollection: {}", key);
+                        }
+                        // Create a corresponding AtomRef for the return list
+                        atom_refs.push(AtomRef::new(Uuid::new_v4().to_string(), "system".to_string()));
                     }
-                    _ => {
-                        // For single fields, create a normal AtomRef
-                        AtomRef::new(Uuid::new_v4().to_string(), "system".to_string())
+                    FieldVariant::Range(_) => {
+                        // For range fields, create AtomRefRange
+                        let atom_ref_range = AtomRefRange::new(ref_atom_uuid.clone());
+                        if let Err(e) = self.db_ops.store_item(&key, &atom_ref_range) {
+                            info!("Failed to persist AtomRefRange '{}': {}", ref_atom_uuid, e);
+                        } else {
+                            info!("✅ Persisted AtomRefRange: {}", key);
+                        }
+                        // Create a corresponding AtomRef for the return list
+                        atom_refs.push(AtomRef::new(Uuid::new_v4().to_string(), "system".to_string()));
+                    }
+                    FieldVariant::Single(_) => {
+                        // For single fields, create AtomRef
+                        let atom_ref = AtomRef::new(Uuid::new_v4().to_string(), "system".to_string());
+                        if let Err(e) = self.db_ops.store_item(&key, &atom_ref) {
+                            info!("Failed to persist AtomRef '{}': {}", ref_atom_uuid, e);
+                        } else {
+                            info!("✅ Persisted AtomRef: {}", key);
+                        }
+                        atom_refs.push(atom_ref);
                     }
                 };
 
-                // Add the AtomRef to the list to be persisted
-                atom_refs.push(atom_ref);
-
-                // Set the ref_atom_uuid in the field
+                // Set the ref_atom_uuid in the field - this will be used as the key to find the AtomRef
                 field.set_ref_atom_uuid(ref_atom_uuid);
             }
         }

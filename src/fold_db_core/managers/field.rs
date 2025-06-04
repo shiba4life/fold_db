@@ -12,7 +12,7 @@ use crate::fold_db_core::infrastructure::message_bus::{
     AtomRefCreateRequest, AtomRefCreateResponse, AtomRefUpdateResponse,
     FieldValueSet
 };
-use crate::schema::{Schema, SchemaError};
+use crate::schema::{Schema, SchemaError, SchemaCore};
 use log::{info, warn, error};
 use serde_json::Value;
 use std::sync::{Arc, Mutex, mpsc};
@@ -51,16 +51,18 @@ pub enum ResponseResult {
 pub struct FieldManager {
     retrieval_service: FieldRetrievalService,
     message_bus: Arc<MessageBus>,
+    schema_core: Arc<SchemaCore>,
     stats: Arc<Mutex<EventDrivenFieldStats>>,
     event_threads: Arc<Mutex<Vec<JoinHandle<()>>>>,
     pending_requests: Arc<Mutex<HashMap<String, PendingRequest>>>,
 }
 
 impl FieldManager {
-    pub fn new(message_bus: Arc<MessageBus>) -> Self {
+    pub fn new(message_bus: Arc<MessageBus>, schema_core: Arc<SchemaCore>) -> Self {
         let manager = Self {
             retrieval_service: FieldRetrievalService::new(Arc::clone(&message_bus)),
             message_bus: Arc::clone(&message_bus),
+            schema_core: Arc::clone(&schema_core),
             stats: Arc::new(Mutex::new(EventDrivenFieldStats::new())),
             event_threads: Arc::new(Mutex::new(Vec::new())),
             pending_requests: Arc::new(Mutex::new(HashMap::new())),
@@ -347,6 +349,26 @@ impl FieldManager {
 
         // Send final response
         let final_response = if aref_response.success {
+            // 🔧 CRITICAL FIX: Update schema field definition with new AtomRef UUID
+            info!("✅ AtomRef created successfully with UUID: {}", aref_uuid);
+            info!("🔧 FIXING UUID MISMATCH: Updating schema field definition");
+            
+            match self.schema_core.update_field_ref_atom_uuid(
+                &request.schema_name,
+                &request.field_name,
+                aref_uuid.clone()
+            ) {
+                Ok(_) => {
+                    info!("✅ Schema field {}.{} updated with AtomRef UUID: {}",
+                          request.schema_name, request.field_name, aref_uuid);
+                }
+                Err(e) => {
+                    error!("❌ Failed to update schema field {}.{} with AtomRef UUID {}: {}",
+                           request.schema_name, request.field_name, aref_uuid, e);
+                    // Continue with success response since AtomRef was created successfully
+                }
+            }
+            
             // Publish FieldValueSet event
             let field_path = format!("{}.{}", request.schema_name, request.field_name);
             let field_event = FieldValueSet::new(field_path, request.value, "event_driven_field_manager");
@@ -558,6 +580,7 @@ impl Clone for FieldManager {
         Self {
             retrieval_service: FieldRetrievalService::new_default(),
             message_bus: Arc::clone(&self.message_bus),
+            schema_core: Arc::clone(&self.schema_core),
             stats: Arc::clone(&self.stats),
             event_threads: Arc::clone(&self.event_threads),
             pending_requests: Arc::clone(&self.pending_requests),

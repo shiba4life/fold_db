@@ -83,7 +83,7 @@ impl DataFoldNode {
                 .db
                 .lock()
                 .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-            db.can_query_schema(&query.schema_name)
+            db.schema_manager.can_query_schema(&query.schema_name)
         };
 
         if !can_query {
@@ -134,7 +134,7 @@ impl DataFoldNode {
                 .db
                 .lock()
                 .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
-            db.can_mutate_schema(&mutation.schema_name)
+            db.schema_manager.can_mutate_schema(&mutation.schema_name)
         };
 
         if !can_mutate {

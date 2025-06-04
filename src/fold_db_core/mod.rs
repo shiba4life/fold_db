@@ -42,6 +42,7 @@ use crate::permissions::PermissionWrapper;
 use crate::schema::core::SchemaState;
 use crate::schema::SchemaCore;
 use crate::schema::{Schema, SchemaError};
+use crate::schema::types::field::common::Field;
 use log::{info, warn};
 use serde_json::Value;
 use std::sync::mpsc;
@@ -156,13 +157,14 @@ impl FoldDB {
         }
 
         // Create managers using event-driven initialization only
+        let db_ops_arc = Arc::new(db_ops.clone());
         let atom_manager = AtomManager::new(db_ops.clone(), Arc::clone(&message_bus));
-        let field_manager = FieldManager::new(Arc::clone(&message_bus));
-        let collection_manager = CollectionManager::new(field_manager.clone(), Arc::clone(&message_bus));
         let schema_manager = Arc::new(
-            SchemaCore::new(path, Arc::new(db_ops.clone()), Arc::clone(&message_bus))
+            SchemaCore::new(path, Arc::clone(&db_ops_arc), Arc::clone(&message_bus))
                 .map_err(|e| sled::Error::Unsupported(e.to_string()))?,
         );
+        let field_manager = FieldManager::new(Arc::clone(&message_bus), Arc::clone(&schema_manager));
+        let collection_manager = CollectionManager::new(field_manager.clone(), Arc::clone(&message_bus));
         
         // Use standard initialization but with deprecated closures that recommend events
         let closures = build_closure_fns(&atom_manager, &schema_manager);
@@ -171,14 +173,24 @@ impl FoldDB {
             init_orchestrator(&field_manager, transform_manager.clone(), orchestrator_tree, Arc::clone(&message_bus))?;
 
         info!("Loading schema states from disk during FoldDB initialization");
-        if let Err(e) = schema_manager.load_schema_states_from_disk() {
+        if let Err(e) = schema_manager.discover_and_load_all_schemas() {
             info!("Failed to load schema states: {}", e);
         } else {
-            // After loading schema states, we need to ensure AtomRefs are properly mapped and persisted
-            // for all approved schemas
+            // After loading schema states, we need to ensure approved schemas are moved from 'available'
+            // to 'schemas' HashMap so that map_fields() can find them
             if let Ok(approved_schemas) =
                 schema_manager.list_schemas_by_state(SchemaState::Approved)
             {
+                info!("Moving {} approved schemas from 'available' to 'schemas' HashMap for field mapping", approved_schemas.len());
+                
+                // Move approved schemas from available to schemas HashMap
+                for schema_name in &approved_schemas {
+                    if let Err(e) = schema_manager.ensure_approved_schema_in_schemas(schema_name) {
+                        info!("Failed to move approved schema '{}' to schemas HashMap: {}", schema_name, e);
+                    }
+                }
+                
+                // Now proceed with field mapping for all approved schemas
                 for schema_name in approved_schemas {
                     if let Ok(atom_refs) = schema_manager.map_fields(&schema_name) {
                         // Persist each atom ref using event-driven communication
@@ -290,19 +302,15 @@ impl FoldDB {
     }
 
     /// Load schema from JSON string (creates Available schema)
-    pub fn load_schema_from_json(&mut self, _json_str: &str) -> Result<(), SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaLoadRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaLoadRequest via message bus instead of direct schema_manager access".to_string()
-        ))
+    pub fn load_schema_from_json(&mut self, json_str: &str) -> Result<(), SchemaError> {
+        // Delegate to working schema_manager implementation
+        self.schema_manager.load_schema_from_json(json_str)
     }
 
     /// Load schema from file (creates Available schema)
-    pub fn load_schema_from_file<P: AsRef<Path>>(&mut self, _path: P) -> Result<(), SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaLoadRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaLoadRequest via message bus instead of direct schema_manager access".to_string()
-        ))
+    pub fn load_schema_from_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), SchemaError> {
+        // Delegate to working schema_manager implementation
+        self.schema_manager.load_schema_from_file(path.as_ref().to_str().unwrap())
     }
 
     /// Check if a schema can be queried (must be Approved)
@@ -503,12 +511,23 @@ impl FoldDB {
             }
         };
 
-        // Check permissions - simplified for now
-        // if !self.permission_wrapper.can_mutate(&mutation.schema_name) {
-        //     return Err(SchemaError::InvalidData(
-        //         "No mutation permission for schema".to_string(),
-        //     ));
-        // }
+        // Check field-level permissions for each field in the mutation
+        for field_name in mutation.fields_and_values.keys() {
+            let permission_result = self.permission_wrapper.check_mutation_field_permission(
+                &mutation,
+                field_name,
+                &self.schema_manager,
+            );
+            
+            if !permission_result.allowed {
+                return Err(permission_result.error.unwrap_or_else(|| {
+                    SchemaError::InvalidData(format!(
+                        "Permission denied for field '{}' in schema '{}' with trust distance {}",
+                        field_name, mutation.schema_name, mutation.trust_distance
+                    ))
+                }));
+            }
+        }
 
         // Generate mutation hash for tracking
         let mut hasher = <sha2::Sha256 as Digest>::new();
@@ -591,16 +610,88 @@ impl FoldDB {
     }
 
     /// Query multiple fields from a schema
-    pub fn query(&self, _query: Query) -> Result<Value, SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Direct schema_manager access bypasses event system
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaLoadRequest via message bus instead of direct schema_manager access".to_string()
-        ))
+    pub fn query(&self, query: Query) -> Result<Value, SchemaError> {
+        use log::info;
+        
+        info!("🔍 EVENT-DRIVEN query for schema: {}", query.schema_name);
+        
+        // Get schema first
+        let schema = match self.schema_manager.get_schema(&query.schema_name)? {
+            Some(schema) => schema,
+            None => {
+                return Err(SchemaError::NotFound(format!(
+                    "Schema '{}' not found",
+                    query.schema_name
+                )));
+            }
+        };
+        
+        // Check field-level permissions for each field in the query
+        for field_name in &query.fields {
+            let permission_result = self.permission_wrapper.check_query_field_permission(
+                &query,
+                field_name,
+                &self.schema_manager,
+            );
+            
+            if !permission_result.allowed {
+                return Err(permission_result.error.unwrap_or_else(|| {
+                    SchemaError::InvalidData(format!(
+                        "Permission denied for field '{}' in schema '{}' with trust distance {}",
+                        field_name, query.schema_name, query.trust_distance
+                    ))
+                }));
+            }
+        }
+        
+        // Retrieve actual field values by accessing database directly
+        let mut field_values = serde_json::Map::new();
+        
+        for field_name in &query.fields {
+            match self.get_field_value_from_db(&schema, field_name) {
+                Ok(value) => {
+                    field_values.insert(field_name.clone(), value);
+                }
+                Err(e) => {
+                    info!("Failed to retrieve field '{}': {}", field_name, e);
+                    field_values.insert(field_name.clone(), serde_json::Value::Null);
+                }
+            }
+        }
+        
+        // Return actual field values
+        Ok(serde_json::Value::Object(field_values))
+    }
+
+    /// Get field value directly from database by following the chain:
+    /// field -> ref_atom_uuid -> AtomRef -> atom_uuid -> Atom -> content
+    fn get_field_value_from_db(&self, schema: &Schema, field_name: &str) -> Result<Value, SchemaError> {
+        // Get field definition
+        let field = schema.fields.get(field_name)
+            .ok_or_else(|| SchemaError::InvalidField(format!("Field '{}' not found", field_name)))?;
+        
+        // Get ref_atom_uuid from field
+        let ref_atom_uuid = field.ref_atom_uuid()
+            .ok_or_else(|| SchemaError::InvalidField(format!("Field '{}' has no ref_atom_uuid", field_name)))?;
+        
+        // Get AtomRef from database
+        let atom_ref: crate::atom::AtomRef = self.db_ops.get_item(&format!("ref:{}", ref_atom_uuid))?
+            .ok_or_else(|| SchemaError::InvalidField(format!("AtomRef '{}' not found", ref_atom_uuid)))?;
+        
+        // Get atom_uuid from AtomRef
+        let atom_uuid = atom_ref.get_atom_uuid();
+        
+        // Get Atom from database
+        let atom: crate::atom::Atom = self.db_ops.get_item(&format!("atom:{}", atom_uuid))?
+            .ok_or_else(|| SchemaError::InvalidField(format!("Atom '{}' not found", atom_uuid)))?;
+        
+        // Return atom content (the actual field value)
+        Ok(atom.content().clone())
     }
 
     /// Query a schema (compatibility method)
     pub fn query_schema(&self, query: Query) -> Vec<Result<Value, SchemaError>> {
-        // For compatibility, delegate to the main query method and wrap in Vec
+        // Delegate to the main query method and wrap in Vec
         vec![self.query(query)]
     }
 }

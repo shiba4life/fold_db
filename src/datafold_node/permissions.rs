@@ -103,7 +103,7 @@ impl DataFoldNode {
         })?;
 
         // Check schema state - only approved schemas are accessible
-        match db.get_schema_state(schema_name) {
+        match db.schema_manager.get_schema_state(schema_name) {
             Some(crate::schema::core::SchemaState::Approved) => Ok(true),
             Some(crate::schema::core::SchemaState::Available) => {
                 log::warn!(

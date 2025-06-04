@@ -39,8 +39,8 @@ pub fn build_closure_fns(
     );
 
     let message_bus = Arc::new(MessageBus::new());
-    let field_value_manager = FieldManager::new(message_bus);
     let schema_clone = Arc::clone(schema_manager);
+    let field_value_manager = FieldManager::new(message_bus, schema_clone.clone());
     let get_field_fn: GetFieldFn = Arc::new(move |schema_name: &str, field_name: &str| {
         match schema_clone.get_schema(schema_name)? {
             Some(schema) => field_value_manager.get_field_value(&schema, field_name),

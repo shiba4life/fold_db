@@ -5,10 +5,10 @@
 //! complex branching logic in FieldManager.
 
 use crate::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueQueryRequest};
-use crate::schema::types::field::FieldVariant;
+use crate::schema::types::field::{FieldVariant, Field};
 use crate::schema::Schema;
 use crate::schema::SchemaError;
-use log::info;
+use log::{info, error};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -39,6 +39,24 @@ impl FieldRetrievalService {
             "🔍 FieldRetrievalService::get_field_value - schema: {}, field: {} (EVENT-DRIVEN)",
             schema.name, field
         );
+
+        // 🚨 DIAGNOSTIC: Check what ref_atom_uuid is stored in the schema field definition
+        if let Some(field_def) = schema.fields.get(field) {
+            let ref_uuid = match field_def {
+                FieldVariant::Single(field) => field.ref_atom_uuid(),
+                FieldVariant::Range(field) => field.ref_atom_uuid(),
+                FieldVariant::Collection(field) => field.ref_atom_uuid(),
+            };
+            
+            if let Some(uuid) = ref_uuid {
+                error!("🚨 QUERY DIAGNOSIS: Schema field {}.{} has ref_atom_uuid: {}", schema.name, field, uuid);
+                error!("🚨 This is where the query gets the 'wrong' UUID from!");
+            } else {
+                error!("🚨 QUERY DIAGNOSIS: Schema field {}.{} has NO ref_atom_uuid set!", schema.name, field);
+            }
+        } else {
+            error!("🚨 QUERY DIAGNOSIS: Field {} not found in schema {}", field, schema.name);
+        }
 
         // Send FieldValueQueryRequest via message bus instead of direct AtomManager access
         let correlation_id = Uuid::new_v4().to_string();

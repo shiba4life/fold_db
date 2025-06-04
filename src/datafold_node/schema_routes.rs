@@ -125,7 +125,10 @@ pub async fn list_available_schemas(state: web::Data<AppState>) -> impl Responde
     let node_guard = state.node.lock().await;
 
     match node_guard.list_available_schemas() {
-        Ok(schemas) => HttpResponse::Ok().json(json!({"data": schemas})),
+        Ok(schemas) => {
+            info!("Successfully retrieved {} available schemas", schemas.len());
+            HttpResponse::Ok().json(json!({"data": schemas}))
+        },
         Err(e) => {
             error!("Failed to list available schemas: {}", e);
             HttpResponse::InternalServerError()
