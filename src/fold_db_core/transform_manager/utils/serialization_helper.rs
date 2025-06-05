@@ -7,7 +7,6 @@ use crate::schema::types::SchemaError;
 use crate::fold_db_core::transform_manager::utils::lock_helper::LockHelper;
 use log::{info, error};
 use std::sync::RwLock;
-use std::collections::HashMap;
 
 /// Utility for serializing mappings with consistent error handling and logging
 pub struct SerializationHelper;
@@ -142,7 +141,7 @@ impl SerializationHelper {
         
         // Special debug logging for field_to_transforms
         if mapping_name == "field_to_transforms" {
-            let map = LockHelper::read_lock(mapping, mapping_name)?;
+            let _map = LockHelper::read_lock(mapping, mapping_name)?;
             info!("🔍 DEBUG: Storing field_to_transforms mapping to database");
         }
         

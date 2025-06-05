@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use crate::atom::{Atom, AtomRef, AtomRefBehavior, AtomRefCollection, AtomRefRange};
     use crate::db_operations::DbOperations;

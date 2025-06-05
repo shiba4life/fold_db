@@ -3,6 +3,7 @@
 //! This module contains comprehensive tests for all message bus components
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use super::super::events::*;
     use super::super::async_bus::AsyncMessageBus;

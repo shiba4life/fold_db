@@ -417,8 +417,10 @@ That should work."#;
     }
 
     fn create_test_service() -> OpenRouterService {
-        let mut config = IngestionConfig::default();
-        config.openrouter_api_key = "test-key".to_string();
+        let config = IngestionConfig {
+            openrouter_api_key: "test-key".to_string(),
+            ..Default::default()
+        };
         OpenRouterService::new(config).unwrap()
     }
 }

@@ -244,7 +244,7 @@ mod tests {
     fn test_string_to_json_value_with_inference() {
         assert_eq!(ConversionHelper::string_to_json_value("true", true), JsonValue::Bool(true));
         assert_eq!(ConversionHelper::string_to_json_value("42", true), JsonValue::Number(serde_json::Number::from(42)));
-        assert_eq!(ConversionHelper::string_to_json_value("3.14", true), JsonValue::Number(serde_json::Number::from_f64(3.14).unwrap()));
+        assert_eq!(ConversionHelper::string_to_json_value("3.15", true), JsonValue::Number(serde_json::Number::from_f64(3.15).unwrap()));
         assert_eq!(ConversionHelper::string_to_json_value("hello", true), JsonValue::String("hello".to_string()));
     }
 

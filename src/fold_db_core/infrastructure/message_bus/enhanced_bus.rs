@@ -226,10 +226,10 @@ mod tests {
         let event = FieldValueSet::new("test.field", json!("value"), "source");
         
         // This would need proper event conversion to work fully
-        let result = bus.publish_with_retry(event, 3, "test_source".to_string()).await;
+        let _result = bus.publish_with_retry(event, 3, "test_source".to_string()).await;
         
         // Should have recorded in history regardless of publish result
-        assert!(bus.get_event_history().await.len() > 0);
+        assert!(!bus.get_event_history().await.is_empty());
     }
 
     #[tokio::test]

@@ -187,13 +187,13 @@ impl TransformManager {
         db_ops.store_item(&format!("ref:{}", ref_uuid), &atom_ref)?;
         
         info!("✅ Created/updated AtomRef {} -> atom {}", ref_uuid, atom_uuid);
-        LoggingHelper::log_atom_ref_operation(&ref_uuid, &atom_uuid, "creation");
+        LoggingHelper::log_atom_ref_operation(&ref_uuid, atom_uuid, "creation");
         
         // Debug: Verify the atom was stored correctly
         match db_ops.get_item::<crate::atom::Atom>(&format!("atom:{}", atom_uuid)) {
             Ok(Some(stored_atom)) => {
                 let content_str = stored_atom.content().to_string();
-                LoggingHelper::log_verification_result("atom", &atom_uuid, Some(&content_str));
+                LoggingHelper::log_verification_result("atom", atom_uuid, Some(&content_str));
             }
             Ok(None) => {
                 error!("❌ DEBUG: Atom {} was not found after storage!", atom_uuid);
@@ -208,7 +208,7 @@ impl TransformManager {
             Ok(Some(stored_ref)) => {
                 let target_atom_uuid = stored_ref.get_atom_uuid();
                 LoggingHelper::log_verification_result("AtomRef", &ref_uuid, Some(&format!("points to atom: {}", target_atom_uuid)));
-                LoggingHelper::log_atom_ref_operation(&ref_uuid, &target_atom_uuid, "verification");
+                LoggingHelper::log_atom_ref_operation(&ref_uuid, target_atom_uuid, "verification");
                 
                 // Verify this is NOT pointing to itself (the bug we just fixed)
                 if ref_uuid == *target_atom_uuid {

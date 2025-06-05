@@ -17,21 +17,11 @@ pub struct QueueItem {
 }
 
 /// Internal queue state with deduplication tracking
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct QueueState {
     pub queue: VecDeque<QueueItem>,
     pub queued: HashSet<String>,
     pub processed: HashSet<String>,
-}
-
-impl Default for QueueState {
-    fn default() -> Self {
-        Self {
-            queue: VecDeque::new(),
-            queued: HashSet::new(),
-            processed: HashSet::new(),
-        }
-    }
 }
 
 /// Thread-safe queue manager for transform orchestration

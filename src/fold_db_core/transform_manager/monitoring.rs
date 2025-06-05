@@ -9,7 +9,7 @@ impl TransformManager {
     /// Set up monitoring of SchemaChanged events to reload transforms
     pub(super) fn setup_schema_changed_monitoring(
         message_bus: Arc<MessageBus>,
-        db_ops: Arc<DbOperations>,
+        _db_ops: Arc<DbOperations>,
     ) -> thread::JoinHandle<()> {
         let mut consumer = message_bus.subscribe::<crate::fold_db_core::infrastructure::message_bus::SchemaChanged>();
         

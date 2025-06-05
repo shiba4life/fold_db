@@ -239,8 +239,10 @@ mod tests {
 
     #[test]
     fn test_validation_succeeds_with_api_key() {
-        let mut config = IngestionConfig::default();
-        config.openrouter_api_key = "test-key".to_string();
+        let config = IngestionConfig {
+            openrouter_api_key: "test-key".to_string(),
+            ..Default::default()
+        };
         assert!(config.validate().is_ok());
     }
 

@@ -75,19 +75,21 @@ impl TestFixture {
         })?;
 
         let node_clone = node.clone();
-        let fold_db = node_clone.get_fold_db().map_err(|e|
-            SchemaError::InvalidData(format!("Failed to get FoldDB from node: {}", e))
-        )?;
+        {
+            let fold_db = node_clone.get_fold_db().map_err(|e|
+                SchemaError::InvalidData(format!("Failed to get FoldDB from node: {}", e))
+            )?;
 
-        // Set up schemas for transform testing
-        fold_db.schema_manager().approve_schema("TransformBase")
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to approve TransformBase schema: {}", e)))?;
-        fold_db.schema_manager().approve_schema("TransformSchema")
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to approve TransformSchema schema: {}", e)))?;
+            // Set up schemas for transform testing
+            fold_db.schema_manager().approve_schema("TransformBase")
+                .map_err(|e| SchemaError::InvalidData(format!("Failed to approve TransformBase schema: {}", e)))?;
+            fold_db.schema_manager().approve_schema("TransformSchema")
+                .map_err(|e| SchemaError::InvalidData(format!("Failed to approve TransformSchema schema: {}", e)))?;
 
-        // Reload transforms to pick up new schemas
-        fold_db.transform_manager().reload_transforms()
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to reload transforms: {}", e)))?;
+            // Reload transforms to pick up new schemas
+            fold_db.transform_manager().reload_transforms()
+                .map_err(|e| SchemaError::InvalidData(format!("Failed to reload transforms: {}", e)))?;
+        } // Drop the lock here
 
         // Wait for async initialization
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;

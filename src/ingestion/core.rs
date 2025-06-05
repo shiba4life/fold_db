@@ -411,9 +411,11 @@ mod tests {
 
     #[allow(dead_code)]
     fn create_test_ingestion_core() -> IngestionResult<IngestionCore> {
-        let mut config = IngestionConfig::default();
-        config.openrouter_api_key = "test-key".to_string();
-        config.enabled = true;
+        let config = IngestionConfig {
+            openrouter_api_key: "test-key".to_string(),
+            enabled: true,
+            ..Default::default()
+        };
 
         // Create temporary directory for each test to avoid conflicts
         let temp_dir =
@@ -433,9 +435,11 @@ mod tests {
     #[test]
     fn test_validate_input() {
         // Create isolated test setup for this test
-        let mut config = IngestionConfig::default();
-        config.openrouter_api_key = "test-key".to_string();
-        config.enabled = true;
+        let config = IngestionConfig {
+            openrouter_api_key: "test-key".to_string(),
+            enabled: true,
+            ..Default::default()
+        };
 
         let temp_dir = TempDir::new().unwrap();
         let test_path = temp_dir
@@ -484,9 +488,11 @@ mod tests {
     #[test]
     fn test_create_basic_schema_from_definition() {
         // Create isolated test setup for this test
-        let mut config = IngestionConfig::default();
-        config.openrouter_api_key = "test-key".to_string();
-        config.enabled = true;
+        let config = IngestionConfig {
+            openrouter_api_key: "test-key".to_string(),
+            enabled: true,
+            ..Default::default()
+        };
 
         let temp_dir = TempDir::new().unwrap();
         let test_path = temp_dir

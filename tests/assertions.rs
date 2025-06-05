@@ -275,9 +275,9 @@ impl TestSteps {
 macro_rules! assert_success {
     ($result:expr, $message:expr) => {
         match $result {
-            Ok(_) => crate::assertions::TestReporter::success($message),
+            Ok(_) => $crate::assertions::TestReporter::success($message),
             Err(e) => {
-                crate::assertions::TestReporter::error(format!("{}: {}", $message, e));
+                $crate::assertions::TestReporter::error(format!("{}: {}", $message, e));
                 panic!("Assertion failed: {}: {:?}", $message, e);
             }
         }
@@ -287,24 +287,24 @@ macro_rules! assert_success {
 #[macro_export]
 macro_rules! assert_event {
     ($event_result:expr, $event_type:expr) => {
-        crate::assertions::TestAssertions::assert_event_received(&$event_result, $event_type);
+        $crate::assertions::TestAssertions::assert_event_received(&$event_result, $event_type);
     };
 }
 
 #[macro_export]
 macro_rules! test_section {
     ($section_name:expr, $code:block) => {
-        crate::assertions::TestSteps::begin_section($section_name);
+        $crate::assertions::TestSteps::begin_section($section_name);
         $code
-        crate::assertions::TestSteps::complete_section($section_name);
+        $crate::assertions::TestSteps::complete_section($section_name);
     };
 }
 
 #[macro_export]
 macro_rules! test_case {
     ($test_name:expr, $code:block) => {
-        crate::assertions::TestSteps::begin_test($test_name);
+        $crate::assertions::TestSteps::begin_test($test_name);
         $code
-        crate::assertions::TestSteps::complete_test($test_name);
+        $crate::assertions::TestSteps::complete_test($test_name);
     };
 }

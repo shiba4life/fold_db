@@ -50,7 +50,7 @@ pub struct TransformManager {
     /// Maps transform IDs to their output atom reference UUIDs
     pub(super) transform_outputs: RwLock<HashMap<String, String>>,
     /// Message bus for event-driven communication
-    pub(super) message_bus: Arc<MessageBus>,
+    pub(super) _message_bus: Arc<MessageBus>,
     /// Thread handle for monitoring SchemaChanged events to reload transforms
     pub(super) _schema_changed_consumer_thread: Option<thread::JoinHandle<()>>,
 }
@@ -135,7 +135,7 @@ impl TransformManager {
             field_to_transforms: RwLock::new(field_to_transforms),
             transform_to_fields: RwLock::new(transform_to_fields),
             transform_outputs: RwLock::new(transform_outputs),
-            message_bus,
+            _message_bus: message_bus,
             _schema_changed_consumer_thread: Some(schema_changed_consumer_thread),
         })
     }

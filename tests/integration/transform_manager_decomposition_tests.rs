@@ -8,9 +8,6 @@ use crate::common::CommonTestFixture;
 use fold_node::fold_db_core::infrastructure::message_bus::{
     SchemaChanged, TransformTriggered, TransformExecuted,
 };
-use fold_node::fold_db_core::transform_manager::TransformRunner;
-use fold_node::schema::types::{Transform, TransformRegistration};
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
 

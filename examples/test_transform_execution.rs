@@ -1,16 +1,9 @@
-use fold_node::fold_db_core::infrastructure::message_bus::MessageBus;
 use fold_node::fold_db_core::transform_manager::TransformManager;
-use fold_node::db_operations::DbOperations;
 use fold_node::schema::types::{Schema, Transform};
-use fold_node::schema::types::field::single_field::SingleField;
 use fold_node::schema::types::field::variant::FieldVariant;
-use fold_node::schema::types::field::common::{Field, FieldCommon};
+use fold_node::schema::types::field::common::Field;
 use fold_node::atom::{Atom, AtomRef};
-use fold_node::permissions::types::policy::PermissionsPolicy;
-use fold_node::fees::types::config::FieldPaymentConfig;
-use serde_json::{json, Value as JsonValue};
-use std::collections::HashMap;
-use std::sync::Arc;
+use serde_json::json;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
@@ -60,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fold_node::schema::TransformSetupHelper::create_transform_test_schema(
         "TransformSchema",
         vec![("result", serde_json::json!(null))],
-        &db_ops,
+        db_ops,
     )?;
     
     // Create and store a transform
@@ -78,8 +71,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let (count, success, error) = TransformManager::execute_transform_with_db(
         "test_transform",
-        &message_bus,
-        Some(&db_ops),
+        message_bus,
+        Some(db_ops),
     );
     
     println!("📊 Result: count={}, success={}, error={:?}", count, success, error);

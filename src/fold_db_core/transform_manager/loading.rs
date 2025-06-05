@@ -35,11 +35,11 @@ impl TransformManager {
                     registered_transforms.insert(transform_id.clone(), transform.clone());
                     
                     // Register field mappings for the new transform
-                    LoggingHelper::log_transform_registration(&transform_id, &transform.get_inputs(), &transform.get_output());
+                    LoggingHelper::log_transform_registration(&transform_id, transform.get_inputs(), transform.get_output());
                     for input in transform.get_inputs() {
                         field_to_transforms.entry(input.clone()).or_insert_with(HashSet::new).insert(transform_id.clone());
                         transform_to_fields.entry(transform_id.clone()).or_insert_with(HashSet::new).insert(input.to_string());
-                        LoggingHelper::log_field_mapping_creation(&input, &transform_id);
+                        LoggingHelper::log_field_mapping_creation(input, &transform_id);
                     }
                 }
                 Ok(None) => {

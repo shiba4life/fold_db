@@ -17,7 +17,7 @@ use super::queue_manager::QueueItem;
 pub struct ExecutionCoordinator {
     manager: Arc<dyn TransformRunner>,
     message_bus: Arc<MessageBus>,
-    db_ops: Arc<crate::db_operations::DbOperations>,
+    _db_ops: Arc<crate::db_operations::DbOperations>,
 }
 
 impl ExecutionCoordinator {
@@ -30,7 +30,7 @@ impl ExecutionCoordinator {
         Self {
             manager,
             message_bus,
-            db_ops,
+            _db_ops: db_ops,
         }
     }
 

@@ -40,7 +40,7 @@ impl FieldValueResolver {
         info!("🔗 AtomRef points to atom: {}", atom_uuid);
         
         // Load Atom from database
-        let atom = Self::load_atom(db_ops, &atom_uuid)?;
+        let atom = Self::load_atom(db_ops, atom_uuid)?;
         
         info!("✅ Atom loaded successfully");
         let content = atom.content().clone();
