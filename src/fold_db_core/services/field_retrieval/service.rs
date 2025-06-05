@@ -5,10 +5,12 @@
 //! complex branching logic in FieldManager.
 
 use crate::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueQueryRequest};
-use crate::schema::types::field::{FieldVariant, Field};
+use crate::fold_db_core::transform_manager::utils::FieldValueResolver;
+use crate::schema::types::field::FieldVariant;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
-use log::{info, error};
+use crate::db_operations::DbOperations;
+use log::info;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -16,67 +18,69 @@ use uuid::Uuid;
 
 pub struct FieldRetrievalService {
     message_bus: Arc<MessageBus>,
+    db_ops: Option<Arc<DbOperations>>,
 }
 
 impl FieldRetrievalService {
     pub fn new(message_bus: Arc<MessageBus>) -> Self {
-        Self { message_bus }
+        Self {
+            message_bus,
+            db_ops: None,
+        }
+    }
+
+    pub fn new_with_db_ops(message_bus: Arc<MessageBus>, db_ops: Arc<DbOperations>) -> Self {
+        Self {
+            message_bus,
+            db_ops: Some(db_ops),
+        }
     }
 
     pub fn new_default() -> Self {
         Self {
-            message_bus: Arc::new(MessageBus::new())
+            message_bus: Arc::new(MessageBus::new()),
+            db_ops: None,
         }
     }
 
-    /// Retrieves a field value without filtering using event-driven communication
+    /// Retrieves a field value without filtering using unified FieldValueResolver
     pub fn get_field_value(
         &self,
         schema: &Schema,
         field: &str,
     ) -> Result<Value, SchemaError> {
         info!(
-            "🔍 FieldRetrievalService::get_field_value - schema: {}, field: {} (EVENT-DRIVEN)",
+            "🔍 FieldRetrievalService::get_field_value - schema: {}, field: {} (UNIFIED)",
             schema.name, field
         );
 
-        // 🚨 DIAGNOSTIC: Check what ref_atom_uuid is stored in the schema field definition
-        if let Some(field_def) = schema.fields.get(field) {
-            let ref_uuid = match field_def {
-                FieldVariant::Single(field) => field.ref_atom_uuid(),
-                FieldVariant::Range(field) => field.ref_atom_uuid(),
-                FieldVariant::Collection(field) => field.ref_atom_uuid(),
-            };
-            
-            if let Some(uuid) = ref_uuid {
-                error!("🚨 QUERY DIAGNOSIS: Schema field {}.{} has ref_atom_uuid: {}", schema.name, field, uuid);
-                error!("🚨 This is where the query gets the 'wrong' UUID from!");
-            } else {
-                error!("🚨 QUERY DIAGNOSIS: Schema field {}.{} has NO ref_atom_uuid set!", schema.name, field);
+        // Use the unified FieldValueResolver instead of event-driven placeholder
+        // This ensures consistent field resolution across the application
+        match &self.db_ops {
+            Some(db_ops) => {
+                FieldValueResolver::resolve_field_value_as_value(db_ops, schema, field)
             }
-        } else {
-            error!("🚨 QUERY DIAGNOSIS: Field {} not found in schema {}", field, schema.name);
-        }
+            None => {
+                // Fallback to event-driven approach if no db_ops available
+                let correlation_id = Uuid::new_v4().to_string();
+                let query_request = FieldValueQueryRequest {
+                    correlation_id: correlation_id.clone(),
+                    schema_name: schema.name.clone(),
+                    field_name: field.to_string(),
+                    filter: None,
+                };
 
-        // Send FieldValueQueryRequest via message bus instead of direct AtomManager access
-        let correlation_id = Uuid::new_v4().to_string();
-        let query_request = FieldValueQueryRequest {
-            correlation_id: correlation_id.clone(),
-            schema_name: schema.name.clone(),
-            field_name: field.to_string(),
-            filter: None, // No filtering for basic get_field_value
-        };
-
-        match self.message_bus.publish(query_request) {
-            Ok(_) => {
-                info!("✅ FieldValueQueryRequest sent successfully for {}.{}", schema.name, field);
-                // For now, return a placeholder - in a real event-driven system, this would wait for response
-                Ok(Value::String(format!("EVENT_DRIVEN_PLACEHOLDER_{}_{}", schema.name, field)))
-            }
-            Err(e) => {
-                let error_msg = format!("Failed to send FieldValueQueryRequest for {}.{}: {:?}", schema.name, field, e);
-                info!("❌ {}", error_msg);
-                Err(SchemaError::InvalidField(error_msg))
+                match self.message_bus.publish(query_request) {
+                    Ok(_) => {
+                        info!("✅ FieldValueQueryRequest sent successfully for {}.{}", schema.name, field);
+                        Ok(Value::String(format!("EVENT_DRIVEN_PLACEHOLDER_{}_{}", schema.name, field)))
+                    }
+                    Err(e) => {
+                        let error_msg = format!("Failed to send FieldValueQueryRequest for {}.{}: {:?}", schema.name, field, e);
+                        info!("❌ {}", error_msg);
+                        Err(SchemaError::InvalidField(error_msg))
+                    }
+                }
             }
         }
     }

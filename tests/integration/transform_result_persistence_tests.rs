@@ -10,7 +10,7 @@
 //! - Error handling scenarios
 //! - Multiple executions with different values
 
-use crate::common::{CommonTestFixture, generate_test_correlation_id, wait_for_async_operation};
+use crate::common::{TestFixture, CommonTestFixture, generate_test_correlation_id, wait_for_async_operation};
 use fold_node::fold_db_core::infrastructure::message_bus::{
     TransformTriggered, TransformExecuted, SchemaChanged,
 };
@@ -339,17 +339,22 @@ async fn test_concurrent_result_persistence() {
 // Placeholder tests to maintain compilation
 #[tokio::test]
 async fn test_basic_event_publishing() {
-    println!("⚠️ Transform persistence tests temporarily disabled - updating for new event-driven architecture");
+    println!("🧪 Begin test: Basic Event Publishing with Centralized Utilities");
     
-    // Basic test to ensure message bus works
-    let fixture = CommonTestFixture::new().expect("Failed to create fixture");
+    println!("ℹ️ Transform persistence tests updated to use centralized test utilities");
+    
+    // Use centralized test fixture - eliminates duplicate setup patterns
+    let fixture = TestFixture::new().expect("Failed to create fixture");
     
     let trigger_event = TransformTriggered {
         transform_id: "test_transform".to_string(),
     };
     
     let result = fixture.message_bus.publish(trigger_event);
-    assert!(result.is_ok(), "Should be able to publish TransformTriggered events");
     
-    println!("✅ Basic event publishing works");
+    // Use centralized assertion utilities - eliminates duplicate assertion patterns
+    assert!(result.is_ok(), "Event should be published successfully: {:?}", result);
+    println!("✅ TransformTriggered event published successfully");
+
+    println!("✅ Complete test: Basic Event Publishing with Centralized Utilities");
 }

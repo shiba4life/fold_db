@@ -633,20 +633,32 @@ classDiagram
     note for TransformManager "Source: fold_node/src/fold_db_core/transform_manager/"
 ```
 
-### Transform Execution Flow
+### Direct Event-Driven Transform Architecture
+
+DataFold now uses a **direct event-driven architecture** for transform execution. When field values are set, the system automatically triggers transform orchestration without complex correlation patterns.
+
+**Key Architectural Changes:**
+- **Direct Event Flow**: FieldValueSet events trigger TransformOrchestrator directly
+- **No Correlation Complexity**: Removed indirect correlation_id-based patterns
+- **Simplified Execution Path**: Single clear path from event to execution
+- **Automatic Orchestration**: TransformOrchestrator handles all coordination
+
+#### Event-Driven Transform Flow
 
 ```mermaid
 sequenceDiagram
-    participant Mutation
-    participant FoldDB
+    participant FieldManager
+    participant MessageBus
     participant TransformOrchestrator
     participant TransformManager
     participant TransformExecutor
     participant AtomManager
     
-    Mutation->>FoldDB: Field data written
-    FoldDB->>TransformOrchestrator: trigger_transforms(schema, field)
+    Note over FieldManager: Field value changed
+    FieldManager->>MessageBus: publish(FieldValueSet{schema, field})
+    MessageBus->>TransformOrchestrator: handle(FieldValueSet)
     
+    Note over TransformOrchestrator: Direct event processing
     TransformOrchestrator->>TransformManager: get_transforms_for_field()
     TransformManager-->>TransformOrchestrator: transform_list
     
@@ -667,8 +679,24 @@ sequenceDiagram
         TransformExecutor->>AtomManager: update_atom_ref(output_aref, new_atom)
     end
     
-    TransformOrchestrator-->>FoldDB: transforms_complete
+    TransformOrchestrator-->>MessageBus: publish(TransformExecuted)
 ```
+
+#### Component Responsibilities
+
+**TransformOrchestrator** (Orchestration)
+- Listens for FieldValueSet events
+- Determines which transforms need execution
+- Coordinates transform execution flow
+- Publishes transform completion events
+
+**TransformManager** (Execution)
+- Executes individual transforms
+- Manages transform registration and loading
+- Provides transform lookup capabilities
+- Handles transform execution logic
+
+This architecture eliminates the complexity of correlation_id patterns and provides a clean, direct flow from field changes to transform execution.
 
 ---
 

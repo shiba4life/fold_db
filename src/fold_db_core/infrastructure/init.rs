@@ -26,8 +26,9 @@ pub fn init_orchestrator(
     transform_manager: Arc<TransformManager>,
     tree: Tree,
     message_bus: Arc<MessageBus>,
+    db_ops: Arc<DbOperations>,
 ) -> Result<Arc<TransformOrchestrator>, sled::Error> {
     // In event-driven mode, transform manager and orchestrator integration happens through events
-    let orchestrator = Arc::new(TransformOrchestrator::new(transform_manager, tree, message_bus));
+    let orchestrator = Arc::new(TransformOrchestrator::new(transform_manager, tree, message_bus, db_ops));
     Ok(orchestrator)
 }

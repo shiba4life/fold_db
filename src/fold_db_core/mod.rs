@@ -170,7 +170,7 @@ impl FoldDB {
         // Use standard initialization but with deprecated closures that recommend events
         let transform_manager = init_transform_manager(Arc::new(db_ops.clone()), Arc::clone(&message_bus))?;
         let orchestrator =
-            init_orchestrator(&field_manager, transform_manager.clone(), orchestrator_tree, Arc::clone(&message_bus))?;
+            init_orchestrator(&field_manager, transform_manager.clone(), orchestrator_tree, Arc::clone(&message_bus), Arc::new(db_ops.clone()))?;
 
         info!("Loading schema states from disk during FoldDB initialization");
         if let Err(e) = schema_manager.discover_and_load_all_schemas() {

@@ -19,7 +19,7 @@ async fn test_manager_module_initialization() {
     let fixture = CommonTestFixture::new()
         .expect("Failed to create test fixture");
 
-    let transform_manager = &fixture.transform_manager;
+    let transform_manager = &fixture.common.transform_manager;
 
     // Test that the manager initializes correctly with decomposed modules
     assert!(transform_manager.list_transforms().is_ok());
@@ -32,7 +32,7 @@ async fn test_manager_module_state_consistency() {
     let fixture = CommonTestFixture::new()
         .expect("Failed to create test fixture");
 
-    let transform_manager = &fixture.transform_manager;
+    let transform_manager = &fixture.common.transform_manager;
 
     // Test that the state remains consistent across module boundaries
     let initial_transforms = transform_manager.list_transforms().unwrap();
@@ -63,7 +63,7 @@ async fn test_event_handlers_module_exists() {
         transform_id: "test_transform".to_string(),
     };
 
-    let publish_result = fixture.message_bus.publish(trigger_event);
+    let publish_result = fixture.common.message_bus.publish(trigger_event);
     assert!(publish_result.is_ok());
 
     println!("✅ Event handlers module integrated correctly");
@@ -140,7 +140,7 @@ async fn test_basic_schema_change_event() {
         schema: "test_schema".to_string(),
     };
 
-    let publish_result = fixture.message_bus.publish(schema_change);
+    let publish_result = fixture.common.message_bus.publish(schema_change);
     assert!(publish_result.is_ok());
 
     println!("✅ Basic schema change events work correctly");
@@ -157,7 +157,7 @@ async fn test_basic_transform_execution_event() {
         result: "success".to_string(),
     };
 
-    let publish_result = fixture.message_bus.publish(executed_event);
+    let publish_result = fixture.common.message_bus.publish(executed_event);
     assert!(publish_result.is_ok());
 
     println!("✅ Basic transform execution events work correctly");

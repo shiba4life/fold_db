@@ -3,7 +3,7 @@
 ## Test UI
 ./run_http_server
 
-DataFold is a Rust-based distributed data platform providing a core library, a node server, and a command‑line interface to load schemas, run queries, and execute mutations across connected nodes.
+DataFold is a Rust-based distributed data platform providing a core library, a node server, and a command‑line interface to load schemas, run queries, and execute mutations across connected nodes. The platform features a direct event-driven architecture for transform execution, where field value changes automatically trigger transform orchestration without complex correlation patterns.
 
 For AI, read .cursor_rules
 
@@ -107,8 +107,9 @@ Sample JSON files live under
 directory to make them available in the Samples tab.
 
 The `TransformSchema` example relies on values from the accompanying
-`TransformBase` schema. Populate `value1` and `value2` on `TransformBase`
-before running the `TransformSchema.result` transform.
+`TransformBase` schema. Populate `value1` and `value2` on `TransformBase`,
+and the event-driven architecture will automatically trigger transform
+execution when field values are set, computing the result directly.
 
 ### Network Features
 

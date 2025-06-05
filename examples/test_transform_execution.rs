@@ -17,12 +17,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     println!("🚀 Testing Transform Execution Implementation");
     
-    // Create temporary database
-    let temp_dir = tempfile::tempdir()?;
-    let db_path = temp_dir.path().join("test_db");
-    let sled_db = sled::open(db_path)?;
-    let db_ops = Arc::new(DbOperations::new(sled_db)?);
-    let message_bus = Arc::new(MessageBus::new());
+    // Use centralized database initialization - eliminates duplicate setup pattern
+    let test_env = fold_node::schema::DatabaseInitHelper::create_test_environment()?;
+    let db_ops = &test_env.db_ops;
+    let message_bus = &test_env.message_bus;
     
     // Create TransformBase schema with test values
     let mut transform_base_schema = Schema::new("TransformBase".to_string());
@@ -36,11 +34,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let value1_ref = AtomRef::new(value1_ref_uuid.clone(), value1_atom_uuid.clone());
     db_ops.store_item(&format!("ref:{}", value1_ref_uuid), &value1_ref)?;
     
-    let mut value1_field = SingleField { inner: FieldCommon::new(
-        PermissionsPolicy::default(),
-        FieldPaymentConfig::default(),
-        HashMap::new(),
-    )};
+    // Use centralized field factory - eliminates 18+ field creation duplicate patterns
+    let mut value1_field = fold_node::schema::FieldFactory::create_single_field();
     value1_field.set_ref_atom_uuid(value1_ref_uuid.clone());
     transform_base_schema.fields.insert("value1".to_string(), FieldVariant::Single(value1_field));
     
@@ -53,26 +48,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let value2_ref = AtomRef::new(value2_ref_uuid.clone(), value2_atom_uuid.clone());
     db_ops.store_item(&format!("ref:{}", value2_ref_uuid), &value2_ref)?;
     
-    let mut value2_field = SingleField { inner: FieldCommon::new(
-        PermissionsPolicy::default(),
-        FieldPaymentConfig::default(),
-        HashMap::new(),
-    )};
+    // Use centralized field factory - eliminates duplicate field creation patterns
+    let mut value2_field = fold_node::schema::FieldFactory::create_single_field();
     value2_field.set_ref_atom_uuid(value2_ref_uuid.clone());
     transform_base_schema.fields.insert("value2".to_string(), FieldVariant::Single(value2_field));
     
     // Store TransformBase schema
     db_ops.store_schema("TransformBase", &transform_base_schema)?;
     
-    // Create TransformSchema with result field
-    let mut transform_schema = Schema::new("TransformSchema".to_string());
-    let result_field = SingleField { inner: FieldCommon::new(
-        PermissionsPolicy::default(),
-        FieldPaymentConfig::default(),
-        HashMap::new(),
-    )};
-    transform_schema.fields.insert("result".to_string(), FieldVariant::Single(result_field));
-    db_ops.store_schema("TransformSchema", &transform_schema)?;
+    // Use centralized schema setup - eliminates duplicate schema creation patterns
+    fold_node::schema::TransformSetupHelper::create_transform_test_schema(
+        "TransformSchema",
+        vec![("result", serde_json::json!(null))],
+        &db_ops,
+    )?;
     
     // Create and store a transform
     let mut transform = Transform::new(
@@ -84,68 +73,60 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     println!("✅ Set up test data: value1=15, value2=25, expected result=40");
     
-    // Test the transform execution with different correlation ID patterns
-    let test_patterns = vec![
-        "trigger_cb764c7b-e24f-4a57-a4be-fdd9efb02508_TransformBase.value1",
-        "transform_triggered_TransformSchema.result",
-        "api_request_TransformSchema.result",
-    ];
+    // Test direct transform execution using new event-driven architecture
+    println!("\n🔧 Testing direct transform execution");
     
-    for (i, correlation_id) in test_patterns.iter().enumerate() {
-        println!("\n🔧 Testing correlation_id: '{}'", correlation_id);
-        
-        let (count, success, error) = TransformManager::execute_transform_with_db(
-            correlation_id,
-            &message_bus,
-            Some(&db_ops),
-        );
-        
-        println!("📊 Result: count={}, success={}, error={:?}", count, success, error);
-        
-        if success {
-            // Check if TransformSchema.result was updated
-            if let Ok(Some(updated_schema)) = db_ops.get_schema("TransformSchema") {
-                if let Some(result_field) = updated_schema.fields.get("result") {
-                    if let Some(ref_uuid) = result_field.ref_atom_uuid() {
-                        if let Ok(Some(atom_ref)) = db_ops.get_item::<AtomRef>(&format!("ref:{}", ref_uuid)) {
-                            let atom_uuid = atom_ref.get_atom_uuid();
-                            if let Ok(Some(atom)) = db_ops.get_item::<Atom>(&format!("atom:{}", atom_uuid)) {
-                                println!("✅ Found computed result: {}", atom.content());
-                                
-                                if *atom.content() == json!(40) {
-                                    println!("🎯 PERFECT! Transform computed 15 + 25 = 40 correctly!");
-                                    println!("✅ Result storage and field linking working perfectly!");
-                                } else {
-                                    println!("⚠️  Unexpected result: expected 40, got {}", atom.content());
-                                }
+    let (count, success, error) = TransformManager::execute_transform_with_db(
+        "test_transform",
+        &message_bus,
+        Some(&db_ops),
+    );
+    
+    println!("📊 Result: count={}, success={}, error={:?}", count, success, error);
+    
+    if success {
+        // Check if TransformSchema.result was updated
+        if let Ok(Some(updated_schema)) = db_ops.get_schema("TransformSchema") {
+            if let Some(result_field) = updated_schema.fields.get("result") {
+                if let Some(ref_uuid) = result_field.ref_atom_uuid() {
+                    if let Ok(Some(atom_ref)) = db_ops.get_item::<AtomRef>(&format!("ref:{}", ref_uuid)) {
+                        let atom_uuid = atom_ref.get_atom_uuid();
+                        if let Ok(Some(atom)) = db_ops.get_item::<Atom>(&format!("atom:{}", atom_uuid)) {
+                            println!("✅ Found computed result: {}", atom.content());
+                            
+                            if *atom.content() == json!(40) {
+                                println!("🎯 PERFECT! Transform computed 15 + 25 = 40 correctly!");
+                                println!("✅ Result storage and field linking working perfectly!");
                             } else {
-                                println!("❌ Atom not found for uuid: {}", atom_uuid);
+                                println!("⚠️ Unexpected result: expected 40, got {}", atom.content());
                             }
                         } else {
-                            println!("❌ AtomRef not found for ref_uuid: {}", ref_uuid);
+                            println!("❌ Atom not found for uuid: {}", atom_uuid);
                         }
                     } else {
-                        println!("❌ No ref_atom_uuid found in result field");
+                        println!("❌ AtomRef not found for ref_uuid: {}", ref_uuid);
                     }
                 } else {
-                    println!("❌ Result field not found in TransformSchema");
+                    println!("❌ No ref_atom_uuid found in result field");
                 }
             } else {
-                println!("❌ TransformSchema not found or could not be loaded");
+                println!("❌ Result field not found in TransformSchema");
             }
         } else {
-            println!("❌ Transform execution failed");
+            println!("❌ TransformSchema not found or could not be loaded");
         }
-        
-        // Test result queryability
-        println!("🔍 Testing result queryability...");
-        if let Ok(Some(schema)) = db_ops.get_schema("TransformSchema") {
-            if let Some(result_field) = schema.fields.get("result") {
-                if let Some(ref_uuid) = result_field.ref_atom_uuid() {
-                    println!("✅ TransformSchema.result is queryable with ref_uuid: {}", ref_uuid);
-                } else {
-                    println!("❌ TransformSchema.result has no ref_atom_uuid - not queryable");
-                }
+    } else {
+        println!("❌ Transform execution failed");
+    }
+    
+    // Test result queryability
+    println!("🔍 Testing result queryability...");
+    if let Ok(Some(schema)) = db_ops.get_schema("TransformSchema") {
+        if let Some(result_field) = schema.fields.get("result") {
+            if let Some(ref_uuid) = result_field.ref_atom_uuid() {
+                println!("✅ TransformSchema.result is queryable with ref_uuid: {}", ref_uuid);
+            } else {
+                println!("❌ TransformSchema.result has no ref_atom_uuid - not queryable");
             }
         }
     }

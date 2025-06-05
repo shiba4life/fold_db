@@ -64,64 +64,25 @@ impl IngestionCore {
     ) -> IngestionResult<IngestionResponse> {
         info!("Starting JSON ingestion process");
 
-        if !self.config.is_ready() {
-            return Ok(IngestionResponse::failure(vec![
-                "Ingestion module is not properly configured or disabled".to_string(),
-            ]));
-        }
+        // Step 1: Validate configuration
+        self.validate_configuration()?;
 
-        // Step 1: Get available schemas and strip them
-        let available_schemas = self.get_stripped_available_schemas().await?;
-        let schema_count = if let Some(obj) = available_schemas.as_object() {
-            obj.len()
-        } else {
-            0
-        };
-        info!("Retrieved {} available schemas", schema_count);
+        // Step 2: Prepare schemas
+        let available_schemas = self.prepare_schemas().await?;
 
-        // Step 2: Get AI recommendation
-        let ai_response = self
-            .get_ai_schema_recommendation(&request.data, &available_schemas)
-            .await?;
-        info!(
-            "Received AI recommendation: {} existing schemas, new schema: {}",
-            ai_response.existing_schemas.len(),
-            ai_response.new_schemas.is_some()
-        );
+        // Step 3: Get AI recommendation
+        let ai_response = self.get_ai_recommendation(&request.data, &available_schemas).await?;
 
-        // Step 3: Determine schema to use
-        let schema_name = self.determine_schema_to_use(&ai_response).await?;
-        let new_schema_created = ai_response.new_schemas.is_some();
+        // Step 4: Determine and setup schema
+        let (schema_name, new_schema_created) = self.setup_schema(&ai_response).await?;
 
-        // Step 4: Generate mutations
-        let mutations = self.generate_mutations_for_data(
-            &schema_name,
-            &request.data,
-            &ai_response.mutation_mappers,
-            request
-                .trust_distance
-                .unwrap_or(self.config.default_trust_distance),
-            request.pub_key.unwrap_or_else(|| "default".to_string()),
-        )?;
+        // Step 5: Generate mutations
+        let mutations = self.generate_mutations(&schema_name, &request, &ai_response)?;
 
-        info!("Generated {} mutations", mutations.len());
+        // Step 6: Execute mutations if requested
+        let mutations_executed = self.execute_mutations_if_requested(&request, &mutations).await?;
 
-        // Step 5: Execute mutations if requested
-        let mutations_executed = if request
-            .auto_execute
-            .unwrap_or(self.config.auto_execute_mutations)
-        {
-            self.execute_mutations(&mutations).await?
-        } else {
-            0
-        };
-
-        info!(
-            "Ingestion completed successfully: schema '{}', {} mutations generated, {} executed",
-            schema_name,
-            mutations.len(),
-            mutations_executed
-        );
+        self.log_completion(&schema_name, mutations.len(), mutations_executed);
 
         Ok(IngestionResponse::success(
             schema_name,
@@ -129,6 +90,90 @@ impl IngestionCore {
             mutations.len(),
             mutations_executed,
         ))
+    }
+
+    /// Validates that the ingestion configuration is ready.
+    fn validate_configuration(&self) -> IngestionResult<()> {
+        if !self.config.is_ready() {
+            return Err(IngestionError::configuration_error(
+                "Ingestion module is not properly configured or disabled"
+            ));
+        }
+        Ok(())
+    }
+
+    /// Prepares available schemas for AI recommendation.
+    async fn prepare_schemas(&self) -> IngestionResult<Value> {
+        let available_schemas = self.get_stripped_available_schemas().await?;
+        let schema_count = if let Some(obj) = available_schemas.as_object() {
+            obj.len()
+        } else {
+            0
+        };
+        info!("Retrieved {} available schemas", schema_count);
+        Ok(available_schemas)
+    }
+
+    /// Gets AI recommendation for schema selection/creation.
+    async fn get_ai_recommendation(
+        &self,
+        data: &Value,
+        available_schemas: &Value,
+    ) -> IngestionResult<AISchemaResponse> {
+        let ai_response = self.get_ai_schema_recommendation(data, available_schemas).await?;
+        info!(
+            "Received AI recommendation: {} existing schemas, new schema: {}",
+            ai_response.existing_schemas.len(),
+            ai_response.new_schemas.is_some()
+        );
+        Ok(ai_response)
+    }
+
+    /// Sets up the schema to use (existing or newly created).
+    async fn setup_schema(&self, ai_response: &AISchemaResponse) -> IngestionResult<(String, bool)> {
+        let schema_name = self.determine_schema_to_use(ai_response).await?;
+        let new_schema_created = ai_response.new_schemas.is_some();
+        Ok((schema_name, new_schema_created))
+    }
+
+    /// Generates mutations for the data using the determined schema.
+    fn generate_mutations(
+        &self,
+        schema_name: &str,
+        request: &IngestionRequest,
+        ai_response: &AISchemaResponse,
+    ) -> IngestionResult<Vec<Mutation>> {
+        let mutations = self.generate_mutations_for_data(
+            schema_name,
+            &request.data,
+            &ai_response.mutation_mappers,
+            request.trust_distance.unwrap_or(self.config.default_trust_distance),
+            request.pub_key.clone().unwrap_or_else(|| "default".to_string()),
+        )?;
+
+        info!("Generated {} mutations", mutations.len());
+        Ok(mutations)
+    }
+
+    /// Executes mutations if auto-execution is enabled.
+    async fn execute_mutations_if_requested(
+        &self,
+        request: &IngestionRequest,
+        mutations: &[Mutation],
+    ) -> IngestionResult<usize> {
+        if request.auto_execute.unwrap_or(self.config.auto_execute_mutations) {
+            self.execute_mutations(mutations).await
+        } else {
+            Ok(0)
+        }
+    }
+
+    /// Logs the completion of the ingestion process.
+    fn log_completion(&self, schema_name: &str, mutations_count: usize, mutations_executed: usize) {
+        info!(
+            "Ingestion completed successfully: schema '{}', {} mutations generated, {} executed",
+            schema_name, mutations_count, mutations_executed
+        );
     }
 
     /// Get available schemas stripped of payment and permission data

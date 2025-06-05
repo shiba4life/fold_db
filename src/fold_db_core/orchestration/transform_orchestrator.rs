@@ -1,15 +1,23 @@
-use serde::{Deserialize, Serialize};
-use sled::Tree;
-use std::collections::{HashSet, VecDeque};
-use std::sync::{Arc, Mutex};
-use std::thread;
+//! Refactored Transform Orchestrator using component delegation
+//! 
+//! This orchestrator now coordinates between specialized components rather than
+//! handling all operations directly, resulting in better separation of concerns
+//! and improved maintainability.
 
+use sled::Tree;
+use std::sync::Arc;
 use log::{error, info};
 use serde_json::Value as JsonValue;
 
 use crate::fold_db_core::transform_manager::types::TransformRunner;
-use crate::fold_db_core::infrastructure::message_bus::{MessageBus, TransformExecuted, FieldValueSet};
+use crate::fold_db_core::infrastructure::message_bus::MessageBus;
 use crate::schema::SchemaError;
+
+// Import the new specialized components
+use super::queue_manager::QueueManager;
+use super::persistence_manager::PersistenceManager;
+use super::event_monitor::EventMonitor;
+use super::execution_coordinator::ExecutionCoordinator;
 
 /// Trait for adding transforms to a queue
 pub trait TransformQueue {
@@ -17,549 +25,214 @@ pub trait TransformQueue {
     fn add_transform(&self, transform_id: &str, mutation_hash: &str) -> Result<(), SchemaError>;
 }
 
-/// Orchestrates execution of transforms sequentially.
-#[derive(Debug, Serialize, Deserialize)]
-struct QueueItem {
-    id: String,
-    mutation_hash: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct QueueState {
-    queue: VecDeque<QueueItem>,
-    queued: HashSet<String>,
-    processed: HashSet<String>,
-}
-
+/// Orchestrates execution of transforms sequentially using specialized components.
+/// 
+/// This refactored version delegates operations to focused components:
+/// - QueueManager: Thread-safe queue operations
+/// - PersistenceManager: State persistence 
+/// - EventMonitor: Field value event monitoring
+/// - ExecutionCoordinator: Transform execution and result publishing
 pub struct TransformOrchestrator {
-    queue: Mutex<QueueState>,
-    manager: Arc<dyn TransformRunner>,
-    tree: Tree,
-    message_bus: Arc<MessageBus>,
-    /// Thread handle for monitoring FieldValueSet events
-    _field_value_consumer_thread: Option<thread::JoinHandle<()>>,
+    queue_manager: QueueManager,
+    persistence_manager: PersistenceManager,
+    execution_coordinator: ExecutionCoordinator,
+    _event_monitor: EventMonitor, // Kept alive for background monitoring
 }
 
 impl TransformOrchestrator {
-    pub fn new(manager: Arc<dyn TransformRunner>, tree: Tree, message_bus: Arc<MessageBus>) -> Self {
-        let state = tree
-            .get("state")
-            .ok()
-            .flatten()
-            .and_then(|v| serde_json::from_slice::<QueueState>(&v).ok())
-            .unwrap_or_else(|| QueueState {
-                queue: VecDeque::new(),
-                queued: HashSet::new(),
-                processed: HashSet::new(),
-            });
-
-        // Set up direct monitoring of FieldValueSet events
-        let field_value_consumer_thread = TransformOrchestrator::setup_field_value_monitoring(
-            Arc::clone(&message_bus),
-            Arc::clone(&manager),
-            tree.clone(),
-        );
-
-        Self {
-            queue: Mutex::new(state),
-            manager,
-            tree,
-            message_bus,
-            _field_value_consumer_thread: Some(field_value_consumer_thread),
-        }
-    }
-
-
-    fn persist_state(&self) -> Result<(), SchemaError> {
-        info!("💾 PERSIST_STATE START - saving orchestrator state to disk");
-        
-        let state = {
-            info!("🔒 Acquiring queue lock for state persistence");
-            let q = self.queue.lock().map_err(|e| {
-                error!("❌ Failed to acquire queue lock for persistence: {}", e);
-                SchemaError::InvalidData("Failed to acquire queue lock".to_string())
-            })?;
-            
-            info!("📋 Current state to persist - queue length: {}, queued count: {}, processed count: {}",
-                q.queue.len(), q.queued.len(), q.processed.len());
-            info!("📋 Queue items: {:?}", q.queue);
-            info!("📋 Queued set: {:?}", q.queued);
-            info!("📋 Processed set: {:?}", q.processed);
-            
-            serde_json::to_vec(&*q).map_err(|e| {
-                error!("❌ Failed to serialize orchestrator state: {}", e);
-                SchemaError::InvalidData(format!("Failed to serialize state: {}", e))
-            })?
-        };
-        
-        info!("💾 Inserting state into tree (size: {} bytes)", state.len());
-        self.tree.insert("state", state).map_err(|e| {
-            error!("❌ Failed to insert orchestrator state into tree: {}", e);
-            SchemaError::InvalidData(format!("Failed to persist orchestrator state: {}", e))
-        })?;
-        
-        info!("💾 Flushing tree to disk");
-        self.tree.flush().map_err(|e| {
-            error!("❌ Failed to flush orchestrator state to disk: {}", e);
-            SchemaError::InvalidData(format!("Failed to flush orchestrator state: {}", e))
-        })?;
-        
-        info!("✅ PERSIST_STATE COMPLETE - state saved successfully");
-        Ok(())
-    }
-
-    /// Set up monitoring of FieldValueSet events to directly add transforms to queue
-    fn setup_field_value_monitoring(
-        message_bus: Arc<MessageBus>,
+    /// Create a new TransformOrchestrator with component delegation
+    pub fn new(
         manager: Arc<dyn TransformRunner>,
         tree: Tree,
-    ) -> thread::JoinHandle<()> {
-        let mut field_value_consumer = message_bus.subscribe::<FieldValueSet>();
+        message_bus: Arc<MessageBus>,
+        db_ops: Arc<crate::db_operations::DbOperations>,
+    ) -> Self {
+        info!("🏗️ Creating TransformOrchestrator with component delegation");
         
-        thread::spawn(move || {
-            info!("🔍 TransformOrchestrator: Starting direct monitoring of FieldValueSet events");
-            
-            loop {
-                match field_value_consumer.recv_timeout(std::time::Duration::from_millis(100)) {
-                    Ok(event) => {
-                        info!(
-                            "🎯 TransformOrchestrator: Field value set detected - field: {}, source: {}",
-                            event.field, event.source
-                        );
-                        
-                        // Parse schema.field from the field path
-                        if let Some((schema_name, field_name)) = event.field.split_once('.') {
-                            // Look up transforms for this field using the manager
-                            match manager.get_transforms_for_field(schema_name, field_name) {
-                                Ok(transform_ids) => {
-                                    if !transform_ids.is_empty() {
-                                        info!(
-                                            "🔍 Found {} transforms for field {}: {:?}",
-                                            transform_ids.len(), event.field, transform_ids
-                                        );
-                                        
-                                        // Load current queue state from persistent storage
-                                        let mut current_state = tree
-                                            .get("state")
-                                            .ok()
-                                            .flatten()
-                                            .and_then(|v| serde_json::from_slice::<QueueState>(&v).ok())
-                                            .unwrap_or_else(|| QueueState {
-                                                queue: VecDeque::new(),
-                                                queued: HashSet::new(),
-                                                processed: HashSet::new(),
-                                            });
-                                        
-                                        // Add transforms directly to queue
-                                        for transform_id in &transform_ids {
-                                            let key = format!("{}|{}", transform_id, event.source);
-                                            if current_state.queued.insert(key.clone()) {
-                                                current_state.queue.push_back(QueueItem {
-                                                    id: transform_id.clone(),
-                                                    mutation_hash: event.source.clone(),
-                                                });
-                                                info!(
-                                                    "✅ Added transform {} to queue for field {}",
-                                                    transform_id, event.field
-                                                );
-                                            }
-                                        }
-                                        
-                                        // Persist updated state
-                                        if let Ok(state_bytes) = serde_json::to_vec(&current_state) {
-                                            if let Err(e) = tree.insert("state", state_bytes) {
-                                                error!("❌ Failed to persist queue state: {}", e);
-                                            } else if let Err(e) = tree.flush() {
-                                                error!("❌ Failed to flush queue state: {}", e);
-                                            }
-                                        }
-                                        
-                                        // Process transforms immediately using the manager
-                                        info!("🚀 TransformOrchestrator: Auto-processing {} transforms after field update", transform_ids.len());
-                                        for (index, transform_id) in transform_ids.iter().enumerate() {
-                                            info!("🔧 Processing transform {}/{}: {}", index + 1, transform_ids.len(), transform_id);
-                                            
-                                            let execution_start = std::time::Instant::now();
-                                            match manager.execute_transform_now(transform_id) {
-                                                Ok(result) => {
-                                                    let duration = execution_start.elapsed();
-                                                    info!("✅ Transform {} executed successfully from FieldValueSet event in {:?}: {}",
-                                                        transform_id, duration, result);
-                                                    
-                                                    // Mark as processed in persistent state
-                                                    let key = format!("{}|{}", transform_id, event.source);
-                                                    info!("📝 Marking transform as processed with key: {}", key);
-                                                    current_state.processed.insert(key.clone());
-                                                    
-                                                    let items_before = current_state.queue.len();
-                                                    current_state.queue.retain(|item| {
-                                                        !(item.id == *transform_id && item.mutation_hash == event.source)
-                                                    });
-                                                    let items_after = current_state.queue.len();
-                                                    info!("📋 Removed {} items from queue ({} -> {})",
-                                                        items_before - items_after, items_before, items_after);
-                                                    
-                                                    current_state.queued.remove(&key);
-                                                    info!("📋 Removed key from queued set: {}", key);
-                                                    
-                                                    // Publish TransformExecuted event for successful execution
-                                                    let event = TransformExecuted::new(transform_id, "success");
-                                                    if let Err(e) = message_bus.publish(event) {
-                                                        error!("❌ Failed to publish TransformExecuted success event for {}: {}", transform_id, e);
-                                                    } else {
-                                                        info!("📢 Published TransformExecuted success event for: {}", transform_id);
-                                                    }
-                                                }
-                                                Err(e) => {
-                                                    let duration = execution_start.elapsed();
-                                                    error!("❌ Transform {} failed during execution after {:?}: {}", transform_id, duration, e);
-                                                    error!("❌ FieldValueSet execution error details: {:?}", e);
-                                                    
-                                                    // Publish TransformExecuted event for failed execution
-                                                    let event = TransformExecuted::new(transform_id, "failed");
-                                                    if let Err(publish_err) = message_bus.publish(event) {
-                                                        error!("❌ Failed to publish TransformExecuted failure event for {}: {}", transform_id, publish_err);
-                                                    } else {
-                                                        info!("📢 Published TransformExecuted failure event for: {}", transform_id);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        
-                                        // Persist final state after processing
-                                        if let Ok(state_bytes) = serde_json::to_vec(&current_state) {
-                                            if let Err(e) = tree.insert("state", state_bytes) {
-                                                error!("❌ Failed to persist final queue state: {}", e);
-                                            } else if let Err(e) = tree.flush() {
-                                                error!("❌ Failed to flush final queue state: {}", e);
-                                            }
-                                        }
-                                    } else {
-                                        info!(
-                                            "ℹ️ No transforms found for field {}",
-                                            event.field
-                                        );
-                                    }
-                                }
-                                Err(e) => {
-                                    error!(
-                                        "❌ Failed to get transforms for field {}: {}",
-                                        event.field, e
-                                    );
-                                }
-                            }
-                        } else {
-                            error!(
-                                "❌ Invalid field format '{}' - expected 'schema.field'",
-                                event.field
-                            );
-                        }
-                    }
-                    Err(_) => continue, // Timeout or channel disconnected
-                }
-            }
-        })
+        // Initialize persistence manager
+        let persistence_manager = PersistenceManager::new(tree.clone());
+        
+        // Load initial state or create empty state
+        let initial_state = persistence_manager.load_state()
+            .unwrap_or_else(|e| {
+                error!("❌ Failed to load initial state, using empty state: {}", e);
+                super::queue_manager::QueueState::default()
+            });
+        
+        info!("📋 Loaded initial state - queue length: {}, queued count: {}, processed count: {}",
+            initial_state.queue.len(), initial_state.queued.len(), initial_state.processed.len());
+        
+        // Initialize queue manager with loaded state
+        let queue_manager = QueueManager::new(initial_state);
+        
+        // Initialize execution coordinator
+        let execution_coordinator = ExecutionCoordinator::new(
+            Arc::clone(&manager),
+            Arc::clone(&message_bus),
+            Arc::clone(&db_ops)
+        );
+        
+        // Initialize event monitor (starts background monitoring)
+        let event_monitor = EventMonitor::new(
+            Arc::clone(&message_bus),
+            Arc::clone(&manager),
+            PersistenceManager::new(tree.clone())
+        );
+        
+        info!("✅ TransformOrchestrator initialized with all components");
+        
+        Self {
+            queue_manager,
+            persistence_manager,
+            execution_coordinator,
+            _event_monitor: event_monitor,
+        }
     }
 
-    /// Add a task for the given schema and field.
-    pub fn add_task(
-        &self,
-        schema_name: &str,
-        field_name: &str,
-        mutation_hash: &str,
-    ) -> Result<(), SchemaError> {
-        let ids = self
-            .manager
-            .get_transforms_for_field(schema_name, field_name)?;
-        info!(
-            "Transforms queued for {}.{}: {:?}",
-            schema_name, field_name, ids
-        );
-        if ids.is_empty() {
+    /// Add a task for the given schema and field using the execution coordinator
+    pub fn add_task(&self, schema_name: &str, field_name: &str, mutation_hash: &str) -> Result<(), SchemaError> {
+        info!("📋 ADD_TASK - Adding task for {}.{}", schema_name, field_name);
+        
+        // Use execution coordinator to get transforms for the field
+        let manager = self.execution_coordinator.get_manager();
+        let transform_ids = manager.get_transforms_for_field(schema_name, field_name)?;
+        
+        info!("🔍 Found {} transforms for {}.{}: {:?}", 
+              transform_ids.len(), schema_name, field_name, transform_ids);
+        
+        if transform_ids.is_empty() {
+            info!("ℹ️ No transforms found for {}.{}", schema_name, field_name);
             return Ok(());
         }
-        let mut q = self
-            .queue
-            .lock()
-            .map_err(|_| SchemaError::InvalidData("Failed to acquire queue lock".to_string()))?;
-        for id in ids {
-            let key = format!("{}|{}", id, mutation_hash);
-            if q.queued.insert(key.clone()) {
-                q.queue.push_back(QueueItem {
-                    id,
-                    mutation_hash: mutation_hash.to_string(),
-                });
-            }
+
+        // Add each transform to the queue
+        for transform_id in transform_ids {
+            self.queue_manager.add_item(&transform_id, mutation_hash)?;
         }
-        drop(q);
-        self.persist_state()?;
+
+        // Persist the updated state
+        self.persist_current_state()?;
+        
+        info!("✅ ADD_TASK completed for {}.{}", schema_name, field_name);
         Ok(())
     }
 
-    /// Add a transform directly to the queue by ID.
-    pub fn add_transform(
-        &self,
-        transform_id: &str,
-        mutation_hash: &str,
-    ) -> Result<(), SchemaError> {
-        info!("🚀 ADD_TRANSFORM START - attempting to add transform to queue: {}", transform_id);
-        info!("📋 Transform details - ID: {}, mutation_hash: {}", transform_id, mutation_hash);
-
-        // Verify the transform exists
-        info!("🔍 Checking if transform exists: {}", transform_id);
-        match self.manager.transform_exists(transform_id) {
-            Ok(exists) => {
-                if !exists {
-                    error!("❌ Transform not found: {}", transform_id);
-                    return Err(SchemaError::InvalidData(format!(
-                        "Transform '{}' not found",
-                        transform_id
-                    )));
-                } else {
-                    info!("✅ Transform exists: {}", transform_id);
-                }
-            }
-            Err(e) => {
-                error!("❌ Error checking transform existence for {}: {}", transform_id, e);
-                return Err(e);
-            }
-        }
-
-        info!("🔒 Acquiring queue lock for transform: {}", transform_id);
-        let mut q = self.queue.lock().map_err(|e| {
-            error!("❌ Failed to acquire queue lock for {}: {}", transform_id, e);
-            SchemaError::InvalidData("Failed to acquire queue lock".to_string())
-        })?;
-
-        info!("📋 Queue state before adding transform {} - length: {}, items: {:?}", transform_id, q.queue.len(), q.queue);
-        info!("📋 Queued set before adding: {:?}", q.queued);
-        info!("📋 Processed set before adding: {:?}", q.processed);
-
-        let key = format!("{}|{}", transform_id, mutation_hash);
-        info!("🔑 Generated key for transform: {}", key);
+    /// Add a transform directly to the queue by ID
+    pub fn add_transform(&self, transform_id: &str, mutation_hash: &str) -> Result<(), SchemaError> {
+        info!("🚀 ADD_TRANSFORM - Adding transform: {}", transform_id);
         
-        if q.queued.insert(key.clone()) {
-            q.queue.push_back(QueueItem {
-                id: transform_id.to_string(),
-                mutation_hash: mutation_hash.to_string(),
-            });
-            info!("✅ Successfully added transform {} to queue with key: {}", transform_id, key);
+        // Validate transform exists using execution coordinator
+        self.execution_coordinator.validate_transform_exists(transform_id)?;
+        
+        // Add to queue
+        let added = self.queue_manager.add_item(transform_id, mutation_hash)?;
+        
+        if added {
+            info!("✅ Transform {} added to queue", transform_id);
         } else {
-            info!("ℹ️ Transform {} with key {} already in queue, skipping", transform_id, key);
+            info!("ℹ️ Transform {} already in queue", transform_id);
         }
-
-        info!("📋 Queue state after adding transform {} - length: {}, items: {:?}", transform_id, q.queue.len(), q.queue);
-        info!("📋 Queued set after adding: {:?}", q.queued);
-
-        drop(q);
         
-        info!("💾 Persisting state after adding transform: {}", transform_id);
-        if let Err(e) = self.persist_state() {
-            error!("❌ Failed to persist state after adding transform {}: {:?}", transform_id, e);
-            return Err(e);
-        }
-        info!("✅ State persisted successfully after adding transform: {}", transform_id);
+        // Persist state
+        self.persist_current_state()?;
         
-        // Process the queue immediately after adding transforms
-        info!("🔄 Triggering automatic queue processing after adding transform: {}", transform_id);
+        // Process queue immediately after adding
+        info!("🔄 Triggering automatic queue processing for: {}", transform_id);
         self.process_queue();
-        info!("🏁 Automatic queue processing completed for transform: {}", transform_id);
-
-        info!("🏁 ADD_TRANSFORM COMPLETE - successfully added and processed transform: {}", transform_id);
+        
+        info!("🏁 ADD_TRANSFORM completed for: {}", transform_id);
         Ok(())
     }
 
-    /// Process a single task from the queue.
+    /// Process a single task from the queue
     pub fn process_one(&self) -> Option<Result<JsonValue, SchemaError>> {
-        info!("🔄 PROCESS_ONE START - checking queue for items to process");
-
-        let (transform_id, mutation_hash, already_processed) = {
-            info!("🔒 Acquiring queue lock for process_one");
-            let mut q = self
-                .queue
-                .lock()
-                .map_err(|e| {
-                    error!("❌ Failed to acquire queue lock in process_one: {}", e);
-                    SchemaError::InvalidData("Failed to acquire queue lock".to_string())
-                })
-                .ok()?;
-
-            info!(
-                "📋 Queue state before processing - length: {}, items: {:?}",
-                q.queue.len(),
-                q.queue
-            );
-            info!("📋 Queued set: {:?}", q.queued);
-            info!("📋 Processed set: {:?}", q.processed);
-
-            match q.queue.pop_front() {
-                Some(item) => {
-                    let key = format!("{}|{}", item.id, item.mutation_hash);
-                    let processed = q.processed.contains(&key);
-                    let was_in_queued = q.queued.remove(&key);
-                    
-                    info!(
-                        "📤 Popped item from queue: {} (mutation_hash: {}, already_processed: {}, was_in_queued_set: {})",
-                        item.id, item.mutation_hash, processed, was_in_queued
-                    );
-                    info!("🔑 Processing key: {}", key);
-                    
-                    (item.id, item.mutation_hash, processed)
-                }
-                None => {
-                    info!("📭 Queue is empty, nothing to process");
-                    return None;
-                }
-            }
-        };
-
-        info!("💾 Persisting orchestrator state before processing transform: {}", transform_id);
-        if let Err(e) = self.persist_state() {
-            error!("❌ Failed to persist state before processing {}: {:?}", transform_id, e);
-            return Some(Err(SchemaError::InvalidData(
-                "Failed to persist state".to_string(),
-            )));
-        }
-        info!("✅ State persisted successfully before processing: {}", transform_id);
-
-        if already_processed {
-            info!("⏭️ Transform {} already processed, skipping execution", transform_id);
-            return Some(Ok(serde_json::json!({
-                "status": "skipped_already_processed",
-                "transform_id": transform_id,
-                "mutation_hash": mutation_hash
-            })));
-        }
-
-        info!("🚀 EXECUTING TRANSFORM: {}", transform_id);
-        info!("🔧 Calling execute_transform_now with transform_id: {}", transform_id);
+        info!("🔄 PROCESS_ONE - Checking queue for items");
         
-        // Execute transform directly through TransformManager instance method
-        // This ensures database operations are available for the transform
-        let execution_start_time = std::time::Instant::now();
-        let result = match self.manager.execute_transform_now(&transform_id) {
-            Ok(execution_result) => {
-                let duration = execution_start_time.elapsed();
-                info!("✅ Transform {} executed successfully in {:?}: {}", transform_id, duration, execution_result);
-                Ok(serde_json::json!({
-                    "status": "executed_from_queue",
-                    "transform_id": transform_id,
-                    "result": execution_result,
-                    "method": "direct_execution",
-                    "duration_ms": duration.as_millis(),
-                    "mutation_hash": mutation_hash
-                }))
+        // Pop item from queue
+        let item = match self.queue_manager.pop_item() {
+            Ok(Some(item)) => item,
+            Ok(None) => {
+                info!("📭 Queue is empty");
+                return None;
             }
             Err(e) => {
-                let duration = execution_start_time.elapsed();
-                error!("❌ Transform {} failed during execution after {:?}: {}", transform_id, duration, e);
-                error!("❌ Execution error details: {:?}", e);
-                Err(SchemaError::InvalidData(format!("Transform execution failed: {}", e)))
+                error!("❌ Failed to pop item from queue: {}", e);
+                return Some(Err(e));
             }
         };
-
-        // Handle the execution result
-        match &result {
-            Ok(value) => {
-                info!("✅ Transform {} execution completed successfully", transform_id);
-                info!("📊 Execution result details: {:?}", value);
-                
-                // Mark as processed and update queue state
-                info!("📝 Marking transform {} as processed", transform_id);
-                let process_key = format!("{}|{}", transform_id, mutation_hash);
-                {
-                    let mut q = self.queue.lock().expect("queue lock for marking processed");
-                    q.processed.insert(process_key.clone());
-                    info!("✅ Transform {} marked as processed with key: {}", transform_id, process_key);
-                    info!("📋 Updated processed set: {:?}", q.processed);
-                }
-                
-                info!("💾 Persisting state after successful transform execution: {}", transform_id);
-                if let Err(e) = self.persist_state() {
-                    error!("❌ Failed to persist state after successful transform {}: {:?}", transform_id, e);
-                    return Some(Err(e));
-                }
-                info!("✅ State persisted after successful execution: {}", transform_id);
-
-                // Publish TransformExecuted event for successful execution
-                info!("📢 Publishing TransformExecuted success event for: {}", transform_id);
-                let event = TransformExecuted::new(&transform_id, "success");
-                if let Err(e) = self.message_bus.publish(event) {
-                    error!("❌ Failed to publish TransformExecuted success event for {}: {}", transform_id, e);
-                } else {
-                    info!("✅ Published TransformExecuted success event for transform: {}", transform_id);
-                }
-            }
+        
+        // Check if already processed
+        let already_processed = match self.queue_manager.is_processed(&item.id, &item.mutation_hash) {
+            Ok(processed) => processed,
             Err(e) => {
-                error!("❌ Transform {} execution failed", transform_id);
-                error!("❌ Failure details: {:?}", e);
-                
-                // Publish TransformExecuted event for failed execution
-                info!("📢 Publishing TransformExecuted failure event for: {}", transform_id);
-                let event = TransformExecuted::new(&transform_id, "failed");
-                if let Err(publish_err) = self.message_bus.publish(event) {
-                    error!("❌ Failed to publish TransformExecuted failure event for {}: {}", transform_id, publish_err);
-                } else {
-                    info!("✅ Published TransformExecuted failure event for transform: {}", transform_id);
-                }
+                error!("❌ Failed to check processed status: {}", e);
+                return Some(Err(e));
+            }
+        };
+        
+        // Persist state before execution
+        if let Err(e) = self.persist_current_state() {
+            error!("❌ Failed to persist state before execution: {}", e);
+            return Some(Err(e));
+        }
+        
+        // Execute transform using execution coordinator
+        let result = self.execution_coordinator.execute_transform(&item, already_processed);
+        
+        // Mark as processed if execution succeeded
+        if result.is_ok() {
+            if let Err(e) = self.queue_manager.mark_processed(&item.id, &item.mutation_hash) {
+                error!("❌ Failed to mark transform as processed: {}", e);
+                return Some(Err(e));
+            }
+            
+            // Persist state after successful processing
+            if let Err(e) = self.persist_current_state() {
+                error!("❌ Failed to persist state after processing: {}", e);
+                return Some(Err(e));
             }
         }
-
-        // Log final queue state after processing
-        if let Ok(final_length) = self.len() {
-            info!("📊 Queue length after processing {}: {}", transform_id, final_length);
-        }
-
-        info!(
-            "🏁 PROCESS_ONE COMPLETE - transform: {}, success: {}",
-            transform_id, result.is_ok()
-        );
+        
+        info!("🏁 PROCESS_ONE completed for: {}", item.id);
         Some(result)
     }
 
-    /// Process all queued tasks sequentially.
+    /// Process all queued tasks sequentially
     pub fn process_queue(&self) {
-        info!("🔄 PROCESS_QUEUE START - beginning to process all queued transforms");
+        info!("🔄 PROCESS_QUEUE - Starting to process all queued transforms");
         
-        // Check initial queue state
-        let initial_queue_length = match self.len() {
+        let initial_length = match self.len() {
             Ok(length) => {
                 info!("📊 Initial queue length: {}", length);
                 length
             }
             Err(e) => {
-                error!("❌ Failed to get initial queue length: {:?}", e);
+                error!("❌ Failed to get initial queue length: {}", e);
                 return;
             }
         };
-
-        if initial_queue_length == 0 {
+        
+        if initial_length == 0 {
             info!("📭 Queue is empty, nothing to process");
             return;
         }
-
-        info!("🚀 Starting to process {} queued transforms", initial_queue_length);
+        
         let mut processed_count = 0;
         let mut iteration_count = 0;
-
+        
         loop {
             iteration_count += 1;
             info!("🔄 Processing iteration #{}", iteration_count);
             
-            // Log queue state before each iteration
-            if let Ok(current_length) = self.len() {
-                info!("📊 Queue length at iteration #{}: {}", iteration_count, current_length);
-            }
-
             match self.process_one() {
                 Some(result) => {
                     processed_count += 1;
                     match result {
                         Ok(value) => {
-                            info!("✅ Successfully processed transform #{} in iteration #{}: {:?}", processed_count, iteration_count, value);
+                            info!("✅ Successfully processed transform #{}: {:?}", processed_count, value);
                         }
                         Err(e) => {
-                            error!("❌ Failed to process transform #{} in iteration #{}: {:?}", processed_count, iteration_count, e);
+                            error!("❌ Failed to process transform #{}: {:?}", processed_count, e);
                         }
                     }
                 }
@@ -568,77 +241,51 @@ impl TransformOrchestrator {
                     break;
                 }
             }
-
+            
             // Safety check to prevent infinite loops
             if iteration_count > 100 {
-                error!("❌ Breaking out of process_queue loop after {} iterations to prevent infinite loop", iteration_count);
+                error!("❌ Breaking out of process_queue loop after {} iterations", iteration_count);
                 break;
             }
         }
-
-        // Final queue state check
-        let final_queue_length = match self.len() {
-            Ok(length) => {
-                info!("📊 Final queue length: {}", length);
-                length
-            }
-            Err(e) => {
-                error!("❌ Failed to get final queue length: {:?}", e);
-                0
-            }
-        };
-
-        info!(
-            "🏁 PROCESS_QUEUE COMPLETE - processed {} transforms across {} iterations",
-            processed_count, iteration_count
-        );
-        info!("📈 Queue processing stats - Initial: {}, Final: {}, Processed: {}",
-            initial_queue_length, final_queue_length, processed_count);
         
-        if final_queue_length > 0 {
-            error!("⚠️ WARNING: Queue still contains {} items after processing", final_queue_length);
-            if let Ok(remaining_transforms) = self.list_queued_transforms() {
-                error!("⚠️ Remaining transforms in queue: {:?}", remaining_transforms);
-            }
-        }
+        let final_length = self.len().unwrap_or(0);
+        info!("🏁 PROCESS_QUEUE completed - processed {} transforms, final queue length: {}",
+              processed_count, final_length);
     }
 
-    /// List queued transform IDs without dequeuing or running them.
+    /// Helper method to persist current queue state
+    fn persist_current_state(&self) -> Result<(), SchemaError> {
+        let current_state = self.queue_manager.get_state()?;
+        self.persistence_manager.save_and_flush(&current_state)
+    }
+
+    /// List queued transform IDs without dequeuing or running them
     pub fn list_queued_transforms(&self) -> Result<Vec<String>, SchemaError> {
-        // info!("📋 LIST_QUEUED_TRANSFORMS - getting current queue contents");
-        let q = self.queue.lock().map_err(|e| {
-            error!("❌ Failed to acquire queue lock for listing transforms: {}", e);
-            SchemaError::InvalidData("Failed to acquire queue lock".to_string())
-        })?;
-        
-        let transform_ids: Vec<String> = q.queue.iter().map(|item| item.id.clone()).collect();
-        // info!("📋 Found {} queued transforms: {:?}", transform_ids.len(), transform_ids);
-        Ok(transform_ids)
+        self.queue_manager.list_queued_transforms()
     }
 
-    /// Queue length, useful for tests.
+    /// Queue length, useful for tests
     pub fn len(&self) -> Result<usize, SchemaError> {
-        let q = self.queue.lock().map_err(|e| {
-            error!("❌ Failed to acquire queue lock for length check: {}", e);
-            SchemaError::InvalidData("Failed to acquire queue lock".to_string())
-        })?;
-        let length = q.queue.len();
-        info!("📊 Current queue length: {}", length);
-        Ok(length)
+        self.queue_manager.len()
     }
 
-    /// Returns true if the queue is empty.
+    /// Returns true if the queue is empty
     pub fn is_empty(&self) -> Result<bool, SchemaError> {
-        let q = self.queue.lock().map_err(|e| {
-            error!("❌ Failed to acquire queue lock for empty check: {}", e);
-            SchemaError::InvalidData("Failed to acquire queue lock".to_string())
-        })?;
-        let empty = q.queue.is_empty();
-        // info!("📊 Queue is empty: {}", empty);
-        // if !empty {
-        //     info!("📋 Queue contents: {:?}", q.queue);
-        // }
-        Ok(empty)
+        self.queue_manager.is_empty()
+    }
+
+    /// Get access to individual components for advanced operations
+    pub fn get_queue_manager(&self) -> &QueueManager {
+        &self.queue_manager
+    }
+
+    pub fn get_persistence_manager(&self) -> &PersistenceManager {
+        &self.persistence_manager
+    }
+
+    pub fn get_execution_coordinator(&self) -> &ExecutionCoordinator {
+        &self.execution_coordinator
     }
 }
 
@@ -649,5 +296,83 @@ impl TransformQueue for TransformOrchestrator {
 
     fn add_transform(&self, transform_id: &str, mutation_hash: &str) -> Result<(), SchemaError> {
         self.add_transform(transform_id, mutation_hash)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use crate::fold_db_core::transform_manager::types::TransformRunner;
+
+    struct MockTransformRunner;
+
+    impl TransformRunner for MockTransformRunner {
+        fn execute_transform_now(&self, _transform_id: &str) -> Result<JsonValue, SchemaError> {
+            Ok(serde_json::json!({"status": "success"}))
+        }
+
+        fn transform_exists(&self, _transform_id: &str) -> Result<bool, SchemaError> {
+            Ok(true)
+        }
+
+        fn get_transforms_for_field(&self, _schema_name: &str, _field_name: &str) -> Result<HashSet<String>, SchemaError> {
+            let mut transforms = HashSet::new();
+            transforms.insert("test_transform".to_string());
+            Ok(transforms)
+        }
+    }
+
+    fn create_test_orchestrator() -> TransformOrchestrator {
+        let config = sled::Config::new().temporary(true);
+        let db = config.open().expect("Failed to create test database");
+        let tree = db.open_tree("test_orchestrator").expect("Failed to create test tree");
+        let manager = Arc::new(MockTransformRunner);
+        let message_bus = Arc::new(MessageBus::new());
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let db_ops = Arc::new(crate::db_operations::DbOperations::new(db).unwrap());
+        
+        TransformOrchestrator::new(manager, tree, message_bus, db_ops)
+    }
+
+    #[test]
+    fn test_add_and_process_transform() {
+        let orchestrator = create_test_orchestrator();
+        
+        // Add transform
+        let result = orchestrator.add_transform("test_transform", "test_hash");
+        assert!(result.is_ok());
+        
+        // Queue should be empty after processing (add_transform auto-processes)
+        assert!(orchestrator.is_empty().unwrap());
+    }
+
+    #[test]
+    fn test_add_task() {
+        let orchestrator = create_test_orchestrator();
+        
+        // Add task
+        let result = orchestrator.add_task("test_schema", "test_field", "test_hash");
+        assert!(result.is_ok());
+        
+        // Should have items in queue
+        assert!(!orchestrator.is_empty().unwrap());
+        assert_eq!(orchestrator.len().unwrap(), 1);
+    }
+
+    #[test]
+    fn test_process_one() {
+        let orchestrator = create_test_orchestrator();
+        
+        // Add task without auto-processing
+        orchestrator.add_task("test_schema", "test_field", "test_hash").unwrap();
+        
+        // Process one item
+        let result = orchestrator.process_one();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+        
+        // Queue should be empty now
+        assert!(orchestrator.is_empty().unwrap());
     }
 }

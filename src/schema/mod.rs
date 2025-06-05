@@ -28,12 +28,14 @@
 // Internal modules
 pub mod core;
 pub mod duplicate_detection;
+pub mod field_factory;
 pub mod file_operations;
 pub mod hasher;
 pub mod types;
 
 // Public re-exports
 pub use core::{SchemaCore, SchemaState};
+pub use field_factory::{FieldFactory, FieldBuilder, TransformSetupHelper, DatabaseInitHelper, TestEnvironment};
 pub use types::{errors::SchemaError, schema::Schema, Transform};
 pub mod validator;
 pub use crate::{MutationType, Operation};

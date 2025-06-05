@@ -1,4 +1,5 @@
 use super::manager::TransformManager;
+use crate::fold_db_core::transform_manager::utils::*;
 use crate::transform::executor::TransformExecutor;
 use crate::schema::types::{Schema, SchemaError};
 use crate::schema::types::field::common::Field;
@@ -48,7 +49,7 @@ impl TransformManager {
                     Err(e) => {
                         warn!("⚠️ Failed to fetch input '{}', using default: {}", input_field, e);
                         // Use default value based on the error or field name
-                        let default_value = Self::get_default_value_for_field(input_field_name);
+                        let default_value = DefaultValueHelper::get_default_value_for_field(input_field_name);
                         info!("📊 Using default value for {}: {}", input_field, default_value);
                         input_values.insert(input_field.clone(), default_value);
                     }
@@ -56,7 +57,7 @@ impl TransformManager {
             } else {
                 // Handle simple field names without schema prefix
                 warn!("⚠️ Simple field name '{}' without schema prefix, using default value", input_field);
-                let default_value = Self::get_default_value_for_field(&input_field);
+                let default_value = DefaultValueHelper::get_default_value_for_field(&input_field);
                 info!("📊 Using default value for {}: {}", input_field, default_value);
                 input_values.insert(input_field.clone(), default_value);
             }
@@ -112,16 +113,6 @@ impl TransformManager {
         result
     }
     
-    /// Get default value for a field based on its name
-    fn get_default_value_for_field(field_name: &str) -> JsonValue {
-        match field_name {
-            "input1" => JsonValue::Number(serde_json::Number::from(42)),
-            "input2" => JsonValue::Number(serde_json::Number::from(24)),
-            "value1" => JsonValue::Number(serde_json::Number::from(5)),
-            "value2" => JsonValue::Number(serde_json::Number::from(10)),
-            _ => JsonValue::Number(serde_json::Number::from(0)),
-        }
-    }
     
     
     /// Generic result storage for any transform
@@ -196,13 +187,13 @@ impl TransformManager {
         db_ops.store_item(&format!("ref:{}", ref_uuid), &atom_ref)?;
         
         info!("✅ Created/updated AtomRef {} -> atom {}", ref_uuid, atom_uuid);
-        info!("🔧 DEBUG: AtomRef UUID: {} (this is the reference ID)", ref_uuid);
-        info!("🔧 DEBUG: Target Atom UUID: {} (this is what the reference points to)", atom_uuid);
+        LoggingHelper::log_atom_ref_operation(&ref_uuid, &atom_uuid, "creation");
         
         // Debug: Verify the atom was stored correctly
         match db_ops.get_item::<crate::atom::Atom>(&format!("atom:{}", atom_uuid)) {
             Ok(Some(stored_atom)) => {
-                info!("🔍 DEBUG: Verified atom {} exists with content: {}", atom_uuid, stored_atom.content());
+                let content_str = stored_atom.content().to_string();
+                LoggingHelper::log_verification_result("atom", &atom_uuid, Some(&content_str));
             }
             Ok(None) => {
                 error!("❌ DEBUG: Atom {} was not found after storage!", atom_uuid);
@@ -216,8 +207,8 @@ impl TransformManager {
         match db_ops.get_item::<crate::atom::AtomRef>(&format!("ref:{}", ref_uuid)) {
             Ok(Some(stored_ref)) => {
                 let target_atom_uuid = stored_ref.get_atom_uuid();
-                info!("🔍 DEBUG: Verified AtomRef {} points to atom: {}", ref_uuid, target_atom_uuid);
-                info!("🔍 DEBUG: Reference chain: Schema.field → AtomRef {} → Data Atom {}", ref_uuid, target_atom_uuid);
+                LoggingHelper::log_verification_result("AtomRef", &ref_uuid, Some(&format!("points to atom: {}", target_atom_uuid)));
+                LoggingHelper::log_atom_ref_operation(&ref_uuid, &target_atom_uuid, "verification");
                 
                 // Verify this is NOT pointing to itself (the bug we just fixed)
                 if ref_uuid == *target_atom_uuid {
@@ -242,57 +233,13 @@ impl TransformManager {
         Ok(())
     }
 
-    /// Get field value from a schema using database operations
+    /// Get field value from a schema using database operations (consolidated implementation)
     fn get_field_value_from_schema(
         db_ops: &Arc<crate::db_operations::DbOperations>,
         schema: &Schema,
         field_name: &str,
     ) -> Result<JsonValue, SchemaError> {
-        info!("🔍 Looking up field '{}' in schema", field_name);
-        
-        // Get field definition
-        let field = schema.fields.get(field_name)
-            .ok_or_else(|| {
-                error!("❌ Field '{}' not found in schema", field_name);
-                SchemaError::InvalidField(format!("Field '{}' not found", field_name))
-            })?;
-        
-        info!("✅ Field '{}' found in schema", field_name);
-        
-        // Get ref_atom_uuid from field
-        let ref_atom_uuid = field.ref_atom_uuid()
-            .ok_or_else(|| {
-                error!("❌ Field '{}' has no ref_atom_uuid", field_name);
-                SchemaError::InvalidField(format!("Field '{}' has no ref_atom_uuid", field_name))
-            })?;
-        
-        info!("🔗 Field ref_atom_uuid: {}", ref_atom_uuid);
-        
-        // Get AtomRef from database
-        info!("🔍 Loading AtomRef from database...");
-        let atom_ref: crate::atom::AtomRef = db_ops.get_item(&format!("ref:{}", ref_atom_uuid))?
-            .ok_or_else(|| {
-                error!("❌ AtomRef '{}' not found", ref_atom_uuid);
-                SchemaError::InvalidField(format!("AtomRef '{}' not found", ref_atom_uuid))
-            })?;
-        
-        // Get atom_uuid from AtomRef
-        let atom_uuid = atom_ref.get_atom_uuid();
-        info!("🔗 AtomRef points to atom: {}", atom_uuid);
-        
-        // Get Atom from database
-        info!("🔍 Loading Atom from database...");
-        let atom: crate::atom::Atom = db_ops.get_item(&format!("atom:{}", atom_uuid))?
-            .ok_or_else(|| {
-                error!("❌ Atom '{}' not found", atom_uuid);
-                SchemaError::InvalidField(format!("Atom '{}' not found", atom_uuid))
-            })?;
-        
-        info!("✅ Atom loaded successfully");
-        let content = atom.content().clone();
-        info!("📦 Atom content: {}", content);
-        
-        // Return atom content (the actual field value)
-        Ok(content)
+        // Use the unified FieldValueResolver instead of duplicate implementation
+        FieldValueResolver::resolve_field_value(db_ops, schema, field_name)
     }
 }

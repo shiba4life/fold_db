@@ -3,6 +3,7 @@ use super::manager::{
     FIELD_TO_TRANSFORMS_KEY, TRANSFORM_TO_FIELDS_KEY, TRANSFORM_OUTPUTS_KEY,
     TransformManager
 };
+use super::utils::*;
 use crate::db_operations::DbOperations;
 use crate::schema::types::SchemaError;
 use log::info;
@@ -13,81 +14,52 @@ impl TransformManager {
     /// Persist mappings using event-driven operations only
     pub fn persist_mappings_direct(&self) -> Result<(), SchemaError> {
         // Store aref_to_transforms mapping
-        {
-            let map = self.aref_to_transforms.read().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire aref_to_transforms lock".to_string())
-            })?;
-            let json = serde_json::to_vec(&*map).map_err(|e| {
-                SchemaError::InvalidData(format!("Failed to serialize aref_to_transforms: {}", e))
-            })?;
-            self.db_ops.store_transform_mapping(AREF_TO_TRANSFORMS_KEY, &json)?;
-        }
+        SerializationHelper::store_mapping(
+            &self.db_ops,
+            &self.aref_to_transforms,
+            AREF_TO_TRANSFORMS_KEY,
+            "aref_to_transforms"
+        )?;
 
         // Store transform_to_arefs mapping
-        {
-            let map = self.transform_to_arefs.read().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire transform_to_arefs lock".to_string())
-            })?;
-            let json = serde_json::to_vec(&*map).map_err(|e| {
-                SchemaError::InvalidData(format!("Failed to serialize transform_to_arefs: {}", e))
-            })?;
-            self.db_ops.store_transform_mapping(TRANSFORM_TO_AREFS_KEY, &json)?;
-        }
+        SerializationHelper::store_mapping(
+            &self.db_ops,
+            &self.transform_to_arefs,
+            TRANSFORM_TO_AREFS_KEY,
+            "transform_to_arefs"
+        )?;
 
         // Store transform_input_names mapping
-        {
-            let map = self.transform_input_names.read().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire transform_input_names lock".to_string())
-            })?;
-            let json = serde_json::to_vec(&*map).map_err(|e| {
-                SchemaError::InvalidData(format!(
-                    "Failed to serialize transform_input_names: {}",
-                    e
-                ))
-            })?;
-            self.db_ops.store_transform_mapping(TRANSFORM_INPUT_NAMES_KEY, &json)?;
-        }
+        SerializationHelper::store_mapping(
+            &self.db_ops,
+            &self.transform_input_names,
+            TRANSFORM_INPUT_NAMES_KEY,
+            "transform_input_names"
+        )?;
 
-        // Store field_to_transforms mapping
-        {
-            let map = self.field_to_transforms.read().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire field_to_transforms lock".to_string())
-            })?;
-            
-            // DEBUG: Log what we're storing
-            info!("🔍 DEBUG: Storing field_to_transforms mapping with {} entries:", map.len());
-            for (field_key, transforms) in map.iter() {
-                info!("  📋 Storing '{}' -> {:?}", field_key, transforms);
-            }
-            
-            let json = serde_json::to_vec(&*map).map_err(|e| {
-                SchemaError::InvalidData(format!("Failed to serialize field_to_transforms: {}", e))
-            })?;
-            self.db_ops.store_transform_mapping(FIELD_TO_TRANSFORMS_KEY, &json)?;
-            info!("✅ DEBUG: Successfully stored field_to_transforms mapping to database");
-        }
+        // Store field_to_transforms mapping (with debug logging)
+        SerializationHelper::store_mapping_with_debug(
+            &self.db_ops,
+            &self.field_to_transforms,
+            FIELD_TO_TRANSFORMS_KEY,
+            "field_to_transforms"
+        )?;
 
         // Store transform_to_fields mapping
-        {
-            let map = self.transform_to_fields.read().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire transform_to_fields lock".to_string())
-            })?;
-            let json = serde_json::to_vec(&*map).map_err(|e| {
-                SchemaError::InvalidData(format!("Failed to serialize transform_to_fields: {}", e))
-            })?;
-            self.db_ops.store_transform_mapping(TRANSFORM_TO_FIELDS_KEY, &json)?;
-        }
+        SerializationHelper::store_mapping(
+            &self.db_ops,
+            &self.transform_to_fields,
+            TRANSFORM_TO_FIELDS_KEY,
+            "transform_to_fields"
+        )?;
 
         // Store transform_outputs mapping
-        {
-            let map = self.transform_outputs.read().map_err(|_| {
-                SchemaError::InvalidData("Failed to acquire transform_outputs lock".to_string())
-            })?;
-            let json = serde_json::to_vec(&*map).map_err(|e| {
-                SchemaError::InvalidData(format!("Failed to serialize transform_outputs: {}", e))
-            })?;
-            self.db_ops.store_transform_mapping(TRANSFORM_OUTPUTS_KEY, &json)?;
-        }
+        SerializationHelper::store_mapping(
+            &self.db_ops,
+            &self.transform_outputs,
+            TRANSFORM_OUTPUTS_KEY,
+            "transform_outputs"
+        )?;
 
         Ok(())
     }
@@ -107,59 +79,56 @@ impl TransformManager {
         ),
         SchemaError,
     > {
-        // Load aref_to_transforms
-        let aref_to_transforms =
-            if let Some(data) = db_ops.get_transform_mapping(AREF_TO_TRANSFORMS_KEY)? {
-                serde_json::from_slice(&data).unwrap_or_default()
-            } else {
-                HashMap::new()
-            };
+        // Load aref_to_transforms using unified helper
+        let aref_to_transforms = SerializationHelper::load_mapping_or_default(
+            db_ops,
+            AREF_TO_TRANSFORMS_KEY,
+            "aref_to_transforms"
+        )?;
 
-        // Load transform_to_arefs
-        let transform_to_arefs =
-            if let Some(data) = db_ops.get_transform_mapping(TRANSFORM_TO_AREFS_KEY)? {
-                serde_json::from_slice(&data).unwrap_or_default()
-            } else {
-                HashMap::new()
-            };
+        // Load transform_to_arefs using unified helper
+        let transform_to_arefs = SerializationHelper::load_mapping_or_default(
+            db_ops,
+            TRANSFORM_TO_AREFS_KEY,
+            "transform_to_arefs"
+        )?;
 
-        // Load transform_input_names
-        let transform_input_names =
-            if let Some(data) = db_ops.get_transform_mapping(TRANSFORM_INPUT_NAMES_KEY)? {
-                serde_json::from_slice(&data).unwrap_or_default()
-            } else {
-                HashMap::new()
-            };
+        // Load transform_input_names using unified helper
+        let transform_input_names = SerializationHelper::load_mapping_or_default(
+            db_ops,
+            TRANSFORM_INPUT_NAMES_KEY,
+            "transform_input_names"
+        )?;
 
-        // Load field_to_transforms
-        let field_to_transforms =
-            if let Some(data) = db_ops.get_transform_mapping(FIELD_TO_TRANSFORMS_KEY)? {
-                let loaded_map: HashMap<String, HashSet<String>> = serde_json::from_slice(&data).unwrap_or_default();
+        // Load field_to_transforms with special debug logging
+        let field_to_transforms = match db_ops.get_transform_mapping(FIELD_TO_TRANSFORMS_KEY)? {
+            Some(data) => {
+                let loaded_map: HashMap<String, HashSet<String>> = SerializationHelper::deserialize_mapping(&data, "field_to_transforms")?;
                 info!("🔍 DEBUG: Loaded field_to_transforms mapping from database with {} entries:", loaded_map.len());
                 for (field_key, transforms) in &loaded_map {
                     info!("  📋 Loaded '{}' -> {:?}", field_key, transforms);
                 }
                 loaded_map
-            } else {
-                info!("🔍 DEBUG: No field_to_transforms mapping found in database - starting with empty map");
+            }
+            None => {
+                LoggingHelper::log_persistence_operation("field_to_transforms", "load", false);
                 HashMap::new()
-            };
+            }
+        };
 
-        // Load transform_to_fields
-        let transform_to_fields =
-            if let Some(data) = db_ops.get_transform_mapping(TRANSFORM_TO_FIELDS_KEY)? {
-                serde_json::from_slice(&data).unwrap_or_default()
-            } else {
-                HashMap::new()
-            };
+        // Load transform_to_fields using unified helper
+        let transform_to_fields = SerializationHelper::load_mapping_or_default(
+            db_ops,
+            TRANSFORM_TO_FIELDS_KEY,
+            "transform_to_fields"
+        )?;
 
-        // Load transform_outputs
-        let transform_outputs =
-            if let Some(data) = db_ops.get_transform_mapping(TRANSFORM_OUTPUTS_KEY)? {
-                serde_json::from_slice(&data).unwrap_or_default()
-            } else {
-                HashMap::new()
-            };
+        // Load transform_outputs using unified helper
+        let transform_outputs = SerializationHelper::load_mapping_or_default(
+            db_ops,
+            TRANSFORM_OUTPUTS_KEY,
+            "transform_outputs"
+        )?;
 
         Ok((
             aref_to_transforms,

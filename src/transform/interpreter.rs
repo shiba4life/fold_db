@@ -43,156 +43,184 @@ impl Interpreter {
 
     /// Evaluates an expression.
     pub fn evaluate(&mut self, expr: &Expression) -> Result<Value, SchemaError> {
-        // Evaluate the expression
-        let result =
-            match expr {
-                Expression::Literal(value) => Ok(value.clone()),
+        match expr {
+            Expression::Literal(value) => self.evaluate_literal(value),
+            Expression::Variable(name) => self.evaluate_variable(name),
+            Expression::FieldAccess { object, field } => self.evaluate_field_access(object, field),
+            Expression::BinaryOp { left, operator, right } => self.evaluate_binary_op(left, operator, right),
+            Expression::UnaryOp { operator, expr } => self.evaluate_unary_op(operator, expr),
+            Expression::FunctionCall { name, args } => self.evaluate_function_call(name, args),
+            Expression::IfElse { condition, then_branch, else_branch } => {
+                self.evaluate_if_else(condition, then_branch, else_branch)
+            }
+            Expression::LetBinding { name, value, body } => self.evaluate_let_binding(name, value, body),
+            Expression::Return(expr) => self.evaluate_return(expr),
+        }
+    }
 
-                Expression::Variable(name) => self.variables.get(name).cloned().ok_or_else(|| {
-                    SchemaError::InvalidField(format!("Variable not found: {}", name))
-                }),
+    /// Evaluates a literal value.
+    fn evaluate_literal(&self, value: &Value) -> Result<Value, SchemaError> {
+        Ok(value.clone())
+    }
 
-                Expression::FieldAccess { object, field } => {
-                    // Handle schema.field references
-                    if let Expression::Variable(schema_name) = &**object {
-                        // Look up schema.field in variables
-                        let key = format!("{}.{}", schema_name, field);
-                        if let Some(value) = self.variables.get(&key) {
-                            return Ok(value.clone());
-                        }
+    /// Evaluates a variable reference.
+    fn evaluate_variable(&self, name: &str) -> Result<Value, SchemaError> {
+        self.variables.get(name).cloned().ok_or_else(|| {
+            SchemaError::InvalidField(format!("Variable not found: {}", name))
+        })
+    }
 
-                        // Check if the schema name is a variable containing an object
-                        if let Some(Value::Object(map)) = self.variables.get(schema_name) {
-                            if let Some(value) = map.get(field) {
-                                return Ok(Value::from(value.clone()));
-                            }
-                        }
+    /// Evaluates field access expressions (object.field).
+    fn evaluate_field_access(&mut self, object: &Expression, field: &str) -> Result<Value, SchemaError> {
+        // Handle schema.field references
+        if let Expression::Variable(schema_name) = object {
+            return self.evaluate_schema_field_access(schema_name, field);
+        }
 
-                        // Fall back to looking up just the field name
-                        return self.variables.get(field).cloned().ok_or_else(|| {
-                            SchemaError::InvalidField(format!("Field not found: {}", field))
-                        });
-                    }
-
-                    // Handle regular object field access
-                    let obj = self.evaluate(object)?;
-                    match obj {
-                        Value::Object(map) => {
-                            if let Some(value) = map.get(field) {
-                                Ok(Value::from(value.clone()))
-                            } else {
-                                Err(SchemaError::InvalidField(format!(
-                                    "Field not found: {}",
-                                    field
-                                )))
-                            }
-                        }
-                        _ => Err(SchemaError::InvalidField(format!(
-                            "Cannot access field {} on non-object value",
-                            field
-                        ))),
-                    }
+        // Handle regular object field access
+        let obj = self.evaluate(object)?;
+        match obj {
+            Value::Object(map) => {
+                if let Some(value) = map.get(field) {
+                    Ok(Value::from(value.clone()))
+                } else {
+                    Err(SchemaError::InvalidField(format!(
+                        "Field not found: {}",
+                        field
+                    )))
                 }
+            }
+            _ => Err(SchemaError::InvalidField(format!(
+                "Cannot access field {} on non-object value",
+                field
+            ))),
+        }
+    }
 
-                Expression::BinaryOp {
-                    left,
-                    operator,
-                    right,
-                } => {
-                    let left_val = self.evaluate(left)?;
-                    let right_val = self.evaluate(right)?;
+    /// Evaluates schema.field access patterns.
+    fn evaluate_schema_field_access(&self, schema_name: &str, field: &str) -> Result<Value, SchemaError> {
+        // Look up schema.field in variables
+        let key = format!("{}.{}", schema_name, field);
+        if let Some(value) = self.variables.get(&key) {
+            return Ok(value.clone());
+        }
 
-                    match operator {
-                        Operator::Add => self.add(&left_val, &right_val),
-                        Operator::Subtract => self.subtract(&left_val, &right_val),
-                        Operator::Multiply => self.multiply(&left_val, &right_val),
-                        Operator::Divide => self.divide(&left_val, &right_val),
-                        Operator::Power => self.power(&left_val, &right_val),
-                        Operator::Equal => self.equal(&left_val, &right_val),
-                        Operator::NotEqual => self.not_equal(&left_val, &right_val),
-                        Operator::LessThan => self.less_than(&left_val, &right_val),
-                        Operator::LessThanOrEqual => self.less_than_or_equal(&left_val, &right_val),
-                        Operator::GreaterThan => self.greater_than(&left_val, &right_val),
-                        Operator::GreaterThanOrEqual => {
-                            self.greater_than_or_equal(&left_val, &right_val)
-                        }
-                        Operator::And => self.and(&left_val, &right_val),
-                        Operator::Or => self.or(&left_val, &right_val),
-                    }
+        // Check if the schema name is a variable containing an object
+        if let Some(Value::Object(map)) = self.variables.get(schema_name) {
+            if let Some(value) = map.get(field) {
+                return Ok(Value::from(value.clone()));
+            }
+        }
+
+        // Fall back to looking up just the field name
+        self.variables.get(field).cloned().ok_or_else(|| {
+            SchemaError::InvalidField(format!("Field not found: {}", field))
+        })
+    }
+
+    /// Evaluates binary operations.
+    fn evaluate_binary_op(&mut self, left: &Expression, operator: &Operator, right: &Expression) -> Result<Value, SchemaError> {
+        let left_val = self.evaluate(left)?;
+        let right_val = self.evaluate(right)?;
+
+        match operator {
+            Operator::Add => self.add(&left_val, &right_val),
+            Operator::Subtract => self.subtract(&left_val, &right_val),
+            Operator::Multiply => self.multiply(&left_val, &right_val),
+            Operator::Divide => self.divide(&left_val, &right_val),
+            Operator::Power => self.power(&left_val, &right_val),
+            Operator::Equal => self.equal(&left_val, &right_val),
+            Operator::NotEqual => self.not_equal(&left_val, &right_val),
+            Operator::LessThan => self.less_than(&left_val, &right_val),
+            Operator::LessThanOrEqual => self.less_than_or_equal(&left_val, &right_val),
+            Operator::GreaterThan => self.greater_than(&left_val, &right_val),
+            Operator::GreaterThanOrEqual => self.greater_than_or_equal(&left_val, &right_val),
+            Operator::And => self.and(&left_val, &right_val),
+            Operator::Or => self.or(&left_val, &right_val),
+        }
+    }
+
+    /// Evaluates unary operations.
+    fn evaluate_unary_op(&mut self, operator: &UnaryOperator, expr: &Expression) -> Result<Value, SchemaError> {
+        let val = self.evaluate(expr)?;
+
+        match operator {
+            UnaryOperator::Negate => self.negate(&val),
+            UnaryOperator::Not => self.not(&val),
+        }
+    }
+
+    /// Evaluates function calls.
+    fn evaluate_function_call(&mut self, name: &str, args: &[Expression]) -> Result<Value, SchemaError> {
+        let mut evaluated_args = Vec::new();
+
+        for arg in args {
+            evaluated_args.push(self.evaluate(arg)?);
+        }
+
+        if let Some(func) = self.functions.get(name) {
+            func(evaluated_args).map_err(SchemaError::InvalidField)
+        } else {
+            Err(SchemaError::InvalidField(format!(
+                "Function not found: {}",
+                name
+            )))
+        }
+    }
+
+    /// Evaluates if-else conditional expressions.
+    fn evaluate_if_else(
+        &mut self,
+        condition: &Expression,
+        then_branch: &Expression,
+        else_branch: &Option<Box<Expression>>
+    ) -> Result<Value, SchemaError> {
+        let cond = self.evaluate(condition)?;
+
+        match cond {
+            Value::Boolean(true) => self.evaluate(then_branch),
+            Value::Boolean(false) => {
+                if let Some(else_expr) = else_branch {
+                    self.evaluate(else_expr)
+                } else {
+                    Ok(Value::Null)
                 }
+            }
+            _ => Err(SchemaError::InvalidField(
+                "Condition must be a boolean".to_string(),
+            )),
+        }
+    }
 
-                Expression::UnaryOp { operator, expr } => {
-                    let val = self.evaluate(expr)?;
+    /// Evaluates let binding expressions.
+    fn evaluate_let_binding(
+        &mut self,
+        name: &str,
+        value: &Expression,
+        body: &Expression
+    ) -> Result<Value, SchemaError> {
+        let val = self.evaluate(value)?;
 
-                    match operator {
-                        UnaryOperator::Negate => self.negate(&val),
-                        UnaryOperator::Not => self.not(&val),
-                    }
-                }
+        // Save the old value if it exists
+        let _old_value = self.variables.get(name).cloned();
 
-                Expression::FunctionCall { name, args } => {
-                    let mut evaluated_args = Vec::new();
+        // Set the new value
+        self.variables.insert(name.to_string(), val.clone());
 
-                    for arg in args {
-                        evaluated_args.push(self.evaluate(arg)?);
-                    }
+        // If the body is Null, just return the value (for sequential evaluation)
+        // Don't restore the old value or remove the variable for sequential evaluation
+        // This allows variables to persist between statements in the transform logic
+        if let Expression::Literal(Value::Null) = body {
+            Ok(val)
+        } else {
+            // Otherwise evaluate the body
+            self.evaluate(body)
+        }
+    }
 
-                    if let Some(func) = self.functions.get(name) {
-                        func(evaluated_args).map_err(SchemaError::InvalidField)
-                    } else {
-                        Err(SchemaError::InvalidField(format!(
-                            "Function not found: {}",
-                            name
-                        )))
-                    }
-                }
-
-                Expression::IfElse {
-                    condition,
-                    then_branch,
-                    else_branch,
-                } => {
-                    let cond = self.evaluate(condition)?;
-
-                    match cond {
-                        Value::Boolean(true) => self.evaluate(then_branch),
-                        Value::Boolean(false) => {
-                            if let Some(else_expr) = else_branch {
-                                self.evaluate(else_expr)
-                            } else {
-                                Ok(Value::Null)
-                            }
-                        }
-                        _ => Err(SchemaError::InvalidField(
-                            "Condition must be a boolean".to_string(),
-                        )),
-                    }
-                }
-
-                Expression::LetBinding { name, value, body } => {
-                    let val = self.evaluate(value)?;
-
-                    // Save the old value if it exists
-                    let _old_value = self.variables.get(name).cloned();
-
-                    // Set the new value
-                    self.variables.insert(name.clone(), val.clone());
-
-                    // If the body is Null, just return the value (for sequential evaluation)
-                    // Don't restore the old value or remove the variable for sequential evaluation
-                    // This allows variables to persist between statements in the transform logic
-                    if let Expression::Literal(Value::Null) = **body {
-                        Ok(val)
-                    } else {
-                        // Otherwise evaluate the body
-                        self.evaluate(body)
-                    }
-                }
-
-                Expression::Return(expr) => self.evaluate(expr),
-            };
-
-        result
+    /// Evaluates return expressions.
+    fn evaluate_return(&mut self, expr: &Expression) -> Result<Value, SchemaError> {
+        self.evaluate(expr)
     }
 
     // Operator implementations

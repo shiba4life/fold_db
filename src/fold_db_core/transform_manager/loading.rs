@@ -1,6 +1,7 @@
 use super::manager::TransformManager;
 use crate::schema::types::{SchemaError, Transform, TransformRegistration};
 use crate::transform::TransformExecutor;
+use crate::fold_db_core::transform_manager::utils::*;
 use log::info;
 use std::collections::{HashMap, HashSet};
 
@@ -13,17 +14,11 @@ impl TransformManager {
         let transform_ids = self.db_ops.list_transforms()?;
         
         // Load transforms into memory
-        let mut registered_transforms = self.registered_transforms.write().map_err(|_| {
-            SchemaError::InvalidData("Failed to acquire registered_transforms write lock".to_string())
-        })?;
+        let mut registered_transforms = LockHelper::write_lock(&self.registered_transforms, "registered_transforms")?;
         
-        let mut field_to_transforms = self.field_to_transforms.write().map_err(|_| {
-            SchemaError::InvalidData("Failed to acquire field_to_transforms write lock".to_string())
-        })?;
+        let mut field_to_transforms = LockHelper::write_lock(&self.field_to_transforms, "field_to_transforms")?;
         
-        let mut transform_to_fields = self.transform_to_fields.write().map_err(|_| {
-            SchemaError::InvalidData("Failed to acquire transform_to_fields write lock".to_string())
-        })?;
+        let mut transform_to_fields = LockHelper::write_lock(&self.transform_to_fields, "transform_to_fields")?;
 
         for transform_id in transform_ids {
             // Skip if transform is already loaded
@@ -40,11 +35,11 @@ impl TransformManager {
                     registered_transforms.insert(transform_id.clone(), transform.clone());
                     
                     // Register field mappings for the new transform
-                    info!("🔍 DEBUG: Creating field mappings for transform '{}' with inputs: {:?}", transform_id, transform.get_inputs());
+                    LoggingHelper::log_transform_registration(&transform_id, &transform.get_inputs(), &transform.get_output());
                     for input in transform.get_inputs() {
                         field_to_transforms.entry(input.clone()).or_insert_with(HashSet::new).insert(transform_id.clone());
                         transform_to_fields.entry(transform_id.clone()).or_insert_with(HashSet::new).insert(input.to_string());
-                        info!("🔗 DEBUG: Mapped field '{}' -> transform '{}'", input, transform_id);
+                        LoggingHelper::log_field_mapping_creation(&input, &transform_id);
                     }
                 }
                 Ok(None) => {

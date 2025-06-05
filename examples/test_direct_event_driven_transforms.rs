@@ -59,6 +59,7 @@ impl DirectEventTestFixture {
             Arc::clone(&transform_manager) as Arc<dyn fold_node::fold_db_core::transform_manager::types::TransformRunner>,
             orchestrator_tree,
             Arc::clone(&message_bus),
+            Arc::clone(&db_ops),
         );
         
         Ok(Self {
