@@ -40,9 +40,11 @@ impl TransformManager {
                     registered_transforms.insert(transform_id.clone(), transform.clone());
                     
                     // Register field mappings for the new transform
+                    info!("🔍 DEBUG: Creating field mappings for transform '{}' with inputs: {:?}", transform_id, transform.get_inputs());
                     for input in transform.get_inputs() {
                         field_to_transforms.entry(input.clone()).or_insert_with(HashSet::new).insert(transform_id.clone());
                         transform_to_fields.entry(transform_id.clone()).or_insert_with(HashSet::new).insert(input.to_string());
+                        info!("🔗 DEBUG: Mapped field '{}' -> transform '{}'", input, transform_id);
                     }
                 }
                 Ok(None) => {
@@ -180,11 +182,19 @@ impl TransformManager {
         })?;
 
         let field_set: HashSet<String> = trigger_fields.iter().cloned().collect();
+        info!("🔍 DEBUG: Registering field mappings for transform '{}' with trigger_fields: {:?}", transform_id, trigger_fields);
         for field_key in trigger_fields {
             let set = field_to_transforms.entry(field_key.clone()).or_default();
             set.insert(transform_id.to_string());
+            info!("🔗 DEBUG: Registered field mapping '{}' -> transform '{}'", field_key, transform_id);
         }
         transform_to_fields.insert(transform_id.to_string(), field_set);
+        
+        // DEBUG: Log current field mappings state
+        info!("🔍 DEBUG: Current field_to_transforms state after registration:");
+        for (field_key, transforms) in field_to_transforms.iter() {
+            info!("  📋 '{}' -> {:?}", field_key, transforms);
+        }
 
         Ok(())
     }

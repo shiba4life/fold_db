@@ -306,6 +306,11 @@ impl DataFoldNode {
         }
     }
 
+    /// Get a reference to the underlying FoldDB instance
+    pub fn get_fold_db(&self) -> FoldDbResult<std::sync::MutexGuard<'_, FoldDB>> {
+        self.db.lock().map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))
+    }
+
     /// Check which schemas are available on a remote peer
     pub async fn check_remote_schemas(
         &self,

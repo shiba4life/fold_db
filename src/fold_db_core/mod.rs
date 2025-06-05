@@ -449,6 +449,16 @@ impl FoldDB {
         Arc::clone(&self.message_bus)
     }
 
+    /// Get the transform manager for testing transform functionality
+    pub fn transform_manager(&self) -> Arc<TransformManager> {
+        Arc::clone(&self.transform_manager)
+    }
+
+    /// Get the schema manager for testing schema functionality
+    pub fn schema_manager(&self) -> Arc<SchemaCore> {
+        Arc::clone(&self.schema_manager)
+    }
+
     // ========== EVENT-DRIVEN API METHODS ==========
 
     /// Write schema operation - main orchestration method for mutations
@@ -587,12 +597,12 @@ impl FoldDB {
         self.transform_manager.list_transforms()
     }
 
-    /// Execute a transform by ID using event-driven architecture
-    /// This publishes a TransformExecutionRequest event and returns immediately
+    /// Execute a transform by ID using direct execution
+    /// This executes the transform immediately and returns the result
     pub fn run_transform(&self, transform_id: &str) -> Result<Value, SchemaError> {
-        log::info!("🔄 run_transform called for {} - using event-driven execution", transform_id);
+        log::info!("🔄 run_transform called for {} - using direct execution", transform_id);
         
-        // Use the event-driven execution method which publishes TransformExecutionRequest
+        // Use direct execution through the transform manager
         match TransformRunner::execute_transform_now(&*self.transform_manager, transform_id) {
             Ok(result) => Ok(result),
             Err(e) => Err(SchemaError::InvalidData(e.to_string())),

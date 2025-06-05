@@ -223,6 +223,10 @@ impl DataFoldHttpServer {
                             "/system/status",
                             web::get().to(system_routes::get_system_status),
                         )
+                        .route(
+                            "/system/reset-database",
+                            web::post().to(system_routes::reset_database),
+                        )
                         // Network endpoints
                         .service(
                             web::scope("/network")

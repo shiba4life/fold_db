@@ -5,6 +5,7 @@ use super::manager::{
 };
 use crate::db_operations::DbOperations;
 use crate::schema::types::SchemaError;
+use log::info;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -52,10 +53,18 @@ impl TransformManager {
             let map = self.field_to_transforms.read().map_err(|_| {
                 SchemaError::InvalidData("Failed to acquire field_to_transforms lock".to_string())
             })?;
+            
+            // DEBUG: Log what we're storing
+            info!("🔍 DEBUG: Storing field_to_transforms mapping with {} entries:", map.len());
+            for (field_key, transforms) in map.iter() {
+                info!("  📋 Storing '{}' -> {:?}", field_key, transforms);
+            }
+            
             let json = serde_json::to_vec(&*map).map_err(|e| {
                 SchemaError::InvalidData(format!("Failed to serialize field_to_transforms: {}", e))
             })?;
             self.db_ops.store_transform_mapping(FIELD_TO_TRANSFORMS_KEY, &json)?;
+            info!("✅ DEBUG: Successfully stored field_to_transforms mapping to database");
         }
 
         // Store transform_to_fields mapping
@@ -125,8 +134,14 @@ impl TransformManager {
         // Load field_to_transforms
         let field_to_transforms =
             if let Some(data) = db_ops.get_transform_mapping(FIELD_TO_TRANSFORMS_KEY)? {
-                serde_json::from_slice(&data).unwrap_or_default()
+                let loaded_map: HashMap<String, HashSet<String>> = serde_json::from_slice(&data).unwrap_or_default();
+                info!("🔍 DEBUG: Loaded field_to_transforms mapping from database with {} entries:", loaded_map.len());
+                for (field_key, transforms) in &loaded_map {
+                    info!("  📋 Loaded '{}' -> {:?}", field_key, transforms);
+                }
+                loaded_map
             } else {
+                info!("🔍 DEBUG: No field_to_transforms mapping found in database - starting with empty map");
                 HashMap::new()
             };
 

@@ -1,5 +1,5 @@
 use super::manager::TransformManager;
-use crate::fold_db_core::infrastructure::message_bus::{MessageBus, TransformExecuted};
+use crate::fold_db_core::infrastructure::message_bus::MessageBus;
 use crate::transform::executor::TransformExecutor;
 use crate::schema::types::{Schema, SchemaError};
 use crate::schema::types::field::common::Field;
@@ -9,231 +9,223 @@ use std::collections::HashMap;
 use serde_json::Value as JsonValue;
 
 impl TransformManager {
-    /// Extract transform ID from correlation and execute the transform
-    pub(super) fn execute_transform_from_correlation(
-        correlation_id: &str,
-        message_bus: &Arc<MessageBus>,
-    ) -> (usize, bool, Option<String>) {
-        Self::execute_transform_from_correlation_with_db(correlation_id, message_bus, None)
-    }
 
-    /// Execute transform with optional database operations access
-    pub(super) fn execute_transform_from_correlation_with_db(
-        correlation_id: &str,
-        message_bus: &Arc<MessageBus>,
-        db_ops: Option<&Arc<crate::db_operations::DbOperations>>,
-    ) -> (usize, bool, Option<String>) {
-        if correlation_id.starts_with("transform_triggered_") {
-            let transform_id = correlation_id.strip_prefix("transform_triggered_").unwrap_or("");
-            if !transform_id.is_empty() {
-                Self::publish_transform_executed_event(transform_id, message_bus)
-            } else {
-                error!("❌ Invalid correlation_id format: {}", correlation_id);
-                (0_usize, false, Some("Invalid correlation_id format".to_string()))
-            }
-        } else if correlation_id.starts_with("api_request_") {
-            let transform_id = correlation_id.strip_prefix("api_request_").unwrap_or("");
-            if !transform_id.is_empty() {
-                info!("🔄 Processing API request for transform: {}", transform_id);
-                Self::publish_transform_executed_event(transform_id, message_bus)
-            } else {
-                error!("❌ Invalid api_request correlation_id format: {}", correlation_id);
-                (0_usize, false, Some("Invalid correlation_id format".to_string()))
-            }
-        } else {
-            // Generic transform execution - this is where we implement the actual computation
-            info!("🔧 TransformManager: Executing transform with correlation_id: {}", correlation_id);
-            Self::execute_actual_transform(correlation_id, message_bus, db_ops)
-        }
-    }
-
-    /// Publish a TransformExecuted event for the given transform
-    pub(super) fn publish_transform_executed_event(
+    /// Execute a single transform with input fetching and computation
+    pub fn execute_single_transform(
         transform_id: &str,
-        message_bus: &Arc<MessageBus>,
-    ) -> (usize, bool, Option<String>) {
-        let executed_event = TransformExecuted {
-            transform_id: transform_id.to_string(),
-            result: "executed_via_event_request".to_string(),
-        };
+        transform: &crate::schema::types::Transform,
+        db_ops: &Arc<crate::db_operations::DbOperations>,
+    ) -> Result<JsonValue, SchemaError> {
+        info!("🚀 Executing single transform: {} with inputs: {:?}", transform_id, transform.get_inputs());
+        info!("🔧 Transform logic: {}", transform.logic);
         
-        match message_bus.publish(executed_event) {
-            Ok(_) => {
-                info!("✅ Successfully published TransformExecuted event for: {}", transform_id);
-                (1_usize, true, None)
-            }
-            Err(e) => {
-                error!("❌ Failed to publish TransformExecuted event for {}: {}", transform_id, e);
-                (0_usize, false, Some(format!("Failed to publish execution event: {}", e)))
-            }
-        }
-    }
-
-    /// Execute an actual transform with input fetching, computation, and result persistence
-    pub(super) fn execute_actual_transform(
-        correlation_id: &str,
-        message_bus: &Arc<MessageBus>,
-        db_ops: Option<&Arc<crate::db_operations::DbOperations>>,
-    ) -> (usize, bool, Option<String>) {
-        info!("🚀 TransformManager: Starting actual transform execution for: {}", correlation_id);
+        // Fetch input values for all transform inputs
+        let mut input_values = HashMap::new();
+        info!("📥 Loading input values for transform '{}'...", transform_id);
         
-        // For TransformSchema.result transform, we need to:
-        // 1. Load TransformBase schema and get value1, value2
-        // 2. Execute transform logic: value1 + value2
-        // 3. Store result in TransformSchema.result field
-        
-        // For demo purposes, let's look for the specific TransformSchema.result transform
-        if correlation_id.contains("TransformSchema.result") {
-            match Self::execute_transform_schema_result(message_bus, db_ops) {
-                Ok(result) => {
-                    info!("✅ TransformSchema.result computed successfully: {}", result);
-                    
-                    // Publish TransformExecuted event with the actual computed result
-                    let executed_event = TransformExecuted {
-                        transform_id: "TransformSchema.result".to_string(),
-                        result: format!("computed_result: {}", result),
-                    };
-                    
-                    match message_bus.publish(executed_event) {
-                        Ok(_) => {
-                            info!("✅ Successfully published TransformExecuted event with computed result");
-                            (1_usize, true, None)
-                        }
-                        Err(e) => {
-                            error!("❌ Failed to publish TransformExecuted event: {}", e);
-                            (0_usize, false, Some(format!("Failed to publish result: {}", e)))
-                        }
+        for input_field in transform.get_inputs() {
+            info!("📥 Loading input {}...", input_field);
+            
+            // Parse input field as "Schema.field"
+            if let Some(dot_pos) = input_field.find('.') {
+                let input_schema = &input_field[..dot_pos];
+                let input_field_name = &input_field[dot_pos + 1..];
+                
+                match Self::fetch_field_value(db_ops, input_schema, input_field_name) {
+                    Ok(value) => {
+                        info!("📊 Input value {}: {}", input_field, value);
+                        input_values.insert(input_field.clone(), value);
+                    }
+                    Err(e) => {
+                        warn!("⚠️ Failed to fetch input '{}', using default: {}", input_field, e);
+                        // Use default value based on the error or field name
+                        let default_value = Self::get_default_value_for_field(input_field_name);
+                        info!("📊 Using default value for {}: {}", input_field, default_value);
+                        input_values.insert(input_field.clone(), default_value);
                     }
                 }
-                Err(e) => {
-                    error!("❌ Transform execution failed: {}", e);
-                    
-                    // Publish failure event
-                    let executed_event = TransformExecuted {
-                        transform_id: "TransformSchema_result".to_string(),
-                        result: format!("execution_failed: {}", e),
-                    };
-                    let _ = message_bus.publish(executed_event);
-                    
-                    (0_usize, false, Some(format!("Transform execution failed: {}", e)))
-                }
+            } else {
+                warn!("⚠️ Invalid input field format '{}', expected 'Schema.field'", input_field);
+                let default_value = Self::get_default_value_for_field(input_field);
+                info!("📊 Using default value for {}: {}", input_field, default_value);
+                input_values.insert(input_field.clone(), default_value);
             }
-        } else {
-            // For other transforms, we'd implement generic transform loading and execution
-            warn!("⚠️ Generic transform execution not yet implemented for: {}", correlation_id);
-            (0_usize, true, None)
-        }
-    }
-
-    /// Execute the specific TransformSchema.result transform
-    fn execute_transform_schema_result(
-        _message_bus: &Arc<MessageBus>,
-        db_ops: Option<&Arc<crate::db_operations::DbOperations>>,
-    ) -> Result<JsonValue, SchemaError> {
-        info!("🔢 Executing TransformSchema.result transform (value1 + value2)");
-        
-        // Step 1: Try to fetch actual values from TransformBase schema if db_ops is available
-        let (value1, value2) = if let Some(db_ops) = db_ops {
-            match Self::fetch_transform_base_values(db_ops) {
-                Ok((v1, v2)) => {
-                    info!("✅ Fetched actual values from database: value1={}, value2={}", v1, v2);
-                    (v1, v2)
-                }
-                Err(e) => {
-                    warn!("⚠️ Failed to fetch from database, using fallback values: {}", e);
-                    // Use fallback values to demonstrate the pipeline works
-                    (JsonValue::Number(serde_json::Number::from(10)),
-                     JsonValue::Number(serde_json::Number::from(20)))
-                }
-            }
-        } else {
-            info!("📋 No database access provided, using demo values");
-            (JsonValue::Number(serde_json::Number::from(10)),
-             JsonValue::Number(serde_json::Number::from(20)))
-        };
-        
-        info!("📊 Input values - value1: {}, value2: {}", value1, value2);
-        
-        // Step 2: Create input map for TransformExecutor
-        let mut input_values = HashMap::new();
-        input_values.insert("TransformBase.value1".to_string(), value1.clone());
-        input_values.insert("TransformBase.value2".to_string(), value2.clone());
-        
-        // Step 3: Create the transform definition (matches TransformSchema.json)
-        let transform = crate::schema::types::Transform::new(
-            "TransformBase.value1 + TransformBase.value2".to_string(),
-            "TransformSchema.result".to_string(),
-        );
-        
-        // Step 4: Execute the transform using TransformExecutor
-        let result = TransformExecutor::execute_transform(&transform, input_values)?;
-        
-        info!("🎯 Transform computation complete: {} + {} = {}", value1, value2, result);
-        
-        // Step 5: Store result in TransformSchema.result field in database
-        if let Some(db_ops) = db_ops {
-            match Self::store_transform_result(db_ops, &result) {
-                Ok(_) => info!("✅ Transform result stored in TransformSchema.result"),
-                Err(e) => warn!("⚠️ Failed to store transform result: {}", e),
-            }
-        } else {
-            info!("📋 No database access - result not persisted");
         }
         
+        // Log complete set of inputs before computation
+        info!("📊 Complete input set for computation:");
+        for (key, value) in &input_values {
+            info!("  📋 {}: {}", key, value);
+        }
+        
+        // Execute the transform using TransformExecutor
+        info!("🧮 Starting computation with logic: {}", transform.logic);
+        let result = TransformExecutor::execute_transform(transform, input_values)?;
+        
+        info!("✨ Computation result: {}", result);
+        info!("🎯 Transform '{}' computation complete: {}", transform_id, result);
         Ok(result)
     }
-
-    /// Fetch input values from TransformBase schema
-    fn fetch_transform_base_values(
+    
+    /// Fetch field value from a specific schema
+    fn fetch_field_value(
         db_ops: &Arc<crate::db_operations::DbOperations>,
-    ) -> Result<(JsonValue, JsonValue), SchemaError> {
-        info!("📥 Fetching TransformBase.value1 and TransformBase.value2 from database");
+        schema_name: &str,
+        field_name: &str,
+    ) -> Result<JsonValue, SchemaError> {
+        info!("📥 Loading input {}.{}...", schema_name, field_name);
+        info!("🔍 Fetching field value from database...");
         
-        // Load TransformBase schema
-        let schema = db_ops.get_schema("TransformBase")?
-            .ok_or_else(|| SchemaError::InvalidData("TransformBase schema not found".to_string()))?;
+        // Load schema
+        info!("📋 Loading schema '{}'...", schema_name);
+        let schema = db_ops.get_schema(schema_name)?
+            .ok_or_else(|| {
+                error!("❌ Schema '{}' not found", schema_name);
+                SchemaError::InvalidData(format!("Schema '{}' not found", schema_name))
+            })?;
         
-        // Get value1
-        let value1 = Self::get_field_value_from_schema(db_ops, &schema, "value1")
-            .unwrap_or_else(|e| {
-                warn!("Failed to get value1, using default: {}", e);
-                JsonValue::Number(serde_json::Number::from(5))
-            });
+        info!("✅ Schema '{}' loaded successfully", schema_name);
         
-        // Get value2
-        let value2 = Self::get_field_value_from_schema(db_ops, &schema, "value2")
-            .unwrap_or_else(|e| {
-                warn!("Failed to get value2, using default: {}", e);
-                JsonValue::Number(serde_json::Number::from(15))
-            });
+        // Get field value using existing helper
+        info!("🔍 Looking up field '{}' in schema...", field_name);
+        let result = Self::get_field_value_from_schema(db_ops, &schema, field_name);
         
-        Ok((value1, value2))
+        match &result {
+            Ok(value) => {
+                info!("📊 Input value {}.{}: {}", schema_name, field_name, value);
+            }
+            Err(e) => {
+                error!("❌ Failed to load {}.{}: {}", schema_name, field_name, e);
+            }
+        }
+        
+        result
     }
-
-    /// Store the computed result in TransformSchema.result field
-    fn store_transform_result(
+    
+    /// Get default value for a field based on its name
+    fn get_default_value_for_field(field_name: &str) -> JsonValue {
+        match field_name {
+            "value1" => JsonValue::Number(serde_json::Number::from(5)),
+            "value2" => JsonValue::Number(serde_json::Number::from(10)),
+            _ => JsonValue::Number(serde_json::Number::from(0)),
+        }
+    }
+    
+    
+    /// Generic result storage for any transform
+    pub fn store_transform_result_generic(
         db_ops: &Arc<crate::db_operations::DbOperations>,
+        transform: &crate::schema::types::Transform,
         result: &JsonValue,
     ) -> Result<(), SchemaError> {
-        info!("💾 Storing transform result: {} in TransformSchema.result", result);
+        info!("💾 Storing generic transform result: {} for output: {}", result, transform.get_output());
         
-        // Create an atom with the computed result
-        let atom = db_ops.create_atom(
-            "TransformSchema",
-            "transform_system".to_string(), // System-generated result
-            None, // No previous version
-            result.clone(),
-            None, // Active status
-        )?;
+        // Parse output field as "Schema.field"
+        if let Some(dot_pos) = transform.get_output().find('.') {
+            let schema_name = &transform.get_output()[..dot_pos];
+            let field_name = &transform.get_output()[dot_pos + 1..];
+            
+            info!("💾 Storing result {} to {}.{}", result, schema_name, field_name);
+            
+            // Create an atom with the computed result
+            info!("🔧 Creating atom for result storage...");
+            let atom = db_ops.create_atom(
+                schema_name,
+                "transform_system".to_string(), // System-generated result
+                None, // No previous version
+                result.clone(),
+                None, // Active status
+            )?;
+            
+            info!("✅ Created atom {} with result: {} for {}.{}", atom.uuid(), result, schema_name, field_name);
+            info!("💾 Storing result {} to {}.{}", result, schema_name, field_name);
+            
+            // Update the field's ref_atom_uuid to point to this atom
+            info!("🔗 Updating field reference to point to new atom...");
+            Self::update_field_reference(db_ops, schema_name, field_name, atom.uuid())?;
+            
+            info!("✅ Result stored successfully with atom_id: {}", atom.uuid());
+            Ok(())
+        } else {
+            return Err(SchemaError::InvalidField(format!("Invalid output field format '{}', expected 'Schema.field'", transform.get_output())));
+        }
+    }
+    
+    /// Update a field's ref_atom_uuid to point to a new atom and create proper linking
+    fn update_field_reference(
+        db_ops: &Arc<crate::db_operations::DbOperations>,
+        schema_name: &str,
+        field_name: &str,
+        atom_uuid: &str,
+    ) -> Result<(), SchemaError> {
+        info!("🔗 Updating field reference: {}.{} -> atom {}", schema_name, field_name, atom_uuid);
         
-        info!("✅ Created atom {} with result: {}", atom.uuid(), result);
+        // 1. Load the schema
+        let mut schema = db_ops.get_schema(schema_name)?
+            .ok_or_else(|| SchemaError::InvalidData(format!("Schema '{}' not found", schema_name)))?;
         
-        // TODO: Update TransformSchema.result field's ref_atom_uuid to point to this atom
-        // This would involve:
-        // 1. Loading TransformSchema
-        // 2. Updating the result field's ref_atom_uuid
-        // 3. Creating/updating an AtomRef to point to the new atom
-        // 4. Saving the updated schema
+        // 2. Get the field
+        let field = schema.fields.get_mut(field_name)
+            .ok_or_else(|| SchemaError::InvalidField(format!("Field '{}' not found in schema '{}'", field_name, schema_name)))?;
+        
+        // 3. Get or create new ref_atom_uuid for the field
+        let ref_uuid = match field.ref_atom_uuid() {
+            Some(existing_ref) => existing_ref.clone(),
+            None => {
+                // Create new UUID for the field reference
+                let new_ref_uuid = uuid::Uuid::new_v4().to_string();
+                field.set_ref_atom_uuid(new_ref_uuid.clone());
+                new_ref_uuid
+            }
+        };
+        
+        // 4. Create/update AtomRef to point to the new atom
+        let atom_ref = crate::atom::AtomRef::new(atom_uuid.to_string(), "transform_system".to_string());
+        db_ops.store_item(&format!("ref:{}", ref_uuid), &atom_ref)?;
+        
+        info!("✅ Created/updated AtomRef {} -> atom {}", ref_uuid, atom_uuid);
+        info!("🔧 DEBUG: AtomRef UUID: {} (this is the reference ID)", ref_uuid);
+        info!("🔧 DEBUG: Target Atom UUID: {} (this is what the reference points to)", atom_uuid);
+        
+        // Debug: Verify the atom was stored correctly
+        match db_ops.get_item::<crate::atom::Atom>(&format!("atom:{}", atom_uuid)) {
+            Ok(Some(stored_atom)) => {
+                info!("🔍 DEBUG: Verified atom {} exists with content: {}", atom_uuid, stored_atom.content());
+            }
+            Ok(None) => {
+                error!("❌ DEBUG: Atom {} was not found after storage!", atom_uuid);
+            }
+            Err(e) => {
+                error!("❌ DEBUG: Error retrieving atom {}: {}", atom_uuid, e);
+            }
+        }
+        
+        // Debug: Verify the AtomRef was stored correctly
+        match db_ops.get_item::<crate::atom::AtomRef>(&format!("ref:{}", ref_uuid)) {
+            Ok(Some(stored_ref)) => {
+                let target_atom_uuid = stored_ref.get_atom_uuid();
+                info!("🔍 DEBUG: Verified AtomRef {} points to atom: {}", ref_uuid, target_atom_uuid);
+                info!("🔍 DEBUG: Reference chain: Schema.field → AtomRef {} → Data Atom {}", ref_uuid, target_atom_uuid);
+                
+                // Verify this is NOT pointing to itself (the bug we just fixed)
+                if ref_uuid == *target_atom_uuid {
+                    error!("❌ CRITICAL BUG: AtomRef {} is pointing to itself instead of data atom!", ref_uuid);
+                } else {
+                    info!("✅ VERIFIED: AtomRef {} correctly points to different atom {}", ref_uuid, target_atom_uuid);
+                }
+            }
+            Ok(None) => {
+                error!("❌ DEBUG: AtomRef {} was not found after storage!", ref_uuid);
+            }
+            Err(e) => {
+                error!("❌ DEBUG: Error retrieving AtomRef {}: {}", ref_uuid, e);
+            }
+        }
+        
+        // 5. Save the updated schema
+        db_ops.store_schema(schema_name, &schema)?;
+        
+        info!("✅ Updated schema '{}' with field '{}' pointing to atom {}", schema_name, field_name, atom_uuid);
         
         Ok(())
     }
@@ -244,26 +236,51 @@ impl TransformManager {
         schema: &Schema,
         field_name: &str,
     ) -> Result<JsonValue, SchemaError> {
+        info!("🔍 Looking up field '{}' in schema", field_name);
+        
         // Get field definition
         let field = schema.fields.get(field_name)
-            .ok_or_else(|| SchemaError::InvalidField(format!("Field '{}' not found", field_name)))?;
+            .ok_or_else(|| {
+                error!("❌ Field '{}' not found in schema", field_name);
+                SchemaError::InvalidField(format!("Field '{}' not found", field_name))
+            })?;
+        
+        info!("✅ Field '{}' found in schema", field_name);
         
         // Get ref_atom_uuid from field
         let ref_atom_uuid = field.ref_atom_uuid()
-            .ok_or_else(|| SchemaError::InvalidField(format!("Field '{}' has no ref_atom_uuid", field_name)))?;
+            .ok_or_else(|| {
+                error!("❌ Field '{}' has no ref_atom_uuid", field_name);
+                SchemaError::InvalidField(format!("Field '{}' has no ref_atom_uuid", field_name))
+            })?;
+        
+        info!("🔗 Field ref_atom_uuid: {}", ref_atom_uuid);
         
         // Get AtomRef from database
+        info!("🔍 Loading AtomRef from database...");
         let atom_ref: crate::atom::AtomRef = db_ops.get_item(&format!("ref:{}", ref_atom_uuid))?
-            .ok_or_else(|| SchemaError::InvalidField(format!("AtomRef '{}' not found", ref_atom_uuid)))?;
+            .ok_or_else(|| {
+                error!("❌ AtomRef '{}' not found", ref_atom_uuid);
+                SchemaError::InvalidField(format!("AtomRef '{}' not found", ref_atom_uuid))
+            })?;
         
         // Get atom_uuid from AtomRef
         let atom_uuid = atom_ref.get_atom_uuid();
+        info!("🔗 AtomRef points to atom: {}", atom_uuid);
         
         // Get Atom from database
+        info!("🔍 Loading Atom from database...");
         let atom: crate::atom::Atom = db_ops.get_item(&format!("atom:{}", atom_uuid))?
-            .ok_or_else(|| SchemaError::InvalidField(format!("Atom '{}' not found", atom_uuid)))?;
+            .ok_or_else(|| {
+                error!("❌ Atom '{}' not found", atom_uuid);
+                SchemaError::InvalidField(format!("Atom '{}' not found", atom_uuid))
+            })?;
+        
+        info!("✅ Atom loaded successfully");
+        let content = atom.content().clone();
+        info!("📦 Atom content: {}", content);
         
         // Return atom content (the actual field value)
-        Ok(atom.content().clone())
+        Ok(content)
     }
 }

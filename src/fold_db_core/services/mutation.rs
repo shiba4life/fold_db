@@ -11,7 +11,7 @@
 //! - Event publishing (belongs to FoldDB)
 //! - Schema validation (belongs to FoldDB)
 
-use crate::fold_db_core::infrastructure::message_bus::{MessageBus, TransformTriggerRequest, CollectionUpdateRequest, FieldValueSetRequest};
+use crate::fold_db_core::infrastructure::message_bus::{MessageBus, CollectionUpdateRequest, FieldValueSetRequest};
 use crate::schema::types::field::FieldVariant;
 use crate::schema::types::schema::Schema;
 use crate::schema::types::Mutation;
@@ -127,7 +127,7 @@ impl MutationService {
         field_name: &str,
         _single_field: &crate::schema::types::field::single_field::SingleField,
         value: &Value,
-        mutation_hash: &str,
+        _mutation_hash: &str,
     ) -> Result<(), SchemaError> {
         log::info!("🔧 Updating single field: {}.{}", schema.name, field_name);
         
@@ -147,25 +147,9 @@ impl MutationService {
         }
         log::info!("✅ Field value set request sent for {}.{}", schema.name, field_name);
         
-        // Then send TransformTriggerRequest for this field (for any transforms)
-        let transform_correlation_id = Uuid::new_v4().to_string();
-        let transform_request = TransformTriggerRequest {
-            correlation_id: transform_correlation_id.clone(),
-            schema_name: schema.name.clone(),
-            field_name: field_name.to_string(),
-            mutation_hash: mutation_hash.to_owned(),
-        };
-
-        match self.message_bus.publish(transform_request) {
-            Ok(_) => {
-                log::info!("✅ Single field transform trigger sent for {}.{}", schema.name, field_name);
-                Ok(())
-            }
-            Err(e) => {
-                log::error!("❌ Failed to send transform trigger for {}.{}: {:?}", schema.name, field_name, e);
-                Err(SchemaError::InvalidData(format!("Failed to update single field: {}", e)))
-            }
-        }
+        // Transform triggers are now handled automatically by TransformOrchestrator
+        // via direct FieldValueSet event monitoring
+        Ok(())
     }
 
     /// Handle range field mutation
@@ -175,29 +159,13 @@ impl MutationService {
         field_name: &str,
         _range_field: &crate::schema::types::field::range_field::RangeField,
         _value: &Value,
-        mutation_hash: &str,
+        _mutation_hash: &str,
     ) -> Result<(), SchemaError> {
         log::info!("🔧 Updating range field: {}.{}", schema.name, field_name);
         
-        // Send TransformTriggerRequest for this field
-        let correlation_id = Uuid::new_v4().to_string();
-        let transform_request = TransformTriggerRequest {
-            correlation_id: correlation_id.clone(),
-            schema_name: schema.name.clone(),
-            field_name: field_name.to_string(),
-            mutation_hash: mutation_hash.to_owned(),
-        };
-
-        match self.message_bus.publish(transform_request) {
-            Ok(_) => {
-                log::info!("✅ Range field transform trigger sent for {}.{}", schema.name, field_name);
-                Ok(())
-            }
-            Err(e) => {
-                log::error!("❌ Failed to send transform trigger for {}.{}: {:?}", schema.name, field_name, e);
-                Err(SchemaError::InvalidData(format!("Failed to update range field: {}", e)))
-            }
-        }
+        // Transform triggers are now handled automatically by TransformOrchestrator
+        // via direct FieldValueSet event monitoring
+        Ok(())
     }
 
     /// Handle collection field mutation

@@ -11,5 +11,9 @@ pub mod init;
 pub mod async_api;
 pub mod event_monitor;
 
-pub use message_bus::MessageBus;
+pub use message_bus::{
+    MessageBus,
+    TransformExecuted, TransformTriggered,
+    SchemaChanged
+};
 pub use event_monitor::EventMonitor;

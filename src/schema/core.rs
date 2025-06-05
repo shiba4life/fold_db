@@ -160,17 +160,17 @@ impl SchemaCore {
 
     /// Auto-register field transforms with TransformManager during schema loading
     fn register_schema_transforms(&self, schema: &Schema) -> Result<(), SchemaError> {
-        info!("🔧 Auto-registering transforms for schema: {}", schema.name);
+        info!("🔧 DEBUG: Auto-registering transforms for schema: {}", schema.name);
+        info!("🔍 DEBUG: Schema has {} fields to check for transforms", schema.fields.len());
         
         for (field_name, field) in &schema.fields {
+            info!("🔍 DEBUG: Checking field '{}.{}' for transforms", schema.name, field_name);
             if let Some(transform) = field.transform() {
                 info!(
                     "📋 Found transform on field {}.{}: inputs={:?}, logic={}, output={}",
                     schema.name, field_name, transform.get_inputs(), transform.logic, transform.get_output()
                 );
                 
-                // For now, store transform registration information in database for later processing
-                // This ensures transforms are discovered and can be registered when TransformManager is available
                 let transform_id = format!("{}.{}", schema.name, field_name);
                 
                 // Store the transform in the database so it can be loaded by TransformManager
@@ -179,14 +179,64 @@ impl SchemaCore {
                         "Failed to store transform {}: {}",
                         transform_id, e
                     );
-                } else {
+                    continue;
+                }
+                
+                info!("✅ Stored transform {} for auto-registration", transform_id);
+                
+                // 🛠️ FIX: Create field-to-transform mappings for TransformOrchestrator
+                // This is the missing piece - we need to map each input field to this transform
+                for input_field in transform.get_inputs() {
                     info!(
-                        "✅ Stored transform {} for auto-registration",
-                        transform_id
+                        "🔗 Creating field mapping: '{}' → '{}' transform",
+                        input_field, transform_id
                     );
+                    
+                    // Store field mapping in database for TransformManager to load
+                    if let Err(e) = self.store_field_to_transform_mapping(input_field, &transform_id) {
+                        log::error!(
+                            "Failed to store field mapping '{}' → '{}': {}",
+                            input_field, transform_id, e
+                        );
+                    } else {
+                        info!(
+                            "✅ Stored field mapping: '{}' → '{}' transform",
+                            input_field, transform_id
+                        );
+                    }
                 }
             }
         }
+        
+        Ok(())
+    }
+
+    /// Store field-to-transform mapping in database for TransformManager to load
+    fn store_field_to_transform_mapping(&self, field_key: &str, transform_id: &str) -> Result<(), SchemaError> {
+        // Use the same key format as TransformManager
+        const FIELD_TO_TRANSFORMS_KEY: &str = "map_field_to_transforms";
+        
+        // Load existing mappings using the correct method
+        let mut field_mappings: std::collections::HashMap<String, std::collections::HashSet<String>> =
+            if let Some(data) = self.db_ops.get_transform_mapping(FIELD_TO_TRANSFORMS_KEY)? {
+                serde_json::from_slice(&data).unwrap_or_default()
+            } else {
+                std::collections::HashMap::new()
+            };
+        
+        // Add this mapping
+        field_mappings
+            .entry(field_key.to_string())
+            .or_default()
+            .insert(transform_id.to_string());
+        
+        // Store updated mappings using the correct method
+        let json = serde_json::to_vec(&field_mappings).map_err(|e| {
+            SchemaError::InvalidData(format!("Failed to serialize field mappings: {}", e))
+        })?;
+        self.db_ops.store_transform_mapping(FIELD_TO_TRANSFORMS_KEY, &json)?;
+        
+        info!("💾 Updated field mappings in database: {} fields mapped", field_mappings.len());
         
         Ok(())
     }
@@ -195,7 +245,7 @@ impl SchemaCore {
     /// This preserves existing schema state if it exists, otherwise defaults to Available.
     pub fn load_schema_internal(&self, mut schema: Schema) -> Result<(), SchemaError> {
         info!(
-            "🔄 LOAD_SCHEMA_INTERNAL START - schema: '{}' with {} fields: {:?}",
+            "🔄 DEBUG: LOAD_SCHEMA_INTERNAL START - schema: '{}' with {} fields: {:?}",
             schema.name,
             schema.fields.len(),
             schema.fields.keys().collect::<Vec<_>>()
@@ -232,6 +282,7 @@ impl SchemaCore {
         self.fix_transform_outputs(&mut schema);
         
         // Auto-register field transforms with TransformManager
+        info!("🔧 DEBUG: About to call register_schema_transforms for schema: {}", schema.name);
         self.register_schema_transforms(&schema)?;
         info!(
             "After fix_transform_outputs, schema '{}' has {} fields: {:?}",
@@ -523,6 +574,7 @@ impl SchemaCore {
 
     /// Discover schemas from the available_schemas directory
     pub fn discover_available_schemas(&self) -> Result<Vec<Schema>, SchemaError> {
+        info!("🔍 DEBUG: Starting discovery from available_schemas directory");
         let mut discovered_schemas = Vec::new();
         let available_schemas_dir = PathBuf::from("available_schemas");
 

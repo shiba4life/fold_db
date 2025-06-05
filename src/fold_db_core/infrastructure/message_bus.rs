@@ -506,29 +506,6 @@ pub struct AtomRefQueryResponse {
     pub error: Option<String>,
 }
 
-/// Request to trigger a transform
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TransformTriggerRequest {
-    /// Correlation ID for matching request with response
-    pub correlation_id: String,
-    /// Schema name
-    pub schema_name: String,
-    /// Field name
-    pub field_name: String,
-    /// Mutation hash for the transform
-    pub mutation_hash: String,
-}
-
-/// Response to transform trigger request
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TransformTriggerResponse {
-    /// Correlation ID matching the request
-    pub correlation_id: String,
-    /// Success flag
-    pub success: bool,
-    /// Error message (if failed)
-    pub error: Option<String>,
-}
 
 /// Request to get schema status
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -623,25 +600,6 @@ pub struct CollectionUpdateResponse {
 }
 
 
-/// Request to execute transforms in the queue
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TransformExecutionRequest {
-    /// Correlation ID for matching request with response
-    pub correlation_id: String,
-}
-
-/// Response to transform execution request
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TransformExecutionResponse {
-    /// Correlation ID matching the request
-    pub correlation_id: String,
-    /// Success flag
-    pub success: bool,
-    /// Number of transforms executed
-    pub transforms_executed: usize,
-    /// Error message (if failed)
-    pub error: Option<String>,
-}
 
 /// Request for system initialization
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -740,14 +698,6 @@ pub enum Event {
     AtomRefQueryRequest(AtomRefQueryRequest),
     /// AtomRef query response
     AtomRefQueryResponse(AtomRefQueryResponse),
-    /// Transform trigger request
-    TransformTriggerRequest(TransformTriggerRequest),
-    /// Transform trigger response
-    TransformTriggerResponse(TransformTriggerResponse),
-    /// Transform execution request
-    TransformExecutionRequest(TransformExecutionRequest),
-    /// Transform execution response
-    TransformExecutionResponse(TransformExecutionResponse),
     /// System initialization request
     SystemInitializationRequest(SystemInitializationRequest),
     /// System initialization response
@@ -793,10 +743,6 @@ impl Event {
             Event::FieldValueQueryResponse(_) => "FieldValueQueryResponse",
             Event::AtomRefQueryRequest(_) => "AtomRefQueryRequest",
             Event::AtomRefQueryResponse(_) => "AtomRefQueryResponse",
-            Event::TransformTriggerRequest(_) => "TransformTriggerRequest",
-            Event::TransformTriggerResponse(_) => "TransformTriggerResponse",
-            Event::TransformExecutionRequest(_) => "TransformExecutionRequest",
-            Event::TransformExecutionResponse(_) => "TransformExecutionResponse",
             Event::SystemInitializationRequest(_) => "SystemInitializationRequest",
             Event::SystemInitializationResponse(_) => "SystemInitializationResponse",
         }
@@ -1023,30 +969,6 @@ impl EventType for AtomRefQueryResponse {
     }
 }
 
-impl EventType for TransformTriggerRequest {
-    fn type_id() -> &'static str {
-        "TransformTriggerRequest"
-    }
-}
-
-impl EventType for TransformTriggerResponse {
-    fn type_id() -> &'static str {
-        "TransformTriggerResponse"
-    }
-}
-
-
-impl EventType for TransformExecutionRequest {
-    fn type_id() -> &'static str {
-        "TransformExecutionRequest"
-    }
-}
-
-impl EventType for TransformExecutionResponse {
-    fn type_id() -> &'static str {
-        "TransformExecutionResponse"
-    }
-}
 
 impl EventType for SystemInitializationRequest {
     fn type_id() -> &'static str {
@@ -1235,10 +1157,6 @@ impl MessageBus {
             Event::FieldValueQueryResponse(e) => self.publish(e),
             Event::AtomRefQueryRequest(e) => self.publish(e),
             Event::AtomRefQueryResponse(e) => self.publish(e),
-            Event::TransformTriggerRequest(e) => self.publish(e),
-            Event::TransformTriggerResponse(e) => self.publish(e),
-            Event::TransformExecutionRequest(e) => self.publish(e),
-            Event::TransformExecutionResponse(e) => self.publish(e),
             Event::SystemInitializationRequest(e) => self.publish(e),
             Event::SystemInitializationResponse(e) => self.publish(e),
         }

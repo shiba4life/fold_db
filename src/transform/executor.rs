@@ -7,7 +7,7 @@ use super::ast::Value;
 use super::interpreter::Interpreter;
 use super::parser::TransformParser;
 use crate::schema::types::{SchemaError, Transform};
-use log::info;
+use log::{info, error};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 
@@ -29,14 +29,30 @@ impl TransformExecutor {
         transform: &Transform,
         input_values: HashMap<String, JsonValue>,
     ) -> Result<JsonValue, SchemaError> {
-        info!(
-            "execute_transform logic: {} with inputs: {:?}",
-            transform.logic, input_values
-        );
-        let result = Self::execute_transform_with_expr(transform, input_values);
-        if let Ok(ref value) = result {
-            info!("execute_transform result: {:?}", value);
+        info!("🧮 TransformExecutor: Starting computation");
+        info!("🔧 Transform logic: {}", transform.logic);
+        
+        // Log individual input values
+        info!("📊 Input values for computation:");
+        for (key, value) in &input_values {
+            info!("  📋 {}: {}", key, value);
         }
+        
+        // Log a simplified computation description
+        info!("🧮 Computing with logic: {}", transform.logic);
+        
+        let result = Self::execute_transform_with_expr(transform, input_values);
+        
+        match &result {
+            Ok(value) => {
+                info!("✨ Computation result: {}", value);
+                info!("✅ Transform execution completed successfully");
+            }
+            Err(e) => {
+                error!("❌ Transform execution failed: {}", e);
+            }
+        }
+        
         result
     }
 
@@ -137,24 +153,29 @@ impl TransformExecutor {
             }
         };
 
-        info!(
-            "execute_transform_with_expr expression: {:?} inputs: {:?}",
-            ast, input_values
-        );
+        info!("🔍 Transform AST: {:?}", ast);
+        info!("📊 Input values: {:?}", input_values);
 
         // Convert input values to interpreter values
+        info!("🔄 Converting input values to interpreter format...");
         let variables = Self::convert_input_values(input_values);
+        info!("🔄 Variables for interpreter: {:?}", variables);
 
         // Create interpreter with input variables
+        info!("🧠 Creating interpreter with variables...");
         let mut interpreter = Interpreter::with_variables(variables);
 
         // Evaluate the AST
+        info!("⚡ Evaluating expression...");
         let evaluated = interpreter.evaluate(&ast).map_err(|e| {
+            error!("❌ Expression evaluation failed: {}", e);
             SchemaError::InvalidField(format!("Failed to execute transform: {}", e))
         })?;
 
+        info!("🎯 Raw evaluation result: {:?}", evaluated);
+        
         let json_result = Self::convert_result_value(evaluated)?;
-        info!("execute_transform_with_expr result: {:?}", json_result);
+        info!("✨ Final JSON result: {}", json_result);
         Ok(json_result)
     }
 
@@ -180,6 +201,61 @@ impl TransformExecutor {
     /// Converts a result value from interpreter Value to JsonValue.
     fn convert_result_value(value: Value) -> Result<JsonValue, SchemaError> {
         Ok(JsonValue::from(value))
+    }
+
+    /// Creates a human-readable description of the computation being performed.
+    fn describe_computation(logic: &str, input_values: &HashMap<String, JsonValue>) -> String {
+        // For simple arithmetic operations, create a descriptive string
+        if logic.contains('+') {
+            let parts: Vec<&str> = logic.split('+').map(|s| s.trim()).collect();
+            if parts.len() == 2 {
+                let left_val = Self::resolve_value_description(parts[0], input_values);
+                let right_val = Self::resolve_value_description(parts[1], input_values);
+                return format!("{} + {}", left_val, right_val);
+            }
+        } else if logic.contains('-') {
+            let parts: Vec<&str> = logic.split('-').map(|s| s.trim()).collect();
+            if parts.len() == 2 {
+                let left_val = Self::resolve_value_description(parts[0], input_values);
+                let right_val = Self::resolve_value_description(parts[1], input_values);
+                return format!("{} - {}", left_val, right_val);
+            }
+        } else if logic.contains('*') {
+            let parts: Vec<&str> = logic.split('*').map(|s| s.trim()).collect();
+            if parts.len() == 2 {
+                let left_val = Self::resolve_value_description(parts[0], input_values);
+                let right_val = Self::resolve_value_description(parts[1], input_values);
+                return format!("{} * {}", left_val, right_val);
+            }
+        } else if logic.contains('/') {
+            let parts: Vec<&str> = logic.split('/').map(|s| s.trim()).collect();
+            if parts.len() == 2 {
+                let left_val = Self::resolve_value_description(parts[0], input_values);
+                let right_val = Self::resolve_value_description(parts[1], input_values);
+                return format!("{} / {}", left_val, right_val);
+            }
+        }
+        
+        // Fallback to the original logic
+        logic.to_string()
+    }
+    
+    /// Resolves a value description for computation display.
+    fn resolve_value_description(var_name: &str, input_values: &HashMap<String, JsonValue>) -> String {
+        // Try to find the value in inputs
+        for (key, value) in input_values {
+            if key == var_name || key.ends_with(&format!(".{}", var_name)) {
+                return value.to_string();
+            }
+        }
+        
+        // If it's a literal number, return as-is
+        if var_name.parse::<f64>().is_ok() {
+            return var_name.to_string();
+        }
+        
+        // Return the variable name as fallback
+        var_name.to_string()
     }
 
     /// Validates a transform.
