@@ -141,7 +141,8 @@ impl SerializationHelper {
         
         // Special debug logging for field_to_transforms
         if mapping_name == "field_to_transforms" {
-            let _map = LockHelper::read_lock(mapping, mapping_name)?;
+            let _map = mapping.read()
+                .map_err(|_| SchemaError::InvalidData(format!("Failed to acquire read lock for {}", mapping_name)))?;
             info!("🔍 DEBUG: Storing field_to_transforms mapping to database");
         }
         

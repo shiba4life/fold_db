@@ -12,51 +12,7 @@ use std::sync::Arc;
 pub struct EventPublisher;
 
 impl EventPublisher {
-    /// Publish a TransformExecuted success event with consistent error handling
-    pub fn publish_transform_executed_success(
-        message_bus: &Arc<MessageBus>,
-        transform_id: &str,
-    ) -> Result<(), SchemaError> {
-        info!("📢 Publishing TransformExecuted success event for: {}", transform_id);
-        
-        let event = TransformExecuted::new(transform_id, "success");
-        
-        match message_bus.publish(event) {
-            Ok(_) => {
-                info!("✅ Published TransformExecuted success event for transform: {}", transform_id);
-                Ok(())
-            }
-            Err(e) => {
-                let error_msg = format!("Failed to publish TransformExecuted success event for {}: {}", transform_id, e);
-                error!("❌ {}", error_msg);
-                Err(SchemaError::InvalidData(error_msg))
-            }
-        }
-    }
-
-    /// Publish a TransformExecuted failure event with consistent error handling
-    pub fn publish_transform_executed_failure(
-        message_bus: &Arc<MessageBus>,
-        transform_id: &str,
-    ) -> Result<(), SchemaError> {
-        info!("📢 Publishing TransformExecuted failure event for: {}", transform_id);
-        
-        let event = TransformExecuted::new(transform_id, "failed");
-        
-        match message_bus.publish(event) {
-            Ok(_) => {
-                info!("✅ Published TransformExecuted failure event for transform: {}", transform_id);
-                Ok(())
-            }
-            Err(e) => {
-                let error_msg = format!("Failed to publish TransformExecuted failure event for {}: {}", transform_id, e);
-                error!("❌ {}", error_msg);
-                Err(SchemaError::InvalidData(error_msg))
-            }
-        }
-    }
-
-    /// Publish a TransformExecuted event with the specified status
+    /// Publish a TransformExecuted event with consistent error handling
     pub fn publish_transform_executed(
         message_bus: &Arc<MessageBus>,
         transform_id: &str,
@@ -77,6 +33,22 @@ impl EventPublisher {
                 Err(SchemaError::InvalidData(error_msg))
             }
         }
+    }
+
+    /// Convenience method for publishing success events
+    pub fn publish_transform_executed_success(
+        message_bus: &Arc<MessageBus>,
+        transform_id: &str,
+    ) -> Result<(), SchemaError> {
+        Self::publish_transform_executed(message_bus, transform_id, "success")
+    }
+
+    /// Convenience method for publishing failure events
+    pub fn publish_transform_executed_failure(
+        message_bus: &Arc<MessageBus>,
+        transform_id: &str,
+    ) -> Result<(), SchemaError> {
+        Self::publish_transform_executed(message_bus, transform_id, "failed")
     }
 
     /// Execute and publish pattern - combines execution result handling with event publishing

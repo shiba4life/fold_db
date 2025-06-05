@@ -142,40 +142,36 @@ impl TransformManager {
 
     /// Returns true if a transform with the given id is registered.
     pub fn transform_exists(&self, transform_id: &str) -> Result<bool, SchemaError> {
-        let registered_transforms = LockHelper::read_lock(&self.registered_transforms, "registered_transforms")?;
+        let registered_transforms = self.registered_transforms.read()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire read lock".to_string()))?;
         Ok(registered_transforms.contains_key(transform_id))
     }
 
     /// List all registered transforms.
     pub fn list_transforms(&self) -> Result<HashMap<String, Transform>, SchemaError> {
-        let registered_transforms = LockHelper::read_lock(&self.registered_transforms, "registered_transforms")?;
+        let registered_transforms = self.registered_transforms.read()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire read lock".to_string()))?;
         Ok(registered_transforms.clone())
     }
 
     /// Gets all transforms that depend on the specified atom reference.
-    pub fn get_dependent_transforms(
-        &self,
-        aref_uuid: &str,
-    ) -> Result<HashSet<String>, SchemaError> {
-        let aref_to_transforms = LockHelper::read_lock(&self.aref_to_transforms, "aref_to_transforms")?;
-        Ok(match aref_to_transforms.get(aref_uuid) {
-            Some(transform_set) => transform_set.clone(),
-            None => HashSet::new(),
-        })
+    pub fn get_dependent_transforms(&self, aref_uuid: &str) -> Result<HashSet<String>, SchemaError> {
+        let aref_to_transforms = self.aref_to_transforms.read()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire read lock".to_string()))?;
+        Ok(aref_to_transforms.get(aref_uuid).cloned().unwrap_or_default())
     }
 
     /// Gets all atom references that a transform depends on.
     pub fn get_transform_inputs(&self, transform_id: &str) -> Result<HashSet<String>, SchemaError> {
-        let transform_to_arefs = LockHelper::read_lock(&self.transform_to_arefs, "transform_to_arefs")?;
-        Ok(match transform_to_arefs.get(transform_id) {
-            Some(aref_set) => aref_set.clone(),
-            None => HashSet::new(),
-        })
+        let transform_to_arefs = self.transform_to_arefs.read()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire read lock".to_string()))?;
+        Ok(transform_to_arefs.get(transform_id).cloned().unwrap_or_default())
     }
 
     /// Gets the output atom reference for a transform.
     pub fn get_transform_output(&self, transform_id: &str) -> Result<Option<String>, SchemaError> {
-        let transform_outputs = LockHelper::read_lock(&self.transform_outputs, "transform_outputs")?;
+        let transform_outputs = self.transform_outputs.read()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire read lock".to_string()))?;
         Ok(transform_outputs.get(transform_id).cloned())
     }
 
@@ -186,7 +182,8 @@ impl TransformManager {
         field_name: &str,
     ) -> Result<HashSet<String>, SchemaError> {
         let key = format!("{}.{}", schema_name, field_name);
-        let field_to_transforms = LockHelper::read_lock(&self.field_to_transforms, "field_to_transforms")?;
+        let field_to_transforms = self.field_to_transforms.read()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire read lock".to_string()))?;
         
         let result = field_to_transforms.get(&key).cloned().unwrap_or_default();
         

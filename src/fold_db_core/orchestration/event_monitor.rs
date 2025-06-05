@@ -17,10 +17,8 @@ pub struct EventMonitor {
     message_bus: Arc<MessageBus>,
     manager: Arc<dyn TransformRunner>,
     persistence: PersistenceManager,
-    /// Thread handle for monitoring FieldValueSet events
+    /// Single monitoring thread for all events
     _monitoring_thread: Option<thread::JoinHandle<()>>,
-    /// Thread handle for monitoring TransformTriggered events
-    _triggered_monitoring_thread: Option<thread::JoinHandle<()>>,
 }
 
 impl EventMonitor {
@@ -30,15 +28,10 @@ impl EventMonitor {
         manager: Arc<dyn TransformRunner>,
         persistence: PersistenceManager,
     ) -> Self {
-        let monitoring_thread = Self::start_monitoring(
+        let monitoring_thread = Self::start_unified_monitoring(
             Arc::clone(&message_bus),
             Arc::clone(&manager),
             persistence.get_tree().clone(),
-        );
-
-        let triggered_monitoring_thread = Self::start_triggered_monitoring(
-            Arc::clone(&message_bus),
-            Arc::clone(&manager),
         );
 
         Self {
@@ -46,53 +39,38 @@ impl EventMonitor {
             manager,
             persistence,
             _monitoring_thread: Some(monitoring_thread),
-            _triggered_monitoring_thread: Some(triggered_monitoring_thread),
         }
     }
 
-    /// Start the field value monitoring thread
-    fn start_monitoring(
+    /// Start unified monitoring for both FieldValueSet and TransformTriggered events
+    fn start_unified_monitoring(
         message_bus: Arc<MessageBus>,
         manager: Arc<dyn TransformRunner>,
         tree: sled::Tree,
     ) -> thread::JoinHandle<()> {
         let mut field_value_consumer = message_bus.subscribe::<FieldValueSet>();
-        
-        thread::spawn(move || {
-            info!("🔍 EventMonitor: Starting direct monitoring of FieldValueSet events");
-            
-            loop {
-                match field_value_consumer.recv_timeout(Duration::from_millis(100)) {
-                    Ok(event) => {
-                        if let Err(e) = Self::handle_field_value_event(&event, &manager, &tree, &message_bus) {
-                            error!("❌ Error handling field value event: {}", e);
-                        }
-                    }
-                    Err(_) => continue, // Timeout or channel disconnected
-                }
-            }
-        })
-    }
-
-    /// Start monitoring TransformTriggered events
-    fn start_triggered_monitoring(
-        message_bus: Arc<MessageBus>,
-        manager: Arc<dyn TransformRunner>,
-    ) -> thread::JoinHandle<()> {
         let mut triggered_consumer = message_bus.subscribe::<TransformTriggered>();
         
         thread::spawn(move || {
-            info!("🔍 EventMonitor: Starting monitoring of TransformTriggered events");
+            info!("🔍 EventMonitor: Starting unified monitoring of FieldValueSet and TransformTriggered events");
             
             loop {
-                match triggered_consumer.recv_timeout(Duration::from_millis(100)) {
-                    Ok(event) => {
-                        if let Err(e) = Self::handle_transform_triggered_event(&event, &manager, &message_bus) {
-                            error!("❌ Error handling TransformTriggered event: {}", e);
-                        }
+                // Check FieldValueSet events
+                if let Ok(event) = field_value_consumer.try_recv() {
+                    if let Err(e) = Self::handle_field_value_event(&event, &manager, &tree, &message_bus) {
+                        error!("❌ Error handling field value event: {}", e);
                     }
-                    Err(_) => continue, // Timeout or channel disconnected
                 }
+
+                // Check TransformTriggered events
+                if let Ok(event) = triggered_consumer.try_recv() {
+                    if let Err(e) = Self::handle_transform_triggered_event(&event, &manager, &message_bus) {
+                        error!("❌ Error handling TransformTriggered event: {}", e);
+                    }
+                }
+
+                // Small sleep to prevent busy waiting
+                thread::sleep(Duration::from_millis(10));
             }
         })
     }
@@ -275,14 +253,11 @@ impl EventMonitor {
         if let Some(_handle) = self._monitoring_thread.take() {
             // In a real implementation, we would send a shutdown signal
             // For now, the thread will be stopped when the handle is dropped
-            info!("🛑 EventMonitor: Stopping field value monitoring");
+            info!("🛑 EventMonitor: Stopping unified event monitoring");
             // Note: In a production system, you would want to implement
             // a proper shutdown mechanism using channels or atomic flags
         }
         
-        if let Some(_handle) = self._triggered_monitoring_thread.take() {
-            info!("🛑 EventMonitor: Stopping TransformTriggered monitoring");
-        }
     }
 }
 

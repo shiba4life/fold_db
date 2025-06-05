@@ -14,11 +14,14 @@ impl TransformManager {
         let transform_ids = self.db_ops.list_transforms()?;
         
         // Load transforms into memory
-        let mut registered_transforms = LockHelper::write_lock(&self.registered_transforms, "registered_transforms")?;
-        
-        let mut field_to_transforms = LockHelper::write_lock(&self.field_to_transforms, "field_to_transforms")?;
-        
-        let mut transform_to_fields = LockHelper::write_lock(&self.transform_to_fields, "transform_to_fields")?;
+        let mut registered_transforms = self.registered_transforms.write()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire write lock".to_string()))?;
+
+        let mut field_to_transforms = self.field_to_transforms.write()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire write lock".to_string()))?;
+
+        let mut transform_to_fields = self.transform_to_fields.write()
+            .map_err(|_| SchemaError::InvalidData("Failed to acquire write lock".to_string()))?;
 
         for transform_id in transform_ids {
             // Skip if transform is already loaded
