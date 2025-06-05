@@ -9,12 +9,12 @@ use crate::fold_db_core::infrastructure::message_bus::{
     FieldValueSetRequest, FieldValueSetResponse,
     FieldUpdateRequest, FieldUpdateResponse,
     AtomCreateRequest, AtomCreateResponse,
-    AtomRefCreateRequest, AtomRefCreateResponse, AtomRefUpdateResponse,
+    AtomRefCreateRequest, AtomRefCreateResponse, AtomRefUpdateRequest, AtomRefUpdateResponse,
     FieldValueSet
 };
 use crate::schema::{Schema, SchemaError, SchemaCore};
 use log::{info, warn, error};
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -215,15 +215,24 @@ impl FieldManager {
         stats.last_activity = Some(Instant::now());
         drop(stats);
 
-        // For now, create a simple atom and then an atomref
-        // Step 1: Create atom
+        // Check if this is a range field request by looking for range_key in the value
+        let (actual_value, range_key) = if let Some(range_obj) = request.value.get("range_key") {
+            let range_key = range_obj.as_str().unwrap_or("").to_string();
+            let actual_value = request.value.get("value").unwrap_or(&request.value).clone();
+            info!("🎯 Range field detected - range_key: '{}', value: {}", range_key, actual_value);
+            (actual_value, Some(range_key))
+        } else {
+            (request.value.clone(), None)
+        };
+
+        // Step 1: Create atom with the actual value (not the wrapper)
         let atom_correlation_id = Uuid::new_v4().to_string();
         let atom_request = AtomCreateRequest::new(
             atom_correlation_id.clone(),
             request.schema_name.clone(),
             request.source_pub_key.clone(),
             None,
-            request.value.clone(),
+            actual_value,
             Some("Approved".to_string()),
         );
 
@@ -286,18 +295,32 @@ impl FieldManager {
             return Ok(());
         }
 
-        // Step 2: Create atomref
+        // Step 2: Create atomref (Single or Range based on request type)
         let atom_uuid = atom_response.atom_uuid.unwrap();
         let aref_uuid = Uuid::new_v4().to_string();
         let aref_correlation_id = Uuid::new_v4().to_string();
         
-        let atomref_request = AtomRefCreateRequest::new(
-            aref_correlation_id.clone(),
-            aref_uuid.clone(),
-            atom_uuid,
-            request.source_pub_key,
-            "Single".to_string(), // Default to Single type
-        );
+        let atomref_request = if let Some(ref range_key_ref) = range_key {
+            // For range fields, create AtomRefRange with range_key mapping
+            info!("🎯 Creating AtomRefRange for range_key: '{}'", range_key_ref);
+            AtomRefCreateRequest::new(
+                aref_correlation_id.clone(),
+                aref_uuid.clone(),
+                atom_uuid.clone(),
+                request.source_pub_key.clone(),
+                "Range".to_string(),
+            )
+        } else {
+            // For single fields, create regular AtomRef
+            info!("🔧 Creating Single AtomRef");
+            AtomRefCreateRequest::new(
+                aref_correlation_id.clone(),
+                aref_uuid.clone(),
+                atom_uuid.clone(),
+                request.source_pub_key.clone(),
+                "Single".to_string(),
+            )
+        };
 
         // Set up response tracking for atomref
         let (aref_response_sender, aref_response_receiver) = mpsc::channel();
@@ -366,6 +389,31 @@ impl FieldManager {
                     error!("❌ Failed to update schema field {}.{} with AtomRef UUID {}: {}",
                            request.schema_name, request.field_name, aref_uuid, e);
                     // Continue with success response since AtomRef was created successfully
+                }
+            }
+            
+            // For range fields, update the AtomRefRange with the range key mapping
+            if let Some(ref range_key_value) = range_key {
+                info!("🎯 Adding range key mapping: '{}' -> atom_uuid: '{}'", range_key_value, &atom_uuid);
+                
+                // Send AtomRefUpdateRequest to update the range mapping
+                let range_update_request = AtomRefUpdateRequest::new(
+                    Uuid::new_v4().to_string(), // correlation_id
+                    aref_uuid.clone(),          // aref_uuid
+                    atom_uuid.clone(),          // atom_uuid
+                    request.source_pub_key.clone(), // source_pub_key
+                    "Range".to_string(),        // aref_type
+                    Some(json!({"range_key": range_key_value.clone()})), // additional_data with range key
+                );
+                
+                match self.message_bus.publish(range_update_request) {
+                    Ok(_) => {
+                        info!("✅ Range key mapping update request sent: '{}' -> '{}'", range_key_value, atom_uuid);
+                    }
+                    Err(e) => {
+                        error!("❌ Failed to send range key mapping update request for '{}': {}", range_key_value, e);
+                        // Continue with success response since AtomRef was created successfully
+                    }
                 }
             }
             

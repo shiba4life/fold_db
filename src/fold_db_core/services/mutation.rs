@@ -73,31 +73,38 @@ impl MutationService {
     ) -> Result<(), SchemaError> {
         log::info!("🎯 MutationService: Processing range schema mutation for range_key_value: {}", range_key_value);
         
-        // Send CollectionUpdateRequest for each field in the range schema
+        // DIRECT APPROACH: Since mutation service doesn't have direct DB access,
+        // we need to use FieldValueSetRequest with range-specific handling
         for (field_name, value) in fields_and_values {
+            log::info!("🔧 Processing range field: {} with value: {} for range_key: {}", field_name, value, range_key_value);
+            
+            // Create a special field value request that includes the range key
+            let range_aware_value = serde_json::json!({
+                "range_key": range_key_value,
+                "value": value
+            });
+            
             let correlation_id = Uuid::new_v4().to_string();
-            let collection_request = CollectionUpdateRequest {
+            let field_request = FieldValueSetRequest {
                 correlation_id: correlation_id.clone(),
                 schema_name: schema.name.clone(),
                 field_name: field_name.clone(),
-                operation: "update".to_string(),
-                value: value.clone(),
+                value: range_aware_value,
                 source_pub_key: "mutation_service".to_string(),
-                item_id: Some(range_key_value.to_string()),
             };
 
-            match self.message_bus.publish(collection_request) {
+            match self.message_bus.publish(field_request) {
                 Ok(_) => {
-                    log::info!("✅ Range schema field update request sent for {}.{}", schema.name, field_name);
+                    log::info!("✅ Range field update request sent for {}.{} with range_key: {}", schema.name, field_name, range_key_value);
                 }
                 Err(e) => {
-                    log::error!("❌ Failed to send range schema field update for {}.{}: {:?}", schema.name, field_name, e);
-                    return Err(SchemaError::InvalidData(format!("Failed to update range schema field {}: {}", field_name, e)));
+                    log::error!("❌ Failed to send range field update for {}.{}: {:?}", schema.name, field_name, e);
+                    return Err(SchemaError::InvalidData(format!("Failed to update range field {}: {}", field_name, e)));
                 }
             }
         }
         
-        log::info!("✅ All range schema field updates sent successfully");
+        log::info!("✅ All range field updates sent successfully");
         Ok(())
     }
 
@@ -152,7 +159,8 @@ impl MutationService {
         Ok(())
     }
 
-    /// Handle range field mutation
+    /// Handle range field mutation (REMOVED - use update_range_schema_fields instead)
+    /// Range fields should be processed via the range schema method which has proper range key context
     fn update_range_field(
         &self,
         schema: &Schema,
@@ -161,11 +169,11 @@ impl MutationService {
         _value: &Value,
         _mutation_hash: &str,
     ) -> Result<(), SchemaError> {
-        log::info!("🔧 Updating range field: {}.{}", schema.name, field_name);
-        
-        // Transform triggers are now handled automatically by TransformOrchestrator
-        // via direct FieldValueSet event monitoring
-        Ok(())
+        log::error!("❌ Individual range field updates not supported. Range fields must be updated via range schema mutation.");
+        Err(SchemaError::InvalidData(format!(
+            "Range field '{}' in schema '{}' cannot be updated individually. Use range schema mutation instead.",
+            field_name, schema.name
+        )))
     }
 
     /// Handle collection field mutation

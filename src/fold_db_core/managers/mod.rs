@@ -9,10 +9,10 @@
 
 pub mod atom;
 pub mod field;
-pub mod collection;
+// pub mod collection; // Temporarily disabled for UI testing
 pub mod schema;
 
 pub use atom::AtomManager;
 pub use field::FieldManager;
-pub use collection::CollectionManager;
+// pub use collection::CollectionManager; // Temporarily disabled for UI testing
 pub use schema::*;
