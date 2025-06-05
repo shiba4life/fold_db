@@ -92,7 +92,6 @@ impl DirectEventTestFixture {
     }
 }
 
-#[tokio::test]
 async fn test_direct_event_driven_transform_orchestrator() {
     env_logger::init();
     
@@ -297,4 +296,15 @@ async fn test_transform_orchestrator_queue_interface_compatibility() {
     // Note: These are maintained for compatibility even though execution is now immediate
     
     println!("✅ Queue interface compatibility verified");
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🚀 Starting direct event-driven transforms test");
+    
+    // Run the comprehensive test
+    test_direct_event_driven_transform_orchestrator().await;
+    
+    println!("✅ All tests completed successfully!");
+    Ok(())
 }

@@ -203,60 +203,6 @@ impl TransformExecutor {
         Ok(JsonValue::from(value))
     }
 
-    /// Creates a human-readable description of the computation being performed.
-    fn describe_computation(logic: &str, input_values: &HashMap<String, JsonValue>) -> String {
-        // For simple arithmetic operations, create a descriptive string
-        if logic.contains('+') {
-            let parts: Vec<&str> = logic.split('+').map(|s| s.trim()).collect();
-            if parts.len() == 2 {
-                let left_val = Self::resolve_value_description(parts[0], input_values);
-                let right_val = Self::resolve_value_description(parts[1], input_values);
-                return format!("{} + {}", left_val, right_val);
-            }
-        } else if logic.contains('-') {
-            let parts: Vec<&str> = logic.split('-').map(|s| s.trim()).collect();
-            if parts.len() == 2 {
-                let left_val = Self::resolve_value_description(parts[0], input_values);
-                let right_val = Self::resolve_value_description(parts[1], input_values);
-                return format!("{} - {}", left_val, right_val);
-            }
-        } else if logic.contains('*') {
-            let parts: Vec<&str> = logic.split('*').map(|s| s.trim()).collect();
-            if parts.len() == 2 {
-                let left_val = Self::resolve_value_description(parts[0], input_values);
-                let right_val = Self::resolve_value_description(parts[1], input_values);
-                return format!("{} * {}", left_val, right_val);
-            }
-        } else if logic.contains('/') {
-            let parts: Vec<&str> = logic.split('/').map(|s| s.trim()).collect();
-            if parts.len() == 2 {
-                let left_val = Self::resolve_value_description(parts[0], input_values);
-                let right_val = Self::resolve_value_description(parts[1], input_values);
-                return format!("{} / {}", left_val, right_val);
-            }
-        }
-        
-        // Fallback to the original logic
-        logic.to_string()
-    }
-    
-    /// Resolves a value description for computation display.
-    fn resolve_value_description(var_name: &str, input_values: &HashMap<String, JsonValue>) -> String {
-        // Try to find the value in inputs
-        for (key, value) in input_values {
-            if key == var_name || key.ends_with(&format!(".{}", var_name)) {
-                return value.to_string();
-            }
-        }
-        
-        // If it's a literal number, return as-is
-        if var_name.parse::<f64>().is_ok() {
-            return var_name.to_string();
-        }
-        
-        // Return the variable name as fallback
-        var_name.to_string()
-    }
 
     /// Validates a transform.
     ///

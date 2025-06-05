@@ -32,7 +32,7 @@ impl TransformManager {
                         let (transforms_executed, success, error) = Self::execute_transform_with_db(
                             &event.transform_id,
                             &message_bus_for_publish,
-                            db_ops.as_ref().map(|arc| arc)
+                            db_ops.as_ref()
                         );
                         
                         // Publish TransformExecuted event

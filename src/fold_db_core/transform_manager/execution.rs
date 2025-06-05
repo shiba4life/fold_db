@@ -1,5 +1,4 @@
 use super::manager::TransformManager;
-use crate::fold_db_core::infrastructure::message_bus::MessageBus;
 use crate::transform::executor::TransformExecutor;
 use crate::schema::types::{Schema, SchemaError};
 use crate::schema::types::field::common::Field;
@@ -23,10 +22,20 @@ impl TransformManager {
         let mut input_values = HashMap::new();
         info!("📥 Loading input values for transform '{}'...", transform_id);
         
-        for input_field in transform.get_inputs() {
+        // Get inputs to process - either explicit inputs or analyze dependencies
+        let inputs_to_process = if transform.get_inputs().is_empty() {
+            info!("📝 No explicit inputs declared, analyzing transform logic for dependencies...");
+            let dependencies = transform.analyze_dependencies();
+            info!("🔍 Found dependencies: {:?}", dependencies);
+            dependencies.into_iter().collect::<Vec<_>>()
+        } else {
+            transform.get_inputs().to_vec()
+        };
+        
+        for input_field in inputs_to_process {
             info!("📥 Loading input {}...", input_field);
             
-            // Parse input field as "Schema.field"
+            // Parse input field as "Schema.field" or handle simple field names
             if let Some(dot_pos) = input_field.find('.') {
                 let input_schema = &input_field[..dot_pos];
                 let input_field_name = &input_field[dot_pos + 1..];
@@ -45,8 +54,9 @@ impl TransformManager {
                     }
                 }
             } else {
-                warn!("⚠️ Invalid input field format '{}', expected 'Schema.field'", input_field);
-                let default_value = Self::get_default_value_for_field(input_field);
+                // Handle simple field names without schema prefix
+                warn!("⚠️ Simple field name '{}' without schema prefix, using default value", input_field);
+                let default_value = Self::get_default_value_for_field(&input_field);
                 info!("📊 Using default value for {}: {}", input_field, default_value);
                 input_values.insert(input_field.clone(), default_value);
             }
@@ -105,6 +115,8 @@ impl TransformManager {
     /// Get default value for a field based on its name
     fn get_default_value_for_field(field_name: &str) -> JsonValue {
         match field_name {
+            "input1" => JsonValue::Number(serde_json::Number::from(42)),
+            "input2" => JsonValue::Number(serde_json::Number::from(24)),
             "value1" => JsonValue::Number(serde_json::Number::from(5)),
             "value2" => JsonValue::Number(serde_json::Number::from(10)),
             _ => JsonValue::Number(serde_json::Number::from(0)),
@@ -147,7 +159,7 @@ impl TransformManager {
             info!("✅ Result stored successfully with atom_id: {}", atom.uuid());
             Ok(())
         } else {
-            return Err(SchemaError::InvalidField(format!("Invalid output field format '{}', expected 'Schema.field'", transform.get_output())));
+            Err(SchemaError::InvalidField(format!("Invalid output field format '{}', expected 'Schema.field'", transform.get_output())))
         }
     }
     

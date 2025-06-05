@@ -94,7 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (i, correlation_id) in test_patterns.iter().enumerate() {
         println!("\n🔧 Testing correlation_id: '{}'", correlation_id);
         
-        let (count, success, error) = TransformManager::execute_transform_from_correlation_with_db(
+        let (count, success, error) = TransformManager::execute_transform_with_db(
             correlation_id,
             &message_bus,
             Some(&db_ops),
