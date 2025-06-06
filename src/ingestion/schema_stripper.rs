@@ -108,6 +108,7 @@ impl SchemaStripper {
     }
 
     /// Simplify a single field for AI analysis
+    #[allow(clippy::only_used_in_recursion)]
     fn simplify_field(&self, field: &Value) -> IngestionResult<Value> {
         if let Value::Object(field_obj) = field {
             let mut simplified = Map::new();

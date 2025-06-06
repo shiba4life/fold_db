@@ -103,7 +103,7 @@ fn test_query_layer_atomref_bug_reproduction() {
     println!("   Bug: Query will try to find atom {}", initial_static_atom_uuid);
     
     // Use the query layer to resolve field value
-    match TransformUtils::resolve_field_value(&Arc::new(db_ops.clone()), &test_schema, "test_field") {
+    match TransformUtils::resolve_field_value(&Arc::new(db_ops.clone()), &test_schema, "test_field", None) {
         Ok(value) => {
             println!("✅ Query layer returned value: {}", value);
             println!("🔍 Check logs above to see if the fix was applied");
@@ -163,7 +163,7 @@ fn test_query_layer_atomref_bug_reproduction() {
     
     // Test query layer again
     println!("🔍 STEP 6: Testing query layer after second mutation");
-    match TransformUtils::resolve_field_value(&Arc::new(db_ops), &test_schema, "test_field") {
+    match TransformUtils::resolve_field_value(&Arc::new(db_ops), &test_schema, "test_field", None) {
         Ok(value) => {
             println!("✅ Query layer returned value after second mutation: {}", value);
             

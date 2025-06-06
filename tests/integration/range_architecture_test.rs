@@ -1028,11 +1028,11 @@ fn test_range_schema_validation_and_consistency() {
         FieldVariant::Range(FieldFactory::create_range_field())
     );
     
-    // Store evolved schema
-    fixture.db_ops.store_schema("ValidRangeSchema", &evolved_schema)
+    // Store evolved schema with different name (schemas are immutable)
+    fixture.db_ops.store_schema("ValidRangeSchemaV2", &evolved_schema)
         .expect("Failed to store evolved schema");
     
-    let evolved_retrieved = fixture.db_ops.get_schema("ValidRangeSchema")
+    let evolved_retrieved = fixture.db_ops.get_schema("ValidRangeSchemaV2")
         .expect("Failed to retrieve evolved schema")
         .expect("Evolved schema should exist");
     

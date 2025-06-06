@@ -494,11 +494,12 @@ impl DataFoldNode {
         &mut self,
         schema: crate::schema::Schema,
     ) -> crate::error::FoldDbResult<()> {
-        let mut db = self
+        let db = self
             .db
             .lock()
             .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
-        db.add_schema_available(schema)
+        // Use schema_manager directly instead of deprecated FoldDB wrapper
+        db.schema_manager.add_schema_available(schema)
             .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to add schema: {}", e)))
     }
 

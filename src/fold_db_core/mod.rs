@@ -37,7 +37,7 @@ use crate::fold_db_core::transform_manager::types::TransformRunner;
 use infrastructure::init::{init_orchestrator, init_transform_manager};
 
 // External dependencies
-use crate::atom::{Atom, AtomRefBehavior};
+use crate::atom::AtomRefBehavior;
 use crate::db_operations::DbOperations;
 use crate::permissions::PermissionWrapper;
 use crate::schema::core::SchemaState;
@@ -232,55 +232,6 @@ impl FoldDB {
     // ========== CONSOLIDATED SCHEMA API - DELEGATES TO SCHEMA_CORE ==========
 
 
-    /// Get comprehensive schema status (NEW UNIFIED METHOD)
-    pub fn get_schema_status(
-        &self,
-    ) -> Result<crate::schema::core::SchemaLoadingReport, SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
-
-    /// Refresh schemas from all sources (NEW UNIFIED METHOD)
-    pub fn refresh_schemas(&self) -> Result<crate::schema::core::SchemaLoadingReport, SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaDiscoveryRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaDiscoveryRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
-
-    /// Approve a schema for queries and mutations
-    pub fn approve_schema(&mut self, _schema_name: &str) -> Result<(), SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaApprovalRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaApprovalRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
-
-    /// Block a schema from queries and mutations
-    pub fn block_schema(&mut self, _schema_name: &str) -> Result<(), SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaApprovalRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaApprovalRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
-
-    /// Load schema state from sled
-    pub fn load_schema_state(&self) -> Result<HashMap<String, SchemaState>, SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
-
-    /// Initialize schema system (NEW UNIFIED METHOD)
-    pub fn initialize_schema_system(&self) -> Result<(), SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaDiscoveryRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaDiscoveryRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
 
     /// Load schema from JSON string (creates Available schema)
     pub fn load_schema_from_json(&mut self, json_str: &str) -> Result<(), SchemaError> {
@@ -294,57 +245,16 @@ impl FoldDB {
         self.schema_manager.load_schema_from_file(path.as_ref().to_str().unwrap())
     }
 
-    /// Check if a schema can be queried (must be Approved)
-    pub fn can_query_schema(&self, _schema_name: &str) -> bool {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
-        false
+    /// Add a schema to available schemas (for testing compatibility)
+    pub fn add_schema_available(&mut self, schema: Schema) -> Result<(), SchemaError> {
+        // Delegate to working schema_manager implementation
+        self.schema_manager.add_schema_available(schema)
     }
 
-    /// Check if a schema can be mutated (must be Approved)
-    pub fn can_mutate_schema(&self, _schema_name: &str) -> bool {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
-        false
-    }
-
-    /// Get schemas by state
-    pub fn list_schemas_by_state(&self, _state: SchemaState) -> Result<Vec<String>, SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
-
-    /// Get all available schemas (any state)
-    pub fn list_all_schemas(&self) -> Result<Vec<String>, SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
-
-    /// Legacy method - now creates Available schema
-    pub fn add_schema_available(&mut self, _schema: Schema) -> Result<(), SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaLoadRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaLoadRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
-
-    pub fn allow_schema(&mut self, _schema_name: &str) -> Result<(), SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
-
-    /// DEPRECATED: This method violated event-driven architecture principles.
-    /// Use the event-driven API with AtomHistoryRequest/AtomHistoryResponse events instead.
-    /// Direct method calls between components are no longer supported.
-    pub fn get_atom_history(
-        &self,
-        _aref_uuid: &str,
-    ) -> Result<Vec<Atom>, Box<dyn std::error::Error>> {
-        Err("Method deprecated: Use event-driven AtomHistoryRequest via message bus instead of direct method calls".into())
+    /// Approve a schema for queries and mutations (for testing compatibility)
+    pub fn approve_schema(&mut self, schema_name: &str) -> Result<(), SchemaError> {
+        // Delegate to working schema_manager implementation
+        self.schema_manager.approve_schema(schema_name)
     }
 
     /// Mark a schema as unloaded without removing transforms.
@@ -360,43 +270,6 @@ impl FoldDB {
         self.schema_manager.get_schema(schema_name)
     }
 
-    /// List all loaded (approved) schemas
-    pub fn list_loaded_schemas(&self) -> Result<Vec<String>, SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
-
-    /// List all available schemas (any state)
-    pub fn list_available_schemas(&self) -> Result<Vec<String>, SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
-
-    /// Get the current state of a schema
-    pub fn get_schema_state(&self, _schema_name: &str) -> Option<SchemaState> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
-        None
-    }
-
-    /// Check if a schema exists
-    pub fn schema_exists(&self, _schema_name: &str) -> Result<bool, SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
-
-    /// List all schemas with their states
-    pub fn list_schemas_with_state(&self) -> Result<HashMap<String, SchemaState>, SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
 
     /// Provides access to the underlying database operations
     pub fn db_ops(&self) -> Arc<DbOperations> {

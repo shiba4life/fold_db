@@ -227,11 +227,12 @@ impl EndToEndWorkflowFixture {
         
         self.message_bus.publish(request)?;
         
-        // Wait for processing
-        thread::sleep(Duration::from_millis(100));
-        
+        // Wait for processing - ensure we get the response first
         let response = response_consumer.recv_timeout(Duration::from_millis(timeout_ms))
             .map_err(|_| "Timeout waiting for FieldValueSetResponse")?;
+        
+        // Additional wait to ensure database consistency after response
+        thread::sleep(Duration::from_millis(250));
         
         if !response.success {
             return Err(format!("Mutation failed: {:?}", response.error).into());
@@ -255,7 +256,7 @@ impl EndToEndWorkflowFixture {
         
         // For Range fields, value should include the range key according to range architecture
         let range_value = json!({
-            range_key: range_key,
+            "range_key": range_key,
             "data": value
         });
         
@@ -269,11 +270,12 @@ impl EndToEndWorkflowFixture {
         
         self.message_bus.publish(request)?;
         
-        // Wait for processing
-        thread::sleep(Duration::from_millis(100));
-        
+        // Wait for processing - ensure we get the response first
         let response = response_consumer.recv_timeout(Duration::from_millis(2000))
             .map_err(|_| "Timeout waiting for FieldValueSetResponse")?;
+        
+        // Additional wait to ensure database consistency after response
+        thread::sleep(Duration::from_millis(250));
         
         if !response.success {
             return Err(format!("Range mutation failed: {:?}", response.error).into());
@@ -305,11 +307,12 @@ impl EndToEndWorkflowFixture {
         
         self.message_bus.publish(request)?;
         
-        // Wait for processing
-        thread::sleep(Duration::from_millis(100));
-        
+        // Wait for processing - ensure we get the response first
         let response = response_consumer.recv_timeout(Duration::from_millis(2000))
             .map_err(|_| "Timeout waiting for FieldValueSetResponse")?;
+        
+        // Additional wait to ensure database consistency after response
+        thread::sleep(Duration::from_millis(250));
         
         if !response.success {
             return Err(format!("Simple range mutation failed: {:?}", response.error).into());

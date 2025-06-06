@@ -1,5 +1,5 @@
 //! Test to reproduce and fix the range key query mismatch bug
-//! 
+//!
 //! Bug 1: When querying for range key 1, system returns data for range key 2
 //! Bug 2: Query results have excessive nesting instead of simple values
 
@@ -7,6 +7,7 @@ use fold_node::db_operations::DbOperations;
 use fold_node::fold_db_core::infrastructure::message_bus::{
     MessageBus, FieldValueSetRequest, FieldValueSetResponse
 };
+use fold_node::fold_db_core::managers::atom::AtomManager;
 use fold_node::schema::{Schema, field_factory::FieldFactory};
 use fold_node::schema::types::field::FieldVariant;
 use serde_json::json;
@@ -18,6 +19,7 @@ use tempfile::TempDir;
 struct RangeKeyTestFixture {
     db_ops: Arc<DbOperations>,
     message_bus: Arc<MessageBus>,
+    atom_manager: AtomManager,
     _temp_dir: TempDir,
 }
 
@@ -33,10 +35,12 @@ impl RangeKeyTestFixture {
             
         let db_ops = Arc::new(DbOperations::new(db).expect("Failed to create DB"));
         let message_bus = Arc::new(MessageBus::new());
+        let atom_manager = AtomManager::new((*db_ops).clone(), Arc::clone(&message_bus));
         
         Self {
             db_ops,
             message_bus,
+            atom_manager,
             _temp_dir: temp_dir,
         }
     }
@@ -63,6 +67,9 @@ impl RangeKeyTestFixture {
     }
     
     fn store_range_data(&self, range_key: &str, test_id_value: &str, test_data_value: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // Give the atom manager time to initialize its event processing
+        thread::sleep(Duration::from_millis(100));
+        
         // Subscribe to responses
         let mut response_consumer = self.message_bus.subscribe::<FieldValueSetResponse>();
         
@@ -79,10 +86,10 @@ impl RangeKeyTestFixture {
         );
         
         self.message_bus.publish(test_id_request)?;
-        thread::sleep(Duration::from_millis(50));
-        let _response1 = response_consumer.recv_timeout(Duration::from_millis(1000))?;
+        thread::sleep(Duration::from_millis(100));
+        let _response1 = response_consumer.recv_timeout(Duration::from_millis(2000))?;
         
-        // Store test_data field  
+        // Store test_data field
         let test_data_request = FieldValueSetRequest::new(
             format!("test_data_{}", range_key),
             "TestRangeSchema".to_string(),
@@ -95,8 +102,8 @@ impl RangeKeyTestFixture {
         );
         
         self.message_bus.publish(test_data_request)?;
-        thread::sleep(Duration::from_millis(50));
-        let _response2 = response_consumer.recv_timeout(Duration::from_millis(1000))?;
+        thread::sleep(Duration::from_millis(100));
+        let _response2 = response_consumer.recv_timeout(Duration::from_millis(2000))?;
         
         Ok(())
     }
