@@ -129,60 +129,6 @@ impl PersistenceManager {
         &self.tree
     }
 
-    /// Create a backup of the current state with a timestamp key
-    pub fn backup_state(&self) -> Result<String, SchemaError> {
-        let current_state = self.load_state()?;
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| {
-                error!("❌ Failed to get timestamp: {}", e);
-                SchemaError::InvalidData("Failed to get timestamp".to_string())
-            })?
-            .as_secs();
-        
-        let backup_key = format!("state_backup_{}", timestamp);
-        
-        let state_bytes = serde_json::to_vec(&current_state).map_err(|e| {
-            let error_msg = format!("Failed to serialize state for backup: {}", e);
-            error!("❌ {}", error_msg);
-            SchemaError::InvalidData(error_msg)
-        })?;
-        
-        self.tree.insert(&backup_key, state_bytes).map_err(|e| {
-            error!("❌ Failed to save backup: {}", e);
-            SchemaError::InvalidData(format!("Failed to save backup: {}", e))
-        })?;
-        
-        self.flush()?;
-        info!("✅ State backed up with key: {}", backup_key);
-        Ok(backup_key)
-    }
-
-    /// Restore state from a backup key
-    pub fn restore_from_backup(&self, backup_key: &str) -> Result<(), SchemaError> {
-        info!("🔄 Restoring state from backup: {}", backup_key);
-        
-        let backup_data = self.tree
-            .get(backup_key)
-            .map_err(|e| {
-                error!("❌ Failed to get backup data: {}", e);
-                SchemaError::InvalidData(format!("Failed to get backup data: {}", e))
-            })?
-            .ok_or_else(|| {
-                error!("❌ Backup key not found: {}", backup_key);
-                SchemaError::InvalidData(format!("Backup key not found: {}", backup_key))
-            })?;
-        
-        let state: QueueState = serde_json::from_slice(&backup_data).map_err(|e| {
-            let error_msg = format!("Failed to deserialize backup data: {}", e);
-            error!("❌ {}", error_msg);
-            SchemaError::InvalidData(error_msg)
-        })?;
-        
-        self.save_and_flush(&state)?;
-        info!("✅ State restored from backup: {}", backup_key);
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -191,9 +137,7 @@ mod tests {
     use crate::fold_db_core::orchestration::queue_manager::QueueItem;
 
     fn create_test_tree() -> Tree {
-        let config = sled::Config::new().temporary(true);
-        let db = config.open().expect("Failed to create test database");
-        db.open_tree("test_persistence").expect("Failed to create test tree")
+        crate::testing_utils::TestDatabaseFactory::create_named_test_tree("test_persistence")
     }
 
     #[test]
@@ -257,36 +201,4 @@ mod tests {
         assert!(!manager.state_exists().unwrap());
     }
 
-    #[test]
-    fn test_backup_and_restore() {
-        let tree = create_test_tree();
-        let manager = PersistenceManager::new(tree);
-        
-        // Create and save initial state
-        let mut initial_state = QueueState::default();
-        initial_state.queue.push_back(QueueItem {
-            id: "initial_transform".to_string(),
-            mutation_hash: "initial_hash".to_string(),
-        });
-        manager.save_and_flush(&initial_state).unwrap();
-        
-        // Create backup
-        let backup_key = manager.backup_state().unwrap();
-        
-        // Modify state
-        let mut modified_state = QueueState::default();
-        modified_state.queue.push_back(QueueItem {
-            id: "modified_transform".to_string(),
-            mutation_hash: "modified_hash".to_string(),
-        });
-        manager.save_and_flush(&modified_state).unwrap();
-        
-        // Restore from backup
-        manager.restore_from_backup(&backup_key).unwrap();
-        
-        // Verify restoration
-        let restored_state = manager.load_state().unwrap();
-        assert_eq!(restored_state.queue.len(), 1);
-        assert_eq!(restored_state.queue[0].id, "initial_transform");
-    }
 }

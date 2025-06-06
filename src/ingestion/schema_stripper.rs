@@ -51,12 +51,8 @@ impl SchemaStripper {
             // Remove permission_policy
             field_obj.remove("permission_policy");
 
-            // For collection fields, strip nested field data
-            if let Some(Value::Object(collection_fields)) = field_obj.get_mut("fields") {
-                for (_, nested_field) in collection_fields.iter_mut() {
-                    self.strip_field_data(nested_field)?;
-                }
-            }
+            // TODO: Collection fields are no longer supported - removed collection field stripping
+            // Collections have been removed from the schema system
 
             // For range fields, strip nested field data
             if let Some(Value::Object(range_field)) = field_obj.get_mut("field") {
@@ -121,10 +117,8 @@ impl SchemaStripper {
                 simplified.insert("type".to_string(), field_type.clone());
             }
 
-            // For collection fields, include nested structure
-            if let Some(fields) = field_obj.get("fields") {
-                simplified.insert("fields".to_string(), self.simplify_fields(fields)?);
-            }
+            // TODO: Collection fields are no longer supported - removed collection field processing
+            // Collections have been removed from the schema system
 
             // For range fields, include range structure
             if let Some(range_field) = field_obj.get("field") {

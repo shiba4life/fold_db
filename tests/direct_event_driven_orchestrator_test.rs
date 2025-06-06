@@ -10,9 +10,9 @@ use tempfile::tempdir;
 
 // Simple test fixture
 struct TestFixture {
-    pub transform_manager: TransformManager,
+    pub _transform_manager: TransformManager,
     pub message_bus: Arc<MessageBus>,
-    pub db_ops: Arc<DbOperations>,
+    pub _db_ops: Arc<DbOperations>,
     pub _temp_dir: tempfile::TempDir,
 }
 
@@ -34,9 +34,9 @@ impl TestFixture {
         )?;
 
         Ok(Self {
-            transform_manager,
+            _transform_manager: transform_manager,
             message_bus,
-            db_ops,
+            _db_ops: db_ops,
             _temp_dir: temp_dir,
         })
     }
@@ -50,7 +50,7 @@ async fn test_direct_event_driven_orchestrator_functionality() {
         .expect("Failed to create test fixture");
 
     // Set up TransformExecuted event monitoring
-    let mut transform_executed_consumer = fixture.message_bus.subscribe::<TransformExecuted>();
+    let _transform_executed_consumer = fixture.message_bus.subscribe::<TransformExecuted>();
 
     // Test 1: Publish FieldValueSet events and verify automatic processing
     println!("📢 Publishing FieldValueSet events to test direct event monitoring...");
@@ -113,7 +113,7 @@ async fn test_orchestrator_thread_safety() {
             let field_event = FieldValueSet::new(
                 format!("test.field{}", i),
                 json!(i),
-                &format!("thread_test_{}", i),
+                format!("thread_test_{}", i),
             );
             message_bus.publish(field_event).unwrap();
         });

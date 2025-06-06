@@ -2,6 +2,9 @@ use super::core::DbOperations;
 use crate::schema::core::SchemaState;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
+use crate::schema::types::field::{FieldVariant, common::Field};
+use crate::atom::{Atom, AtomRef, AtomRefBehavior};
+use serde_json::json;
 
 impl DbOperations {
     /// Stores a schema state using generic tree operations
@@ -33,8 +36,104 @@ impl DbOperations {
     }
 
     /// Stores a schema definition using generic tree operations
+    ///
+    /// IMPORTANT: SCHEMAS ARE IMMUTABLE
+    /// - Once a schema is stored, it CANNOT be modified or updated
+    /// - Attempting to store a schema with the same name will be rejected
+    /// - This enforces data consistency and prevents breaking existing AtomRef chains
+    /// - All fields in a schema must be defined at creation time
+    ///
+    /// Automatically creates placeholder AtomRefs for fields that don't have them.
+    /// This ensures all fields are immediately queryable after schema creation.
     pub fn store_schema(&self, schema_name: &str, schema: &Schema) -> Result<(), SchemaError> {
-        self.store_in_tree(&self.schemas_tree, schema_name, schema)
+        // IMMUTABILITY CHECK: Reject if schema already exists
+        if self.schema_exists(schema_name)? {
+            return Err(SchemaError::InvalidData(format!(
+                "Schema '{}' already exists. Schemas are immutable and cannot be updated. \
+                Create a new schema with a different name instead.",
+                schema_name
+            )));
+        }
+        
+        // Clone the schema so we can modify fields to add AtomRefs
+        let mut schema_with_refs = schema.clone();
+        
+        // Process each field to ensure it has an AtomRef for immediate queryability
+        for (field_name, field_variant) in &mut schema_with_refs.fields {
+            match field_variant {
+                FieldVariant::Single(ref mut field) => {
+                    if field.ref_atom_uuid().is_none() {
+                        // Create placeholder atom and atomref for this field
+                        let placeholder_content = json!({
+                            "field_name": field_name,
+                            "schema_name": schema_name,
+                            "initialized": false,
+                            "value": null
+                        });
+                        
+                        // Create atom with placeholder content
+                        let atom = Atom::new(
+                            schema_name.to_string(),
+                            "system".to_string(),
+                            placeholder_content,
+                        );
+                        let atom_uuid = atom.uuid().to_string();
+                        
+                        // Store the atom
+                        self.store_item(&format!("atom:{}", atom_uuid), &atom)
+                            .map_err(|e| SchemaError::InvalidData(format!("Failed to store placeholder atom: {}", e)))?;
+                        
+                        // Create atomref pointing to the atom
+                        let atom_ref = AtomRef::new(atom_uuid, "system".to_string());
+                        let ref_uuid = atom_ref.uuid().to_string();
+                        
+                        // Store the atomref
+                        self.store_item(&format!("ref:{}", ref_uuid), &atom_ref)
+                            .map_err(|e| SchemaError::InvalidData(format!("Failed to store atomref: {}", e)))?;
+                        
+                        // Link the field to the atomref
+                        field.set_ref_atom_uuid(ref_uuid);
+                    }
+                }
+                FieldVariant::Range(ref mut field) => {
+                    if field.ref_atom_uuid().is_none() {
+                        // Create placeholder atom and atomref for range field
+                        let placeholder_content = json!({
+                            "field_name": field_name,
+                            "schema_name": schema_name,
+                            "initialized": false,
+                            "range_data": []
+                        });
+                        
+                        // Create atom with placeholder content
+                        let atom = Atom::new(
+                            schema_name.to_string(),
+                            "system".to_string(),
+                            placeholder_content,
+                        );
+                        let atom_uuid = atom.uuid().to_string();
+                        
+                        // Store the atom
+                        self.store_item(&format!("atom:{}", atom_uuid), &atom)
+                            .map_err(|e| SchemaError::InvalidData(format!("Failed to store placeholder atom: {}", e)))?;
+                        
+                        // Create atomref pointing to the atom
+                        let atom_ref = AtomRef::new(atom_uuid, "system".to_string());
+                        let ref_uuid = atom_ref.uuid().to_string();
+                        
+                        // Store the atomref
+                        self.store_item(&format!("ref:{}", ref_uuid), &atom_ref)
+                            .map_err(|e| SchemaError::InvalidData(format!("Failed to store atomref: {}", e)))?;
+                        
+                        // Link the field to the atomref
+                        field.set_ref_atom_uuid(ref_uuid);
+                    }
+                }
+            }
+        }
+        
+        // Store the immutable schema with AtomRefs
+        self.store_in_tree(&self.schemas_tree, schema_name, &schema_with_refs)
     }
 
     /// Gets a schema definition using generic tree operations

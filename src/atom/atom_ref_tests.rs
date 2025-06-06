@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::super::{Atom, AtomRef, AtomRefBehavior, AtomRefCollection, AtomRefRange};
+    use super::super::{Atom, AtomRef, AtomRefBehavior, AtomRefRange};
     use chrono::Utc;
     use serde_json::json;
 
@@ -29,47 +29,8 @@ mod tests {
         assert!(updated_ref.updated_at() >= atom_ref.updated_at());
     }
 
-    #[test]
-    fn test_atom_ref_collection() {
-        let atoms: Vec<_> = (0..3)
-            .map(|i| {
-                Atom::new(
-                    "test_schema".to_string(),
-                    "test_key".to_string(),
-                    json!({ "index": i }),
-                )
-            })
-            .collect();
-
-        // Test collection usage
-        let mut collection = AtomRefCollection::new("test_key".to_string());
-        collection.set_atom_uuid("0".to_string(), atoms[0].uuid().to_string());
-        collection.set_atom_uuid("1".to_string(), atoms[1].uuid().to_string());
-        collection.set_atom_uuid("2".to_string(), atoms[2].uuid().to_string());
-
-        assert_eq!(
-            collection.get_atom_uuid("0"),
-            Some(&atoms[0].uuid().to_string())
-        );
-        assert_eq!(
-            collection.get_atom_uuid("1"),
-            Some(&atoms[1].uuid().to_string())
-        );
-        assert_eq!(
-            collection.get_atom_uuid("2"),
-            Some(&atoms[2].uuid().to_string())
-        );
-
-        // Test removal
-        assert_eq!(
-            collection.remove_atom_uuid("1"),
-            Some(atoms[1].uuid().to_string())
-        );
-        assert_eq!(collection.get_atom_uuid("1"), None);
-
-        // Test behavior trait
-        assert!(collection.updated_at() > Utc::now() - chrono::Duration::seconds(1));
-    }
+    // TODO: AtomRefCollection tests removed - collections are no longer supported
+    // Collections have been removed from the schema system
 
     #[test]
     fn test_atom_ref_range() {

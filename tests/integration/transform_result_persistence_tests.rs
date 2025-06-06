@@ -10,22 +10,10 @@
 //! - Error handling scenarios
 //! - Multiple executions with different values
 
-use crate::common::{TestFixture, CommonTestFixture, generate_test_correlation_id, wait_for_async_operation};
+use crate::test_utils::TestFixture;
 use fold_node::fold_db_core::infrastructure::message_bus::{
-    TransformTriggered, TransformExecuted, SchemaChanged,
+    TransformTriggered,
 };
-use fold_node::fold_db_core::transform_manager::TransformRunner;
-use fold_node::schema::types::{Schema, Transform, TransformRegistration, SchemaError};
-use fold_node::schema::types::field::single_field::SingleField;
-use fold_node::schema::types::field::variant::FieldVariant;
-use fold_node::schema::types::field::common::{Field, FieldCommon};
-use fold_node::atom::{Atom, AtomRef};
-use fold_node::permissions::types::policy::PermissionsPolicy;
-use fold_node::fees::types::config::FieldPaymentConfig;
-use serde_json::{json, Value};
-use std::collections::HashMap;
-use std::time::Duration;
-use tokio::time::timeout;
 
 // TODO: These tests need to be updated for the new event-driven architecture
 // The following functions are temporarily commented out until the new architecture is complete

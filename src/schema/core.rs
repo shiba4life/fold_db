@@ -1,5 +1,5 @@
 use super::validator::SchemaValidator;
-use crate::atom::{AtomRef, AtomRefCollection, AtomRefRange};
+use crate::atom::{AtomRef, AtomRefRange};
 use crate::fold_db_core::infrastructure::message_bus::MessageBus;
 use crate::schema::types::{
     Field, FieldVariant, JsonSchemaDefinition, JsonSchemaField, Schema, SchemaError, SingleField,
@@ -1466,17 +1466,7 @@ impl SchemaCore {
                 let key = format!("ref:{}", ref_atom_uuid);
                 
                 match field {
-                    FieldVariant::Collection(_) => {
-                        // For collection fields, create AtomRefCollection
-                        let atom_ref_collection = AtomRefCollection::new(ref_atom_uuid.clone());
-                        if let Err(e) = self.db_ops.store_item(&key, &atom_ref_collection) {
-                            info!("Failed to persist AtomRefCollection '{}': {}", ref_atom_uuid, e);
-                        } else {
-                            info!("✅ Persisted AtomRefCollection: {}", key);
-                        }
-                        // Create a corresponding AtomRef for the return list
-                        atom_refs.push(AtomRef::new(Uuid::new_v4().to_string(), "system".to_string()));
-                    }
+                    // TODO: Collection fields are no longer supported - CollectionField has been removed
                     FieldVariant::Range(_) => {
                         // For range fields, create AtomRefRange
                         let atom_ref_range = AtomRefRange::new(ref_atom_uuid.clone());

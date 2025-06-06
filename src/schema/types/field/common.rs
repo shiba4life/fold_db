@@ -45,7 +45,7 @@ pub trait Field {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum FieldType {
     Single,
-    Collection,
+    // TODO: Collection support was removed during event system cleanup
     Range,
 }
 

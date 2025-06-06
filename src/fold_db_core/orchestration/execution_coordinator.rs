@@ -346,8 +346,7 @@ mod tests {
     fn test_successful_execution() {
         let message_bus = Arc::new(crate::fold_db_core::infrastructure::message_bus::MessageBus::new());
         let manager = Arc::new(MockTransformRunner::new(true));
-        let db = sled::Config::new().temporary(true).open().unwrap();
-        let db_ops = Arc::new(crate::db_operations::DbOperations::new(db).unwrap());
+        let (db_ops, _message_bus) = crate::testing_utils::TestDatabaseFactory::create_test_environment().unwrap();
         let coordinator = ExecutionCoordinator::new(manager, message_bus, db_ops);
         
         let item = QueueItem {
@@ -367,8 +366,7 @@ mod tests {
     fn test_already_processed_skip() {
         let message_bus = Arc::new(crate::fold_db_core::infrastructure::message_bus::MessageBus::new());
         let manager = Arc::new(MockTransformRunner::new(true));
-        let db = sled::Config::new().temporary(true).open().unwrap();
-        let db_ops = Arc::new(crate::db_operations::DbOperations::new(db).unwrap());
+        let (db_ops, _message_bus) = crate::testing_utils::TestDatabaseFactory::create_test_environment().unwrap();
         let coordinator = ExecutionCoordinator::new(manager, message_bus, db_ops);
         
         let item = QueueItem {
@@ -387,8 +385,7 @@ mod tests {
     fn test_failed_execution() {
         let message_bus = Arc::new(crate::fold_db_core::infrastructure::message_bus::MessageBus::new());
         let manager = Arc::new(MockTransformRunner::new(false));
-        let db = sled::Config::new().temporary(true).open().unwrap();
-        let db_ops = Arc::new(crate::db_operations::DbOperations::new(db).unwrap());
+        let (db_ops, _message_bus) = crate::testing_utils::TestDatabaseFactory::create_test_environment().unwrap();
         let coordinator = ExecutionCoordinator::new(manager, message_bus, db_ops);
         
         let item = QueueItem {
@@ -404,8 +401,7 @@ mod tests {
     fn test_batch_execution() {
         let message_bus = Arc::new(crate::fold_db_core::infrastructure::message_bus::MessageBus::new());
         let manager = Arc::new(MockTransformRunner::new(true));
-        let db = sled::Config::new().temporary(true).open().unwrap();
-        let db_ops = Arc::new(crate::db_operations::DbOperations::new(db).unwrap());
+        let (db_ops, _message_bus) = crate::testing_utils::TestDatabaseFactory::create_test_environment().unwrap();
         let coordinator = ExecutionCoordinator::new(manager, message_bus, db_ops);
         
         let items = vec![
@@ -433,8 +429,7 @@ mod tests {
     fn test_retry_execution() {
         let message_bus = Arc::new(crate::fold_db_core::infrastructure::message_bus::MessageBus::new());
         let manager = Arc::new(MockTransformRunner::new(false)); // Always fails
-        let db = sled::Config::new().temporary(true).open().unwrap();
-        let db_ops = Arc::new(crate::db_operations::DbOperations::new(db).unwrap());
+        let (db_ops, _message_bus) = crate::testing_utils::TestDatabaseFactory::create_test_environment().unwrap();
         let coordinator = ExecutionCoordinator::new(manager, message_bus, db_ops);
         
         let item = QueueItem {

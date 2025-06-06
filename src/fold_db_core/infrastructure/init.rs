@@ -1,8 +1,8 @@
 use crate::fold_db_core::{
-    managers::FieldManager,
     infrastructure::message_bus::MessageBus,
     transform_manager::TransformManager,
     orchestration::TransformOrchestrator,
+    services::field_retrieval::FieldRetrievalService,
 };
 use crate::db_operations::DbOperations;
 use sled::Tree;
@@ -22,7 +22,7 @@ pub fn init_transform_manager(
 }
 
 pub fn init_orchestrator(
-    _field_manager: &FieldManager,
+    _field_retrieval_service: &FieldRetrievalService,
     transform_manager: Arc<TransformManager>,
     tree: Tree,
     message_bus: Arc<MessageBus>,

@@ -409,28 +409,8 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use tempfile::TempDir;
 
-    #[allow(dead_code)]
-    fn create_test_ingestion_core() -> IngestionResult<IngestionCore> {
-        let config = IngestionConfig {
-            openrouter_api_key: "test-key".to_string(),
-            enabled: true,
-            ..Default::default()
-        };
-
-        // Create temporary directory for each test to avoid conflicts
-        let temp_dir =
-            TempDir::new().map_err(|e| IngestionError::configuration_error(e.to_string()))?;
-        let test_path = temp_dir.path().to_string_lossy().to_string();
-
-        // Create test schema core and fold db
-        let schema_core = Arc::new(SchemaCore::new_for_testing(&test_path).unwrap());
-        let fold_db = Arc::new(Mutex::new(FoldDB::new(&test_path).unwrap()));
-
-        // Keep temp_dir alive for the duration of the test
-        std::mem::forget(temp_dir);
-
-        IngestionCore::new(config, schema_core, fold_db)
-    }
+    // REMOVED: create_test_ingestion_core - dead code marked with #[allow(dead_code)]
+    // This duplicated test setup logic available in testing_utils module
 
     #[test]
     fn test_validate_input() {

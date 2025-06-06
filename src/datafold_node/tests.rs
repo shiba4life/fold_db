@@ -1,14 +1,8 @@
 #![allow(dead_code)]
 use super::*;
-use tempfile::tempdir;
 
 fn create_test_config() -> NodeConfig {
-    let dir = tempdir().unwrap();
-    NodeConfig {
-        storage_path: dir.path().to_path_buf(),
-        default_trust_distance: 1,
-        network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-    }
+    crate::testing_utils::TestDatabaseFactory::create_test_node_config()
 }
 
 #[test]

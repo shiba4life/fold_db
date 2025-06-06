@@ -3,6 +3,7 @@
 //! This module provides utilities to eliminate unsafe `.unwrap()` calls
 //! and implement robust error handling patterns across the codebase.
 
+pub mod error_factory;
 pub mod iterator_utils;
 pub mod parser_utils;
 pub mod regex_utils;

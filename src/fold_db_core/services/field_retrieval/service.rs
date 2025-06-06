@@ -5,7 +5,6 @@
 //! complex branching logic in FieldManager.
 
 use crate::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueQueryRequest};
-use crate::fold_db_core::transform_manager::utils::FieldValueResolver;
 use crate::schema::types::field::FieldVariant;
 use crate::schema::Schema;
 use crate::schema::SchemaError;
@@ -38,7 +37,7 @@ impl FieldRetrievalService {
 
     pub fn new_default() -> Self {
         Self {
-            message_bus: Arc::new(MessageBus::new()),
+            message_bus: crate::fold_db_core::infrastructure::factory::InfrastructureFactory::create_message_bus(),
             db_ops: None,
         }
     }
@@ -58,7 +57,7 @@ impl FieldRetrievalService {
         // This ensures consistent field resolution across the application
         match &self.db_ops {
             Some(db_ops) => {
-                FieldValueResolver::resolve_field_value_as_value(db_ops, schema, field)
+                crate::fold_db_core::transform_manager::utils::TransformUtils::resolve_field_value(db_ops, schema, field, None)
             }
             None => {
                 // Fallback to event-driven approach if no db_ops available
@@ -130,7 +129,7 @@ impl FieldRetrievalService {
         let supports = match field_def {
             FieldVariant::Single(_) => false,
             FieldVariant::Range(_) => true,
-            FieldVariant::Collection(_) => false, // Could be changed to true when collection filtering is implemented
+            // TODO: Collection fields are no longer supported - CollectionField has been removed
         };
 
         Ok(supports)

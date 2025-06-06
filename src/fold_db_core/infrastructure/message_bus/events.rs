@@ -501,35 +501,7 @@ pub struct AtomRefGetResponse {
     pub error: Option<String>,
 }
 
-/// Request to update a collection
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct CollectionUpdateRequest {
-    /// Correlation ID for matching request with response
-    pub correlation_id: String,
-    /// Schema name
-    pub schema_name: String,
-    /// Field name
-    pub field_name: String,
-    /// Operation type (add, update, delete)
-    pub operation: String,
-    /// Value for the operation
-    pub value: Value,
-    /// Source public key
-    pub source_pub_key: String,
-    /// Collection item ID (for update/delete operations)
-    pub item_id: Option<String>,
-}
-
-/// Response to collection update request
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct CollectionUpdateResponse {
-    /// Correlation ID matching the request
-    pub correlation_id: String,
-    /// Success flag
-    pub success: bool,
-    /// Error message (if failed)
-    pub error: Option<String>,
-}
+// TODO: CollectionUpdateRequest and CollectionUpdateResponse events removed during event system cleanup
 
 /// Request for system initialization
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -923,17 +895,7 @@ impl EventType for SystemInitializationResponse {
     }
 }
 
-impl EventType for CollectionUpdateRequest {
-    fn type_id() -> &'static str {
-        "CollectionUpdateRequest"
-    }
-}
-
-impl EventType for CollectionUpdateResponse {
-    fn type_id() -> &'static str {
-        "CollectionUpdateResponse"
-    }
-}
+// TODO: EventType implementations for CollectionUpdateRequest and CollectionUpdateResponse removed
 
 impl EventType for Event {
     fn type_id() -> &'static str {

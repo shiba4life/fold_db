@@ -120,11 +120,7 @@ impl TransformManager {
             Arc::clone(&message_bus),
         )?;
 
-        // Set up monitoring of SchemaChanged events to reload transforms
-        let schema_changed_consumer_thread = Self::setup_schema_changed_monitoring(
-            Arc::clone(&message_bus),
-            Arc::clone(&db_ops),
-        );
+        // Monitoring removed during aggressive cleanup
 
         Ok(Self {
             db_ops,
@@ -136,7 +132,7 @@ impl TransformManager {
             transform_to_fields: RwLock::new(transform_to_fields),
             transform_outputs: RwLock::new(transform_outputs),
             _message_bus: message_bus,
-            _schema_changed_consumer_thread: Some(schema_changed_consumer_thread),
+            _schema_changed_consumer_thread: None,
         })
     }
 

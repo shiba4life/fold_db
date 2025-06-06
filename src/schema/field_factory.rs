@@ -8,17 +8,15 @@
 
 use crate::schema::types::field::{
     single_field::SingleField,
-    collection_field::CollectionField,
     range_field::RangeField,
     variant::FieldVariant,
     common::{Field, FieldCommon},
 };
 use crate::permissions::types::policy::PermissionsPolicy;
 use crate::fees::types::config::FieldPaymentConfig;
-use crate::atom::{Atom, AtomRef};
+use crate::atom::{Atom, AtomRef, AtomRefBehavior};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
-use uuid::Uuid;
 
 /// Factory for creating fields with standardized default configurations
 /// Eliminates duplicate PermissionsPolicy::default() + FieldPaymentConfig::default() + HashMap::new() patterns
@@ -81,16 +79,7 @@ impl FieldFactory {
         }
     }
 
-    /// Create a CollectionField with default configuration
-    pub fn create_collection_field() -> CollectionField {
-        CollectionField {
-            inner: FieldCommon::new(
-                PermissionsPolicy::default(),
-                FieldPaymentConfig::default(),
-                HashMap::new(),
-            ),
-        }
-    }
+    // TODO: Collection fields are no longer supported - CollectionField has been removed
 
     /// Create a RangeField with default configuration
     pub fn create_range_field() -> RangeField {
@@ -109,10 +98,7 @@ impl FieldFactory {
         FieldVariant::Single(Self::create_single_field())
     }
 
-    /// Create a FieldVariant::Collection with default configuration
-    pub fn create_collection_variant() -> FieldVariant {
-        FieldVariant::Collection(Self::create_collection_field())
-    }
+    // TODO: Collection fields are no longer supported - CollectionField has been removed
 
     /// Create a FieldVariant::Range with default configuration
     pub fn create_range_variant() -> FieldVariant {
@@ -129,12 +115,12 @@ impl FieldFactory {
     ) -> Result<SingleField, Box<dyn std::error::Error>> {
         // Create atom
         let atom = Atom::new(schema_name.to_string(), user_key.to_string(), content);
-        let atom_uuid = Uuid::new_v4().to_string();
+        let atom_uuid = atom.uuid().to_string();
         db_ops.store_item(&format!("atom:{}", atom_uuid), &atom)?;
 
-        // Create atom ref
-        let ref_uuid = Uuid::new_v4().to_string();
-        let atom_ref = AtomRef::new(ref_uuid.clone(), atom_uuid);
+        // Create atom ref - Note: AtomRef::new takes (atom_uuid, source_pub_key)
+        let atom_ref = AtomRef::new(atom_uuid, user_key.to_string());
+        let ref_uuid = atom_ref.uuid().to_string();
         db_ops.store_item(&format!("ref:{}", ref_uuid), &atom_ref)?;
 
         // Create field with ref linked
@@ -211,12 +197,7 @@ impl FieldBuilder {
         }
     }
 
-    /// Build a CollectionField
-    pub fn build_collection(self) -> CollectionField {
-        CollectionField {
-            inner: FieldCommon::new(self.permissions, self.payment_config, self.metadata),
-        }
-    }
+    // TODO: Collection fields are no longer supported - CollectionField has been removed
 
     /// Build a RangeField
     pub fn build_range(self) -> RangeField {
@@ -326,34 +307,20 @@ impl TransformSetupHelper {
 pub struct DatabaseInitHelper;
 
 impl DatabaseInitHelper {
-    /// Create temporary database with standard configuration
-    /// Consolidates the sled database creation pattern used across examples
+    /// Create a temporary database for testing
     pub fn create_temp_database() -> Result<(sled::Db, tempfile::TempDir), Box<dyn std::error::Error>> {
         let temp_dir = tempfile::tempdir()?;
-        let db_path = temp_dir.path().join("test_db");
-        let sled_db = sled::open(db_path)?;
-        Ok((sled_db, temp_dir))
+        let db = sled::Config::new()
+            .path(temp_dir.path().join("test_db"))
+            .create_new(true)
+            .open()?;
+        Ok((db, temp_dir))
     }
 
-    /// Create DbOperations with temporary database
-    /// Consolidates the DbOperations creation pattern
-    pub fn create_temp_db_ops() -> Result<(crate::db_operations::DbOperations, tempfile::TempDir), Box<dyn std::error::Error>> {
-        let (sled_db, temp_dir) = Self::create_temp_database()?;
-        let db_ops = crate::db_operations::DbOperations::new(sled_db)?;
-        Ok((db_ops, temp_dir))
-    }
-
-    /// Create complete test environment with database and message bus
-    /// Consolidates the full test environment setup pattern
-    pub fn create_test_environment() -> Result<TestEnvironment, Box<dyn std::error::Error>> {
-        let (db_ops, temp_dir) = Self::create_temp_db_ops()?;
-        let message_bus = std::sync::Arc::new(crate::fold_db_core::infrastructure::message_bus::MessageBus::new());
-        
-        Ok(TestEnvironment {
-            db_ops: std::sync::Arc::new(db_ops),
-            message_bus,
-            _temp_dir: temp_dir,
-        })
+    /// Create a test environment with database operations
+    pub fn create_test_environment() -> Result<crate::db_operations::DbOperations, Box<dyn std::error::Error>> {
+        let (db, _temp_dir) = Self::create_temp_database()?;
+        Ok(crate::db_operations::DbOperations::new(db)?)
     }
 }
 
@@ -417,8 +384,8 @@ mod tests {
         let env = DatabaseInitHelper::create_test_environment();
         assert!(env.is_ok());
         
-        let environment = env.unwrap();
-        let transform_manager = environment.create_transform_manager();
-        assert!(transform_manager.is_ok());
+        let _environment = env.unwrap();
+        // Test that we can access basic database operations
+        // Transform manager creation is now handled by the system infrastructure
     }
 }

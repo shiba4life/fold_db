@@ -38,8 +38,9 @@ pub mod logging;
 pub mod network;
 pub mod permissions;
 pub mod schema;
-pub mod testing;
+pub mod testing_utils;
 pub mod transform;
+pub mod validation_utils;
 pub mod web_logger;
 
 // Re-export main types for convenience

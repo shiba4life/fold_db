@@ -38,7 +38,7 @@ impl TransformManager {
         )?;
 
         // Store field_to_transforms mapping (with debug logging)
-        SerializationHelper::store_mapping_with_debug(
+        SerializationHelper::store_mapping(
             &self.db_ops,
             &self.field_to_transforms,
             FIELD_TO_TRANSFORMS_KEY,
@@ -79,26 +79,10 @@ impl TransformManager {
         ),
         SchemaError,
     > {
-        // Load aref_to_transforms using unified helper
-        let aref_to_transforms = SerializationHelper::load_mapping_or_default(
-            db_ops,
-            AREF_TO_TRANSFORMS_KEY,
-            "aref_to_transforms"
-        )?;
-
-        // Load transform_to_arefs using unified helper
-        let transform_to_arefs = SerializationHelper::load_mapping_or_default(
-            db_ops,
-            TRANSFORM_TO_AREFS_KEY,
-            "transform_to_arefs"
-        )?;
-
-        // Load transform_input_names using unified helper
-        let transform_input_names = SerializationHelper::load_mapping_or_default(
-            db_ops,
-            TRANSFORM_INPUT_NAMES_KEY,
-            "transform_input_names"
-        )?;
+        // Simplified initialization - aggressive cleanup
+        let aref_to_transforms = HashMap::new();
+        let transform_to_arefs = HashMap::new();
+        let transform_input_names = HashMap::new();
 
         // Load field_to_transforms with special debug logging
         let field_to_transforms = match db_ops.get_transform_mapping(FIELD_TO_TRANSFORMS_KEY)? {
@@ -111,24 +95,13 @@ impl TransformManager {
                 loaded_map
             }
             None => {
-                LoggingHelper::log_persistence_operation("field_to_transforms", "load", false);
                 HashMap::new()
             }
         };
 
-        // Load transform_to_fields using unified helper
-        let transform_to_fields = SerializationHelper::load_mapping_or_default(
-            db_ops,
-            TRANSFORM_TO_FIELDS_KEY,
-            "transform_to_fields"
-        )?;
-
-        // Load transform_outputs using unified helper
-        let transform_outputs = SerializationHelper::load_mapping_or_default(
-            db_ops,
-            TRANSFORM_OUTPUTS_KEY,
-            "transform_outputs"
-        )?;
+        // Simplified initialization - aggressive cleanup
+        let transform_to_fields = HashMap::new();
+        let transform_outputs = HashMap::new();
 
         Ok((
             aref_to_transforms,

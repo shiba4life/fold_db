@@ -7,8 +7,6 @@
 //! - Event-driven database operations
 
 pub mod transform_orchestrator;
-pub mod event_driven_folddb;
-pub mod event_driven_db_operations;
 
 // New decomposed orchestration components
 pub mod queue_manager;

@@ -184,152 +184,26 @@ impl MutationGenerator {
         }
     }
 
-    /// Generate mutations for collection fields (arrays)
+    // TODO: Collection field mutations are no longer supported
+    // Collections have been removed from the schema system
+    /// Generate mutations for collection fields (arrays) - DEPRECATED
     pub fn generate_collection_mutations(
         &self,
-        schema_name: &str,
-        json_data: &Value,
-        mutation_mappers: &HashMap<String, String>,
-        trust_distance: u32,
-        pub_key: String,
+        _schema_name: &str,
+        _json_data: &Value,
+        _mutation_mappers: &HashMap<String, String>,
+        _trust_distance: u32,
+        _pub_key: String,
     ) -> IngestionResult<Vec<Mutation>> {
-        info!(
-            "Generating collection mutations for schema '{}'",
-            schema_name
-        );
-
-        let mut mutations = Vec::new();
-
-        // Group mappers by collection field
-        let mut collection_groups: HashMap<String, Vec<(String, String)>> = HashMap::new();
-
-        for (json_path, schema_path) in mutation_mappers {
-            // Check if this is a collection field (contains array index)
-            if json_path.contains('[') && json_path.contains(']') {
-                let _base_path = self.get_base_collection_path(json_path)?;
-                let field_name = self.parse_schema_field_path(schema_path)?;
-
-                collection_groups
-                    .entry(field_name)
-                    .or_default()
-                    .push((json_path.clone(), schema_path.clone()));
-            }
-        }
-
-        // Generate mutations for each collection
-        for (field_name, mappers) in collection_groups {
-            let collection_mutations = self.generate_collection_field_mutations(
-                schema_name,
-                &field_name,
-                json_data,
-                &mappers,
-                trust_distance,
-                pub_key.clone(),
-            )?;
-            mutations.extend(collection_mutations);
-        }
-
-        Ok(mutations)
+        warn!("Collection mutations are no longer supported - collections have been removed from the schema system");
+        Ok(Vec::new())
     }
 
-    /// Get the base path for a collection (remove array indices)
-    fn get_base_collection_path(&self, path: &str) -> IngestionResult<String> {
-        // Remove all array indices from the path
-        let mut result = String::new();
-        let chars = path.chars();
-        let mut skip_until_bracket = false;
+    // TODO: Removed get_base_collection_path - collections no longer supported
 
-        for ch in chars {
-            if ch == '[' {
-                skip_until_bracket = true;
-            } else if ch == ']' {
-                skip_until_bracket = false;
-            } else if !skip_until_bracket {
-                result.push(ch);
-            }
-        }
+    // TODO: Removed generate_collection_field_mutations - collections no longer supported
 
-        Ok(result)
-    }
-
-    /// Generate mutations for a specific collection field
-    fn generate_collection_field_mutations(
-        &self,
-        schema_name: &str,
-        _field_name: &str,
-        json_data: &Value,
-        mappers: &[(String, String)],
-        trust_distance: u32,
-        pub_key: String,
-    ) -> IngestionResult<Vec<Mutation>> {
-        let mut mutations = Vec::new();
-
-        // Extract the collection data
-        let base_path = if let Some((first_path, _)) = mappers.first() {
-            self.get_base_collection_path(first_path)?
-        } else {
-            return Ok(mutations);
-        };
-
-        if let Ok(Some(Value::Array(collection_data))) =
-            self.extract_value_from_json_path(json_data, &base_path)
-        {
-            // Create a mutation for each item in the collection
-            for (index, _item) in collection_data.iter().enumerate() {
-                let mut fields_and_values = HashMap::new();
-
-                // For each mapper, extract the value for this specific item
-                for (json_path, schema_path) in mappers {
-                    // Replace the array index in the path with the current index
-                    let item_path = self.replace_array_index_in_path(json_path, index)?;
-
-                    if let Ok(Some(value)) =
-                        self.extract_value_from_json_path(json_data, &item_path)
-                    {
-                        let field_name = self.parse_schema_field_path(schema_path)?;
-                        fields_and_values.insert(field_name, value);
-                    }
-                }
-
-                if !fields_and_values.is_empty() {
-                    let mutation = Mutation {
-                        schema_name: schema_name.to_string(),
-                        fields_and_values,
-                        pub_key: pub_key.clone(),
-                        trust_distance,
-                        mutation_type: MutationType::AddToCollection(index.to_string()),
-                    };
-                    mutations.push(mutation);
-                }
-            }
-        }
-
-        Ok(mutations)
-    }
-
-    /// Replace array index in a path with a specific index
-    fn replace_array_index_in_path(&self, path: &str, new_index: usize) -> IngestionResult<String> {
-        let mut result = String::new();
-        let mut chars = path.chars().peekable();
-
-        while let Some(ch) = chars.next() {
-            if ch == '[' {
-                result.push(ch);
-                // Skip the existing index
-                for index_ch in chars.by_ref() {
-                    if index_ch == ']' {
-                        result.push_str(&new_index.to_string());
-                        result.push(index_ch);
-                        break;
-                    }
-                }
-            } else {
-                result.push(ch);
-            }
-        }
-
-        Ok(result)
-    }
+    // TODO: Removed replace_array_index_in_path - collections no longer supported
 }
 
 /// Parts of a JSON path

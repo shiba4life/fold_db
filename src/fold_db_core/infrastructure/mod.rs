@@ -8,8 +8,8 @@
 
 pub mod message_bus;
 pub mod init;
-pub mod async_api;
 pub mod event_monitor;
+pub mod factory;
 
 pub use message_bus::{
     MessageBus,

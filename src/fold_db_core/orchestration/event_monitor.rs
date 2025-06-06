@@ -57,6 +57,7 @@ impl EventMonitor {
             loop {
                 // Check FieldValueSet events
                 if let Ok(event) = field_value_consumer.try_recv() {
+                    info!("🔔 DIAGNOSTIC: EventMonitor received FieldValueSet event - field: {}, source: {}", event.field, event.source);
                     if let Err(e) = Self::handle_field_value_event(&event, &manager, &tree, &message_bus) {
                         error!("❌ Error handling field value event: {}", e);
                     }
@@ -64,6 +65,7 @@ impl EventMonitor {
 
                 // Check TransformTriggered events
                 if let Ok(event) = triggered_consumer.try_recv() {
+                    info!("🔔 DIAGNOSTIC: EventMonitor received TransformTriggered event - transform_id: {}", event.transform_id);
                     if let Err(e) = Self::handle_transform_triggered_event(&event, &manager, &message_bus) {
                         error!("❌ Error handling TransformTriggered event: {}", e);
                     }
@@ -164,8 +166,11 @@ impl EventMonitor {
         message_bus: &Arc<MessageBus>,
     ) -> Result<(), SchemaError> {
         // Look up transforms for this field using the manager
+        info!("🔍 DIAGNOSTIC: Looking up transforms for field {}.{} from manager", schema_name, field_name);
         match manager.get_transforms_for_field(schema_name, field_name) {
             Ok(transform_ids) => {
+                info!("🔍 DIAGNOSTIC: Transform lookup result - found {} transforms: {:?}", transform_ids.len(), transform_ids);
+                
                 if !transform_ids.is_empty() {
                     info!(
                         "🔍 Found {} transforms for field {}.{}: {:?}",
@@ -176,7 +181,7 @@ impl EventMonitor {
                     info!("✅ EventMonitor triggered {} transforms via TransformTriggered events", transform_ids.len());
                 } else {
                     info!(
-                        "ℹ️ No transforms found for field {}.{}",
+                        "ℹ️ DIAGNOSTIC: No transforms found for field {}.{} - this may indicate missing transform dependency mappings",
                         schema_name, field_name
                     );
                 }
@@ -184,7 +189,7 @@ impl EventMonitor {
             }
             Err(e) => {
                 error!(
-                    "❌ Failed to get transforms for field {}.{}: {}",
+                    "❌ DIAGNOSTIC: Failed to get transforms for field {}.{}: {}",
                     schema_name, field_name, e
                 );
                 Err(e)
@@ -305,9 +310,7 @@ mod tests {
     }
 
     fn create_test_tree() -> sled::Tree {
-        let config = sled::Config::new().temporary(true);
-        let db = config.open().expect("Failed to create test database");
-        db.open_tree("test_event_monitor").expect("Failed to create test tree")
+        crate::testing_utils::TestDatabaseFactory::create_named_test_tree("test_event_monitor")
     }
 
     #[test]

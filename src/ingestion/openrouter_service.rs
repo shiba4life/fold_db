@@ -40,15 +40,11 @@ struct OpenRouterResponse {
 #[derive(Debug, Deserialize)]
 struct OpenRouterChoice {
     message: OpenRouterResponseMessage,
-    #[allow(dead_code)]
-    finish_reason: Option<String>,
 }
 
 /// Response message from OpenRouter
 #[derive(Debug, Deserialize)]
 struct OpenRouterResponseMessage {
-    #[allow(dead_code)]
-    role: String,
     content: String,
 }
 

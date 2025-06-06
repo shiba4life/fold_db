@@ -7,7 +7,6 @@
 //! - Field retrieval services
 
 pub mod mutation;
-pub mod context;
 pub mod field_retrieval;
 
 pub use field_retrieval::service::FieldRetrievalService;

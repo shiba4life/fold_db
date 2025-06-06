@@ -4,6 +4,7 @@ use super::{
 };
 use crate::schema::types::field::FieldType;
 use crate::transform::TransformExecutor;
+use crate::validation_utils::ValidationUtils;
 
 /// Validates a [`Schema`] before it is loaded into the database.
 ///
@@ -21,11 +22,7 @@ impl<'a> SchemaValidator<'a> {
 
     /// Validate the given [`Schema`].
     pub fn validate(&self, schema: &Schema) -> Result<(), SchemaError> {
-        if schema.name.is_empty() {
-            return Err(SchemaError::InvalidField(
-                "Schema name cannot be empty".to_string(),
-            ));
-        }
+        ValidationUtils::require_non_empty_string(&schema.name, "Schema name")?;
 
         // For RangeSchema, ensure the range_key is a field in the schema
         if let Some(range_key) = schema.range_key() {
@@ -43,11 +40,7 @@ impl<'a> SchemaValidator<'a> {
             self.validate_range_field_consistency(schema, range_key)?;
         }
 
-        if schema.payment_config.base_multiplier <= 0.0 {
-            return Err(SchemaError::InvalidField(
-                "Schema base_multiplier must be positive".to_string(),
-            ));
-        }
+        ValidationUtils::require_positive(schema.payment_config.base_multiplier, "Schema base_multiplier")?;
 
         for (field_name, field) in &schema.fields {
             if field.payment_config().base_multiplier <= 0.0 {
@@ -159,8 +152,8 @@ impl<'a> SchemaValidator<'a> {
             Some(field_variant) => {
                 let field_type = match field_variant {
                     crate::schema::types::field::FieldVariant::Single(_) => "Single",
-                    crate::schema::types::field::FieldVariant::Collection(_) => "Collection",
                     crate::schema::types::field::FieldVariant::Range(_) => "Range", // Should not reach here
+                    // TODO: Collection fields are no longer supported - CollectionField has been removed
                 };
                 return Err(SchemaError::InvalidField(format!(
                     "RangeSchema '{}' has range_key field '{}' that is a {} field, but range_key must be a Range field",
@@ -192,14 +185,7 @@ impl<'a> SchemaValidator<'a> {
                         schema.name, field_name, field_name
                     )));
                 }
-                crate::schema::types::field::FieldVariant::Collection(_) => {
-                    return Err(SchemaError::InvalidField(format!(
-                        "RangeSchema '{}' contains Collection field '{}', but ALL fields must be Range fields. \
-                        Consider using a regular Schema (not RangeSchema) if you need Collection fields, \
-                        or convert '{}' to a Range field to maintain RangeSchema consistency.",
-                        schema.name, field_name, field_name
-                    )));
-                }
+                // TODO: Collection fields are no longer supported - CollectionField has been removed
             }
         }
 
@@ -252,13 +238,13 @@ impl<'a> SchemaValidator<'a> {
                     schema.name,
                     match field_def.field_type {
                         FieldType::Single => "Single",
-                        FieldType::Collection => "Collection",
+                        // TODO: Collection variant was removed during event system cleanup
                         FieldType::Range => "Range", // shouldn't reach here
                     },
                     field_name,
                     match field_def.field_type {
                         FieldType::Single => "Single",
-                        FieldType::Collection => "Collection",
+                        // TODO: Collection variant was removed during event system cleanup
                         FieldType::Range => "Range",
                     },
                     field_name

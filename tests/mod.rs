@@ -12,13 +12,9 @@
 
 // Centralized test utilities - eliminates duplicate test code across all tests
 pub mod test_utils;
-pub mod assertions;
 
 pub mod integration;
 pub mod unit;
-
-// Common test utilities and fixtures (now delegates to centralized utilities)
-pub mod common;
 
 // Additional test files
 pub mod direct_event_driven_orchestrator_test;

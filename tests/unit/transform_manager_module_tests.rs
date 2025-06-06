@@ -3,14 +3,12 @@
 //! This module contains focused unit tests for each decomposed module to ensure
 //! they function correctly in isolation and maintain their specific responsibilities.
 
-use crate::common::CommonTestFixture;
+use crate::test_utils::CommonTestFixture;
 use fold_node::fold_db_core::infrastructure::message_bus::{
-    TransformTriggered, TransformExecuted,
-    SchemaChanged
+    TransformTriggered,
+    SchemaChanged,
+    TransformExecuted,
 };
-use fold_node::fold_db_core::transform_manager::TransformRunner;
-use std::time::Duration;
-use tokio::time::timeout;
 
 // ========== Manager Module Tests ==========
 

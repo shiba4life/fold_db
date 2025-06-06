@@ -83,25 +83,26 @@
 //! # }
 //! ```
 //!
-//! ### Enhanced Message Bus
+//! ### Async Message Bus
 //!
-//! The [`EnhancedMessageBus`] provides advanced features:
+//! The [`AsyncMessageBus`] provides advanced features:
 //!
 //! ```rust
-//! use fold_node::fold_db_core::infrastructure::message_bus::{EnhancedMessageBus, FieldValueSet};
+//! use fold_node::fold_db_core::infrastructure::message_bus::{AsyncMessageBus, FieldValueSet, Event};
 //! use serde_json::json;
 //!
 //! # async fn example() {
-//! let bus = EnhancedMessageBus::new();
-//! 
+//! let bus = AsyncMessageBus::new();
+//!
 //! let event = FieldValueSet::new("user.status", json!("active"), "user_service");
-//! bus.publish_with_retry(event, 3, "user_service".to_string()).await.unwrap();
-//! 
-//! // Process any failed events
-//! let processed = bus.process_retries().await;
-//! 
-//! // Get event history for event sourcing
-//! let history = bus.get_event_history().await;
+//! let wrapped_event = Event::FieldValueSet(event);
+//! bus.publish_event(wrapped_event).await.unwrap();
+//!
+//! // Subscribe to events
+//! let mut consumer = bus.subscribe("FieldValueSet").await;
+//!
+//! // Check for new events
+//! let _received = consumer.try_recv();
 //! # }
 //! ```
 
@@ -113,7 +114,6 @@ pub use error_handling::{
 };
 pub use sync_bus::{Consumer, MessageBus};
 pub use async_bus::{AsyncConsumer, AsyncEventHandler, AsyncMessageBus};
-pub use enhanced_bus::EnhancedMessageBus;
 
 // Import constructor implementations (these add methods to the event types)
 
@@ -122,9 +122,7 @@ mod events;
 mod error_handling;
 mod sync_bus;
 mod async_bus;
-mod enhanced_bus;
 mod constructors;
-mod tests;
 
 #[cfg(test)]
 mod integration_tests {
@@ -178,30 +176,6 @@ mod integration_tests {
         assert!(received.is_some());
     }
 
-    #[tokio::test]
-    async fn test_enhanced_bus_integration() {
-        let bus = EnhancedMessageBus::new();
-        
-        // Test that both sync and async buses are accessible
-        let sync_bus = bus.sync_bus();
-        let async_bus = bus.async_bus();
-
-        assert_eq!(sync_bus.subscriber_count::<FieldValueSet>(), 0);
-        assert_eq!(async_bus.subscriber_count("AtomCreated").await, 0);
-
-        // Test event history functionality
-        let initial_history = bus.get_event_history().await;
-        assert_eq!(initial_history.len(), 0);
-
-        // Test retry queue functionality
-        let (total, ready) = bus.get_retry_queue_status().await;
-        assert_eq!(total, 0);
-        assert_eq!(ready, 0);
-
-        // Test dead letter queue functionality
-        let dead_letters = bus.get_dead_letters().await;
-        assert_eq!(dead_letters.len(), 0);
-    }
 
     #[test]
     fn test_event_constructors() {

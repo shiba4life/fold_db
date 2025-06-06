@@ -579,39 +579,7 @@ impl AtomRefGetResponse {
     }
 }
 
-impl CollectionUpdateRequest {
-    /// Create a new CollectionUpdateRequest
-    pub fn new(
-        correlation_id: String,
-        schema_name: String,
-        field_name: String,
-        operation: String,
-        value: Value,
-        source_pub_key: String,
-        item_id: Option<String>,
-    ) -> Self {
-        Self {
-            correlation_id,
-            schema_name,
-            field_name,
-            operation,
-            value,
-            source_pub_key,
-            item_id,
-        }
-    }
-}
-
-impl CollectionUpdateResponse {
-    /// Create a new CollectionUpdateResponse
-    pub fn new(correlation_id: String, success: bool, error: Option<String>) -> Self {
-        Self {
-            correlation_id,
-            success,
-            error,
-        }
-    }
-}
+// TODO: CollectionUpdateRequest and CollectionUpdateResponse constructors removed during event system cleanup
 
 impl SystemInitializationRequest {
     /// Create a new SystemInitializationRequest

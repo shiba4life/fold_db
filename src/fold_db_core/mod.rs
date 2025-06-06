@@ -19,7 +19,7 @@ pub mod shared;
 pub mod transform_manager;
 
 // Re-export key components for backwards compatibility
-pub use managers::{AtomManager, FieldManager}; // CollectionManager temporarily disabled for UI testing
+pub use managers::AtomManager; // FieldManager removed (was dead code), CollectionManager removed - collections no longer supported
 pub use services::field_retrieval::service::FieldRetrievalService;
 pub use infrastructure::{MessageBus, EventMonitor};
 pub use orchestration::TransformOrchestrator;
@@ -27,7 +27,6 @@ pub use transform_manager::TransformManager;
 pub use shared::*;
 
 // Import infrastructure components that are used internally
-use crate::schema::types::field::FieldVariant;
 use infrastructure::message_bus::{
     FieldValueSetResponse, FieldUpdateResponse, SchemaLoadResponse, SchemaApprovalResponse, AtomCreateResponse, AtomRefCreateResponse,
     AtomRefUpdateRequest,
@@ -44,10 +43,8 @@ use crate::permissions::PermissionWrapper;
 use crate::schema::core::SchemaState;
 use crate::schema::SchemaCore;
 use crate::schema::{Schema, SchemaError};
-use crate::schema::types::field::common::Field;
 use log::{info, warn};
 use serde_json::Value;
-use std::sync::mpsc;
 use std::time::Instant;
 use crate::schema::types::{Mutation, Query};
 use uuid::Uuid;
@@ -56,14 +53,7 @@ use std::path::Path;
 use std::sync::Arc;
 use sha2::Digest;
 
-/// Response tracker for correlating requests with responses
-#[derive(Debug)]
-#[allow(dead_code)]
-struct PendingOperationRequest {
-    correlation_id: String,
-    created_at: Instant,
-    response_sender: mpsc::Sender<OperationResponse>,
-}
+// REMOVED: PendingOperationRequest - marked as dead code, never used
 
 /// Unified response type for all operations
 #[derive(Debug, Clone)]
@@ -79,12 +69,10 @@ pub enum OperationResponse {
 }
 
 /// The main database coordinator that manages schemas, permissions, and data storage.
-#[allow(dead_code)]
 pub struct FoldDB {
     pub(crate) atom_manager: AtomManager,
-    pub(crate) field_manager: FieldManager,
     pub(crate) field_retrieval_service: FieldRetrievalService,
-    // pub(crate) collection_manager: CollectionManager, // Temporarily disabled for UI testing
+    // TODO: CollectionManager removed - collections are no longer supported
     pub(crate) schema_manager: Arc<SchemaCore>,
     pub(crate) transform_manager: Arc<TransformManager>,
     pub(crate) transform_orchestrator: Arc<TransformOrchestrator>,
@@ -95,10 +83,6 @@ pub struct FoldDB {
     pub(crate) message_bus: Arc<MessageBus>,
     /// Event monitor for system-wide observability
     pub(crate) event_monitor: Arc<infrastructure::event_monitor::EventMonitor>,
-    /// Statistics tracking for event-driven operations
-    event_driven_stats: Arc<std::sync::Mutex<EventDrivenFoldDBStats>>,
-    /// Pending operation tracking for event-driven responses
-    pending_operations: Arc<std::sync::Mutex<HashMap<String, PendingOperationRequest>>>,
 }
 
 impl FoldDB {
@@ -140,14 +124,14 @@ impl FoldDB {
         let orchestrator_tree = db_ops.orchestrator_tree.clone();
 
         // Initialize message bus
-        let message_bus = Arc::new(MessageBus::new());
+        let message_bus = infrastructure::factory::InfrastructureFactory::create_message_bus();
 
         // Initialize components via event-driven system initialization
         let correlation_id = Uuid::new_v4().to_string();
         let init_request = SystemInitializationRequest {
             correlation_id: correlation_id.clone(),
             db_path: path.to_string(),
-            orchestrator_config: None, // TODO: Add orchestrator config if needed
+            orchestrator_config: None,
         };
 
         // Send system initialization request via message bus
@@ -165,13 +149,12 @@ impl FoldDB {
             SchemaCore::new(path, Arc::clone(&db_ops_arc), Arc::clone(&message_bus))
                 .map_err(|e| sled::Error::Unsupported(e.to_string()))?,
         );
-        let field_manager = FieldManager::new(Arc::clone(&message_bus), Arc::clone(&schema_manager));
-        // let collection_manager = CollectionManager::new(field_manager.clone(), Arc::clone(&message_bus)); // Temporarily disabled for UI testing
+        // TODO: CollectionManager removed - collections are no longer supported
         
         // Use standard initialization but with deprecated closures that recommend events
         let transform_manager = init_transform_manager(Arc::new(db_ops.clone()), Arc::clone(&message_bus))?;
         let orchestrator =
-            init_orchestrator(&field_manager, transform_manager.clone(), orchestrator_tree, Arc::clone(&message_bus), Arc::new(db_ops.clone()))?;
+            init_orchestrator(&FieldRetrievalService::new(Arc::clone(&message_bus)), transform_manager.clone(), orchestrator_tree, Arc::clone(&message_bus), Arc::new(db_ops.clone()))?;
 
         info!("Loading schema states from disk during FoldDB initialization");
         if let Err(e) = schema_manager.discover_and_load_all_schemas() {
@@ -234,9 +217,8 @@ impl FoldDB {
 
         Ok(Self {
             atom_manager,
-            field_manager,
             field_retrieval_service: FieldRetrievalService::new(Arc::clone(&message_bus)),
-            // collection_manager, // Temporarily disabled for UI testing
+            // TODO: CollectionManager removed - collections are no longer supported
             schema_manager,
             transform_manager,
             transform_orchestrator: orchestrator,
@@ -244,8 +226,6 @@ impl FoldDB {
             permission_wrapper: PermissionWrapper::new(),
             message_bus,
             event_monitor,
-            event_driven_stats: Arc::new(std::sync::Mutex::new(EventDrivenFoldDBStats::new())),
-            pending_operations: Arc::new(std::sync::Mutex::new(HashMap::new())),
         })
     }
 
@@ -412,7 +392,10 @@ impl FoldDB {
 
     /// List all schemas with their states
     pub fn list_schemas_with_state(&self) -> Result<HashMap<String, SchemaState>, SchemaError> {
-        self.load_schema_state()
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaStatusRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaStatusRequest via message bus instead of direct schema_manager access".to_string()
+        ))
     }
 
     /// Provides access to the underlying database operations
@@ -675,11 +658,51 @@ impl FoldDB {
             }
         }
         
+        // Extract range key filter if this is a range schema with a filter
+        let range_key_filter = if let (Some(range_key), Some(filter)) = (schema.range_key(), &query.filter) {
+            if let Some(range_filter_obj) = filter.get("range_filter") {
+                if let Some(range_filter_map) = range_filter_obj.as_object() {
+                    if let Some(range_key_value) = range_filter_map.get(range_key) {
+                        // Extract the actual filter value - handle different filter types
+                        let extracted_value = if let Some(obj) = range_key_value.as_object() {
+                            // Handle complex filters like {"Key": "1"}, {"KeyPrefix": "abc"}, etc.
+                            if let Some(key_value) = obj.get("Key") {
+                                Some(key_value.as_str().unwrap_or("").to_string())
+                            } else if let Some(prefix_value) = obj.get("KeyPrefix") {
+                                Some(prefix_value.as_str().unwrap_or("").to_string())
+                            } else if let Some(pattern_value) = obj.get("KeyPattern") {
+                                Some(pattern_value.as_str().unwrap_or("").to_string())
+                            } else {
+                                // For other filter types, try to extract any string value
+                                obj.values()
+                                    .find_map(|v| v.as_str())
+                                    .map(|s| s.to_string())
+                            }
+                        } else {
+                            // Simple string filter like "1"
+                            Some(range_key_value.to_string().trim_matches('"').to_string())
+                        };
+                        
+                        info!("🎯 RANGE FILTER EXTRACTED: range_key='{}', filter_value={:?}", range_key, extracted_value);
+                        extracted_value
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         // Retrieve actual field values by accessing database directly
         let mut field_values = serde_json::Map::new();
         
         for field_name in &query.fields {
-            match self.get_field_value_from_db(&schema, field_name) {
+            match self.get_field_value_from_db(&schema, field_name, range_key_filter.clone()) {
                 Ok(value) => {
                     field_values.insert(field_name.clone(), value);
                 }
@@ -694,109 +717,12 @@ impl FoldDB {
         Ok(serde_json::Value::Object(field_values))
     }
 
-    /// Get field value directly from database by following the chain:
-    /// Single fields: field -> ref_atom_uuid -> AtomRef -> atom_uuid -> Atom -> content
-    /// Range fields: field -> ref_atom_uuid -> AtomRefRange -> range_key -> atom_uuid -> Atom -> content
-    fn get_field_value_from_db(&self, schema: &Schema, field_name: &str) -> Result<Value, SchemaError> {
-        use crate::schema::types::field::FieldVariant;
-        
-        // Get field definition
-        let field = schema.fields.get(field_name)
-            .ok_or_else(|| SchemaError::InvalidField(format!("Field '{}' not found", field_name)))?;
-        
-        info!("🔍 DEBUG: get_field_value_from_db for field '{}' in schema '{}'", field_name, schema.name);
-        
-        // Check field type and handle accordingly
-        match field {
-            FieldVariant::Single(_) => {
-                info!("🔍 DEBUG: Single field - using AtomRef");
-                self.get_single_field_value_from_db(field, field_name)
-            }
-            FieldVariant::Range(_) => {
-                info!("🔍 DEBUG: Range field - PROBLEM IDENTIFIED! Needs AtomRefRange handling");
-                self.get_range_field_value_from_db(field, field_name, schema)
-            }
-            FieldVariant::Collection(_) => {
-                info!("🔍 DEBUG: Collection field - using AtomRefCollection");
-                self.get_collection_field_value_from_db(field, field_name)
-            }
-        }
+    /// Get field value directly from database using unified resolver
+    fn get_field_value_from_db(&self, schema: &Schema, field_name: &str, range_key_filter: Option<String>) -> Result<Value, SchemaError> {
+        // Use the unified FieldValueResolver to eliminate duplicate code
+        crate::fold_db_core::transform_manager::utils::TransformUtils::resolve_field_value(&self.db_ops, schema, field_name, range_key_filter)
     }
     
-    /// Handle Single field value retrieval
-    fn get_single_field_value_from_db(&self, field: &FieldVariant, field_name: &str) -> Result<Value, SchemaError> {
-        // Get ref_atom_uuid from field
-        let ref_atom_uuid = field.ref_atom_uuid()
-            .ok_or_else(|| SchemaError::InvalidField(format!("Field '{}' has no ref_atom_uuid", field_name)))?;
-        
-        // Get AtomRef from database
-        let atom_ref: crate::atom::AtomRef = self.db_ops.get_item(&format!("ref:{}", ref_atom_uuid))?
-            .ok_or_else(|| SchemaError::InvalidField(format!("AtomRef '{}' not found", ref_atom_uuid)))?;
-        
-        // Get atom_uuid from AtomRef
-        let atom_uuid = atom_ref.get_atom_uuid();
-        
-        // Get Atom from database
-        let atom: crate::atom::Atom = self.db_ops.get_item(&format!("atom:{}", atom_uuid))?
-            .ok_or_else(|| SchemaError::InvalidField(format!("Atom '{}' not found", atom_uuid)))?;
-        
-        // Return atom content (the actual field value)
-        Ok(atom.content().clone())
-    }
-    
-    /// Handle Range field value retrieval (NEW - fixes the type mismatch)
-    fn get_range_field_value_from_db(&self, field: &FieldVariant, field_name: &str, _schema: &Schema) -> Result<Value, SchemaError> {
-        // Get ref_atom_uuid from field
-        let ref_atom_uuid = field.ref_atom_uuid()
-            .ok_or_else(|| SchemaError::InvalidField(format!("Field '{}' has no ref_atom_uuid", field_name)))?;
-        
-        info!("🔍 DEBUG: Loading AtomRefRange from ref:{}", ref_atom_uuid);
-        
-        // Get AtomRefRange from database (NOT AtomRef!)
-        let atom_ref_range: crate::atom::AtomRefRange = self.db_ops.get_item(&format!("ref:{}", ref_atom_uuid))?
-            .ok_or_else(|| SchemaError::InvalidField(format!("AtomRefRange '{}' not found", ref_atom_uuid)))?;
-        
-        info!("✅ DEBUG: Successfully loaded AtomRefRange");
-        
-        // For range fields, we need to return all values in the range
-        // This is a simplified implementation - you may want to apply filtering based on the query
-        let mut range_values = serde_json::Map::new();
-        
-        for (range_key, atom_uuid) in &atom_ref_range.atom_uuids {
-            // Get Atom from database
-            match self.db_ops.get_item::<crate::atom::Atom>(&format!("atom:{}", atom_uuid)) {
-                Ok(Some(atom)) => {
-                    range_values.insert(range_key.clone(), atom.content().clone());
-                    info!("✅ DEBUG: Added range key '{}' with value", range_key);
-                }
-                Ok(None) => {
-                    info!("⚠️  DEBUG: Atom '{}' not found for range key '{}'", atom_uuid, range_key);
-                }
-                Err(e) => {
-                    info!("❌ DEBUG: Error loading atom '{}' for range key '{}': {}", atom_uuid, range_key, e);
-                }
-            }
-        }
-        
-        info!("✅ DEBUG: Range field processing complete, found {} items", range_values.len());
-        Ok(Value::Object(range_values))
-    }
-    
-    /// Handle Collection field value retrieval
-    fn get_collection_field_value_from_db(&self, field: &FieldVariant, field_name: &str) -> Result<Value, SchemaError> {
-        // Get ref_atom_uuid from field
-        let ref_atom_uuid = field.ref_atom_uuid()
-            .ok_or_else(|| SchemaError::InvalidField(format!("Field '{}' has no ref_atom_uuid", field_name)))?;
-        
-        // Get AtomRefCollection from database
-        let _atom_ref_collection: crate::atom::AtomRefCollection = self.db_ops.get_item(&format!("ref:{}", ref_atom_uuid))?
-            .ok_or_else(|| SchemaError::InvalidField(format!("AtomRefCollection '{}' not found", ref_atom_uuid)))?;
-        
-        // For now, return an empty object for collection fields
-        // TODO: Implement proper collection field access when AtomRefCollection exposes iteration methods
-        info!("⚠️  Collection field access not fully implemented yet - returning empty object");
-        Ok(Value::Object(serde_json::Map::new()))
-    }
 
     /// Query a schema (compatibility method)
     pub fn query_schema(&self, query: Query) -> Vec<Result<Value, SchemaError>> {

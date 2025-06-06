@@ -279,7 +279,14 @@ impl EnvironmentConfiguration {
     /// Apply this configuration to create a test environment
     pub fn create_test_environment(&self) -> Result<crate::schema::field_factory::TestEnvironment, Box<dyn std::error::Error>> {
         if self.test_mode {
-            crate::schema::field_factory::DatabaseInitHelper::create_test_environment()
+            // Use the new consolidated testing utilities
+            let (db_ops, message_bus) = crate::testing_utils::TestDatabaseFactory::create_test_environment()?;
+            let temp_dir = tempfile::tempdir()?;
+            Ok(crate::schema::field_factory::TestEnvironment {
+                db_ops,
+                message_bus,
+                _temp_dir: temp_dir,
+            })
         } else {
             Err("Cannot create test environment from non-test configuration".into())
         }
