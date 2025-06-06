@@ -85,11 +85,7 @@ datafold_cli load-schema userprofile_schema.json
 
 ### Schema Immutability
 
-**Key Principles:**
-- Schemas in fold db are immutable once created
-- Schema structure cannot be modified after creation
-- To change schema structure, create a new schema with a different name
-- Schema immutability ensures data consistency and integrity
+Schemas are immutable in fold db. See [Schema Immutability](schema-management.md#schema-immutability) for detailed principles and migration patterns.
 
 **Creating New Schema Versions:**
 ```json

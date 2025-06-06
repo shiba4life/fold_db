@@ -46,7 +46,7 @@ Schemas define:
 - Permission policies (read/write access)
 - Payment requirements
 - Transform definitions
-- Field mappings between schemas
+- **Immutable structure** - see [Schema Management](schema-management.md) and [Migration Guide](migration-guide.md)
 
 ### Range Fields
 Special field type that stores key-value pairs, enabling:

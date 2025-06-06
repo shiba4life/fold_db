@@ -55,30 +55,6 @@ pub async fn create_schema(
     }
 }
 
-/// Update an existing schema.
-///
-/// # Deprecated
-///
-/// This function is deprecated because schemas are immutable in fold db.
-/// Schema structure cannot be modified after creation. To change schema structure,
-/// create a new schema with a different name.
-///
-/// This endpoint now returns an error indicating schema immutability.
-#[deprecated(since = "1.0.0", note = "Schemas are immutable. Create a new schema with a different name instead.")]
-pub async fn update_schema(
-    path: web::Path<String>,
-    _schema: web::Json<Schema>,
-    _state: web::Data<AppState>,
-) -> impl Responder {
-    let _name = path.into_inner();
-
-    HttpResponse::BadRequest().json(json!({
-        "error": "Schema updates are not supported. Schemas are immutable once created.",
-        "message": "To change schema structure, create a new schema with a different name.",
-        "deprecated": true,
-        "recommendation": "Use POST /api/schema to create a new schema instead."
-    }))
-}
 
 /// Unload a schema so it is no longer active.
 pub async fn unload_schema_route(

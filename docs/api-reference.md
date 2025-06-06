@@ -281,7 +281,7 @@ Get detailed information about a specific schema.
 #### DELETE /api/schema/{schema_name}
 Unload a schema from the node.
 
-**Note**: This removes the schema from memory but does not delete any stored data. Schema immutability ensures data integrity is maintained.
+**Note**: This removes the schema from memory but does not delete any stored data. See [Schema Immutability](schema-management.md#schema-immutability) for details.
 
 **Response:**
 ```json
