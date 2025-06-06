@@ -56,27 +56,28 @@ pub async fn create_schema(
 }
 
 /// Update an existing schema.
+///
+/// # Deprecated
+///
+/// This function is deprecated because schemas are immutable in fold db.
+/// Schema structure cannot be modified after creation. To change schema structure,
+/// create a new schema with a different name.
+///
+/// This endpoint now returns an error indicating schema immutability.
+#[deprecated(since = "1.0.0", note = "Schemas are immutable. Create a new schema with a different name instead.")]
 pub async fn update_schema(
     path: web::Path<String>,
-    schema: web::Json<Schema>,
-    state: web::Data<AppState>,
+    _schema: web::Json<Schema>,
+    _state: web::Data<AppState>,
 ) -> impl Responder {
-    let name = path.into_inner();
-    let schema_data = schema.into_inner();
+    let _name = path.into_inner();
 
-    if schema_data.name != name {
-        return HttpResponse::BadRequest().json(json!({"error": format!("Schema name '{}' does not match path '{}'", schema_data.name, name)}));
-    }
-
-    let mut node_guard = state.node.lock().await;
-
-    let _ = node_guard.unload_schema(&name);
-
-    match node_guard.load_schema(schema_data) {
-        Ok(_) => HttpResponse::Ok().json(json!({"success": true})),
-        Err(e) => HttpResponse::InternalServerError()
-            .json(json!({"error": format!("Failed to update schema: {}", e)})),
-    }
+    HttpResponse::BadRequest().json(json!({
+        "error": "Schema updates are not supported. Schemas are immutable once created.",
+        "message": "To change schema structure, create a new schema with a different name.",
+        "deprecated": true,
+        "recommendation": "Use POST /api/schema to create a new schema instead."
+    }))
 }
 
 /// Unload a schema so it is no longer active.

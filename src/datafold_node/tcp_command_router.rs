@@ -86,18 +86,14 @@ impl TcpServer {
                 Ok(serde_json::json!({ "success": true }))
             }
             "update_schema" => {
-                let schema_json = request
-                    .get("params")
-                    .and_then(|v| v.get("schema"))
-                    .ok_or_else(|| {
-                        crate::error::FoldDbError::Config("Missing schema parameter".to_string())
-                    })?;
-
-                let schema: Schema = serde_json::from_value(schema_json.clone())?;
-                let mut node_guard = node.lock().await;
-                let _ = node_guard.unload_schema(&schema.name);
-                node_guard.load_schema(schema)?;
-                Ok(serde_json::json!({ "success": true }))
+                // DEPRECATED: Schema updates are not supported due to schema immutability
+                // Schemas are immutable once created. To change schema structure,
+                // create a new schema with a different name.
+                log::warn!("Deprecated operation 'update_schema' called. Schemas are immutable.");
+                
+                Err(crate::error::FoldDbError::Config(
+                    "Schema updates are not supported. Schemas are immutable once created. To change schema structure, create a new schema with a different name.".to_string()
+                ))
             }
             "unload_schema" => {
                 let schema_name = request
