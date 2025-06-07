@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::fees::types::config::FieldPaymentConfig;
 use crate::permissions::types::policy::PermissionsPolicy;
 use crate::schema::types::field::{
-    Field, FieldCommon, FieldType, RangeField, SingleField,
+    CollectionField, Field, FieldCommon, FieldType, RangeField, SingleField,
 };
 use crate::schema::types::Transform;
 
@@ -13,7 +13,8 @@ use crate::schema::types::Transform;
 pub enum FieldVariant {
     /// Single value field
     Single(SingleField),
-    // TODO: Collection fields are no longer supported - CollectionField has been removed
+    /// Collection of values field
+    Collection(CollectionField),
     /// Range of values
     Range(RangeField),
 }
@@ -22,6 +23,7 @@ impl Field for FieldVariant {
     fn permission_policy(&self) -> &PermissionsPolicy {
         match self {
             Self::Single(f) => f.permission_policy(),
+            Self::Collection(f) => f.permission_policy(),
             Self::Range(f) => f.permission_policy(),
         }
     }
@@ -29,6 +31,7 @@ impl Field for FieldVariant {
     fn payment_config(&self) -> &FieldPaymentConfig {
         match self {
             Self::Single(f) => f.payment_config(),
+            Self::Collection(f) => f.payment_config(),
             Self::Range(f) => f.payment_config(),
         }
     }
@@ -36,6 +39,7 @@ impl Field for FieldVariant {
     fn ref_atom_uuid(&self) -> Option<&String> {
         match self {
             Self::Single(f) => f.ref_atom_uuid(),
+            Self::Collection(f) => f.ref_atom_uuid(),
             Self::Range(f) => f.ref_atom_uuid(),
         }
     }
@@ -43,6 +47,7 @@ impl Field for FieldVariant {
     fn set_ref_atom_uuid(&mut self, uuid: String) {
         match self {
             Self::Single(f) => f.set_ref_atom_uuid(uuid),
+            Self::Collection(f) => f.set_ref_atom_uuid(uuid),
             Self::Range(f) => f.set_ref_atom_uuid(uuid),
         }
     }
@@ -50,6 +55,7 @@ impl Field for FieldVariant {
     fn field_mappers(&self) -> &HashMap<String, String> {
         match self {
             Self::Single(f) => f.field_mappers(),
+            Self::Collection(f) => f.field_mappers(),
             Self::Range(f) => f.field_mappers(),
         }
     }
@@ -57,6 +63,7 @@ impl Field for FieldVariant {
     fn set_field_mappers(&mut self, mappers: HashMap<String, String>) {
         match self {
             Self::Single(f) => f.set_field_mappers(mappers),
+            Self::Collection(f) => f.set_field_mappers(mappers),
             Self::Range(f) => f.set_field_mappers(mappers),
         }
     }
@@ -64,6 +71,7 @@ impl Field for FieldVariant {
     fn transform(&self) -> Option<&Transform> {
         match self {
             Self::Single(f) => f.transform(),
+            Self::Collection(f) => f.transform(),
             Self::Range(f) => f.transform(),
         }
     }
@@ -71,6 +79,7 @@ impl Field for FieldVariant {
     fn set_transform(&mut self, transform: Transform) {
         match self {
             Self::Single(f) => f.set_transform(transform),
+            Self::Collection(f) => f.set_transform(transform),
             Self::Range(f) => f.set_transform(transform),
         }
     }
@@ -78,6 +87,7 @@ impl Field for FieldVariant {
     fn writable(&self) -> bool {
         match self {
             Self::Single(f) => f.writable(),
+            Self::Collection(f) => f.writable(),
             Self::Range(f) => f.writable(),
         }
     }
@@ -85,6 +95,7 @@ impl Field for FieldVariant {
     fn set_writable(&mut self, writable: bool) {
         match self {
             Self::Single(f) => f.set_writable(writable),
+            Self::Collection(f) => f.set_writable(writable),
             Self::Range(f) => f.set_writable(writable),
         }
     }
@@ -107,7 +118,10 @@ impl Serialize for FieldVariant {
                 inner: &f.inner,
                 field_type: FieldType::Single,
             },
-            // TODO: Collection fields are no longer supported - CollectionField has been removed
+            Self::Collection(f) => Helper {
+                inner: &f.inner,
+                field_type: FieldType::Collection,
+            },
             Self::Range(f) => Helper {
                 inner: &f.inner,
                 field_type: FieldType::Range,
@@ -135,7 +149,9 @@ impl<'de> Deserialize<'de> for FieldVariant {
             FieldType::Single => Self::Single(SingleField {
                 inner: helper.inner,
             }),
-            // TODO: Collection variant was removed during event system cleanup
+            FieldType::Collection => Self::Collection(CollectionField {
+                inner: helper.inner,
+            }),
             FieldType::Range => {
                 let mut range_field = RangeField {
                     inner: helper.inner,

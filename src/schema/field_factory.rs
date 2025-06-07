@@ -8,6 +8,7 @@
 
 use crate::schema::types::field::{
     single_field::SingleField,
+    collection_field::CollectionField,
     range_field::RangeField,
     variant::FieldVariant,
     common::{Field, FieldCommon},
@@ -81,6 +82,50 @@ impl FieldFactory {
 
     // TODO: Collection fields are no longer supported - CollectionField has been removed
 
+    /// Create a CollectionField with default configuration
+    pub fn create_collection_field() -> CollectionField {
+        CollectionField {
+            inner: FieldCommon::new(
+                PermissionsPolicy::default(),
+                FieldPaymentConfig::default(),
+                HashMap::new(),
+            )
+        }
+    }
+
+    /// Create a CollectionField with custom permissions policy
+    pub fn create_collection_field_with_permissions(permissions: PermissionsPolicy) -> CollectionField {
+        CollectionField {
+            inner: FieldCommon::new(
+                permissions,
+                FieldPaymentConfig::default(),
+                HashMap::new(),
+            )
+        }
+    }
+
+    /// Create a CollectionField with custom payment configuration
+    pub fn create_collection_field_with_payment(payment_config: FieldPaymentConfig) -> CollectionField {
+        CollectionField {
+            inner: FieldCommon::new(
+                PermissionsPolicy::default(),
+                payment_config,
+                HashMap::new(),
+            )
+        }
+    }
+
+    /// Create a CollectionField with all custom configurations
+    pub fn create_collection_field_full(
+        permissions: PermissionsPolicy,
+        payment_config: FieldPaymentConfig,
+        metadata: HashMap<String, String>
+    ) -> CollectionField {
+        CollectionField {
+            inner: FieldCommon::new(permissions, payment_config, metadata)
+        }
+    }
+
     /// Create a RangeField with default configuration
     pub fn create_range_field() -> RangeField {
         RangeField {
@@ -99,6 +144,11 @@ impl FieldFactory {
     }
 
     // TODO: Collection fields are no longer supported - CollectionField has been removed
+
+    /// Create a FieldVariant::Collection with default configuration
+    pub fn create_collection_variant() -> FieldVariant {
+        FieldVariant::Collection(Self::create_collection_field())
+    }
 
     /// Create a FieldVariant::Range with default configuration
     pub fn create_range_variant() -> FieldVariant {
@@ -198,6 +248,13 @@ impl FieldBuilder {
     }
 
     // TODO: Collection fields are no longer supported - CollectionField has been removed
+
+    /// Build a CollectionField
+    pub fn build_collection(self) -> CollectionField {
+        CollectionField {
+            inner: FieldCommon::new(self.permissions, self.payment_config, self.metadata)
+        }
+    }
 
     /// Build a RangeField
     pub fn build_range(self) -> RangeField {
