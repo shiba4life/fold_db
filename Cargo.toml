@@ -1,7 +1,16 @@
 [package]
-name = "fold_node"
+name = "datafold"
 version = "0.1.0"
 edition = "2021"
+authors = ["Tom Tang <tom@datafold.ai>"]
+description = "A distributed data platform with schema-based storage and AI-powered ingestion"
+documentation = "https://docs.rs/datafold"
+homepage = "https://github.com/yourusername/datafold"
+repository = "https://github.com/yourusername/datafold"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["database", "distributed", "schema", "ingestion", "ai"]
+categories = ["database", "data-structures", "network-programming"]
 
 [features]
 default = ["mock"]  # Enable mock feature by default
@@ -67,6 +76,20 @@ reqwest = { version = "0.11", features = ["json"] }
 tokio-test = "0.4"
 
 [lib]
-name = "fold_node"
+name = "datafold"
 path = "src/lib.rs"
+
+# Note: Binary paths based on actual file structure
+# These binaries will be available when installing the package
+[[bin]]
+name = "datafold_cli"
+path = "src/bin/datafold_cli.rs"
+
+[[bin]]
+name = "datafold_http_server"
+path = "src/bin/datafold_http_server.rs"
+
+[[bin]]
+name = "datafold_node"
+path = "src/bin/datafold_node.rs"
 
