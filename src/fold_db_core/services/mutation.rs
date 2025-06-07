@@ -11,16 +11,14 @@
 //! - Event publishing (belongs to FoldDB)
 //! - Schema validation (belongs to FoldDB)
 
-use crate::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSetRequest};
 use crate::fold_db_core::infrastructure::factory::InfrastructureLogger;
+use crate::fold_db_core::infrastructure::message_bus::{FieldValueSetRequest, MessageBus};
 use crate::schema::types::field::FieldVariant;
-use crate::schema::types::schema::Schema;
-use crate::schema::types::Mutation;
-use crate::schema::SchemaError;
-use sha2::{Digest, Sha256};
-use std::sync::Arc;
-use uuid::Uuid;
+use crate::schema::types::{Mutation, Schema, SchemaError};
 use serde_json::Value;
+use sha2::{Sha256, Digest};
+use std::sync::Arc;
+use uuid;
 
 /// Mutation service responsible for field updates and atom modifications
 pub struct MutationService {
@@ -58,7 +56,9 @@ impl MutationService {
             FieldVariant::Range(range_field) => {
                 self.update_range_field(schema, field_name, range_field, value, mutation_hash)
             }
-            // TODO: Collection fields are no longer supported - CollectionField has been removed
+            FieldVariant::Collection(collection_field) => {
+                self.update_collection_field(schema, field_name, collection_field, value, mutation_hash)
+            }
         }
     }
 
@@ -178,7 +178,41 @@ impl MutationService {
         )))
     }
 
-    // TODO: Collection fields are no longer supported - CollectionField has been removed
+    /// Update a collection field value
+    fn update_collection_field(
+        &self,
+        schema: &Schema,
+        field_name: &str,
+        _collection_field: &crate::schema::types::field::collection_field::CollectionField,
+        value: &Value,
+        _mutation_hash: &str,
+    ) -> Result<(), SchemaError> {
+        InfrastructureLogger::log_operation_start("MutationService", "Updating collection field", &format!("{}.{}", schema.name, field_name));
+        
+        // For collection fields, we expect an array value
+        if !value.is_array() {
+            return Err(SchemaError::InvalidData(format!(
+                "Collection field '{}' in schema '{}' requires an array value",
+                field_name, schema.name
+            )));
+        }
+        
+        // Convert the array value to individual atoms
+        let correlation_id = uuid::Uuid::new_v4().to_string();
+        let field_value_request = FieldValueSetRequest {
+            correlation_id,
+            schema_name: schema.name.clone(),
+            field_name: field_name.to_string(),
+            value: value.clone(),
+            source_pub_key: "mutation_service".to_string(),
+        };
+        
+        // Publish the field value set request
+        self.message_bus.publish(field_value_request)?;
+        
+        InfrastructureLogger::log_operation_success("MutationService", "Collection field update", &format!("Published update for {}.{}", schema.name, field_name));
+        Ok(())
+    }
 
     /// Generate mutation hash for tracking
     pub fn generate_mutation_hash(mutation: &Mutation) -> Result<String, SchemaError> {
@@ -211,7 +245,13 @@ impl MutationService {
                 }
                 Ok(())
             }
-            // TODO: Collection fields are no longer supported - CollectionField has been removed
+            FieldVariant::Collection(_) => {
+                // Validate collection field value format
+                if !value.is_array() {
+                    return Err(SchemaError::InvalidData("Collection field value must be an array".to_string()));
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -265,7 +305,12 @@ pub fn validate_range_schema_mutation_format(
                         schema.name, field_name
                     )));
                 }
-                // TODO: Collection fields are no longer supported - CollectionField has been removed
+                FieldVariant::Collection(_) => {
+                    return Err(SchemaError::InvalidData(format!(
+                        "Range schema '{}' contains Collection field '{}', but all fields must be RangeFields",
+                        schema.name, field_name
+                    )));
+                }
             }
         }
 

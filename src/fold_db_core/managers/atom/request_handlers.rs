@@ -10,6 +10,7 @@ use crate::fold_db_core::infrastructure::message_bus::{
 };
 use log::{info, warn};
 use std::time::Instant;
+use crate::atom::CollectionOperation;
 
 impl AtomManager {
     /// Handle AtomCreateRequest by creating atom and publishing response
@@ -154,8 +155,14 @@ impl AtomManager {
                 Ok(())
             }
             "Collection" => {
-                // TODO: Collections are no longer supported - AtomRefCollection has been removed
-                Err("Collection AtomRefs are no longer supported".into())
+                // Create new collection
+                let collection = self.db_ops.update_atom_ref_collection(
+                    &request.aref_uuid,
+                    CollectionOperation::Add { atom_uuid: request.atom_uuid.clone() },
+                    request.source_pub_key.clone(),
+                )?;
+                self.ref_collections.lock().unwrap().insert(request.aref_uuid.clone(), collection);
+                Ok(())
             }
             "Range" => {
                 let range = self.db_ops.update_atom_ref_range(
@@ -231,35 +238,48 @@ impl AtomManager {
                     .and_then(|v| v.as_str())
                     .unwrap_or("add");
                 
-                match action {
-                    "add" => {
-                        // Add atom to collection
-                        if let Some(collection) = self.ref_collections.lock().unwrap().get_mut(&request.aref_uuid) {
-                            collection.add_atom_uuid(request.atom_uuid.clone(), request.source_pub_key.clone());
-                            // Store updated collection in database
-                            let db_key = format!("ref:{}", request.aref_uuid);
-                            self.db_ops.store_item(&db_key, &*collection)?;
-                        } else {
-                            // Create new collection if it doesn't exist
-                            let mut collection = crate::atom::AtomRefCollection::new(request.aref_uuid.clone());
-                            collection.add_atom_uuid(request.atom_uuid.clone(), request.source_pub_key.clone());
-                            let db_key = format!("ref:{}", request.aref_uuid);
-                            self.db_ops.store_item(&db_key, &collection)?;
-                            self.ref_collections.lock().unwrap().insert(request.aref_uuid.clone(), collection);
+                let operation = match action {
+                    "add" => CollectionOperation::Add { 
+                        atom_uuid: request.atom_uuid.clone() 
+                    },
+                    "remove" => CollectionOperation::Remove { 
+                        atom_uuid: request.atom_uuid.clone() 
+                    },
+                    "insert" => {
+                        let index = request.additional_data
+                            .as_ref()
+                            .and_then(|d| d.get("index"))
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as usize;
+                        CollectionOperation::Insert { 
+                            index, 
+                            atom_uuid: request.atom_uuid.clone() 
                         }
-                        Ok(())
-                    }
-                    "remove" => {
-                        // Remove atom from collection
-                        if let Some(collection) = self.ref_collections.lock().unwrap().get_mut(&request.aref_uuid) {
-                            collection.remove_atom_uuid(&request.atom_uuid, request.source_pub_key.clone());
-                            let db_key = format!("ref:{}", request.aref_uuid);
-                            self.db_ops.store_item(&db_key, &*collection)?;
+                    },
+                    "update_by_index" => {
+                        let index = request.additional_data
+                            .as_ref()
+                            .and_then(|d| d.get("index"))
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as usize;
+                        CollectionOperation::UpdateByIndex { 
+                            index, 
+                            atom_uuid: request.atom_uuid.clone() 
                         }
-                        Ok(())
-                    }
-                    _ => Err(format!("Unknown Collection action: {}", action).into())
-                }
+                    },
+                    "clear" => CollectionOperation::Clear,
+                    _ => return Err(format!("Unknown Collection action: {}", action).into())
+                };
+                
+                let collection = self.db_ops.update_atom_ref_collection(
+                    &request.aref_uuid,
+                    operation,
+                    request.source_pub_key.clone(),
+                )?;
+                
+                // Update memory cache
+                self.ref_collections.lock().unwrap().insert(request.aref_uuid.clone(), collection);
+                Ok(())
             }
             "Range" => {
                 let key = request.additional_data

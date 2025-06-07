@@ -1467,7 +1467,6 @@ impl SchemaCore {
                 let key = format!("ref:{}", ref_atom_uuid);
                 
                 match field {
-                    // TODO: Collection fields are no longer supported - CollectionField has been removed
                     FieldVariant::Collection(_) => {
                         // For collection fields, create AtomRefCollection
                         let atom_ref_collection = AtomRefCollection::new("system".to_string());

@@ -188,23 +188,38 @@ fn create_collection_atomref(manager: &AtomManager, request: &FieldValueSetReque
     let aref_uuid = format!("{}_{}_collection", request.schema_name, request.field_name);
     info!("🔍 DIAGNOSTIC: Creating AtomRefCollection with UUID: {} -> atom: {}", aref_uuid, atom_uuid);
     
-    // For now, create the collection manually and store it
-    // TODO: Implement update_atom_ref_collection in DbOperations
-    let mut collection = crate::atom::AtomRefCollection::new(aref_uuid.clone());
-    collection.add_atom_uuid(atom_uuid.to_string(), request.source_pub_key.clone());
+    use crate::atom::CollectionOperation;
     
-    // Store in memory cache
-    manager.ref_collections.lock().unwrap().insert(aref_uuid.clone(), collection.clone());
+    // Use the new update_atom_ref_collection method
+    let collection_result = manager.db_ops.update_atom_ref_collection(
+        &aref_uuid,
+        CollectionOperation::Add { atom_uuid: atom_uuid.to_string() },
+        request.source_pub_key.clone(),
+    );
     
-    // Store in database
-    let db_key = format!("ref:{}", aref_uuid);
-    match manager.db_ops.store_item(&db_key, &collection) {
-        Ok(_) => {
+    match collection_result {
+        Ok(collection) => {
+            // Store in memory cache
+            manager.ref_collections.lock().unwrap().insert(aref_uuid.clone(), collection);
             info!("🔍 DIAGNOSTIC: Successfully created and stored AtomRefCollection: {}", aref_uuid);
+            
+            // Verify the AtomRefCollection was properly stored in database
+            match manager.db_ops.get_item::<crate::atom::AtomRefCollection>(&format!("ref:{}", aref_uuid)) {
+                Ok(Some(_)) => {
+                    info!("✅ VERIFICATION: AtomRefCollection {} confirmed in database", aref_uuid);
+                }
+                Ok(None) => {
+                    error!("❌ VERIFICATION FAILED: AtomRefCollection {} not found in database after storage", aref_uuid);
+                }
+                Err(e) => {
+                    error!("❌ VERIFICATION ERROR: Failed to verify AtomRefCollection {}: {}", aref_uuid, e);
+                }
+            }
+            
             Ok(aref_uuid)
         }
         Err(e) => {
-            error!("❌ DIAGNOSTIC: Failed to store AtomRefCollection: {}", e);
+            error!("❌ DIAGNOSTIC: Failed to create AtomRefCollection: {}", e);
             Err(Box::new(e))
         }
     }

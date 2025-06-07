@@ -70,9 +70,9 @@ impl<'de> Deserialize<'de> for MutationType {
             "create" => Ok(MutationType::Create),
             "update" => Ok(MutationType::Update),
             "delete" => Ok(MutationType::Delete),
-            // TODO: Collection operations are no longer supported - removed add_to_collection
             s if s.starts_with("add_to_collection:") => {
-                Err(serde::de::Error::custom(format!("Collection operations are no longer supported: {}", s)))
+                let id = s.split(':').nth(1).unwrap_or_default().to_string();
+                Ok(MutationType::AddToCollection(id))
             }
             s if s.starts_with("update_to_collection:") => {
                 let id = s.split(':').nth(1).unwrap_or_default().to_string();

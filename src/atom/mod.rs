@@ -167,6 +167,21 @@ impl Atom {
     }
 }
 
+/// Operations that can be performed on an AtomRefCollection
+#[derive(Debug, Clone)]
+pub enum CollectionOperation {
+    /// Add an atom UUID to the end of the collection
+    Add { atom_uuid: String },
+    /// Remove the first occurrence of an atom UUID
+    Remove { atom_uuid: String },
+    /// Insert an atom UUID at a specific index
+    Insert { index: usize, atom_uuid: String },
+    /// Update the atom UUID at a specific index
+    UpdateByIndex { index: usize, atom_uuid: String },
+    /// Clear all atom UUIDs from the collection
+    Clear,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

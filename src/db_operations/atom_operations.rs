@@ -1,5 +1,5 @@
 use super::core::DbOperations;
-use crate::atom::{Atom, AtomRef, AtomRefRange, AtomStatus};
+use crate::atom::{Atom, AtomRef, AtomRefRange, AtomStatus, CollectionOperation, AtomRefCollection};
 use crate::schema::SchemaError;
 use serde_json::Value;
 
@@ -79,7 +79,41 @@ impl DbOperations {
         Ok(aref)
     }
 
-    // TODO: Collection operations are no longer supported - AtomRefCollection has been removed
+    /// Creates or updates a collection of atom references
+    pub fn update_atom_ref_collection(
+        &self,
+        aref_uuid: &str,
+        operation: CollectionOperation,
+        source_pub_key: String,
+    ) -> Result<AtomRefCollection, SchemaError> {
+        let mut collection = match self.get_item::<AtomRefCollection>(&format!("ref:{}", aref_uuid))? {
+            Some(existing_collection) => existing_collection,
+            None => AtomRefCollection::new(source_pub_key.clone()),
+        };
+
+        match operation {
+            CollectionOperation::Add { atom_uuid } => {
+                collection.add_atom_uuid(atom_uuid, source_pub_key);
+            }
+            CollectionOperation::Remove { atom_uuid } => {
+                collection.remove_atom_uuid(&atom_uuid, source_pub_key);
+            }
+            CollectionOperation::Insert { index, atom_uuid } => {
+                collection.insert_atom_uuid(index, atom_uuid, source_pub_key)
+                    .map_err(|e| SchemaError::InvalidData(e))?;
+            }
+            CollectionOperation::UpdateByIndex { index, atom_uuid } => {
+                collection.set_atom_uuid(index, atom_uuid, source_pub_key)
+                    .map_err(|e| SchemaError::InvalidData(e))?;
+            }
+            CollectionOperation::Clear => {
+                collection.clear(source_pub_key);
+            }
+        }
+
+        self.store_item(&format!("ref:{}", aref_uuid), &collection)?;
+        Ok(collection)
+    }
 
     /// Creates or updates a range of atom references
     pub fn update_atom_ref_range(
