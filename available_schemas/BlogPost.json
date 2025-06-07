@@ -1,40 +1,33 @@
 {
   "name": "BlogPost",
+  "schema_type": "Single",
   "fields": {
     "title": {
+      "field_type": "Single",
       "permission_policy": {
-        "read_policy": { "Distance": 0 },
-        "write_policy": { "Distance": 1 }
+        "read_policy": {"NoRequirement": null},
+        "write_policy": {"Distance": 0}
       },
       "payment_config": {
         "base_multiplier": 1.0,
-        "trust_distance_scaling": "None",
-        "min_payment": null
+        "trust_distance_scaling": {"Linear": 0.1}
       },
       "ref_atom_uuid": null,
-      "field_type": "Single",
       "field_mappers": {},
       "transform": null,
       "writable": true
     },
     "content": {
+      "field_type": "Single",
       "permission_policy": {
-        "read_policy": { "Distance": 0 },
-        "write_policy": { "Distance": 1 }
+        "read_policy": {"NoRequirement": null},
+        "write_policy": {"Distance": 0}
       },
       "payment_config": {
-        "base_multiplier": 2.0,
-        "trust_distance_scaling": {
-          "Linear": {
-            "slope": 1.0,
-            "intercept": 0.0,
-            "min_factor": 1.0
-          }
-        },
-        "min_payment": 10
+        "base_multiplier": 1.0,
+        "trust_distance_scaling": {"Linear": 0.1}
       },
       "ref_atom_uuid": null,
-      "field_type": "Single",
       "field_mappers": {},
       "transform": null,
       "writable": true
@@ -72,20 +65,30 @@
       "writable": true
     },
     "tags": {
+      "field_type": "Collection",
       "permission_policy": {
-        "read_policy": { "Distance": 0 },
-        "write_policy": { "Distance": 1 }
+        "read_policy": {"NoRequirement": null},
+        "write_policy": {"Distance": 0}
       },
       "payment_config": {
-        "base_multiplier": 1.5,
-        "trust_distance_scaling": "None",
-        "min_payment": null
+        "base_multiplier": 1.0,
+        "trust_distance_scaling": {"Linear": 0.1}
       },
       "ref_atom_uuid": null,
-      "field_type": "Collection",
       "field_mappers": {},
       "transform": null,
       "writable": true
+    },
+    "comments": {
+      "field_type": "Collection",
+      "permission_policy": {
+        "read_policy": {"NoRequirement": null},
+        "write_policy": {"Distance": 1}
+      },
+      "payment_config": {
+        "base_multiplier": 2.0,
+        "trust_distance_scaling": {"Linear": 0.2}
+      }
     }
   },
   "payment_config": {

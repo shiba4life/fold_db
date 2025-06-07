@@ -1,8 +1,9 @@
 use super::validator::SchemaValidator;
-use crate::atom::{AtomRef, AtomRefRange};
+use crate::atom::{AtomRef, AtomRefCollection, AtomRefRange};
 use crate::fold_db_core::infrastructure::message_bus::MessageBus;
 use crate::schema::types::{
-    Field, FieldVariant, JsonSchemaDefinition, JsonSchemaField, Schema, SchemaError, SingleField,
+    CollectionField, Field, FieldType, FieldVariant, JsonSchemaDefinition, JsonSchemaField, 
+    RangeField, Schema, SchemaError, SingleField,
 };
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -1467,6 +1468,17 @@ impl SchemaCore {
                 
                 match field {
                     // TODO: Collection fields are no longer supported - CollectionField has been removed
+                    FieldVariant::Collection(_) => {
+                        // For collection fields, create AtomRefCollection
+                        let atom_ref_collection = AtomRefCollection::new("system".to_string());
+                        if let Err(e) = self.db_ops.store_item(&key, &atom_ref_collection) {
+                            info!("Failed to persist AtomRefCollection '{}': {}", ref_atom_uuid, e);
+                        } else {
+                            info!("✅ Persisted AtomRefCollection: {}", key);
+                        }
+                        // Create a corresponding AtomRef for the return list
+                        atom_refs.push(AtomRef::new(Uuid::new_v4().to_string(), "system".to_string()));
+                    }
                     FieldVariant::Range(_) => {
                         // For range fields, create AtomRefRange
                         let atom_ref_range = AtomRefRange::new(ref_atom_uuid.clone());
@@ -1517,24 +1529,54 @@ impl SchemaCore {
 
     /// Converts a JSON schema field to a FieldVariant.
     fn convert_field(json_field: JsonSchemaField) -> FieldVariant {
-        let mut single_field = SingleField::new(
-            json_field.permission_policy.into(),
-            json_field.payment_config.into(),
-            json_field.field_mappers,
-        );
-
-        if let Some(ref_atom_uuid) = json_field.ref_atom_uuid {
-            single_field.set_ref_atom_uuid(ref_atom_uuid);
+        let permission_policy = json_field.permission_policy.into();
+        let payment_config = json_field.payment_config.into();
+        let field_mappers = json_field.field_mappers;
+        
+        match json_field.field_type {
+            FieldType::Single => {
+                let mut single_field = SingleField::new(
+                    permission_policy,
+                    payment_config,
+                    field_mappers,
+                );
+                if let Some(ref_atom_uuid) = json_field.ref_atom_uuid {
+                    single_field.set_ref_atom_uuid(ref_atom_uuid);
+                }
+                if let Some(json_transform) = json_field.transform {
+                    single_field.set_transform(json_transform.into());
+                }
+                FieldVariant::Single(single_field)
+            }
+            FieldType::Collection => {
+                let mut collection_field = CollectionField::new(
+                    permission_policy,
+                    payment_config,
+                    field_mappers,
+                );
+                if let Some(ref_atom_uuid) = json_field.ref_atom_uuid {
+                    collection_field.set_ref_atom_uuid(ref_atom_uuid);
+                }
+                if let Some(json_transform) = json_field.transform {
+                    collection_field.set_transform(json_transform.into());
+                }
+                FieldVariant::Collection(collection_field)
+            }
+            FieldType::Range => {
+                let mut range_field = RangeField::new(
+                    permission_policy,
+                    payment_config,
+                    field_mappers,
+                );
+                if let Some(ref_atom_uuid) = json_field.ref_atom_uuid {
+                    range_field.set_ref_atom_uuid(ref_atom_uuid);
+                }
+                if let Some(json_transform) = json_field.transform {
+                    range_field.set_transform(json_transform.into());
+                }
+                FieldVariant::Range(range_field)
+            }
         }
-
-        // Add transform if present
-        if let Some(json_transform) = json_field.transform {
-            single_field.set_transform(json_transform.into());
-        }
-
-        // For now, we'll create all fields as Single fields
-        // TODO: Handle Collection and Range field types based on json_field.field_type
-        FieldVariant::Single(single_field)
     }
 
     /// Interprets a JSON schema definition and converts it to a Schema.
