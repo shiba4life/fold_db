@@ -7,13 +7,17 @@ mod atom_ref;
 mod atom_ref_behavior;
 mod atom_ref_collection;
 mod atom_ref_range;
+mod atom_ref_hash;
 mod atom_ref_tests;
+#[cfg(test)]
+mod atom_ref_hash_tests;
 mod atom_ref_types;
 
 pub use atom_ref::AtomRef;
 pub use atom_ref_behavior::AtomRefBehavior;
 pub use atom_ref_collection::AtomRefCollection;
 pub use atom_ref_range::AtomRefRange;
+pub use atom_ref_hash::AtomRefHash;
 pub use atom_ref_types::{AtomRefStatus, AtomRefUpdate};
 
 /// An immutable data container that represents a single version of content in the database.
