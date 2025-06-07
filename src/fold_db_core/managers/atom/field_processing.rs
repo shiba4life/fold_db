@@ -42,8 +42,10 @@ pub(super) fn handle_fieldvalueset_request(manager: &AtomManager, request: Field
         }
     };
 
-    // Publish response
-    manager.message_bus.publish(response)?;
+    // Publish response - Don't fail the operation if response publishing fails
+    if let Err(e) = manager.message_bus.publish(response) {
+        warn!("⚠️ Failed to publish FieldValueSetResponse: {}. Operation completed successfully.", e);
+    }
     Ok(())
 }
 
@@ -95,6 +97,7 @@ fn create_atomref_for_field(manager: &AtomManager, request: &FieldValueSetReques
     
     match field_type.as_str() {
         "Range" => create_range_atomref(manager, request, atom_uuid),
+        "Collection" => create_collection_atomref(manager, request, atom_uuid),
         _ => create_single_atomref(manager, request, atom_uuid),
     }
 }
@@ -175,6 +178,33 @@ fn create_single_atomref(manager: &AtomManager, request: &FieldValueSetRequest, 
         }
         Err(e) => {
             error!("❌ DIAGNOSTIC: Failed to create AtomRef: {}", e);
+            Err(Box::new(e))
+        }
+    }
+}
+
+/// Create AtomRefCollection for Collection fields
+fn create_collection_atomref(manager: &AtomManager, request: &FieldValueSetRequest, atom_uuid: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let aref_uuid = format!("{}_{}_collection", request.schema_name, request.field_name);
+    info!("🔍 DIAGNOSTIC: Creating AtomRefCollection with UUID: {} -> atom: {}", aref_uuid, atom_uuid);
+    
+    // For now, create the collection manually and store it
+    // TODO: Implement update_atom_ref_collection in DbOperations
+    let mut collection = crate::atom::AtomRefCollection::new(aref_uuid.clone());
+    collection.add_atom_uuid(atom_uuid.to_string(), request.source_pub_key.clone());
+    
+    // Store in memory cache
+    manager.ref_collections.lock().unwrap().insert(aref_uuid.clone(), collection.clone());
+    
+    // Store in database
+    let db_key = format!("ref:{}", aref_uuid);
+    match manager.db_ops.store_item(&db_key, &collection) {
+        Ok(_) => {
+            info!("🔍 DIAGNOSTIC: Successfully created and stored AtomRefCollection: {}", aref_uuid);
+            Ok(aref_uuid)
+        }
+        Err(e) => {
+            error!("❌ DIAGNOSTIC: Failed to store AtomRefCollection: {}", e);
             Err(Box::new(e))
         }
     }
