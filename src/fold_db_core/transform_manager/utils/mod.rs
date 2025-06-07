@@ -504,6 +504,11 @@ impl TransformUtils {
                     }
                 }
             }
+            FieldVariant::Collection(_) => {
+                info!("🔄 Detected collection field, using AtomRefCollection resolution");
+                // TODO: Implement collection field resolution
+                return Err(SchemaError::InvalidField(format!("Collection field resolution not yet implemented for field '{}'", field_name)));
+            }
             FieldVariant::Single(_) => {
                 info!("🔄 Detected single field, using AtomRef resolution");
             }

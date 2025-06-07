@@ -305,6 +305,10 @@ fn determine_field_type(manager: &AtomManager, schema_name: &str, field_name: &s
                     info!("🔍 FIELD TYPE: {} in schema {} is Range", field_name, schema_name);
                     "Range".to_string()
                 }
+                Some(crate::schema::types::field::FieldVariant::Collection(_)) => {
+                    info!("🔍 FIELD TYPE: {} in schema {} is Collection", field_name, schema_name);
+                    "Collection".to_string()
+                }
                 Some(crate::schema::types::field::FieldVariant::Single(_)) => {
                     info!("🔍 FIELD TYPE: {} in schema {} is Single", field_name, schema_name);
                     "Single".to_string()

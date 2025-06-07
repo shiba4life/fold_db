@@ -10,7 +10,7 @@ use fold_node::fold_db_core::infrastructure::message_bus::{
 };
 use fold_node::fold_db_core::managers::atom::AtomManager;
 use fold_node::db_operations::DbOperations;
-use fold_node::atom::{AtomRef, AtomRefBehavior};
+use fold_node::atom::AtomRef;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;

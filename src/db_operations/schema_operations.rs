@@ -95,6 +95,40 @@ impl DbOperations {
                         field.set_ref_atom_uuid(ref_uuid);
                     }
                 }
+                FieldVariant::Collection(ref mut field) => {
+                    if field.ref_atom_uuid().is_none() {
+                        // Create placeholder atom and atomref for collection field
+                        let placeholder_content = json!({
+                            "field_name": field_name,
+                            "schema_name": schema_name,
+                            "initialized": false,
+                            "collection_data": []
+                        });
+                        
+                        // Create atom with placeholder content
+                        let atom = Atom::new(
+                            schema_name.to_string(),
+                            "system".to_string(),
+                            placeholder_content,
+                        );
+                        let atom_uuid = atom.uuid().to_string();
+                        
+                        // Store the atom
+                        self.store_item(&format!("atom:{}", atom_uuid), &atom)
+                            .map_err(|e| SchemaError::InvalidData(format!("Failed to store placeholder atom: {}", e)))?;
+                        
+                        // Create atomref pointing to the atom
+                        let atom_ref = AtomRef::new(atom_uuid, "system".to_string());
+                        let ref_uuid = atom_ref.uuid().to_string();
+                        
+                        // Store the atomref
+                        self.store_item(&format!("ref:{}", ref_uuid), &atom_ref)
+                            .map_err(|e| SchemaError::InvalidData(format!("Failed to store atomref: {}", e)))?;
+                        
+                        // Link the field to the atomref
+                        field.set_ref_atom_uuid(ref_uuid);
+                    }
+                }
                 FieldVariant::Range(ref mut field) => {
                     if field.ref_atom_uuid().is_none() {
                         // Create placeholder atom and atomref for range field

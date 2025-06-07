@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::super::{Atom, AtomRefHash, AtomRefBehavior};
+    use super::super::{Atom, AtomRefHash};
     use serde_json::json;
 
     #[test]

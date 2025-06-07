@@ -55,10 +55,13 @@ impl MutationService {
             FieldVariant::Single(single_field) => {
                 self.update_single_field(schema, field_name, single_field, value, mutation_hash)
             }
+            FieldVariant::Collection(_collection_field) => {
+                // TODO: Implement collection field update logic
+                Err(SchemaError::InvalidData(format!("Collection field updates not yet implemented for field '{}'", field_name)))
+            }
             FieldVariant::Range(range_field) => {
                 self.update_range_field(schema, field_name, range_field, value, mutation_hash)
             }
-            // TODO: Collection fields are no longer supported - CollectionField has been removed
         }
     }
 
@@ -204,6 +207,13 @@ impl MutationService {
                 }
                 Ok(())
             }
+            FieldVariant::Collection(_) => {
+                // Validate collection field value format
+                if !value.is_array() {
+                    return Err(SchemaError::InvalidData("Collection field value must be an array".to_string()));
+                }
+                Ok(())
+            }
             FieldVariant::Range(_) => {
                 // Validate range field value format
                 if !value.is_object() {
@@ -211,7 +221,6 @@ impl MutationService {
                 }
                 Ok(())
             }
-            // TODO: Collection fields are no longer supported - CollectionField has been removed
         }
     }
 }
@@ -265,7 +274,12 @@ pub fn validate_range_schema_mutation_format(
                         schema.name, field_name
                     )));
                 }
-                // TODO: Collection fields are no longer supported - CollectionField has been removed
+                FieldVariant::Collection(_) => {
+                    return Err(SchemaError::InvalidData(format!(
+                        "Range schema '{}' contains Collection field '{}', but all fields must be RangeFields",
+                        schema.name, field_name
+                    )));
+                }
             }
         }
 

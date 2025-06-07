@@ -431,10 +431,12 @@ fn test_complete_range_only_architecture_validation() {
             FieldVariant::Single(_) => {
                 println!("✅ Field '{}' is Single (Range-only architecture compatible)", field_name);
             }
+            FieldVariant::Collection(_) => {
+                println!("⚠️ Field '{}' is Collection (architecture includes Collection support)", field_name);
+            }
             FieldVariant::Range(_) => {
                 println!("✅ Field '{}' is Range (Range-only architecture compatible)", field_name);
             }
-            // Note: Collection variant should not exist after collection removal
         }
     }
     

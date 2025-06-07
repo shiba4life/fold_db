@@ -2,9 +2,10 @@ use super::validator::SchemaValidator;
 use crate::atom::{AtomRef, AtomRefCollection, AtomRefRange};
 use crate::fold_db_core::infrastructure::message_bus::MessageBus;
 use crate::schema::types::{
-    CollectionField, Field, FieldType, FieldVariant, JsonSchemaDefinition, JsonSchemaField, 
+    Field, FieldType, FieldVariant, JsonSchemaDefinition, JsonSchemaField, 
     RangeField, Schema, SchemaError, SingleField,
 };
+use crate::schema::types::field::CollectionField;
 use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json;
