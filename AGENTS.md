@@ -2,6 +2,8 @@
 
 All contributors must ensure that every new feature is accompanied by appropriate tests. Write comprehensive tests for each feature you build before submitting your changes.
 
+Before working on this repository, read the `.cursorrules` file in the project root to understand the full project policies.
+
 1. Keep code DRY.
 2. Limit file size for code.  Break out into helpers and utilities
 3. Limit line length for function.  Break out into separate functions where possible.
@@ -16,3 +18,4 @@ validation:
 1. run cargo test --workspace
 2. run cargo clippy   // fix any linting issues
 3. run npm tests in fold_node/src/datafold_node/static-react
+4. read the .cursorrules file for detailed project policies
