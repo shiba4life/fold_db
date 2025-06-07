@@ -1,5 +1,6 @@
 use super::core::DbOperations;
 use crate::atom::{Atom, AtomRef, AtomRefRange, AtomStatus};
+use crate::atom::AtomRefHash;
 use crate::schema::SchemaError;
 use serde_json::Value;
 
@@ -97,5 +98,45 @@ impl DbOperations {
         aref.set_atom_uuid(key, atom_uuid);
         self.store_item(&format!("ref:{}", aref_uuid), &aref)?;
         Ok(aref)
+    }
+
+    /// Creates a new hash atom reference
+    pub fn create_hash_atom_ref(
+        &self,
+        aref_uuid: &str,
+        source_pub_key: String,
+    ) -> Result<AtomRefHash, SchemaError> {
+        let aref = AtomRefHash::new(source_pub_key);
+        self.store_item(&format!("ref:{}", aref_uuid), &aref)?;
+        Ok(aref)
+    }
+
+    /// Inserts or updates an entry in a hash atom reference
+    pub fn hash_insert(
+        &self,
+        aref_uuid: &str,
+        hash_key: String,
+        atom_uuid: String,
+    ) -> Result<AtomRefHash, SchemaError> {
+        let mut aref = match self.get_item::<AtomRefHash>(&format!("ref:{}", aref_uuid))? {
+            Some(existing) => existing,
+            None => AtomRefHash::new("system".to_string()),
+        };
+        aref.set_atom_uuid(hash_key, atom_uuid);
+        self.store_item(&format!("ref:{}", aref_uuid), &aref)?;
+        Ok(aref)
+    }
+
+    /// Retrieves a value from a hash atom reference
+    pub fn hash_get(
+        &self,
+        aref_uuid: &str,
+        hash_key: &str,
+    ) -> Result<Option<String>, SchemaError> {
+        let aref = match self.get_item::<AtomRefHash>(&format!("ref:{}", aref_uuid))? {
+            Some(existing) => existing,
+            None => return Ok(None),
+        };
+        Ok(aref.get_atom_uuid(hash_key).cloned())
     }
 }
