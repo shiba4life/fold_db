@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
-use fold_node::{
+use datafold::{
     db_operations::DbOperations,
     fold_db_core::{
         managers::atom::AtomManager,

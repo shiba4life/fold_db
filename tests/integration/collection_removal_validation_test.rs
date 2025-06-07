@@ -11,15 +11,15 @@
 //! 5. **Serialization/Deserialization** - JSON schema handling works properly
 //! 6. **Database Operations** - Storage and retrieval of field data
 
-use fold_node::schema::types::field::{FieldVariant, Field, FieldType};
-use fold_node::schema::types::{Schema, JsonSchemaDefinition, JsonSchemaField, SchemaType};
-use fold_node::schema::types::json_schema::{JsonPermissionPolicy, JsonFieldPaymentConfig};
-use fold_node::schema::{field_factory::FieldFactory};
-use fold_node::permissions::types::policy::{PermissionsPolicy, TrustDistance};
-use fold_node::fees::{SchemaPaymentConfig, FieldPaymentConfig};
-use fold_node::fees::types::config::TrustDistanceScaling;
-use fold_node::db_operations::DbOperations;
-use fold_node::atom::{Atom, AtomRef, AtomRefBehavior};
+use datafold::schema::types::field::{FieldVariant, Field, FieldType};
+use datafold::schema::types::{Schema, JsonSchemaDefinition, JsonSchemaField, SchemaType};
+use datafold::schema::types::json_schema::{JsonPermissionPolicy, JsonFieldPaymentConfig};
+use datafold::schema::{field_factory::FieldFactory};
+use datafold::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+use datafold::fees::{SchemaPaymentConfig, FieldPaymentConfig};
+use datafold::fees::types::config::TrustDistanceScaling;
+use datafold::db_operations::DbOperations;
+use datafold::atom::{Atom, AtomRef, AtomRefBehavior};
 use serde_json::json;
 use std::collections::HashMap;
 use tempfile::tempdir;
@@ -172,7 +172,7 @@ fn test_range_field_complete_operations() {
     println!("✅ Range field operations working correctly");
     
     // Test 5: Range filtering
-    use fold_node::schema::types::field::range_filter::RangeFilter;
+    use datafold::schema::types::field::range_filter::RangeFilter;
     
     let key_filter = RangeFilter::Key("key_001".to_string());
     let filter_result = range_field.apply_filter(&key_filter);
@@ -299,7 +299,7 @@ fn test_json_schema_serialization_and_validation() {
         },
         field_mappers: HashMap::new(),
         ref_atom_uuid: None,
-        field_type: fold_node::schema::types::field::FieldType::Single,
+        field_type: datafold::schema::types::field::FieldType::Single,
         transform: None,
     };
     
@@ -352,7 +352,7 @@ fn test_json_schema_serialization_and_validation() {
         },
         field_mappers: HashMap::new(),
         ref_atom_uuid: None,
-        field_type: fold_node::schema::types::field::FieldType::Range,
+        field_type: datafold::schema::types::field::FieldType::Range,
         transform: None,
     };
     
@@ -443,7 +443,7 @@ fn test_field_factory_comprehensive_functionality() {
     println!("✅ Field variant creation works");
     
     // Test 4: Builder pattern
-    use fold_node::schema::field_factory::FieldBuilder;
+    use datafold::schema::field_factory::FieldBuilder;
     
     let mut metadata = HashMap::new();
     metadata.insert("category".to_string(), "test".to_string());

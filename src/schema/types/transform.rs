@@ -20,7 +20,7 @@ use std::collections::HashSet;
 /// # Example
 ///
 /// ```
-/// use fold_node::schema::types::Transform;
+/// use datafold::schema::types::Transform;
 ///
 /// let transform = Transform::new(
 ///     "let bmi = weight / (height ^ 2); return 0.5 * blood_pressure + 1.2 * bmi;".to_string(),

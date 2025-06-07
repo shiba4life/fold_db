@@ -5,12 +5,12 @@
 //! - Query looks for atom: f079c516-b08f-4105-a609-7f55ccdfcf0a (old/wrong)
 //! - AtomRef UUID: affc56e5-17fb-48ad-b73e-353fe1739d7e (should point to new atom)
 
-use fold_node::fold_db_core::infrastructure::message_bus::{
+use datafold::fold_db_core::infrastructure::message_bus::{
     MessageBus, FieldValueSetRequest, FieldValueSetResponse
 };
-use fold_node::fold_db_core::managers::atom::AtomManager;
-use fold_node::db_operations::DbOperations;
-use fold_node::atom::{AtomRef, AtomRefBehavior};
+use datafold::fold_db_core::managers::atom::AtomManager;
+use datafold::db_operations::DbOperations;
+use datafold::atom::{AtomRef, AtomRefBehavior};
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;

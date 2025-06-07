@@ -21,8 +21,8 @@ use tokio::sync::Mutex;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use fold_node::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
-/// use fold_node::error::FoldDbResult;
+/// use datafold::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
+/// use datafold::error::FoldDbResult;
 /// use std::path::PathBuf;
 ///
 /// #[tokio::main]
@@ -77,8 +77,8 @@ impl TcpServer {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use fold_node::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
-    /// use fold_node::error::FoldDbResult;
+    /// use datafold::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
+    /// use datafold::error::FoldDbResult;
     /// use std::path::PathBuf;
     ///
     /// #[tokio::main]
@@ -129,8 +129,8 @@ impl TcpServer {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use fold_node::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
-    /// use fold_node::error::FoldDbResult;
+    /// use datafold::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
+    /// use datafold::error::FoldDbResult;
     /// use std::path::PathBuf;
     ///
     /// #[tokio::main]

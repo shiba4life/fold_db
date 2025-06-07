@@ -12,7 +12,7 @@
 //!
 //! ## Usage Example
 //! ```rust
-//! use fold_node::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSet};
+//! use datafold::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSet};
 //! use serde_json::json;
 //!
 //! let mut bus = MessageBus::new();
@@ -52,7 +52,7 @@
 //! The [`MessageBus`] provides synchronous pub/sub messaging:
 //!
 //! ```rust
-//! use fold_node::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSet};
+//! use datafold::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSet};
 //! use serde_json::json;
 //!
 //! let bus = MessageBus::new();
@@ -69,7 +69,7 @@
 //! The [`AsyncMessageBus`] provides async pub/sub messaging:
 //!
 //! ```rust
-//! use fold_node::fold_db_core::infrastructure::message_bus::{AsyncMessageBus, Event, AtomCreated};
+//! use datafold::fold_db_core::infrastructure::message_bus::{AsyncMessageBus, Event, AtomCreated};
 //! use serde_json::json;
 //!
 //! # async fn example() {
@@ -88,7 +88,7 @@
 //! The [`AsyncMessageBus`] provides advanced features:
 //!
 //! ```rust
-//! use fold_node::fold_db_core::infrastructure::message_bus::{AsyncMessageBus, FieldValueSet, Event};
+//! use datafold::fold_db_core::infrastructure::message_bus::{AsyncMessageBus, FieldValueSet, Event};
 //! use serde_json::json;
 //!
 //! # async fn example() {

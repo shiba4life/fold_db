@@ -11,13 +11,13 @@
 //! 5. **Range Filtering and Search** - Advanced query capabilities
 //! 6. **Range Schema Validation** - Ensure Range schemas work correctly
 
-use fold_node::schema::types::field::{FieldVariant, RangeField, Field};
-use fold_node::schema::types::field::range_filter::{RangeFilter, RangeFilterResult};
-use fold_node::schema::{Schema, field_factory::FieldFactory};
-use fold_node::atom::{Atom, AtomRef};
-use fold_node::db_operations::DbOperations;
-use fold_node::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSetRequest, FieldValueSetResponse};
-use fold_node::fold_db_core::managers::atom::AtomManager;
+use datafold::schema::types::field::{FieldVariant, RangeField, Field};
+use datafold::schema::types::field::range_filter::{RangeFilter, RangeFilterResult};
+use datafold::schema::{Schema, field_factory::FieldFactory};
+use datafold::atom::{Atom, AtomRef};
+use datafold::db_operations::DbOperations;
+use datafold::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSetRequest, FieldValueSetResponse};
+use datafold::fold_db_core::managers::atom::AtomManager;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::{Duration, Instant};

@@ -3,11 +3,11 @@
 //! This test verifies that the critical mutation bug fix is working correctly
 //! by testing the new FieldValueSetRequest handler implementation.
 
-use fold_node::fold_db_core::infrastructure::message_bus::{
+use datafold::fold_db_core::infrastructure::message_bus::{
     MessageBus, FieldValueSetRequest, FieldValueSetResponse
 };
-use fold_node::fold_db_core::managers::atom::AtomManager;
-use fold_node::db_operations::DbOperations;
+use datafold::fold_db_core::managers::atom::AtomManager;
+use datafold::db_operations::DbOperations;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;

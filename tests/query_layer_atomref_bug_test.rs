@@ -5,13 +5,13 @@
 //! 2. Query layer incorrectly reads static schema references
 //! 3. Result: Query finds old/wrong atom UUIDs
 
-use fold_node::fold_db_core::infrastructure::message_bus::{
+use datafold::fold_db_core::infrastructure::message_bus::{
     MessageBus, FieldValueSetRequest, FieldValueSetResponse
 };
-use fold_node::fold_db_core::managers::atom::AtomManager;  
-use fold_node::fold_db_core::transform_manager::utils::TransformUtils;
-use fold_node::db_operations::DbOperations;
-use fold_node::schema::{Schema, types::field::FieldVariant};
+use datafold::fold_db_core::managers::atom::AtomManager;  
+use datafold::fold_db_core::transform_manager::utils::TransformUtils;
+use datafold::db_operations::DbOperations;
+use datafold::schema::{Schema, types::field::FieldVariant};
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
@@ -48,12 +48,12 @@ fn test_query_layer_atomref_bug_reproduction() {
     let initial_static_atom_uuid = "static-atom-uuid-12345";
     
     // Create SingleField with proper structure
-    use fold_node::schema::types::field::Field; // Import the trait
+    use datafold::schema::types::field::Field; // Import the trait
     use std::collections::HashMap;
     
-    let mut single_field = fold_node::schema::types::field::SingleField::new(
-        fold_node::permissions::types::policy::PermissionsPolicy::default(),
-        fold_node::fees::types::config::FieldPaymentConfig::default(),
+    let mut single_field = datafold::schema::types::field::SingleField::new(
+        datafold::permissions::types::policy::PermissionsPolicy::default(),
+        datafold::fees::types::config::FieldPaymentConfig::default(),
         HashMap::new(),
     );
     
@@ -86,7 +86,7 @@ fn test_query_layer_atomref_bug_reproduction() {
     
     // STEP 3: Verify dynamic AtomRef was created and points to new atom  
     println!("🔍 STEP 3: Verifying dynamic AtomRef state");
-    let dynamic_aref = db_ops.get_item::<fold_node::atom::AtomRef>(&format!("ref:{}", dynamic_aref_uuid))
+    let dynamic_aref = db_ops.get_item::<datafold::atom::AtomRef>(&format!("ref:{}", dynamic_aref_uuid))
         .expect("Should be able to query dynamic AtomRef")
         .expect("Dynamic AtomRef should exist");
     
@@ -153,7 +153,7 @@ fn test_query_layer_atomref_bug_reproduction() {
     assert_eq!(dynamic_aref_uuid, dynamic_aref_uuid_2, "Should reuse same AtomRef UUID");
     
     // Check that the AtomRef now points to a newer atom
-    let updated_aref = db_ops.get_item::<fold_node::atom::AtomRef>(&format!("ref:{}", dynamic_aref_uuid))
+    let updated_aref = db_ops.get_item::<datafold::atom::AtomRef>(&format!("ref:{}", dynamic_aref_uuid))
         .expect("Should be able to query updated AtomRef")
         .expect("Updated AtomRef should exist");
     

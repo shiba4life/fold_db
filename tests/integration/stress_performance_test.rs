@@ -11,14 +11,14 @@
 //! 5. **Database Scalability** - Large dataset handling and query performance
 //! 6. **Resource Cleanup and Recovery** - System stability after stress
 
-use fold_node::fold_db_core::infrastructure::message_bus::{
+use datafold::fold_db_core::infrastructure::message_bus::{
     MessageBus, FieldValueSetRequest, FieldValueSetResponse, TransformTriggered, TransformExecuted
 };
-use fold_node::fold_db_core::transform_manager::TransformManager;
-use fold_node::fold_db_core::managers::atom::AtomManager;
-use fold_node::db_operations::DbOperations;
-use fold_node::schema::{Schema, types::field::FieldVariant, field_factory::FieldFactory};
-use fold_node::atom::{Atom, AtomRef};
+use datafold::fold_db_core::transform_manager::TransformManager;
+use datafold::fold_db_core::managers::atom::AtomManager;
+use datafold::db_operations::DbOperations;
+use datafold::schema::{Schema, types::field::FieldVariant, field_factory::FieldFactory};
+use datafold::atom::{Atom, AtomRef};
 use serde_json::json;
 use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
 use std::time::{Duration, Instant};

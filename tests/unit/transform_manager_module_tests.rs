@@ -4,7 +4,7 @@
 //! they function correctly in isolation and maintain their specific responsibilities.
 
 use crate::test_utils::CommonTestFixture;
-use fold_node::fold_db_core::infrastructure::message_bus::{
+use datafold::fold_db_core::infrastructure::message_bus::{
     TransformTriggered,
     SchemaChanged,
     TransformExecuted,

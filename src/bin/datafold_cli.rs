@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
-use fold_node::schema::SchemaHasher;
-use fold_node::{load_node_config, DataFoldNode, MutationType, Operation, SchemaState};
+use datafold::schema::SchemaHasher;
+use datafold::{load_node_config, DataFoldNode, MutationType, Operation, SchemaState};
 use log::info;
 use serde_json::Value;
 use std::fs;
@@ -418,7 +418,7 @@ fn handle_execute(
 /// * There is an error executing the requested command
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    fold_node::web_logger::init().ok();
+    datafold::web_logger::init().ok();
     let cli = Cli::parse();
 
     // Handle commands that don't need the node first

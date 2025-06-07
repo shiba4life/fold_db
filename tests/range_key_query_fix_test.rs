@@ -3,14 +3,14 @@
 //! Bug Fix 1: When querying for range key 1, system returns data for range key 1 (not range key 2)
 //! Bug Fix 2: Query results are simplified (no excessive nesting)
 
-use fold_node::db_operations::DbOperations;
-use fold_node::fold_db_core::infrastructure::message_bus::{
+use datafold::db_operations::DbOperations;
+use datafold::fold_db_core::infrastructure::message_bus::{
     MessageBus, FieldValueSetRequest, FieldValueSetResponse
 };
-use fold_node::fold_db_core::transform_manager::utils::TransformUtils;
-use fold_node::fold_db_core::managers::atom::AtomManager;
-use fold_node::schema::{Schema, field_factory::FieldFactory};
-use fold_node::schema::types::field::FieldVariant;
+use datafold::fold_db_core::transform_manager::utils::TransformUtils;
+use datafold::fold_db_core::managers::atom::AtomManager;
+use datafold::schema::{Schema, field_factory::FieldFactory};
+use datafold::schema::types::field::FieldVariant;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;

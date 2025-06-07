@@ -27,9 +27,9 @@ use crate::network::{NetworkConfig, NetworkCore, PeerId};
 /// # Examples
 ///
 /// ```rust,no_run
-/// use fold_node::datafold_node::{DataFoldNode, NodeConfig};
-/// use fold_node::schema::{Schema, types::Operation};
-/// use fold_node::error::FoldDbResult;
+/// use datafold::datafold_node::{DataFoldNode, NodeConfig};
+/// use datafold::schema::{Schema, types::Operation};
+/// use datafold::error::FoldDbResult;
 /// use std::path::PathBuf;
 /// use std::collections::HashMap;
 ///

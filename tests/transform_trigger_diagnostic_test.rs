@@ -3,15 +3,15 @@
 //! This test validates that the critical FieldValueSet event publication fix
 //! resolves the transform trigger issue.
 
-use fold_node::fold_db_core::infrastructure::message_bus::{
+use datafold::fold_db_core::infrastructure::message_bus::{
     MessageBus, FieldValueSetRequest, FieldValueSetResponse, FieldValueSet, TransformTriggered
 };
-use fold_node::fold_db_core::managers::atom::AtomManager;
-use fold_node::fold_db_core::orchestration::event_monitor::EventMonitor;
-use fold_node::fold_db_core::orchestration::persistence_manager::PersistenceManager;
-use fold_node::fold_db_core::transform_manager::types::TransformRunner;
-use fold_node::db_operations::DbOperations;
-use fold_node::schema::types::SchemaError;
+use datafold::fold_db_core::managers::atom::AtomManager;
+use datafold::fold_db_core::orchestration::event_monitor::EventMonitor;
+use datafold::fold_db_core::orchestration::persistence_manager::PersistenceManager;
+use datafold::fold_db_core::transform_manager::types::TransformRunner;
+use datafold::db_operations::DbOperations;
+use datafold::schema::types::SchemaError;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;

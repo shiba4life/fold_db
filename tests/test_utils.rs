@@ -7,12 +7,12 @@
 //! - 7+ duplicate NodeConfig patterns
 //! - Multiple duplicate registration/transform creation patterns
 
-use fold_node::db_operations::DbOperations;
-use fold_node::fold_db_core::infrastructure::message_bus::MessageBus;
-use fold_node::fold_db_core::transform_manager::TransformManager;
-use fold_node::datafold_node::config::NodeConfig;
-use fold_node::datafold_node::DataFoldNode;
-use fold_node::schema::types::{Transform, TransformRegistration, SchemaError};
+use datafold::db_operations::DbOperations;
+use datafold::fold_db_core::infrastructure::message_bus::MessageBus;
+use datafold::fold_db_core::transform_manager::TransformManager;
+use datafold::datafold_node::config::NodeConfig;
+use datafold::datafold_node::DataFoldNode;
+use datafold::schema::types::{Transform, TransformRegistration, SchemaError};
 use std::sync::Arc;
 use tempfile::TempDir;
 use uuid::Uuid;
@@ -35,7 +35,7 @@ pub struct CommonTestFixture {
 /// Specialized fixture for orchestrator testing
 pub struct DirectEventTestFixture {
     pub transform_manager: Arc<TransformManager>,
-    pub transform_orchestrator: fold_node::fold_db_core::orchestration::transform_orchestrator::TransformOrchestrator,
+    pub transform_orchestrator: datafold::fold_db_core::orchestration::transform_orchestrator::TransformOrchestrator,
     pub message_bus: Arc<MessageBus>,
     pub db_ops: Arc<DbOperations>,
     pub _temp_dir: TempDir,
@@ -146,8 +146,8 @@ impl TestFixture {
             orchestrator_db.open_tree("transform_orchestrator")?
         };
         
-        let transform_orchestrator = fold_node::fold_db_core::orchestration::transform_orchestrator::TransformOrchestrator::new(
-            Arc::clone(&transform_manager) as Arc<dyn fold_node::fold_db_core::transform_manager::types::TransformRunner>,
+        let transform_orchestrator = datafold::fold_db_core::orchestration::transform_orchestrator::TransformOrchestrator::new(
+            Arc::clone(&transform_manager) as Arc<dyn datafold::fold_db_core::transform_manager::types::TransformRunner>,
             orchestrator_tree,
             Arc::clone(&message_bus),
             Arc::clone(&db_ops),

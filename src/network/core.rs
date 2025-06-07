@@ -22,7 +22,7 @@ use std::collections::{HashMap, HashSet};
 /// # Examples
 ///
 /// ```rust,no_run
-/// use fold_node::network::{NetworkCore, NetworkConfig, NetworkResult};
+/// use datafold::network::{NetworkCore, NetworkConfig, NetworkResult};
 /// use libp2p::PeerId;
 ///
 /// #[tokio::main]

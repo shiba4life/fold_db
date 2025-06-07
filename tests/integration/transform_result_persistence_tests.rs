@@ -11,7 +11,7 @@
 //! - Multiple executions with different values
 
 use crate::test_utils::TestFixture;
-use fold_node::fold_db_core::infrastructure::message_bus::{
+use datafold::fold_db_core::infrastructure::message_bus::{
     TransformTriggered,
 };
 

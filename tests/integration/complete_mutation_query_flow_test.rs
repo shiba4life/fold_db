@@ -14,15 +14,15 @@
 //! static schema references, causing "Atom not found" errors. This test ensures
 //! the fix is working correctly.
 
-use fold_node::fold_db_core::infrastructure::message_bus::{
+use datafold::fold_db_core::infrastructure::message_bus::{
     MessageBus, FieldValueSetRequest, FieldValueSetResponse
 };
-use fold_node::fold_db_core::transform_manager::utils::TransformUtils;
-use fold_node::db_operations::DbOperations;
-use fold_node::schema::{Schema, types::field::FieldVariant};
-use fold_node::schema::types::field::{SingleField, Field};
-use fold_node::permissions::types::policy::PermissionsPolicy;
-use fold_node::fees::types::config::FieldPaymentConfig;
+use datafold::fold_db_core::transform_manager::utils::TransformUtils;
+use datafold::db_operations::DbOperations;
+use datafold::schema::{Schema, types::field::FieldVariant};
+use datafold::schema::types::field::{SingleField, Field};
+use datafold::permissions::types::policy::PermissionsPolicy;
+use datafold::fees::types::config::FieldPaymentConfig;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
@@ -50,7 +50,7 @@ impl MutationQueryTestFixture {
         let message_bus = Arc::new(MessageBus::new());
         
         // Create AtomManager to handle FieldValueSetRequest events
-        let _atom_manager = fold_node::fold_db_core::managers::atom::AtomManager::new(
+        let _atom_manager = datafold::fold_db_core::managers::atom::AtomManager::new(
             (*db_ops).clone(), 
             Arc::clone(&message_bus)
         );
@@ -136,14 +136,14 @@ impl MutationQueryTestFixture {
         
         // DIAGNOSTIC: Verify AtomRef was created in database
         let aref_key = format!("ref:{}", aref_uuid);
-        match self.db_ops.get_item::<fold_node::atom::AtomRef>(&aref_key) {
+        match self.db_ops.get_item::<datafold::atom::AtomRef>(&aref_key) {
             Ok(Some(aref)) => {
                 let atom_uuid = aref.get_atom_uuid();
                 println!("🔍 DIAGNOSTIC: AtomRef {} points to atom {}", aref_uuid, atom_uuid);
                 
                 // Verify atom exists and contains expected data
                 let atom_key = format!("atom:{}", atom_uuid);
-                match self.db_ops.get_item::<fold_node::atom::Atom>(&atom_key) {
+                match self.db_ops.get_item::<datafold::atom::Atom>(&atom_key) {
                     Ok(Some(atom)) => {
                         println!("🔍 DIAGNOSTIC: Atom {} contains: {}", atom_uuid, atom.content());
                     }
@@ -480,7 +480,7 @@ fn test_diagnostic_atomref_bug_prevention() {
     
     // Verify dynamic AtomRef points to the correct atom
     let aref_key = format!("ref:{}", dynamic_aref_uuid);
-    let dynamic_aref = fixture.db_ops.get_item::<fold_node::atom::AtomRef>(&aref_key)
+    let dynamic_aref = fixture.db_ops.get_item::<datafold::atom::AtomRef>(&aref_key)
         .expect("Failed to load dynamic AtomRef")
         .expect("Dynamic AtomRef should exist");
     

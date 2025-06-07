@@ -1,4 +1,4 @@
-use fold_node::{
+use datafold::{
     datafold_node::{load_node_config, DataFoldNode, TcpServer},
     network::NetworkConfig,
 };
@@ -47,7 +47,7 @@ struct Cli {
 /// * The TCP server cannot be started
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    fold_node::web_logger::init().ok();
+    datafold::web_logger::init().ok();
     info!("Starting DataFold Node...");
 
     // Parse command-line arguments using clap

@@ -11,14 +11,14 @@
 //! 5. **Performance Under Load** - Workflow performance characteristics
 //! 6. **Event-Driven Orchestration** - Event system coordination
 
-use fold_node::fold_db_core::infrastructure::message_bus::{
+use datafold::fold_db_core::infrastructure::message_bus::{
     MessageBus, FieldValueSetRequest, FieldValueSetResponse
 };
-use fold_node::fold_db_core::transform_manager::{TransformManager, TransformUtils};
-use fold_node::fold_db_core::managers::atom::AtomManager;
-use fold_node::db_operations::DbOperations;
-use fold_node::schema::{Schema, types::field::FieldVariant, field_factory::FieldFactory};
-use fold_node::schema::types::Transform;
+use datafold::fold_db_core::transform_manager::{TransformManager, TransformUtils};
+use datafold::fold_db_core::managers::atom::AtomManager;
+use datafold::db_operations::DbOperations;
+use datafold::schema::{Schema, types::field::FieldVariant, field_factory::FieldFactory};
+use datafold::schema::types::Transform;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;

@@ -1,5 +1,5 @@
 use clap::Parser;
-use fold_node::datafold_node::{load_node_config, DataFoldHttpServer, DataFoldNode};
+use datafold::datafold_node::{load_node_config, DataFoldHttpServer, DataFoldNode};
 use log::info;
 
 /// Command line options for the HTTP server binary.
@@ -37,7 +37,7 @@ struct Cli {
 /// * The HTTP server cannot be started
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    fold_node::web_logger::init().ok();
+    datafold::web_logger::init().ok();
     info!("Starting DataFold HTTP Server...");
 
     // Parse command-line arguments using clap

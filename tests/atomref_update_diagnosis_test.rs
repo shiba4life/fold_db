@@ -3,11 +3,11 @@
 //! This test covers the complete mutation→query flow to identify where
 //! the AtomRef update is failing in the FieldValueSetRequest handler.
 
-use fold_node::fold_db_core::infrastructure::message_bus::{
+use datafold::fold_db_core::infrastructure::message_bus::{
     MessageBus, FieldValueSetRequest, FieldValueSetResponse
 };
-use fold_node::fold_db_core::managers::atom::AtomManager;
-use fold_node::db_operations::DbOperations;
+use datafold::fold_db_core::managers::atom::AtomManager;
+use datafold::db_operations::DbOperations;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;

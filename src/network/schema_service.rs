@@ -16,7 +16,7 @@ pub type SchemaCheckCallback = Box<dyn Fn(&[String]) -> Vec<String> + Send + Syn
 /// # Examples
 ///
 /// ```rust
-/// use fold_node::network::schema_service::SchemaService;
+/// use datafold::network::schema_service::SchemaService;
 ///
 /// fn is_schema_available(name: &str) -> bool {
 ///     // This would normally check against your schema storage
@@ -81,7 +81,7 @@ impl SchemaService {
     /// # Examples
     ///
     /// ```rust
-    /// use fold_node::network::schema_service::SchemaService;
+    /// use datafold::network::schema_service::SchemaService;
     ///
     /// struct MockSchemaManager {
     ///     available_schemas: Vec<String>
@@ -132,7 +132,7 @@ impl SchemaService {
     /// # Examples
     ///
     /// ```rust
-    /// use fold_node::network::schema_service::SchemaService;
+    /// use datafold::network::schema_service::SchemaService;
     ///
     /// let mut service = SchemaService::new();
     /// let schemas_to_check = vec!["user_profile".to_string(), "posts".to_string()];
