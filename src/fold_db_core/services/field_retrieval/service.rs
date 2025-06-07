@@ -129,7 +129,7 @@ impl FieldRetrievalService {
         let supports = match field_def {
             FieldVariant::Single(_) => false,
             FieldVariant::Range(_) => true,
-            // TODO: Collection fields are no longer supported - CollectionField has been removed
+            FieldVariant::Collection(_) => false, // Collections don't support filtering in the same way
         };
 
         Ok(supports)

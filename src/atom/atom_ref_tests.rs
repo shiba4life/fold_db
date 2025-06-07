@@ -29,8 +29,51 @@ mod tests {
         assert!(updated_ref.updated_at() >= atom_ref.updated_at());
     }
 
-    // TODO: AtomRefCollection tests removed - collections are no longer supported
-    // Collections have been removed from the schema system
+    #[test]
+    fn test_atom_ref_collection() {
+        use super::super::AtomRefCollection;
+        
+        // Create a collection
+        let mut collection = AtomRefCollection::new("test_key".to_string());
+        
+        // Create some atoms
+        let atom1 = Atom::new(
+            "test_schema".to_string(),
+            "test_key".to_string(),
+            json!({"item": 1}),
+        );
+        let atom2 = Atom::new(
+            "test_schema".to_string(),
+            "test_key".to_string(),
+            json!({"item": 2}),
+        );
+        
+        // Add atoms to collection
+        collection.add_atom_uuid(atom1.uuid().to_string(), "test_key".to_string());
+        collection.add_atom_uuid(atom2.uuid().to_string(), "test_key".to_string());
+        
+        assert_eq!(collection.len(), 2);
+        assert_eq!(collection.get_atom_uuid_at(0), Some(&atom1.uuid().to_string()));
+        assert_eq!(collection.get_atom_uuid_at(1), Some(&atom2.uuid().to_string()));
+        
+        // Test update by index
+        let atom3 = Atom::new(
+            "test_schema".to_string(),
+            "test_key".to_string(),
+            json!({"item": 3}),
+        );
+        
+        collection.set_atom_uuid(0, atom3.uuid().to_string(), "test_key".to_string()).unwrap();
+        assert_eq!(collection.get_atom_uuid_at(0), Some(&atom3.uuid().to_string()));
+        
+        // Test remove
+        collection.remove_atom_uuid(&atom2.uuid(), "test_key".to_string());
+        assert_eq!(collection.len(), 1);
+        
+        // Test clear
+        collection.clear("test_key".to_string());
+        assert!(collection.is_empty());
+    }
 
     #[test]
     fn test_atom_ref_range() {

@@ -262,6 +262,149 @@ fn test_collection_field_operations() {
 }
 
 #[test]
+fn test_collection_field_array_atom_creation() {
+    println!("🧪 TEST: Collection Field Array Atom Creation");
+    println!("   Verifies that individual atoms are created for each array element");
+    
+    // Setup
+    let temp_dir = tempdir().expect("Failed to create temp dir");
+    let db = sled::Config::new()
+        .path(temp_dir.path())
+        .temporary(true)
+        .open()
+        .expect("Failed to open database");
+    
+    let db_ops = DbOperations::new(db).expect("Failed to create DbOperations");
+    
+    // Test array value processing
+    {
+        println!("📝 Creating collection from array value");
+        
+        // Create a FieldValueSetRequest simulator - in real usage this would come through the message bus
+        let array_values = json!([
+            {"id": 1, "name": "First"},
+            {"id": 2, "name": "Second"},
+            {"id": 3, "name": "Third"}
+        ]);
+        
+        // Manually simulate what would happen in field processing
+        let aref_uuid = "test_array_collection";
+        let mut collection = AtomRefCollection::new("test_user".to_string());
+        
+        // Create individual atoms for each array element
+        let array = array_values.as_array().unwrap();
+        let mut created_atoms = Vec::new();
+        
+        for (index, element) in array.iter().enumerate() {
+            let atom = Atom::new("CollectionItem".to_string(), "test_user".to_string(), element.clone());
+            let atom_uuid = atom.uuid().to_string();
+            
+            // Store the atom
+            db_ops.store_item(&format!("atom:{}", atom_uuid), &atom)
+                .expect(&format!("Failed to store atom {}", index));
+            
+            // Add to collection
+            collection.add_atom_uuid(atom_uuid.clone(), "test_user".to_string());
+            created_atoms.push((atom_uuid, element.clone()));
+            
+            println!("  ✓ Created atom {} for element {}: {}", 
+                atom_uuid, index, element);
+        }
+        
+        // Store the collection
+        db_ops.store_item(&format!("ref:{}", aref_uuid), &collection)
+            .expect("Failed to store collection");
+        
+        println!("  ✓ Stored collection with {} atoms", collection.len());
+        
+        // Verify each atom has the correct content
+        for (atom_uuid, expected_content) in &created_atoms {
+            let stored_atom = db_ops.get_item::<Atom>(&format!("atom:{}", atom_uuid))
+                .expect("Failed to load atom")
+                .expect("Atom should exist");
+            
+            assert_eq!(stored_atom.content(), expected_content);
+            println!("  ✓ Verified atom {} has correct content", atom_uuid);
+        }
+        
+        // Verify collection has all atom UUIDs
+        assert_eq!(collection.len(), 3);
+        for (i, (atom_uuid, _)) in created_atoms.iter().enumerate() {
+            assert_eq!(collection.get_atom_uuid_at(i), Some(atom_uuid));
+        }
+        
+        println!("✅ Array elements correctly stored as individual atoms");
+    }
+    
+    // Test updating individual elements
+    {
+        println!("📝 Testing individual element updates");
+        
+        let aref_uuid = "test_update_collection";
+        
+        // Create initial collection with 3 items
+        let initial_values = vec![
+            json!({"value": "original_1"}),
+            json!({"value": "original_2"}),
+            json!({"value": "original_3"}),
+        ];
+        
+        let mut atom_uuids = Vec::new();
+        for value in &initial_values {
+            let atom = Atom::new("CollectionItem".to_string(), "test_user".to_string(), value.clone());
+            let atom_uuid = atom.uuid().to_string();
+            db_ops.store_item(&format!("atom:{}", atom_uuid), &atom).expect("Failed to store atom");
+            atom_uuids.push(atom_uuid);
+        }
+        
+        // Create collection with initial atoms
+        db_ops.update_atom_ref_collection(
+            aref_uuid,
+            CollectionOperation::Add { atom_uuid: atom_uuids[0].clone() },
+            "test_user".to_string(),
+        ).expect("Failed to add first");
+        
+        db_ops.update_atom_ref_collection(
+            aref_uuid,
+            CollectionOperation::Add { atom_uuid: atom_uuids[1].clone() },
+            "test_user".to_string(),
+        ).expect("Failed to add second");
+        
+        db_ops.update_atom_ref_collection(
+            aref_uuid,
+            CollectionOperation::Add { atom_uuid: atom_uuids[2].clone() },
+            "test_user".to_string(),
+        ).expect("Failed to add third");
+        
+        // Update element at index 1 with new value
+        let new_value = json!({"value": "updated_2"});
+        let new_atom = Atom::new("CollectionItem".to_string(), "test_user".to_string(), new_value.clone());
+        let new_atom_uuid = new_atom.uuid().to_string();
+        db_ops.store_item(&format!("atom:{}", new_atom_uuid), &new_atom).expect("Failed to store new atom");
+        
+        let collection = db_ops.update_atom_ref_collection(
+            aref_uuid,
+            CollectionOperation::UpdateByIndex { index: 1, atom_uuid: new_atom_uuid.clone() },
+            "test_user".to_string(),
+        ).expect("Failed to update by index");
+        
+        // Verify the update
+        assert_eq!(collection.get_atom_uuid_at(1), Some(&new_atom_uuid));
+        
+        // Verify the new atom has the updated content
+        let updated_atom = db_ops.get_item::<Atom>(&format!("atom:{}", new_atom_uuid))
+            .expect("Failed to load updated atom")
+            .expect("Updated atom should exist");
+        
+        assert_eq!(updated_atom.content(), &new_value);
+        
+        println!("✅ Individual element update successful");
+    }
+    
+    println!("✅ Collection Field Array Atom Creation Test PASSED");
+}
+
+#[test]
 fn test_collection_field_in_schema() {
     println!("🧪 TEST: Collection Field in Schema");
     

@@ -80,8 +80,6 @@ impl FieldFactory {
         }
     }
 
-    // TODO: Collection fields are no longer supported - CollectionField has been removed
-
     /// Create a CollectionField with default configuration
     pub fn create_collection_field() -> CollectionField {
         CollectionField {
@@ -142,8 +140,6 @@ impl FieldFactory {
     pub fn create_single_variant() -> FieldVariant {
         FieldVariant::Single(Self::create_single_field())
     }
-
-    // TODO: Collection fields are no longer supported - CollectionField has been removed
 
     /// Create a FieldVariant::Collection with default configuration
     pub fn create_collection_variant() -> FieldVariant {
@@ -246,8 +242,6 @@ impl FieldBuilder {
             inner: FieldCommon::new(self.permissions, self.payment_config, self.metadata)
         }
     }
-
-    // TODO: Collection fields are no longer supported - CollectionField has been removed
 
     /// Build a CollectionField
     pub fn build_collection(self) -> CollectionField {

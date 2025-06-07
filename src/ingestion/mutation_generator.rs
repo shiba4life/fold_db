@@ -184,26 +184,24 @@ impl MutationGenerator {
         }
     }
 
-    // TODO: Collection field mutations are no longer supported
-    // Collections have been removed from the schema system
-    /// Generate mutations for collection fields (arrays) - DEPRECATED
+    /// Generate mutations for collection fields (arrays)
+    /// Note: Collections store individual atoms for each array element
     pub fn generate_collection_mutations(
         &self,
-        _schema_name: &str,
-        _json_data: &Value,
-        _mutation_mappers: &HashMap<String, String>,
-        _trust_distance: u32,
-        _pub_key: String,
+        schema_name: &str,
+        json_data: &Value,
+        mutation_mappers: &HashMap<String, String>,
+        trust_distance: u32,
+        pub_key: String,
     ) -> IngestionResult<Vec<Mutation>> {
-        warn!("Collection mutations are no longer supported - collections have been removed from the schema system");
+        warn!("Collection mutations through ingestion are not yet fully implemented");
+        // Collection fields are handled through the field value set mechanism
+        // which creates individual atoms for each array element
         Ok(Vec::new())
     }
 
-    // TODO: Removed get_base_collection_path - collections no longer supported
 
-    // TODO: Removed generate_collection_field_mutations - collections no longer supported
 
-    // TODO: Removed replace_array_index_in_path - collections no longer supported
 }
 
 /// Parts of a JSON path

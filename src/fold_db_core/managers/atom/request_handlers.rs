@@ -238,12 +238,47 @@ impl AtomManager {
                     .and_then(|v| v.as_str())
                     .unwrap_or("add");
                 
+                // For update_by_index and insert operations, we need to create the atom first
+                let atom_uuid = if action == "update_by_index" || action == "insert" || action == "add" {
+                    // Get the value from additional_data if present, otherwise use the atom_uuid from request
+                    let value = request.additional_data
+                        .as_ref()
+                        .and_then(|d| d.get("value"))
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null);
+                    
+                    if !value.is_null() {
+                        // Create a new atom with the provided value
+                        match self.db_ops.create_atom(
+                            "collection_item",  // Generic schema name for collection items
+                            request.source_pub_key.clone(),
+                            None,
+                            value,
+                            Some(crate::atom::AtomStatus::Active),
+                        ) {
+                            Ok(atom) => {
+                                let uuid = atom.uuid().to_string();
+                                self.atoms.lock().unwrap().insert(uuid.clone(), atom);
+                                info!("Created new atom {} for collection operation", uuid);
+                                uuid
+                            }
+                            Err(e) => {
+                                return Err(format!("Failed to create atom for collection: {}", e).into());
+                            }
+                        }
+                    } else {
+                        request.atom_uuid.clone()
+                    }
+                } else {
+                    request.atom_uuid.clone()
+                };
+                
                 let operation = match action {
                     "add" => CollectionOperation::Add { 
-                        atom_uuid: request.atom_uuid.clone() 
+                        atom_uuid: atom_uuid.clone()
                     },
                     "remove" => CollectionOperation::Remove { 
-                        atom_uuid: request.atom_uuid.clone() 
+                        atom_uuid: atom_uuid.clone()
                     },
                     "insert" => {
                         let index = request.additional_data
@@ -253,7 +288,7 @@ impl AtomManager {
                             .unwrap_or(0) as usize;
                         CollectionOperation::Insert { 
                             index, 
-                            atom_uuid: request.atom_uuid.clone() 
+                            atom_uuid: atom_uuid.clone()
                         }
                     },
                     "update_by_index" => {
@@ -264,7 +299,7 @@ impl AtomManager {
                             .unwrap_or(0) as usize;
                         CollectionOperation::UpdateByIndex { 
                             index, 
-                            atom_uuid: request.atom_uuid.clone() 
+                            atom_uuid: atom_uuid.clone()
                         }
                     },
                     "clear" => CollectionOperation::Clear,
