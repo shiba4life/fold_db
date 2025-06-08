@@ -28,9 +28,14 @@
 //! # }
 //! ```
 
+pub mod argon2;
 pub mod ed25519;
 pub mod error;
 
 // Re-export commonly used types
+pub use argon2::{
+    generate_salt, derive_key, derive_master_keypair, derive_master_keypair_default,
+    generate_salt_and_derive_keypair, Salt, Argon2Params, DerivedKey
+};
 pub use ed25519::{generate_master_keypair, MasterKeyPair, PublicKey};
 pub use error::{CryptoError, CryptoResult}; 

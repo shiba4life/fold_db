@@ -62,4 +62,8 @@ pub use schema::Schema;
 pub use ingestion::{IngestionConfig, IngestionCore, IngestionError, IngestionResponse};
 
 // Re-export crypto types
-pub use crypto::{CryptoError, CryptoResult, MasterKeyPair, PublicKey, generate_master_keypair};
+pub use crypto::{
+    CryptoError, CryptoResult, MasterKeyPair, PublicKey, generate_master_keypair,
+    Salt, Argon2Params, DerivedKey, generate_salt, derive_master_keypair, 
+    derive_master_keypair_default, generate_salt_and_derive_keypair
+};
