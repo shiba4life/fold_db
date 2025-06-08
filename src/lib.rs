@@ -27,6 +27,7 @@
 
 pub mod atom;
 pub mod config_utils;
+pub mod crypto;
 pub mod datafold_node;
 pub mod db_operations;
 pub mod error;
@@ -59,3 +60,6 @@ pub use schema::Schema;
 
 // Re-export ingestion types
 pub use ingestion::{IngestionConfig, IngestionCore, IngestionError, IngestionResponse};
+
+// Re-export crypto types
+pub use crypto::{CryptoError, CryptoResult, MasterKeyPair, PublicKey, generate_master_keypair};
