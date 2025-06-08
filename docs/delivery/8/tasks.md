@@ -12,8 +12,8 @@ This document lists all tasks associated with PBI 8.
 | 8-2 | [Implement Ed25519 key generation utilities](./8-2.md) | Done | Create cryptographic utilities for secure Ed25519 key pair generation and management |
 | 8-3 | [Implement Argon2id passphrase-based key derivation](./8-3.md) | Done | Create secure key derivation system using Argon2id for master key generation from user passphrase |
 | 8-4 | [Enhance NodeConfig for cryptographic initialization](./8-4.md) | Done | Extend configuration system to support database cryptographic initialization parameters |
-| 8-5 | [Implement database metadata storage for master public key](./8-5.md) | Review | Add secure storage and retrieval of master public key in database metadata system |
-| 8-6 | [Enhance database initialization with crypto setup](./8-6.md) | Proposed | Integrate cryptographic initialization into existing database creation workflow |
+| 8-5 | [Implement database metadata storage for master public key](./8-5.md) | Done | Add secure storage and retrieval of master public key in database metadata system |
+| 8-6 | [Enhance database initialization with crypto setup](./8-6.md) | InProgress | Integrate cryptographic initialization into existing database creation workflow |
 | 8-7 | [Implement HTTP API endpoints for crypto initialization](./8-7.md) | Proposed | Create REST endpoints for programmatic database cryptographic initialization |
 | 8-8 | [Add CLI support for secure database initialization](./8-8.md) | Proposed | Enhance command-line tools with secure passphrase input and crypto initialization |
 | 8-9 | [Implement secure memory handling and key zeroization](./8-9.md) | Proposed | Add secure memory management for cryptographic material with proper cleanup |

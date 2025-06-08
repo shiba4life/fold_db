@@ -94,6 +94,7 @@ impl<'de> Deserialize<'de> for PublicKey {
 /// This structure holds both the signing (private) key and verifying (public) key
 /// for a database instance. The private key material is automatically zeroized
 /// when the structure is dropped.
+#[derive(Debug)]
 pub struct MasterKeyPair {
     signing_key: SigningKey,
     public_key: PublicKey,

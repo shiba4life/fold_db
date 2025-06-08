@@ -74,3 +74,11 @@ pub use config::crypto::{CryptoConfig, MasterKeyConfig, KeyDerivationConfig, Sec
 
 // Re-export database crypto metadata types
 pub use db_operations::crypto_metadata::CryptoMetadata;
+
+// Re-export crypto initialization types
+pub use datafold_node::{
+    initialize_database_crypto, is_crypto_init_needed, get_crypto_init_status,
+    CryptoInitContext, CryptoInitError, CryptoInitResult, CryptoInitStatus,
+    validate_crypto_config_comprehensive, validate_for_database_creation,
+    validate_crypto_config_quick,
+};

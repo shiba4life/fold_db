@@ -1,11 +1,14 @@
-use log::info;
+use log::{info, warn};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use crate::config::crypto::CryptoConfig;
 use crate::datafold_node::config::NodeConfig;
 use crate::datafold_node::config::NodeInfo;
+use crate::datafold_node::crypto_init::{is_crypto_init_needed, initialize_database_crypto};
+use crate::datafold_node::crypto_validation::validate_for_database_creation;
 use crate::error::{FoldDbError, FoldDbResult, NetworkErrorKind};
 use crate::fold_db_core::FoldDB;
 use crate::network::{NetworkConfig, NetworkCore, PeerId};
@@ -79,12 +82,19 @@ pub struct NetworkStatus {
 impl DataFoldNode {
     /// Creates a new DataFoldNode with the specified configuration.
     pub fn new(config: NodeConfig) -> FoldDbResult<Self> {
-        let db = Arc::new(Mutex::new(FoldDB::new(
-            config
-                .storage_path
-                .to_str()
-                .ok_or_else(|| FoldDbError::Config("Invalid storage path".to_string()))?,
-        )?));
+        let storage_path = config
+            .storage_path
+            .to_str()
+            .ok_or_else(|| FoldDbError::Config("Invalid storage path".to_string()))?;
+
+        let db = Arc::new(Mutex::new(FoldDB::new(storage_path)?));
+
+        // Perform crypto initialization if needed
+        if let Some(crypto_config) = &config.crypto {
+            if crypto_config.enabled {
+                Self::initialize_crypto_if_needed(db.clone(), crypto_config)?;
+            }
+        }
 
         // Retrieve or generate the persistent node_id from fold_db
         let node_id = {
@@ -103,6 +113,47 @@ impl DataFoldNode {
             node_id,
             network: None,
         })
+    }
+
+    /// Helper method to initialize crypto if needed during database creation
+    fn initialize_crypto_if_needed(
+        db: Arc<Mutex<FoldDB>>,
+        crypto_config: &CryptoConfig,
+    ) -> FoldDbResult<()> {
+        info!("Checking if crypto initialization is needed");
+
+        // Validate crypto configuration for database creation
+        validate_for_database_creation(crypto_config)
+            .map_err(|e| FoldDbError::Config(format!("Crypto config validation failed: {}", e)))?;
+
+        // Get database operations for crypto checking
+        let db_ops = {
+            let db_guard = db
+                .lock()
+                .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+            db_guard.db_ops()
+        };
+
+        // Check if crypto initialization is needed
+        let needs_init = is_crypto_init_needed(db_ops.clone(), Some(crypto_config))
+            .map_err(|e| FoldDbError::Config(format!("Failed to check crypto init status: {}", e)))?;
+
+        if needs_init {
+            info!("Crypto initialization needed - starting setup");
+            
+            // Perform crypto initialization
+            let context = initialize_database_crypto(db_ops, crypto_config)
+                .map_err(|e| FoldDbError::Config(format!("Crypto initialization failed: {}", e)))?;
+            
+            info!(
+                "Crypto initialization completed successfully using method: {}",
+                context.derivation_method
+            );
+        } else {
+            info!("Crypto initialization not needed - database already configured or crypto disabled");
+        }
+
+        Ok(())
     }
 
     /// Loads an existing database node from the specified configuration.
@@ -720,5 +771,46 @@ impl DataFoldNode {
         db.schema_manager
             .add_schema_to_available_directory(json_content, schema_name)
             .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to add schema: {}", e)))
+    }
+
+    /// Get crypto initialization status for this database
+    pub fn get_crypto_status(&self) -> FoldDbResult<crate::datafold_node::CryptoInitStatus> {
+        let db_ops = {
+            let db_guard = self.db
+                .lock()
+                .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+            db_guard.db_ops()
+        };
+
+        crate::datafold_node::get_crypto_init_status(db_ops)
+            .map_err(|e| FoldDbError::Config(format!("Failed to get crypto status: {}", e)))
+    }
+
+    /// Manually initialize crypto for an existing database (if not already initialized)
+    pub fn initialize_crypto(&self, crypto_config: &CryptoConfig) -> FoldDbResult<()> {
+        let db_ops = {
+            let db_guard = self.db
+                .lock()
+                .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+            db_guard.db_ops()
+        };
+
+        crate::datafold_node::initialize_database_crypto(db_ops, crypto_config)
+            .map_err(|e| FoldDbError::Config(format!("Crypto initialization failed: {}", e)))?;
+        
+        Ok(())
+    }
+
+    /// Check if crypto initialization is needed for this database
+    pub fn is_crypto_init_needed(&self, crypto_config: Option<&CryptoConfig>) -> FoldDbResult<bool> {
+        let db_ops = {
+            let db_guard = self.db
+                .lock()
+                .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+            db_guard.db_ops()
+        };
+
+        crate::datafold_node::is_crypto_init_needed(db_ops, crypto_config)
+            .map_err(|e| FoldDbError::Config(format!("Failed to check crypto init status: {}", e)))
     }
 }

@@ -126,9 +126,9 @@ impl MasterKeyConfig {
                     });
                 }
                 
-                if passphrase.len() < 8 {
+                if passphrase.len() < 6 {
                     return Err(CryptoError::InvalidKey {
-                        message: "Passphrase must be at least 8 characters".to_string(),
+                        message: "Passphrase must be at least 6 characters".to_string(),
                     });
                 }
                 
@@ -211,6 +211,15 @@ impl KeyDerivationConfig {
         }
     }
     
+    /// Create configuration for a specific security level
+    pub fn for_security_level(level: SecurityLevel) -> Self {
+        match level {
+            SecurityLevel::Interactive => Self::interactive(),
+            SecurityLevel::Balanced => Self::default(),
+            SecurityLevel::Sensitive => Self::sensitive(),
+        }
+    }
+    
     /// Create configuration with custom parameters
     pub fn custom(memory_cost: u32, time_cost: u32, parallelism: u32) -> CryptoResult<Self> {
         let config = Self {
@@ -260,7 +269,7 @@ impl KeyDerivationConfig {
 }
 
 /// Security level presets for key derivation
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SecurityLevel {
     /// Fast parameters for interactive use (32 MB, 2 iterations, 2 threads)
@@ -271,6 +280,17 @@ pub enum SecurityLevel {
     
     /// High security parameters for sensitive operations (128 MB, 4 iterations, 8 threads)
     Sensitive,
+}
+
+impl SecurityLevel {
+    /// Get string representation of security level
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SecurityLevel::Interactive => "Interactive",
+            SecurityLevel::Balanced => "Balanced",
+            SecurityLevel::Sensitive => "Sensitive",
+        }
+    }
 }
 
 /// Configuration validation errors
@@ -342,9 +362,9 @@ mod tests {
         };
         assert!(config.validate().is_err());
 
-        // Short passphrase should fail
+        // Very short passphrase should fail
         let config = MasterKeyConfig::Passphrase {
-            passphrase: "short".to_string(),
+            passphrase: "tiny".to_string(),
         };
         assert!(config.validate().is_err());
 

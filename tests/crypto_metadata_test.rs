@@ -152,6 +152,7 @@ fn test_crypto_metadata_additional_metadata() {
         final_metadata.additional_metadata.get("encryption_level"),
         Some(&"AES-256".to_string())
     );
+    
     assert!(final_metadata.verify_integrity().unwrap());
 }
 

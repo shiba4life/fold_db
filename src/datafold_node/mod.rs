@@ -10,6 +10,8 @@
 //! relationships defining how they share and access data.
 
 pub mod config;
+pub mod crypto_init;
+pub mod crypto_validation;
 mod db;
 pub mod error;
 pub mod http_server;
@@ -30,6 +32,14 @@ mod transform_queue;
 // Re-export the DataFoldNode struct for easier imports
 pub use config::load_node_config;
 pub use config::NodeConfig;
+pub use crypto_init::{
+    initialize_database_crypto, is_crypto_init_needed, get_crypto_init_status,
+    CryptoInitContext, CryptoInitError, CryptoInitResult, CryptoInitStatus,
+};
+pub use crypto_validation::{
+    validate_crypto_config_comprehensive, validate_for_database_creation,
+    validate_crypto_config_quick,
+};
 pub use http_server::DataFoldHttpServer;
 pub use node::DataFoldNode;
 pub use tcp_server::TcpServer;
