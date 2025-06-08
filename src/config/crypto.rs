@@ -215,10 +215,9 @@ impl KeyDerivationConfig {
     pub fn for_security_level(level: SecurityLevel) -> Self {
         match level {
             SecurityLevel::Interactive => Self::interactive(),
-            SecurityLevel::Balanced => {
-                let mut config = Self::default();
-                config.preset = Some(SecurityLevel::Balanced);
-                config
+            SecurityLevel::Balanced => Self {
+                preset: Some(SecurityLevel::Balanced),
+                ..Default::default()
             },
             SecurityLevel::Sensitive => Self::sensitive(),
         }

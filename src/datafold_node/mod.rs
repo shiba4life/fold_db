@@ -14,6 +14,8 @@ pub mod crypto_init;
 pub mod crypto_routes;
 pub mod crypto_validation;
 mod db;
+pub mod encryption_at_rest;
+pub mod encryption_at_rest_async;
 pub mod error;
 pub mod http_server;
 pub mod log_routes;

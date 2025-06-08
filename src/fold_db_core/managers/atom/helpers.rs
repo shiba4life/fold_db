@@ -1,7 +1,7 @@
 //! Helper functions and utilities for AtomManager
 
 use crate::atom::{Atom, AtomRef, AtomRefRange, AtomStatus};
-use crate::db_operations::DbOperations;
+use crate::db_operations::{DbOperations, EncryptionWrapper};
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -21,6 +21,24 @@ pub fn create_atom(
     ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
 }
 
+/// Create a new atom in the database with encryption
+pub fn create_atom_encrypted(
+    db_ops: &Arc<DbOperations>,
+    encryption_wrapper: &EncryptionWrapper,
+    schema_name: &str,
+    source_pub_key: String,
+    content: Value,
+) -> Result<Atom, Box<dyn std::error::Error>> {
+    db_ops.create_atom_encrypted(
+        encryption_wrapper,
+        schema_name,
+        source_pub_key,
+        None,
+        content,
+        Some(AtomStatus::Active),
+    ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+}
+
 /// Update an atom reference
 pub fn update_atom_ref(
     db_ops: &Arc<DbOperations>,
@@ -29,6 +47,18 @@ pub fn update_atom_ref(
     source_pub_key: String,
 ) -> Result<AtomRef, Box<dyn std::error::Error>> {
     db_ops.update_atom_ref(aref_uuid, atom_uuid, source_pub_key)
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+}
+
+/// Update an atom reference with encryption
+pub fn update_atom_ref_encrypted(
+    db_ops: &Arc<DbOperations>,
+    encryption_wrapper: &EncryptionWrapper,
+    aref_uuid: &str,
+    atom_uuid: String,
+    source_pub_key: String,
+) -> Result<AtomRef, Box<dyn std::error::Error>> {
+    db_ops.update_atom_ref_encrypted(encryption_wrapper, aref_uuid, atom_uuid, source_pub_key)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
 }
 
@@ -41,6 +71,19 @@ pub fn update_atom_ref_range(
     source_pub_key: String,
 ) -> Result<AtomRefRange, Box<dyn std::error::Error>> {
     db_ops.update_atom_ref_range(aref_uuid, atom_uuid, key, source_pub_key)
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+}
+
+/// Update an atom reference range with encryption
+pub fn update_atom_ref_range_encrypted(
+    db_ops: &Arc<DbOperations>,
+    encryption_wrapper: &EncryptionWrapper,
+    aref_uuid: &str,
+    atom_uuid: String,
+    key: String,
+    source_pub_key: String,
+) -> Result<AtomRefRange, Box<dyn std::error::Error>> {
+    db_ops.update_atom_ref_range_encrypted(encryption_wrapper, aref_uuid, atom_uuid, key, source_pub_key)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
 }
 

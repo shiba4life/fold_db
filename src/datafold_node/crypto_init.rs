@@ -4,7 +4,7 @@
 //! database creation, including key generation, metadata storage, and 
 //! configuration validation.
 
-use crate::config::crypto::{CryptoConfig, MasterKeyConfig, ConfigError};
+use crate::config::crypto::{CryptoConfig, MasterKeyConfig, KeyDerivationConfig, ConfigError};
 use crate::crypto::{
     generate_master_keypair, derive_master_keypair, generate_salt,
     CryptoError, MasterKeyPair,
@@ -166,7 +166,15 @@ fn generate_master_keypair_from_config(
             let keypair = derive_master_keypair(passphrase, &salt, &params)?;
             
             let method = if let Some(preset) = &crypto_config.key_derivation.preset {
-                format!("Argon2id-{}", preset.as_str())
+                // Check if parameters were customized from preset defaults
+                let preset_config = KeyDerivationConfig::for_security_level(*preset);
+                if crypto_config.key_derivation.memory_cost != preset_config.memory_cost ||
+                   crypto_config.key_derivation.time_cost != preset_config.time_cost ||
+                   crypto_config.key_derivation.parallelism != preset_config.parallelism {
+                    "Argon2id-Custom".to_string()
+                } else {
+                    format!("Argon2id-{}", preset.as_str())
+                }
             } else {
                 "Argon2id-Custom".to_string()
             };
@@ -260,12 +268,26 @@ pub fn validate_crypto_config_for_init(crypto_config: &CryptoConfig) -> CryptoIn
             }
             
             if passphrase.len() < 8 {
-                warn!("Passphrase is shorter than 8 characters - consider using a longer passphrase");
+                return Err(CryptoInitError::InvalidConfig(
+                    "Passphrase must be at least 8 characters long".to_string()
+                ));
             }
             
             if passphrase.len() > 1024 {
                 return Err(CryptoInitError::InvalidConfig(
                     "Passphrase is too long (max 1024 characters)".to_string()
+                ));
+            }
+            
+            // Check for common weak passphrases
+            let weak_passphrases = [
+                "password", "123456", "12345678", "qwerty", "abc123",
+                "password123", "admin", "letmein", "welcome", "monkey"
+            ];
+            
+            if weak_passphrases.iter().any(|&weak| passphrase.eq_ignore_ascii_case(weak)) {
+                return Err(CryptoInitError::InvalidConfig(
+                    "Passphrase is too weak - please choose a stronger passphrase".to_string()
                 ));
             }
             

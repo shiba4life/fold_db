@@ -83,6 +83,8 @@ pub struct FoldDB {
     pub(crate) message_bus: Arc<MessageBus>,
     /// Event monitor for system-wide observability
     pub(crate) event_monitor: Arc<infrastructure::event_monitor::EventMonitor>,
+    /// Optional encryption wrapper for encrypted atom storage
+    pub(crate) encryption_wrapper: Option<Arc<crate::db_operations::EncryptionWrapper>>,
 }
 
 impl FoldDB {
@@ -226,6 +228,7 @@ impl FoldDB {
             permission_wrapper: PermissionWrapper::new(),
             message_bus,
             event_monitor,
+            encryption_wrapper: None,
         })
     }
 
@@ -314,6 +317,87 @@ impl FoldDB {
     /// Get the schema manager for testing schema functionality
     pub fn schema_manager(&self) -> Arc<SchemaCore> {
         Arc::clone(&self.schema_manager)
+    }
+
+    /// Enable encryption for atom storage with the given master key pair
+    pub fn enable_atom_encryption(&mut self, master_keypair: &crate::crypto::MasterKeyPair) -> Result<(), crate::schema::SchemaError> {
+        let encryption_wrapper = crate::db_operations::EncryptionWrapper::new(
+            (*self.db_ops).clone(),
+            master_keypair
+        ).map_err(|e| crate::schema::SchemaError::InvalidData(format!("Failed to create encryption wrapper: {}", e)))?;
+        
+        let encryption_wrapper_arc = Arc::new(encryption_wrapper);
+        
+        // Set encryption wrapper in atom manager
+        self.atom_manager.set_encryption_wrapper(Arc::clone(&encryption_wrapper_arc));
+        
+        // Store the encryption wrapper
+        self.encryption_wrapper = Some(encryption_wrapper_arc);
+        
+        Ok(())
+    }
+
+    /// Enable encryption for atom storage with crypto config
+    pub fn enable_atom_encryption_with_config(
+        &mut self,
+        master_keypair: &crate::crypto::MasterKeyPair,
+        crypto_config: &crate::config::crypto::CryptoConfig,
+    ) -> Result<(), crate::schema::SchemaError> {
+        let encryption_wrapper = crate::db_operations::EncryptionWrapper::with_config(
+            (*self.db_ops).clone(),
+            master_keypair,
+            crypto_config
+        ).map_err(|e| crate::schema::SchemaError::InvalidData(format!("Failed to create encryption wrapper: {}", e)))?;
+        
+        let encryption_wrapper_arc = Arc::new(encryption_wrapper);
+        
+        // Set encryption wrapper in atom manager
+        self.atom_manager.set_encryption_wrapper(Arc::clone(&encryption_wrapper_arc));
+        
+        // Store the encryption wrapper
+        self.encryption_wrapper = Some(encryption_wrapper_arc);
+        
+        Ok(())
+    }
+
+    /// Disable encryption for atom storage (fallback to unencrypted)
+    pub fn disable_atom_encryption(&mut self) {
+        self.encryption_wrapper = None;
+        // Note: AtomManager will fall back to unencrypted operations when encryption_wrapper is None
+    }
+
+    /// Check if atom encryption is enabled
+    pub fn is_atom_encryption_enabled(&self) -> bool {
+        self.encryption_wrapper.as_ref().map_or(false, |wrapper| wrapper.is_encryption_enabled())
+    }
+
+    /// Get encryption statistics
+    pub fn get_encryption_stats(&self) -> Result<std::collections::HashMap<String, u64>, crate::schema::SchemaError> {
+        if let Some(encryption_wrapper) = &self.encryption_wrapper {
+            encryption_wrapper.get_encryption_stats()
+        } else {
+            let mut stats = std::collections::HashMap::new();
+            stats.insert("encryption_enabled".to_string(), 0);
+            stats.insert("encrypted_items".to_string(), 0);
+            stats.insert("unencrypted_items".to_string(), 0);
+            stats.insert("available_contexts".to_string(), 0);
+            Ok(stats)
+        }
+    }
+
+    /// Migrate existing unencrypted atoms to encrypted format
+    pub fn migrate_atoms_to_encrypted(&mut self) -> Result<u64, crate::schema::SchemaError> {
+        if let Some(encryption_wrapper) = &self.encryption_wrapper {
+            // Use an immutable reference to perform migration
+            encryption_wrapper.migrate_to_encrypted(crate::db_operations::contexts::ATOM_DATA)
+        } else {
+            Err(crate::schema::SchemaError::InvalidData("Encryption is not enabled".to_string()))
+        }
+    }
+
+    /// Get a reference to the encryption wrapper for advanced operations
+    pub fn encryption_wrapper(&self) -> Option<&Arc<crate::db_operations::EncryptionWrapper>> {
+        self.encryption_wrapper.as_ref()
     }
 
     // ========== EVENT-DRIVEN API METHODS ==========

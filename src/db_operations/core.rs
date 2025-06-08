@@ -212,4 +212,41 @@ impl DbOperations {
         tree.contains_key(key.as_bytes())
             .map_err(|e| SchemaError::InvalidData(format!("Existence check failed: {}", e)))
     }
+    
+    // ========== PUBLIC TREE ACCESSORS FOR TESTING ==========
+    
+    /// Get a reference to the metadata tree
+    pub fn metadata_tree(&self) -> &sled::Tree {
+        &self.metadata_tree
+    }
+    
+    /// Get a reference to the schemas tree
+    #[cfg(test)]
+    pub fn schemas_tree(&self) -> &sled::Tree {
+        &self.schemas_tree
+    }
+    
+    /// Get a reference to the transforms tree
+    #[cfg(test)]
+    pub fn transforms_tree(&self) -> &sled::Tree {
+        &self.transforms_tree
+    }
+    
+    /// Get a reference to the permissions tree
+    #[cfg(test)]
+    pub fn permissions_tree(&self) -> &sled::Tree {
+        &self.permissions_tree
+    }
+    
+    /// Get a reference to the orchestrator tree
+    #[cfg(test)]
+    pub fn orchestrator_tree(&self) -> &sled::Tree {
+        &self.orchestrator_tree
+    }
+    
+    /// Get a reference to the schema states tree
+    #[cfg(test)]
+    pub fn schema_states_tree(&self) -> &sled::Tree {
+        &self.schema_states_tree
+    }
 }

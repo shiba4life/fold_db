@@ -11,9 +11,10 @@ mod event_processing;
 mod request_handlers;
 mod field_processing;
 mod helpers;
+pub mod async_operations;
 
 use crate::atom::{Atom, AtomRef, AtomRefCollection, AtomRefRange};
-use crate::db_operations::DbOperations;
+use crate::db_operations::{DbOperations, EncryptionWrapper};
 use crate::fold_db_core::infrastructure::message_bus::MessageBus;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -32,6 +33,7 @@ pub struct AtomManager {
     pub(crate) message_bus: Arc<MessageBus>,
     pub(crate) stats: Arc<Mutex<EventDrivenAtomStats>>,
     pub(crate) event_threads: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    pub(crate) encryption_wrapper: Option<Arc<EncryptionWrapper>>,
 }
 
 impl AtomManager {
@@ -70,11 +72,22 @@ impl AtomManager {
             message_bus: Arc::clone(&message_bus),
             stats: Arc::new(Mutex::new(EventDrivenAtomStats::new())),
             event_threads: Arc::new(Mutex::new(Vec::new())),
+            encryption_wrapper: None,
         };
 
         // Start pure event-driven processing
         manager.start_event_processing();
         manager
+    }
+
+    /// Set the encryption wrapper for encrypted atom operations
+    pub fn set_encryption_wrapper(&mut self, encryption_wrapper: Arc<EncryptionWrapper>) {
+        self.encryption_wrapper = Some(encryption_wrapper);
+    }
+
+    /// Check if encryption is enabled
+    pub fn is_encryption_enabled(&self) -> bool {
+        self.encryption_wrapper.as_ref().map_or(false, |wrapper| wrapper.is_encryption_enabled())
     }
 
     /// Public API methods for direct access (for backward compatibility)
@@ -84,7 +97,11 @@ impl AtomManager {
         source_pub_key: String,
         content: serde_json::Value,
     ) -> Result<Atom, Box<dyn std::error::Error>> {
-        helpers::create_atom(&self.db_ops, schema_name, source_pub_key, content)
+        if let Some(encryption_wrapper) = &self.encryption_wrapper {
+            helpers::create_atom_encrypted(&self.db_ops, encryption_wrapper, schema_name, source_pub_key, content)
+        } else {
+            helpers::create_atom(&self.db_ops, schema_name, source_pub_key, content)
+        }
     }
 
     pub fn update_atom_ref(
@@ -93,7 +110,11 @@ impl AtomManager {
         atom_uuid: String,
         source_pub_key: String,
     ) -> Result<AtomRef, Box<dyn std::error::Error>> {
-        helpers::update_atom_ref(&self.db_ops, aref_uuid, atom_uuid, source_pub_key)
+        if let Some(encryption_wrapper) = &self.encryption_wrapper {
+            helpers::update_atom_ref_encrypted(&self.db_ops, encryption_wrapper, aref_uuid, atom_uuid, source_pub_key)
+        } else {
+            helpers::update_atom_ref(&self.db_ops, aref_uuid, atom_uuid, source_pub_key)
+        }
     }
 
     pub fn update_atom_ref_range(
@@ -103,14 +124,64 @@ impl AtomManager {
         key: String,
         source_pub_key: String,
     ) -> Result<AtomRefRange, Box<dyn std::error::Error>> {
-        helpers::update_atom_ref_range(&self.db_ops, aref_uuid, atom_uuid, key, source_pub_key)
+        if let Some(encryption_wrapper) = &self.encryption_wrapper {
+            helpers::update_atom_ref_range_encrypted(&self.db_ops, encryption_wrapper, aref_uuid, atom_uuid, key, source_pub_key)
+        } else {
+            helpers::update_atom_ref_range(&self.db_ops, aref_uuid, atom_uuid, key, source_pub_key)
+        }
     }
 
     pub fn get_atom_history(
         &self,
         aref_uuid: &str,
     ) -> Result<Vec<crate::atom::Atom>, Box<dyn std::error::Error>> {
-        helpers::get_atom_history(&self.db_ops, aref_uuid)
+        // Check if encryption is enabled
+        if let Some(encryption_wrapper) = &self.encryption_wrapper {
+            self.get_atom_history_encrypted(aref_uuid, encryption_wrapper)
+        } else {
+            helpers::get_atom_history(&self.db_ops, aref_uuid)
+        }
+    }
+
+    /// Get atom history with encryption support
+    fn get_atom_history_encrypted(
+        &self,
+        aref_uuid: &str,
+        encryption_wrapper: &Arc<crate::db_operations::EncryptionWrapper>,
+    ) -> Result<Vec<crate::atom::Atom>, Box<dyn std::error::Error>> {
+        // Load the atom ref from database using encryption wrapper
+        let key = format!("ref:{}", aref_uuid);
+        
+        // Try to get AtomRef first
+        if let Ok(Some(atom_ref)) = encryption_wrapper.get_encrypted_item::<crate::atom::AtomRef>(
+            &key,
+            crate::db_operations::contexts::ATOM_DATA
+        ) {
+            let atom_uuid = atom_ref.get_atom_uuid();
+            
+            // Get the current atom using encryption wrapper
+            let atom_key = format!("atom:{}", atom_uuid);
+            match encryption_wrapper.get_encrypted_item::<crate::atom::Atom>(
+                &atom_key,
+                crate::db_operations::contexts::ATOM_DATA
+            ) {
+                Ok(Some(atom)) => Ok(vec![atom]),
+                Ok(None) => Ok(vec![]),
+                Err(e) => Err(format!("Failed to retrieve encrypted atom: {}", e).into()),
+            }
+        } else {
+            // Try as AtomRefRange
+            if let Ok(Some(_range)) = encryption_wrapper.get_encrypted_item::<crate::atom::AtomRefRange>(
+                &key,
+                crate::db_operations::contexts::ATOM_DATA
+            ) {
+                // For ranges, we would need to iterate through all atoms in the range
+                // For now, return empty vector
+                Ok(vec![])
+            } else {
+                Ok(vec![])
+            }
+        }
     }
 
     /// Get current statistics for testing
@@ -130,6 +201,7 @@ impl Clone for AtomManager {
             message_bus: Arc::clone(&self.message_bus),
             stats: Arc::clone(&self.stats),
             event_threads: Arc::clone(&self.event_threads),
+            encryption_wrapper: self.encryption_wrapper.clone(),
         }
     }
 }

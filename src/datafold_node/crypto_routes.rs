@@ -237,7 +237,7 @@ pub async fn init_passphrase_key(
         drop(node);
 
         // Create crypto configuration for passphrase
-        let mut key_derivation = KeyDerivationConfig::for_security_level(request.security_level.clone());
+        let mut key_derivation = KeyDerivationConfig::for_security_level(request.security_level);
         
         // Apply custom parameters if provided
         if let Some(custom_params) = &request.custom_params {
@@ -399,7 +399,7 @@ pub async fn validate_crypto_config(
                     warnings.push("Passphrase contains only letters - consider adding numbers and symbols".to_string());
                 }
 
-                let mut key_derivation = KeyDerivationConfig::for_security_level(request.security_level.clone());
+                let mut key_derivation = KeyDerivationConfig::for_security_level(request.security_level);
                 
                 // Apply custom parameters if provided
                 if let Some(custom_params) = &request.custom_params {

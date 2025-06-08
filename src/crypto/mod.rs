@@ -31,6 +31,9 @@
 pub mod argon2;
 pub mod ed25519;
 pub mod error;
+pub mod enhanced_error;
+pub mod audit_logger;
+pub mod security_monitor;
 
 // Re-export commonly used types
 pub use argon2::{
@@ -38,4 +41,18 @@ pub use argon2::{
     generate_salt_and_derive_keypair, Salt, Argon2Params, DerivedKey
 };
 pub use ed25519::{generate_master_keypair, MasterKeyPair, PublicKey};
-pub use error::{CryptoError, CryptoResult}; 
+pub use error::{CryptoError, CryptoResult};
+pub use enhanced_error::{
+    EnhancedCryptoError, EnhancedCryptoResult, ErrorSeverity, RecoveryAction,
+    ErrorContext
+};
+pub use audit_logger::{
+    CryptoAuditLogger, AuditConfig, AuditEvent, AuditEventType, AuditSeverity,
+    OperationResult, SecurityEventDetails, PerformanceMetrics,
+    init_global_audit_logger, get_global_audit_logger,
+    audit_encryption_operation, audit_decryption_operation, audit_security_event
+};
+pub use security_monitor::{
+    CryptoSecurityMonitor, SecurityMonitorConfig, SecurityDetection, ThreatLevel,
+    SecurityPattern, init_global_security_monitor, get_global_security_monitor
+};
