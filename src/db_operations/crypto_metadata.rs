@@ -73,21 +73,21 @@ impl CryptoMetadata {
         use sha2::{Sha256, Digest};
         use std::collections::BTreeMap;
         
-        // Create a temporary metadata with sorted additional_metadata for consistent hashing
+        // Create a deterministic serialization with sorted additional_metadata
         let sorted_additional_metadata: BTreeMap<String, String> =
             self.additional_metadata.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         
-        let temp_metadata = Self {
-            version: self.version,
-            master_public_key: self.master_public_key.clone(),
-            signature_algorithm: self.signature_algorithm.clone(),
-            key_derivation_method: self.key_derivation_method.clone(),
-            created_at: self.created_at,
-            additional_metadata: sorted_additional_metadata.into_iter().collect(),
-            checksum: String::new(),
-        };
+        // Create a serializable structure with sorted metadata
+        let serializable_data = serde_json::json!({
+            "version": self.version,
+            "master_public_key": self.master_public_key,
+            "signature_algorithm": self.signature_algorithm,
+            "key_derivation_method": self.key_derivation_method,
+            "created_at": self.created_at,
+            "additional_metadata": sorted_additional_metadata
+        });
         
-        let serialized = serde_json::to_vec(&temp_metadata)
+        let serialized = serde_json::to_vec(&serializable_data)
             .map_err(|e| CryptoError::InvalidInput(format!("Failed to serialize metadata for checksum: {}", e)))?;
         
         let mut hasher = Sha256::new();

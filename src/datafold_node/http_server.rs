@@ -1,4 +1,4 @@
-use super::log_routes;
+use super::{crypto_routes, log_routes};
 use super::{network_routes, query_routes, schema_routes, system_routes};
 use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
@@ -222,6 +222,14 @@ impl DataFoldHttpServer {
                         .route(
                             "/system/reset-database",
                             web::post().to(system_routes::reset_database),
+                        )
+                        // Crypto endpoints
+                        .service(
+                            web::scope("/crypto")
+                                .route("/init/random", web::post().to(crypto_routes::init_random_key))
+                                .route("/init/passphrase", web::post().to(crypto_routes::init_passphrase_key))
+                                .route("/status", web::get().to(crypto_routes::get_crypto_status))
+                                .route("/validate", web::post().to(crypto_routes::validate_crypto_config))
                         )
                         // Network endpoints
                         .service(

@@ -1,4 +1,4 @@
-use log::{info, warn};
+use log::info;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -343,7 +343,7 @@ impl DataFoldNode {
                         peer_id_str.clone(),
                         NodeInfo {
                             id: peer_id_str,
-                            trust_distance: self.config.default_trust_distance,
+                            trust_distance: 1, // Default trust distance
                         },
                     );
                 }

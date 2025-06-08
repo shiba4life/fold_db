@@ -14,3 +14,6 @@ pub mod end_to_end_workflow_test;
 pub mod range_architecture_test;
 pub mod stress_performance_test;
 pub mod regression_prevention_test;
+
+// Crypto workflow integration tests
+pub mod node_crypto_workflow_test;

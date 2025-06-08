@@ -1,10 +1,16 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use datafold::schema::SchemaHasher;
 use datafold::{load_node_config, DataFoldNode, MutationType, Operation, SchemaState};
-use log::info;
+use datafold::config::crypto::{CryptoConfig, MasterKeyConfig, KeyDerivationConfig, SecurityLevel};
+use datafold::datafold_node::crypto_init::{
+    initialize_database_crypto, get_crypto_init_status, validate_crypto_config_for_init
+};
+use log::{info, warn, error};
+use rpassword::read_password;
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
+use std::io::{self, Write};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -18,8 +24,58 @@ struct Cli {
     command: Commands,
 }
 
+/// Crypto initialization method
+#[derive(Debug, Clone, ValueEnum)]
+enum CryptoMethod {
+    /// Generate a random master key pair (highest security, no password recovery)
+    Random,
+    /// Derive master key from user passphrase (allows password recovery)
+    Passphrase,
+}
+
+/// Security level enum for CLI (wrapper around the config SecurityLevel)
+#[derive(Debug, Clone, ValueEnum)]
+enum CliSecurityLevel {
+    /// Fast parameters for interactive use
+    Interactive,
+    /// Balanced parameters for general use
+    Balanced,
+    /// High security parameters for sensitive operations
+    Sensitive,
+}
+
+impl From<CliSecurityLevel> for SecurityLevel {
+    fn from(cli_level: CliSecurityLevel) -> Self {
+        match cli_level {
+            CliSecurityLevel::Interactive => SecurityLevel::Interactive,
+            CliSecurityLevel::Balanced => SecurityLevel::Balanced,
+            CliSecurityLevel::Sensitive => SecurityLevel::Sensitive,
+        }
+    }
+}
+
 #[derive(Subcommand)]
 enum Commands {
+    /// Initialize database cryptography
+    CryptoInit {
+        /// Crypto initialization method
+        #[arg(long, value_enum, default_value = "random")]
+        method: CryptoMethod,
+        /// Security level for key derivation (when using passphrase)
+        #[arg(long, value_enum, default_value = "balanced")]
+        security_level: CliSecurityLevel,
+        /// Force re-initialization even if crypto is already initialized
+        #[arg(long)]
+        force: bool,
+    },
+    /// Check database crypto initialization status
+    CryptoStatus {},
+    /// Validate crypto configuration
+    CryptoValidate {
+        /// Path to configuration file to validate (defaults to CLI config)
+        #[arg(long)]
+        config_file: Option<PathBuf>,
+    },
     /// Load a schema from a JSON file
     LoadSchema {
         /// Path to the schema JSON file
@@ -119,6 +175,233 @@ enum Commands {
         #[arg(required = true)]
         path: PathBuf,
     },
+}
+fn handle_crypto_init(
+    method: CryptoMethod,
+    security_level: CliSecurityLevel,
+    force: bool,
+    node: &mut DataFoldNode,
+) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Starting database crypto initialization");
+    
+    // Get the actual SecurityLevel from the CLI wrapper
+    let security_level: SecurityLevel = security_level.into();
+    
+    // Check if crypto is already initialized
+    let fold_db = node.get_fold_db()?;
+    let db_ops = fold_db.db_ops();
+    let status = get_crypto_init_status(db_ops.clone()).map_err(|e| format!("Failed to check crypto status: {}", e))?;
+    
+    if status.initialized && !force {
+        info!("Database crypto is already initialized: {}", status.summary());
+        if status.is_healthy() {
+            info!("Crypto initialization is healthy and verified");
+            return Ok(());
+        } else {
+            warn!("Crypto initialization exists but integrity check failed");
+            info!("Use --force to re-initialize if needed");
+            return Err("Crypto initialization integrity check failed".into());
+        }
+    } else if status.initialized && force {
+        warn!("Forcing crypto re-initialization on already initialized database");
+    }
+    
+    // Get passphrase if needed
+    let passphrase = match method {
+        CryptoMethod::Random => None,
+        CryptoMethod::Passphrase => Some(get_secure_passphrase()?),
+    };
+    
+    // Create crypto configuration
+    let crypto_config = match method {
+        CryptoMethod::Random => {
+            info!("Using random key generation");
+            CryptoConfig {
+                enabled: true,
+                master_key: MasterKeyConfig::Random,
+                key_derivation: KeyDerivationConfig::for_security_level(security_level),
+            }
+        }
+        CryptoMethod::Passphrase => {
+            let passphrase = passphrase.unwrap(); // Safe since we just set it
+            info!("Using passphrase-based key derivation with {} security level", security_level.as_str());
+            CryptoConfig {
+                enabled: true,
+                master_key: MasterKeyConfig::Passphrase { passphrase },
+                key_derivation: KeyDerivationConfig::for_security_level(security_level),
+            }
+        }
+    };
+    
+    // Validate configuration
+    validate_crypto_config_for_init(&crypto_config)
+        .map_err(|e| format!("Crypto configuration validation failed: {}", e))?;
+    info!("Crypto configuration validated successfully");
+    
+    // Perform initialization
+    match initialize_database_crypto(db_ops, &crypto_config) {
+        Ok(context) => {
+            info!("✅ Database crypto initialization completed successfully!");
+            info!("Derivation method: {}", context.derivation_method);
+            info!("Master public key stored in database metadata");
+            
+            // Verify the initialization was successful
+            let fold_db = node.get_fold_db()?;
+            let final_status = get_crypto_init_status(fold_db.db_ops())
+                .map_err(|e| format!("Failed to verify crypto initialization: {}", e))?;
+            
+            if final_status.is_healthy() {
+                info!("✅ Crypto initialization verified successfully");
+            } else {
+                error!("❌ Crypto initialization verification failed");
+                return Err("Crypto initialization verification failed".into());
+            }
+        }
+        Err(e) => {
+            error!("❌ Crypto initialization failed: {}", e);
+            return Err(format!("Crypto initialization failed: {}", e).into());
+        }
+    }
+    
+    Ok(())
+}
+
+fn handle_crypto_status(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Checking database crypto initialization status");
+    
+    let fold_db = node.get_fold_db()?;
+    let db_ops = fold_db.db_ops();
+    let status = get_crypto_init_status(db_ops)
+        .map_err(|e| format!("Failed to get crypto status: {}", e))?;
+    
+    info!("Crypto Status: {}", status.summary());
+    
+    if status.initialized {
+        info!("  Initialized: ✅ Yes");
+        info!("  Algorithm: {}", status.algorithm.as_deref().unwrap_or("Unknown"));
+        info!("  Derivation Method: {}", status.derivation_method.as_deref().unwrap_or("Unknown"));
+        info!("  Version: {}", status.version.unwrap_or(0));
+        
+        if let Some(created_at) = status.created_at {
+            info!("  Created: {}", created_at.format("%Y-%m-%d %H:%M:%S UTC"));
+        }
+        
+        match status.integrity_verified {
+            Some(true) => info!("  Integrity: ✅ Verified"),
+            Some(false) => warn!("  Integrity: ❌ Failed verification"),
+            None => info!("  Integrity: ⚠️  Not checked"),
+        }
+        
+        if status.is_healthy() {
+            info!("🟢 Overall Status: Healthy");
+        } else {
+            warn!("🟡 Overall Status: Issues detected");
+        }
+    } else {
+        info!("  Initialized: ❌ No");
+        info!("🔴 Overall Status: Not initialized");
+    }
+    
+    Ok(())
+}
+
+fn handle_crypto_validate(
+    config_file: Option<PathBuf>,
+    default_config_path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config_path = config_file
+        .as_deref()
+        .map(|p| p.to_str().unwrap_or(default_config_path))
+        .unwrap_or(default_config_path);
+    
+    info!("Validating crypto configuration in: {}", config_path);
+    
+    // Load the node configuration
+    let node_config = load_node_config(Some(config_path), None)?;
+    
+    // Check if crypto configuration exists
+    if let Some(crypto_config) = &node_config.crypto {
+        info!("Found crypto configuration");
+        
+        // Validate the configuration
+        match validate_crypto_config_for_init(crypto_config) {
+            Ok(()) => {
+                info!("✅ Crypto configuration is valid");
+                
+                // Show configuration details
+                info!("Configuration details:");
+                info!("  Enabled: {}", crypto_config.enabled);
+                
+                if crypto_config.enabled {
+                    match &crypto_config.master_key {
+                        MasterKeyConfig::Random => {
+                            info!("  Master Key: Random generation");
+                        }
+                        MasterKeyConfig::Passphrase { .. } => {
+                            info!("  Master Key: Passphrase-based derivation");
+                            
+                            if let Some(preset) = &crypto_config.key_derivation.preset {
+                                info!("  Security Level: {}", preset.as_str());
+                            } else {
+                                info!("  Key Derivation: Custom parameters");
+                                info!("    Memory Cost: {} KB", crypto_config.key_derivation.memory_cost);
+                                info!("    Time Cost: {} iterations", crypto_config.key_derivation.time_cost);
+                                info!("    Parallelism: {} threads", crypto_config.key_derivation.parallelism);
+                            }
+                        }
+                        MasterKeyConfig::External { key_source } => {
+                            info!("  Master Key: External source ({})", key_source);
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                error!("❌ Crypto configuration validation failed: {}", e);
+                return Err(format!("Crypto configuration validation failed: {}", e).into());
+            }
+        }
+    } else {
+        info!("No crypto configuration found in node config");
+        info!("ℹ️  Crypto will be disabled by default");
+    }
+    
+    Ok(())
+}
+
+fn get_secure_passphrase() -> Result<String, Box<dyn std::error::Error>> {
+    loop {
+        print!("Enter passphrase for master key derivation: ");
+        io::stdout().flush()?;
+        
+        let passphrase = read_password()?;
+        
+        if passphrase.len() < 6 {
+            error!("Passphrase must be at least 6 characters long");
+            continue;
+        }
+        
+        if passphrase.len() > 1024 {
+            error!("Passphrase is too long (maximum 1024 characters)");
+            continue;
+        }
+        
+        // Confirm passphrase
+        print!("Confirm passphrase: ");
+        io::stdout().flush()?;
+        
+        let confirmation = read_password()?;
+        
+        if passphrase != confirmation {
+            error!("Passphrases do not match. Please try again.");
+            continue;
+        }
+        
+        // Clear confirmation from memory
+        drop(confirmation);
+        
+        info!("✅ Passphrase accepted");
+        return Ok(passphrase);
+    }
 }
 
 fn handle_load_schema(
@@ -422,8 +705,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     // Handle commands that don't need the node first
-    if let Commands::HashSchemas { verify } = cli.command {
-        return handle_hash_schemas(verify);
+    match &cli.command {
+        Commands::HashSchemas { verify } => {
+            return handle_hash_schemas(*verify);
+        }
+        Commands::CryptoValidate { config_file } => {
+            return handle_crypto_validate(config_file.clone(), &cli.config);
+        }
+        _ => {}
     }
 
     // Load node configuration
@@ -459,6 +748,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::BlockSchema { name } => handle_block_schema(name, &mut node)?,
         Commands::GetSchemaState { name } => handle_get_schema_state(name, &mut node)?,
         Commands::ListSchemasByState { state } => handle_list_schemas_by_state(state, &mut node)?,
+        Commands::CryptoInit { method, security_level, force } => {
+            handle_crypto_init(method, security_level, force, &mut node)?
+        }
+        Commands::CryptoStatus {} => handle_crypto_status(&mut node)?,
+        Commands::CryptoValidate { .. } => unreachable!(), // Already handled above
         Commands::Execute { path } => handle_execute(path, &mut node)?,
     }
 

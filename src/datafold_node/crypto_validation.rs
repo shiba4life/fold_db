@@ -3,7 +3,7 @@
 //! This module provides validation functions to ensure that configuration
 //! is valid and consistent before proceeding with crypto initialization.
 
-use crate::config::crypto::{CryptoConfig, MasterKeyConfig, ConfigError};
+use crate::config::crypto::{CryptoConfig, MasterKeyConfig};
 use crate::datafold_node::crypto_init::{CryptoInitError, CryptoInitResult};
 use log::{debug, warn};
 
@@ -46,7 +46,7 @@ fn validate_basic_config(crypto_config: &CryptoConfig) -> CryptoInitResult<()> {
     
     // Use built-in validation from CryptoConfig
     crypto_config.validate()
-        .map_err(|e| CryptoInitError::Crypto(e))?;
+        .map_err(CryptoInitError::Crypto)?;
     
     if !crypto_config.enabled {
         debug!("Crypto is disabled - skipping validation");
@@ -169,19 +169,16 @@ fn validate_key_derivation_config(crypto_config: &CryptoConfig) -> CryptoInitRes
     
     // Convert to Argon2 parameters to validate (validation happens in to_argon2_params)
     let _params = crypto_config.key_derivation.to_argon2_params()
-        .map_err(|e| CryptoInitError::Crypto(e))?;
+        .map_err(CryptoInitError::Crypto)?;
     
     // Additional validation for initialization context
     if let Some(preset) = &crypto_config.key_derivation.preset {
         debug!("Key derivation security level: {}", preset.as_str());
         
         // Warn about performance implications of high security levels
-        match preset {
-            crate::config::crypto::SecurityLevel::Sensitive => {
-                warn!("Using 'Sensitive' security level - key derivation will be very slow");
-                warn!("Consider using 'Interactive' level unless high security is required");
-            }
-            _ => {}
+        if preset == &crate::config::crypto::SecurityLevel::Sensitive {
+            warn!("Using 'Sensitive' security level - key derivation will be very slow");
+            warn!("Consider using 'Interactive' level unless high security is required");
         }
     } else {
         debug!("Using custom key derivation parameters");
@@ -321,7 +318,7 @@ pub fn validate_crypto_config_quick(crypto_config: &CryptoConfig) -> CryptoInitR
     
     // Basic structure validation
     crypto_config.validate()
-        .map_err(|e| CryptoInitError::Crypto(e))?;
+        .map_err(CryptoInitError::Crypto)?;
     
     // Check basic requirements
     if crypto_config.enabled {

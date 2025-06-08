@@ -7,7 +7,7 @@
 use crate::config::crypto::{CryptoConfig, MasterKeyConfig, ConfigError};
 use crate::crypto::{
     generate_master_keypair, derive_master_keypair, generate_salt,
-    CryptoError, CryptoResult, MasterKeyPair,
+    CryptoError, MasterKeyPair,
 };
 use crate::db_operations::{DbOperations, CryptoMetadata};
 use crate::schema::SchemaError;

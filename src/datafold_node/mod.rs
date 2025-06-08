@@ -11,6 +11,7 @@
 
 pub mod config;
 pub mod crypto_init;
+pub mod crypto_routes;
 pub mod crypto_validation;
 mod db;
 pub mod error;

@@ -30,7 +30,6 @@ use tokio::sync::Mutex;
 ///     // Create a node first
 ///     let config = NodeConfig {
 ///         storage_path: PathBuf::from("data"),
-///         default_trust_distance: 1,
 ///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
 ///         crypto: None,
 ///     };
@@ -86,7 +85,6 @@ impl TcpServer {
     /// async fn main() -> FoldDbResult<()> {
 ///     let config = NodeConfig {
 ///         storage_path: PathBuf::from("data"),
-///         default_trust_distance: 1,
 ///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
 ///         crypto: None,
 ///     };
@@ -139,7 +137,6 @@ impl TcpServer {
 /// async fn main() -> FoldDbResult<()> {
 ///     let config = NodeConfig {
 ///         storage_path: PathBuf::from("data"),
-///         default_trust_distance: 1,
 ///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
 ///         crypto: None,
 ///     };

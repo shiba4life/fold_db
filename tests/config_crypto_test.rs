@@ -87,7 +87,6 @@ fn test_node_config_serialization_without_crypto() {
         .expect("Should deserialize");
     
     assert_eq!(config.storage_path, deserialized.storage_path);
-    assert_eq!(config.default_trust_distance, deserialized.default_trust_distance);
     assert_eq!(config.network_listen_address, deserialized.network_listen_address);
     assert_eq!(config.crypto.is_some(), deserialized.crypto.is_some());
 }

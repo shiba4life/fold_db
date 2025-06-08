@@ -39,7 +39,7 @@ impl CryptoConfig {
         Self {
             enabled: true,
             master_key: MasterKeyConfig::Passphrase { passphrase },
-            key_derivation: KeyDerivationConfig::default(),
+            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Balanced),
         }
     }
     
@@ -215,7 +215,11 @@ impl KeyDerivationConfig {
     pub fn for_security_level(level: SecurityLevel) -> Self {
         match level {
             SecurityLevel::Interactive => Self::interactive(),
-            SecurityLevel::Balanced => Self::default(),
+            SecurityLevel::Balanced => {
+                let mut config = Self::default();
+                config.preset = Some(SecurityLevel::Balanced);
+                config
+            },
             SecurityLevel::Sensitive => Self::sensitive(),
         }
     }

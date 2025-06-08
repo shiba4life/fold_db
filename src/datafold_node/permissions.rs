@@ -12,7 +12,7 @@ impl DataFoldNode {
             node_id.to_string(),
             NodeInfo {
                 id: node_id.to_string(),
-                trust_distance: self.config.default_trust_distance,
+                trust_distance: 1, // Default trust distance
             },
         );
         Ok(())
@@ -135,7 +135,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = NodeConfig {
             storage_path: dir.path().to_path_buf(),
-            default_trust_distance: 1,
             network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
             crypto: None,
         };

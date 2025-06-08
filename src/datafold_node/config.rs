@@ -7,9 +7,6 @@ use crate::config::crypto::{CryptoConfig, ConfigError};
 pub struct NodeConfig {
     /// Path where the node will store its data
     pub storage_path: PathBuf,
-    /// Default trust distance for queries when not explicitly specified
-    /// Must be greater than 0
-    pub default_trust_distance: u32,
     /// Network listening address
     #[serde(default = "default_network_listen_address")]
     pub network_listen_address: String,
@@ -26,7 +23,6 @@ impl Default for NodeConfig {
     fn default() -> Self {
         Self {
             storage_path: PathBuf::from("data"),
-            default_trust_distance: 1,
             network_listen_address: default_network_listen_address(),
             crypto: None,
         }
