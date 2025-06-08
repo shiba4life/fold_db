@@ -26,6 +26,7 @@
 //! permissions and payment requirements.
 
 pub mod atom;
+pub mod config;
 pub mod config_utils;
 pub mod crypto;
 pub mod datafold_node;
@@ -67,3 +68,6 @@ pub use crypto::{
     Salt, Argon2Params, DerivedKey, generate_salt, derive_master_keypair, 
     derive_master_keypair_default, generate_salt_and_derive_keypair
 };
+
+// Re-export config types
+pub use config::crypto::{CryptoConfig, MasterKeyConfig, KeyDerivationConfig, SecurityLevel, ConfigError};

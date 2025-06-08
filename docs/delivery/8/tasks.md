@@ -10,8 +10,8 @@ This document lists all tasks associated with PBI 8.
 | :------ | :--- | :----- | :---------- |
 | 8-1 | [Research and document cryptographic dependencies](./8-1.md) | Done | Research ed25519-dalek, argon2, and zeroize crates, document APIs and create implementation guide |
 | 8-2 | [Implement Ed25519 key generation utilities](./8-2.md) | Done | Create cryptographic utilities for secure Ed25519 key pair generation and management |
-| 8-3 | [Implement Argon2id passphrase-based key derivation](./8-3.md) | Review | Create secure key derivation system using Argon2id for master key generation from user passphrase |
-| 8-4 | [Enhance NodeConfig for cryptographic initialization](./8-4.md) | Proposed | Extend configuration system to support database cryptographic initialization parameters |
+| 8-3 | [Implement Argon2id passphrase-based key derivation](./8-3.md) | Done | Create secure key derivation system using Argon2id for master key generation from user passphrase |
+| 8-4 | [Enhance NodeConfig for cryptographic initialization](./8-4.md) | Review | Extend configuration system to support database cryptographic initialization parameters |
 | 8-5 | [Implement database metadata storage for master public key](./8-5.md) | Proposed | Add secure storage and retrieval of master public key in database metadata system |
 | 8-6 | [Enhance database initialization with crypto setup](./8-6.md) | Proposed | Integrate cryptographic initialization into existing database creation workflow |
 | 8-7 | [Implement HTTP API endpoints for crypto initialization](./8-7.md) | Proposed | Create REST endpoints for programmatic database cryptographic initialization |

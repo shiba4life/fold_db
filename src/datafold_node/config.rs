@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use crate::config::crypto::{CryptoConfig, ConfigError};
 
 /// Configuration for a DataFoldNode instance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,6 +13,9 @@ pub struct NodeConfig {
     /// Network listening address
     #[serde(default = "default_network_listen_address")]
     pub network_listen_address: String,
+    /// Cryptographic configuration for database encryption (optional)
+    #[serde(default)]
+    pub crypto: Option<CryptoConfig>,
 }
 
 fn default_network_listen_address() -> String {
@@ -24,6 +28,7 @@ impl Default for NodeConfig {
             storage_path: PathBuf::from("data"),
             default_trust_distance: 1,
             network_listen_address: default_network_listen_address(),
+            crypto: None,
         }
     }
 }
@@ -35,6 +40,39 @@ impl NodeConfig {
             storage_path,
             ..Default::default()
         }
+    }
+    
+    /// Create a new node configuration with cryptographic encryption enabled
+    pub fn with_crypto(storage_path: PathBuf, crypto_config: CryptoConfig) -> Self {
+        Self {
+            storage_path,
+            crypto: Some(crypto_config),
+            ..Default::default()
+        }
+    }
+    
+    /// Enable cryptographic encryption for this configuration
+    pub fn enable_crypto(mut self, crypto_config: CryptoConfig) -> Self {
+        self.crypto = Some(crypto_config);
+        self
+    }
+    
+    /// Check if cryptographic encryption is enabled
+    pub fn is_crypto_enabled(&self) -> bool {
+        self.crypto.as_ref().is_some_and(|c| c.enabled)
+    }
+    
+    /// Get the crypto configuration if enabled
+    pub fn crypto_config(&self) -> Option<&CryptoConfig> {
+        self.crypto.as_ref()
+    }
+    
+    /// Validate the configuration (including crypto settings)
+    pub fn validate(&self) -> Result<(), ConfigError> {
+        if let Some(crypto) = &self.crypto {
+            crypto.validate().map_err(ConfigError::CryptoValidation)?;
+        }
+        Ok(())
     }
 
     /// Set the network listening address
