@@ -71,3 +71,6 @@ pub use crypto::{
 
 // Re-export config types
 pub use config::crypto::{CryptoConfig, MasterKeyConfig, KeyDerivationConfig, SecurityLevel, ConfigError};
+
+// Re-export database crypto metadata types
+pub use db_operations::crypto_metadata::CryptoMetadata;

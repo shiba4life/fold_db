@@ -3,6 +3,7 @@
 use crate::crypto::error::{CryptoError, CryptoResult};
 use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
 use rand::rngs::OsRng;
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use zeroize::Zeroize;
 
 /// Ed25519 public key length in bytes
@@ -54,6 +55,37 @@ impl PublicKey {
     /// Get the inner VerifyingKey (for advanced use cases)
     pub fn inner(&self) -> &VerifyingKey {
         &self.inner
+    }
+}
+
+// Custom serde implementations for PublicKey
+impl Serialize for PublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let bytes = self.to_bytes();
+        serializer.serialize_bytes(&bytes)
+    }
+}
+
+impl<'de> Deserialize<'de> for PublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        let bytes: Vec<u8> = Vec::deserialize(deserializer)?;
+        if bytes.len() != PUBLIC_KEY_LENGTH {
+            return Err(D::Error::custom(format!(
+                "Invalid public key length: expected {}, got {}",
+                PUBLIC_KEY_LENGTH, bytes.len()
+            )));
+        }
+        let mut byte_array = [0u8; PUBLIC_KEY_LENGTH];
+        byte_array.copy_from_slice(&bytes);
+        PublicKey::from_bytes(&byte_array)
+            .map_err(|e| D::Error::custom(format!("Invalid public key: {}", e)))
     }
 }
 

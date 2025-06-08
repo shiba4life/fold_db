@@ -1,6 +1,7 @@
 // Core database operations
 mod atom_operations;
 pub mod core;
+pub mod crypto_metadata;
 pub mod error_utils;
 mod metadata_operations;
 mod orchestrator_operations;
@@ -12,4 +13,5 @@ mod utility_operations;
 
 // Re-export the main DbOperations struct and error utilities
 pub use core::DbOperations;
+pub use crypto_metadata::CryptoMetadata;
 pub use error_utils::ErrorUtils;

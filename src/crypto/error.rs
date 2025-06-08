@@ -43,6 +43,10 @@ pub enum CryptoError {
     /// Invalid signature format
     #[error("Invalid signature format: {message}")]
     InvalidSignature { message: String },
+
+    /// Invalid input provided
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
 impl From<ed25519_dalek::SignatureError> for CryptoError {
