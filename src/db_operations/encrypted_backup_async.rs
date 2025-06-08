@@ -58,7 +58,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::fs::{File, OpenOptions};
-use tokio::io::{AsyncBufReader, AsyncBufWriter, AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::sync::{RwLock, Semaphore, mpsc};
 use tokio::task;
 use futures::stream::{Stream, StreamExt};
@@ -357,7 +357,7 @@ impl AsyncEncryptedBackup {
             .await
             .map_err(|e| SchemaError::InvalidData(format!("Failed to create backup file: {}", e)))?;
         
-        let mut writer = AsyncBufWriter::with_capacity(self.config.buffer_size, backup_file);
+        let mut writer = BufWriter::with_capacity(self.config.buffer_size, backup_file);
         
         // Write backup header
         let backup_id = Uuid::new_v4().to_string();
@@ -480,7 +480,7 @@ impl AsyncEncryptedBackup {
         let backup_file = File::open(backup_path).await
             .map_err(|e| SchemaError::InvalidData(format!("Failed to open backup file: {}", e)))?;
         
-        let mut reader = AsyncBufReader::with_capacity(self.config.buffer_size, backup_file);
+        let mut reader = BufReader::with_capacity(self.config.buffer_size, backup_file);
         
         // Read and parse backup header
         let header_len = reader.read_u32().await
@@ -503,7 +503,8 @@ impl AsyncEncryptedBackup {
         
         // Create target encryption wrapper
         let crypto_config = CryptoConfig::default();
-        let master_keypair = self.get_master_keypair().await?;
+        let master_keypair = self.get_master_keypair().await
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to get master keypair: {}", e)))?;
         let async_wrapper_config = AsyncWrapperConfig::default();
         let target_encryption = AsyncEncryptionWrapper::new(
             target_db_ops,
@@ -561,7 +562,7 @@ impl AsyncEncryptedBackup {
                 // Update progress
                 if self.config.enable_progress_tracking {
                     if let Some(ref mut progress) = *self.progress.write().await {
-                        progress.update(batch_count, item_size as u64);
+                        progress.update(items_restored, item_size as u64);
                     }
                 }
             }
@@ -687,11 +688,11 @@ impl AsyncEncryptedBackup {
                 contexts::METADATA
             };
             
-            // Encrypt the data
-            let encrypted_data = self.encryption.store_encrypted_item_async(key, data, context).await
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to encrypt item {}: {}", key, e)))?;
+            // Serialize the data for backup
+            let serialized_data = serde_json::to_vec(data)
+                .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize item: {}", e)))?;
             
-            encrypted_items.push((key.clone(), encrypted_data));
+            encrypted_items.push((key.clone(), serialized_data));
         }
         
         Ok(encrypted_items)
@@ -899,12 +900,21 @@ mod tests {
     
     #[tokio::test]
     async fn test_compression_decompression() {
-        let backup_manager = create_test_backup_manager().await;
+        // Create a custom config with no compression
+        let mut config = AsyncBackupConfig::default();
+        config.compression_level = 0;
+        
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("test_db");
+        let db = sled::open(&db_path).unwrap();
+        let db_ops = DbOperations::new(db).unwrap();
+        let master_keypair = crate::crypto::generate_master_keypair().unwrap();
+        
+        let backup_manager = AsyncEncryptedBackup::new(db_ops, &master_keypair, config).await.unwrap();
         
         let test_data = b"This is test data for compression";
         
         // Test without compression
-        backup_manager.config.compression_level = 0;
         let uncompressed = backup_manager.compress_data(test_data).await.unwrap();
         assert_eq!(uncompressed, test_data);
         

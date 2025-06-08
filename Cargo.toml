@@ -79,6 +79,11 @@ actix-cors = "0.6"
 # HTTP Client for OpenRouter API
 reqwest = { version = "0.11", features = ["json"] }
 
+# Additional dependencies for encryption at rest
+lru = "0.12"
+bytes = "1.5"
+flate2 = "1.0"
+
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "full"] }
 reqwest = { version = "0.11", features = ["json"] }

@@ -12,6 +12,7 @@ use datafold::fold_db_core::managers::atom::async_operations::{AsyncAtomManager,
 use datafold::db_operations::encryption_wrapper::contexts;
 use serde_json::json;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tempfile::tempdir;
 use tokio::test;
@@ -311,7 +312,7 @@ async fn test_memory_usage_and_caching() {
 async fn test_concurrent_operations_performance() {
     let key = [0x42u8; 32];
     let config = PerformanceConfig::default();
-    let encryptor = AsyncEncryptionAtRest::new(key, config).await.unwrap();
+    let encryptor = Arc::new(AsyncEncryptionAtRest::new(key, config).await.unwrap());
     
     let test_data = create_test_data(SMALL_DATA_SIZE);
     let concurrent_ops = 10;
@@ -322,7 +323,7 @@ async fn test_concurrent_operations_performance() {
     // Create concurrent tasks
     let mut tasks = Vec::new();
     for _ in 0..concurrent_ops {
-        let encryptor_clone = &encryptor;
+        let encryptor_clone = Arc::clone(&encryptor);
         let data_clone = test_data.clone();
         
         let task = tokio::spawn(async move {
@@ -474,7 +475,7 @@ async fn test_pbi_9_performance_requirements() {
     
     for i in 0..iterations {
         let key = format!("baseline_key_{}", i);
-        db.insert(key.as_bytes(), &test_data).unwrap();
+        db.insert(key.as_bytes(), test_data.as_slice()).unwrap();
         let _retrieved = db.get(key.as_bytes()).unwrap();
     }
     

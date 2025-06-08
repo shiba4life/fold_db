@@ -565,7 +565,7 @@ impl AsyncEncryptionAtRest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::io::Cursor;
+    use std::io::Cursor;
     
     fn create_test_key() -> [u8; AES_KEY_SIZE] {
         [0x42; AES_KEY_SIZE]

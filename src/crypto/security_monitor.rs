@@ -14,7 +14,7 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 /// Security threat levels
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ThreatLevel {
     /// Low threat - informational
     Low,
@@ -27,7 +27,7 @@ pub enum ThreatLevel {
 }
 
 /// Types of security patterns to monitor
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Copy)]
 pub enum SecurityPattern {
     /// Repeated failed decryption attempts
     RepeatedDecryptionFailures,

@@ -340,7 +340,7 @@ impl AsyncAtomManager {
             .ok_or_else(|| SchemaError::InvalidData(format!("Atom not found: {}", atom_uuid)))?;
         
         // Create new atom with updated content
-        let new_atom = Atom::new(existing_atom.schema_name().to_string(), source_pub_key, new_content)
+        let new_atom = Atom::new(existing_atom.source_schema_name().to_string(), source_pub_key, new_content)
             .with_prev_version(atom_uuid.to_string())
             .with_status(AtomStatus::Active);
         
