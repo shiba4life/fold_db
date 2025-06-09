@@ -260,11 +260,36 @@ impl EncryptedBackupManager {
         let backup_id = Uuid::new_v4();
         let mut metadata = self.create_backup_metadata(backup_id, options)?;
         
+        // Pre-calculate final metadata size by creating a sample with realistic values
+        let sample_metadata = BackupMetadata {
+            version: metadata.version,
+            backup_id: metadata.backup_id,
+            created_at: metadata.created_at,
+            mode: metadata.mode,
+            source_db_path: metadata.source_db_path.clone(),
+            total_items: 9999999, // Large placeholder value
+            total_size: 9999999999, // Large placeholder value
+            compression_level: metadata.compression_level,
+            encryption_params: metadata.encryption_params.clone(),
+            integrity_checksum: "placeholder_checksum_that_is_reasonably_long_to_ensure_consistent_sizing".to_string(),
+            previous_backup_id: None,
+            additional_metadata: metadata.additional_metadata.clone(),
+        };
+        let metadata_size = serde_json::to_vec(&sample_metadata)?.len();
+        
         // Create backup file
         let mut backup_file = self.create_backup_file(backup_path)?;
         
-        // Write header placeholder (we'll update it later)
-        self.write_backup_header(&mut backup_file, &metadata)?;
+        // Write magic bytes and version
+        backup_file.write_all(BACKUP_MAGIC)?;
+        backup_file.write_all(&metadata.version.to_le_bytes())?;
+        
+        // Write metadata size
+        backup_file.write_all(&(metadata_size as u64).to_le_bytes())?;
+        
+        // Write placeholder metadata (padded to exact size)
+        let placeholder_metadata_bytes = vec![0u8; metadata_size];
+        backup_file.write_all(&placeholder_metadata_bytes)?;
         
         // Create backup data
         let backup_stats = self.write_backup_data(&mut backup_file, &mut metadata, options)?;
@@ -276,9 +301,14 @@ impl EncryptedBackupManager {
         // Calculate final integrity checksum
         metadata.integrity_checksum = self.calculate_backup_checksum(&backup_file)?;
         
-        // Rewrite header with updated metadata
-        backup_file.seek(SeekFrom::Start(0))?;
-        self.write_backup_header(&mut backup_file, &metadata)?;
+        // Serialize final metadata and pad to exact size
+        let final_metadata_bytes = serde_json::to_vec(&metadata)?;
+        let mut padded_metadata = final_metadata_bytes;
+        padded_metadata.resize(metadata_size, 0); // Pad with zeros to exact size
+        
+        // Rewrite just the metadata section
+        backup_file.seek(SeekFrom::Start(8 + 4 + 8))?; // Skip magic + version + size
+        backup_file.write_all(&padded_metadata)?;
         
         let duration = start_time.elapsed();
         
@@ -537,6 +567,11 @@ impl EncryptedBackupManager {
         let mut metadata_bytes = vec![0u8; metadata_size];
         file.read_exact(&mut metadata_bytes)?;
         
+        // Remove padding (null bytes) from the end
+        while let Some(&0) = metadata_bytes.last() {
+            metadata_bytes.pop();
+        }
+        
         let metadata: BackupMetadata = serde_json::from_slice(&metadata_bytes)?;
         
         Ok(metadata)
@@ -567,7 +602,7 @@ impl EncryptedBackupManager {
     fn restore_backup_data(
         &self,
         file: &mut File,
-        metadata: &BackupMetadata,
+        _metadata: &BackupMetadata,
         options: &RestoreOptions,
     ) -> Result<RestoreStats, BackupError> {
         let mut items_restored = 0u64;
@@ -575,9 +610,10 @@ impl EncryptedBackupManager {
         let mut error_count = 0u64;
         let mut restored_trees = Vec::new();
         
-        // Skip to data section (after header and metadata)
-        let data_start = 8 + 4 + 8 + serde_json::to_vec(metadata)?.len();
-        file.seek(SeekFrom::Start(data_start as u64))?;
+        // File pointer is already positioned at the start of data section
+        // after reading metadata, so no need to seek
+        // File pointer is already positioned at the start of data section
+        // after reading metadata, so no need to seek
         
         loop {
             // Try to read tree name length

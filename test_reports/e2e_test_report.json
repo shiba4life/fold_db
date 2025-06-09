@@ -1,0 +1,30 @@
+{
+  "overall_success": false,
+  "platform_results": {
+    "CLI": {
+      "errors": [],
+      "platform": "CLI",
+      "tests_failed": 0,
+      "tests_passed": 3,
+      "tests_run": 3,
+      "tests_skipped": 0,
+      "warnings": []
+    }
+  },
+  "summary": {
+    "coverage_metrics": {
+      "branch_coverage": 0.0,
+      "function_coverage": 0.0,
+      "line_coverage": 0.0,
+      "platform_coverage": {}
+    },
+    "success_rate": 0.0,
+    "total_failed": 0,
+    "total_passed": 0,
+    "total_skipped": 0,
+    "total_tests": 0
+  },
+  "test_vectors": 4,
+  "timestamp": "2025-06-09T17:08:36.578069+00:00",
+  "total_duration_ms": null
+}

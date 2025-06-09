@@ -1,17 +1,19 @@
 //! Comprehensive tests for CLI Ed25519 key generation functionality
-//! 
+//!
 //! This test suite validates task 10-4-1 acceptance criteria:
 //! - Keypair generated on client, private key never leaves client, test coverage present
 //! - CLI command structure
-//! - Key format output options  
+//! - Key format output options
 //! - Batch generation capabilities
 
-use datafold::crypto::ed25519::{generate_master_keypair, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH};
+#![allow(clippy::needless_borrows_for_generic_args)]
+#![allow(unused_imports)]
+#![allow(clippy::single_component_path_imports)]
+
+use datafold::crypto::ed25519::generate_master_keypair;
 use std::process::Command;
 use std::fs;
-use std::path::PathBuf;
 use tempfile::TempDir;
-use hex;
 
 /// Test basic key generation functionality
 #[test]

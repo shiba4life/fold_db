@@ -3,9 +3,10 @@
 //! This test suite validates the backup/recovery implementation across all platforms
 //! using the test vectors defined in docs/delivery/10/backup/test_vectors.md
 
+#![allow(deprecated)]
+
 use std::collections::HashMap;
 use std::time::Instant;
-use serde_json::Value;
 
 // Test vector data from the specification
 const TEST_VECTOR_1_PASSPHRASE: &str = "correct horse battery staple";

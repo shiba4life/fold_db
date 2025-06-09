@@ -10,7 +10,7 @@ use datafold::fold_db_core::infrastructure::message_bus::{
 };
 use datafold::fold_db_core::managers::atom::AtomManager;
 use datafold::db_operations::DbOperations;
-use datafold::atom::{AtomRef, AtomRefBehavior};
+use datafold::atom::AtomRef;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;

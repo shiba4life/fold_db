@@ -745,8 +745,8 @@ mod tests {
 
     fn create_test_key() -> [u8; AES_KEY_SIZE] {
         let mut key = [0u8; AES_KEY_SIZE];
-        for i in 0..AES_KEY_SIZE {
-            key[i] = (i % 256) as u8;
+        for (i, byte) in key.iter_mut().enumerate().take(AES_KEY_SIZE) {
+            *byte = (i % 256) as u8;
         }
         key
     }

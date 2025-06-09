@@ -1,0 +1,21 @@
+# Temporary clippy suppressions for test files
+# These can be addressed in a future cleanup task
+
+[tool.clippy]
+allow = [
+    "unused_imports",
+    "unused_variables", 
+    "unused_mut",
+    "dead_code",
+    "needless_borrows_for_generic_args",
+    "single_component_path_imports",
+    "redundant_closure",
+    "useless_vec",
+    "useless_asref",
+    "empty_line_after_doc_comments",
+    "items_after_test_module",
+    "ptr_arg",
+    "needless_borrow",
+    "absurd_extreme_comparisons",
+    "unused_comparisons"
+]

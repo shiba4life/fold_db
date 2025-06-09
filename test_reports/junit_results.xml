@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="E2E Client-Side Key Management" tests="0" failures="0" time="0.000">
+    <testsuite name="Cross-Platform Tests" tests="0" failures="0" time="0.000">
+        <!-- Test cases would be listed here -->
+    </testsuite>
+</testsuites>

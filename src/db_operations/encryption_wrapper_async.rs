@@ -759,7 +759,6 @@ mod tests {
         assert_eq!(test_data, &retrieved[..]);
         
         // Test passes - basic functionality works
-        assert!(true);
     }
     
     #[tokio::test]

@@ -1429,8 +1429,8 @@ fn handle_rotate_key(
     }
     
     // Clear sensitive data
-    drop(current_key_bytes);
-    drop(new_key_bytes);
+    let _ = current_key_bytes;
+    let _ = new_key_bytes;
     
     Ok(())
 }
@@ -1819,7 +1819,7 @@ fn handle_export_key(
     }
     
     // Clear sensitive data
-    drop(decrypted_key);
+    let _ = decrypted_key;
     
     Ok(())
 }
@@ -1966,13 +1966,14 @@ fn handle_import_key(
     }
     
     // Clear sensitive data
-    drop(imported_key);
+    let _ = imported_key;
     drop(decrypted_data);
     
     Ok(())
 }
 
 /// Handle public key registration with server
+#[allow(clippy::too_many_arguments)]
 async fn handle_register_key(
     server_url: String,
     key_id: String,
@@ -2099,6 +2100,7 @@ async fn handle_check_registration(
 }
 
 /// Handle signing message and verifying with server
+#[allow(clippy::too_many_arguments)]
 async fn handle_sign_and_verify(
     server_url: String,
     key_id: String,
@@ -2202,6 +2204,7 @@ async fn handle_sign_and_verify(
 }
 
 /// Handle end-to-end server integration test
+#[allow(clippy::too_many_arguments)]
 async fn handle_test_server_integration(
     server_url: String,
     key_id: String,

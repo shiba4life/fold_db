@@ -901,8 +901,10 @@ mod tests {
     #[tokio::test]
     async fn test_compression_decompression() {
         // Create a custom config with no compression
-        let mut config = AsyncBackupConfig::default();
-        config.compression_level = 0;
+        let config = AsyncBackupConfig {
+            compression_level: 0,
+            ..Default::default()
+        };
         
         let temp_dir = tempfile::tempdir().unwrap();
         let db_path = temp_dir.path().join("test_db");

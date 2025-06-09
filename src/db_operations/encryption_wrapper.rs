@@ -1229,7 +1229,7 @@ mod tests {
         
         // Create encryption wrapper
         let master_keypair = generate_master_keypair().unwrap();
-        let mut wrapper = EncryptionWrapper::new(db_ops, &master_keypair).unwrap();
+        let wrapper = EncryptionWrapper::new(db_ops, &master_keypair).unwrap();
         
         // Migrate to encrypted
         let migrated_count = wrapper.migrate_to_encrypted(contexts::ATOM_DATA).unwrap();

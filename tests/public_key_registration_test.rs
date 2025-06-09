@@ -4,8 +4,7 @@
 //! functionality including validation, storage, and retrieval.
 
 use tempfile::TempDir;
-use actix_web::{test, web, App, HttpResponse};
-use serde_json::json;
+use actix_web::{test, web, App};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -307,7 +306,7 @@ async fn test_register_duplicate_public_key() {
     let request2 = PublicKeyRegistrationRequest {
         client_id: Some("client-2".to_string()),
         user_id: None,
-        public_key: public_key,
+        public_key,
         key_name: Some("Duplicate Key".to_string()),
         metadata: None,
     };

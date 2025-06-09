@@ -1,0 +1,86 @@
+{
+  "timestamp": 1749490184,
+  "execution_metrics": {
+    "total_tests": 3,
+    "tests_passed": 2,
+    "tests_failed": 1,
+    "tests_skipped": 0,
+    "success_rate": 0.0,
+    "total_duration_ms": 0,
+    "average_test_duration_ms": 0,
+    "slowest_tests": []
+  },
+  "performance_metrics": {
+    "key_generation_time_ms": {
+      "javascript": 150
+    },
+    "storage_operation_time_ms": {
+      "python": 200
+    },
+    "derivation_time_ms": {},
+    "backup_restore_time_ms": {},
+    "memory_usage_mb": {
+      "javascript_key_generation": 50,
+      "python_storage_operation": 75
+    },
+    "cpu_usage_percent": {},
+    "performance_regressions": []
+  },
+  "security_metrics": {
+    "cryptographic_strength_validations": 1,
+    "key_storage_security_checks": 1,
+    "encryption_algorithm_validations": 0,
+    "random_number_quality_tests": 0,
+    "side_channel_resistance_tests": 0,
+    "security_vulnerabilities_found": [],
+    "compliance_checks": {
+      "key_storage_security": true,
+      "cryptographic_strength": true
+    }
+  },
+  "platform_metrics": {
+    "cli": {
+      "platform_name": "cli",
+      "tests_run": 1,
+      "success_rate": 0.0,
+      "average_execution_time_ms": 0,
+      "memory_usage_mb": 0,
+      "compatibility_score": 100.0,
+      "platform_specific_issues": []
+    },
+    "python": {
+      "platform_name": "python",
+      "tests_run": 1,
+      "success_rate": 100.0,
+      "average_execution_time_ms": 0,
+      "memory_usage_mb": 0,
+      "compatibility_score": 100.0,
+      "platform_specific_issues": []
+    },
+    "javascript": {
+      "platform_name": "javascript",
+      "tests_run": 1,
+      "success_rate": 100.0,
+      "average_execution_time_ms": 0,
+      "memory_usage_mb": 0,
+      "compatibility_score": 100.0,
+      "platform_specific_issues": []
+    }
+  },
+  "coverage_metrics": {
+    "line_coverage_percent": 0.0,
+    "function_coverage_percent": 0.0,
+    "branch_coverage_percent": 0.0,
+    "feature_coverage_percent": 0.0,
+    "platform_coverage": {},
+    "uncovered_areas": []
+  },
+  "quality_metrics": {
+    "test_reliability_score": 0.0,
+    "test_maintainability_score": 0.0,
+    "documentation_completeness": 0.0,
+    "automation_coverage": 0.0,
+    "flaky_tests": [],
+    "technical_debt_indicators": []
+  }
+}

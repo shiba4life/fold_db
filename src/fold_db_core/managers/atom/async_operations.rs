@@ -644,9 +644,7 @@ mod tests {
         let created_atoms = manager.create_atoms_batch_async(atom_specs).await.unwrap();
         let uuids: Vec<String> = created_atoms.iter().map(|a| a.uuid().to_string()).collect();
         
-        let mut processed_count = 0;
         let processor = |_atom: Atom| async move {
-            processed_count += 1;
             Ok::<_, SchemaError>(())
         };
         

@@ -5,7 +5,6 @@
 //! from task 10-1-3.
 
 use std::fs;
-use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
 

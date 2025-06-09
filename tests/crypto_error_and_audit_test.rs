@@ -1,5 +1,10 @@
 //! Comprehensive tests for enhanced error handling and audit logging in crypto operations
 
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+#![allow(unused_mut)]
+#![allow(dead_code)]
+
 use datafold::crypto::{
     enhanced_error::{EnhancedCryptoError, ErrorSeverity, RecoveryAction, ErrorContext},
     audit_logger::{CryptoAuditLogger, AuditConfig, AuditEventType, AuditSeverity, OperationResult, SecurityEventDetails},
