@@ -489,7 +489,7 @@ pub mod key_derivation {
             
             let mut hasher = Sha256::new();
             hasher.update(b"DataFold_MasterKey_Fingerprint:");
-            hasher.update(&self.master_key_bytes);
+            hasher.update(self.master_key_bytes);
             
             let result = hasher.finalize();
             let mut fingerprint = [0u8; 32];
@@ -504,7 +504,7 @@ pub mod key_derivation {
             let mut hasher = Sha256::new();
             
             // Include enabled state
-            hasher.update(&[crypto_config.enabled as u8]);
+            hasher.update([crypto_config.enabled as u8]);
             
             // Include master key config type (but not sensitive data)
             match &crypto_config.master_key {
@@ -515,9 +515,9 @@ pub mod key_derivation {
             
             // Include key derivation parameters
             if let Ok(params) = crypto_config.key_derivation.to_argon2_params() {
-                hasher.update(&params.memory_cost.to_le_bytes());
-                hasher.update(&params.time_cost.to_le_bytes());
-                hasher.update(&params.parallelism.to_le_bytes());
+                hasher.update(params.memory_cost.to_le_bytes());
+                hasher.update(params.time_cost.to_le_bytes());
+                hasher.update(params.parallelism.to_le_bytes());
             }
             
             let result = hasher.finalize();

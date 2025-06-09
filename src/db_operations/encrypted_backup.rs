@@ -6,8 +6,7 @@
 
 use super::core::DbOperations;
 use super::encryption_wrapper::EncryptionWrapper;
-use crate::crypto::{MasterKeyPair, CryptoError, CryptoResult};
-use crate::config::crypto::CryptoConfig;
+use crate::crypto::{MasterKeyPair, CryptoError};
 use crate::schema::SchemaError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -233,6 +232,7 @@ pub struct EncryptedBackupManager {
     /// Database operations instance
     pub db_ops: DbOperations,
     /// Encryption wrapper for backup operations
+    #[allow(dead_code)]
     encryption_wrapper: EncryptionWrapper,
 }
 
@@ -450,12 +450,13 @@ impl EncryptedBackupManager {
     fn write_backup_data(
         &self,
         file: &mut File,
-        metadata: &mut BackupMetadata,
+        _metadata: &mut BackupMetadata,
         options: &BackupOptions,
     ) -> Result<BackupStats, BackupError> {
         let mut items_backed_up = 0u64;
+        #[allow(unused_variables)]
         let mut bytes_written = 0u64;
-        let start_pos = file.seek(SeekFrom::Current(0))?;
+        let start_pos = file.stream_position()?;
         
         // Get all tree names
         let tree_names = self.get_tree_names(options)?;
@@ -496,7 +497,7 @@ impl EncryptedBackupManager {
             }
         }
         
-        let end_pos = file.seek(SeekFrom::Current(0))?;
+        let end_pos = file.stream_position()?;
         let actual_bytes_written = end_pos - start_pos;
         
         Ok(BackupStats {
@@ -511,7 +512,7 @@ impl EncryptedBackupManager {
         // Read and verify magic bytes
         let mut magic = [0u8; 8];
         file.read_exact(&mut magic)?;
-        if &magic != BACKUP_MAGIC {
+        if magic != BACKUP_MAGIC {
             return Err(BackupError::FormatError("Invalid backup file magic".to_string()));
         }
         

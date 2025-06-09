@@ -40,12 +40,7 @@
 
 use crate::crypto::error::{CryptoError, CryptoResult};
 use crate::datafold_node::encryption_at_rest::{
-    EncryptionAtRest, EncryptedData, AES_KEY_SIZE, AES_NONCE_SIZE, 
-    MAX_PLAINTEXT_SIZE, MIN_ENCRYPTED_SIZE
-};
-use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng},
-    Aes256Gcm, Key, Nonce,
+    EncryptionAtRest, EncryptedData, AES_KEY_SIZE
 };
 use lru::LruCache;
 use std::collections::HashMap;
@@ -56,7 +51,7 @@ use tokio::sync::{RwLock, Semaphore};
 use tokio::task;
 use serde::{Deserialize, Serialize};
 use futures::future::join_all;
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 
 /// Configuration for performance optimizations
 #[derive(Debug, Clone)]
@@ -202,6 +197,7 @@ impl PerformanceMetrics {
 }
 
 /// Cache entry for derived encryption keys
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct CachedKey {
     key: [u8; AES_KEY_SIZE],
@@ -209,6 +205,7 @@ struct CachedKey {
     last_used: Instant,
 }
 
+#[allow(dead_code)]
 impl CachedKey {
     fn new(key: [u8; AES_KEY_SIZE]) -> Self {
         let now = Instant::now();
@@ -295,6 +292,7 @@ impl EncryptionContextPool {
         }
     }
     
+    #[allow(dead_code)]
     async fn return_context(&self, context: EncryptionAtRest) {
         let mut contexts = self.contexts.write().await;
         if contexts.len() < contexts.capacity() {

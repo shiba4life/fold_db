@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataFold JS SDK - Server Integration Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .section {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .success {
+            color: #28a745;
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .info {
+            color: #17a2b8;
+            background: #d1ecf1;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        .key-display {
+            font-family: monospace;
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            word-break: break-all;
+            font-size: 12px;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.disconnected { background: #f8d7da; color: #721c24; }
+        .status.unknown { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>DataFold JS SDK - Server Integration Example</h1>
+    <p>This example demonstrates how to use the DataFold JavaScript SDK to integrate with the DataFold server for public key registration and signature verification.</p>
+
+    <div class="container">
+        <!-- Connection Status -->
+        <div class="section full-width">
+            <h2>Server Connection</h2>
+            <p>
+                Server URL: <input type="text" id="serverUrl" value="http://localhost:9001" placeholder="Server URL">
+                <button onclick="testConnection()">Test Connection</button>
+            </p>
+            <div id="connectionStatus"></div>
+        </div>
+
+        <!-- Key Generation -->
+        <div class="section">
+            <h2>1. Key Generation</h2>
+            <p>Generate a new Ed25519 key pair for testing:</p>
+            <button onclick="generateKeys()">Generate Key Pair</button>
+            <div id="keyGenStatus"></div>
+            <div id="keyDisplay"></div>
+        </div>
+
+        <!-- Public Key Registration -->
+        <div class="section">
+            <h2>2. Public Key Registration</h2>
+            <p>Register the public key with the DataFold server:</p>
+            <input type="text" id="clientId" placeholder="Client ID (optional)" value="">
+            <input type="text" id="keyName" placeholder="Key Name (optional)" value="Example Key">
+            <button onclick="registerKey()" id="registerBtn" disabled>Register Public Key</button>
+            <div id="registrationStatus"></div>
+        </div>
+
+        <!-- Signature Generation & Verification -->
+        <div class="section">
+            <h2>3. Signature Generation</h2>
+            <p>Generate a digital signature for a message:</p>
+            <input type="text" id="message" placeholder="Message to sign" value="Hello, DataFold!">
+            <select id="messageEncoding">
+                <option value="utf8">UTF-8 Text</option>
+                <option value="hex">Hex</option>
+                <option value="base64">Base64</option>
+            </select>
+            <button onclick="generateSignature()" id="signBtn" disabled>Generate Signature</button>
+            <div id="signatureStatus"></div>
+        </div>
+
+        <!-- Signature Verification -->
+        <div class="section">
+            <h2>4. Signature Verification</h2>
+            <p>Verify the signature with the server:</p>
+            <button onclick="verifySignature()" id="verifyBtn" disabled>Verify Signature</button>
+            <div id="verificationStatus"></div>
+        </div>
+
+        <!-- Complete Workflow -->
+        <div class="section full-width">
+            <h2>5. Complete Integration Test</h2>
+            <p>Run the complete workflow: key generation → registration → signature → verification</p>
+            <button onclick="runCompleteWorkflow()">Run Complete Workflow</button>
+            <div id="workflowStatus"></div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="section full-width">
+            <h2>Activity Log</h2>
+            <button onclick="clearLog()">Clear Log</button>
+            <textarea id="activityLog" readonly placeholder="Activity log will appear here..."></textarea>
+        </div>
+    </div>
+
+    <!-- Load the SDK -->
+    <script type="module">
+        import { 
+            generateKeyPair,
+            createServerIntegration,
+            quickIntegrationTest,
+            formatKey
+        } from '../dist/index.js';
+
+        // Global state
+        window.sdkState = {
+            keyPair: null,
+            integration: null,
+            registrationResponse: null,
+            signatureResult: null,
+            clientId: null
+        };
+
+        // Initialize integration client
+        function updateIntegration() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            window.sdkState.integration = createServerIntegration({
+                baseUrl: serverUrl,
+                timeout: 10000,
+                retries: 3,
+                retryDelay: 1000
+            });
+        }
+
+        // Utility functions
+        function log(message, type = 'info') {
+            const logArea = document.getElementById('activityLog');
+            const timestamp = new Date().toLocaleTimeString();
+            logArea.value += `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function showStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        function generateClientId() {
+            return `client_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        }
+
+        // Test server connection
+        window.testConnection = async function() {
+            try {
+                updateIntegration();
+                showStatus('connectionStatus', 'Testing connection...', 'info');
+                log('Testing server connection...');
+
+                const result = await window.sdkState.integration.testConnection();
+                
+                if (result.connected) {
+                    showStatus('connectionStatus', 
+                        `<span class="status connected">Connected</span> (${result.latency}ms)`, 
+                        'success'
+                    );
+                    log(`Connected to server (latency: ${result.latency}ms)`);
+                } else {
+                    showStatus('connectionStatus', 
+                        `<span class="status disconnected">Disconnected</span> - ${result.error}`, 
+                        'error'
+                    );
+                    log(`Connection failed: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus('connectionStatus', 
+                    `<span class="status disconnected">Error</span> - ${error.message}`, 
+                    'error'
+                );
+                log(`Connection error: ${error.message}`, 'error');
+            }
+        };
+
+        // Generate key pair
+        window.generateKeys = async function() {
+            try {
+                showStatus('keyGenStatus', 'Generating key pair...', 'info');
+                log('Generating Ed25519 key pair...');
+
+                const keyPair = await generateKeyPair();
+                window.sdkState.keyPair = keyPair;
+
+                const publicKeyHex = formatKey(keyPair.publicKey, 'hex');
+                const privateKeyHex = formatKey(keyPair.privateKey, 'hex');
+
+                document.getElementById('keyDisplay').innerHTML = `
+                    <div class="key-display">
+                        <strong>Public Key:</strong><br>${publicKeyHex}<br><br>
+                        <strong>Private Key:</strong><br>${privateKeyHex.substring(0, 20)}...
+                    </div>
+                `;
+
+                showStatus('keyGenStatus', 'Key pair generated successfully!', 'success');
+                log('Key pair generated successfully');
+
+                // Enable registration button
+                document.getElementById('registerBtn').disabled = false;
+
+                // Generate default client ID
+                if (!document.getElementById('clientId').value) {
+                    const clientId = generateClientId();
+                    document.getElementById('clientId').value = clientId;
+                    window.sdkState.clientId = clientId;
+                }
+
+            } catch (error) {
+                showStatus('keyGenStatus', `Error: ${error.message}`, 'error');
+                log(`Key generation failed: ${error.message}`, 'error');
+            }
+        };
+
+        // Register public key
+        window.registerKey = async function() {
+            if (!window.sdkState.keyPair) {
+                showStatus('registrationStatus', 'Please generate a key pair first', 'error');
+                return;
+            }
+
+            try {
+                updateIntegration();
+                showStatus('registrationStatus', 'Registering public key...', 'info');
+                
+                const clientId = document.getElementById('clientId').value || generateClientId();
+                const keyName = document.getElementById('keyName').value;
+                
+                log(`Registering public key for client: ${clientId}`);
+
+                const response = await window.sdkState.integration.registerKeyPair(
+                    window.sdkState.keyPair,
+                    {
+                        clientId,
+                        keyName,
+                        metadata: {
+                            source: 'web-example',
+                            timestamp: new Date().toISOString()
+                        }
+                    }
+                );
+
+                window.sdkState.registrationResponse = response;
+                window.sdkState.clientId = response.clientId;
+
+                showStatus('registrationStatus', 
+                    `Registration successful!<br>
+                     Client ID: ${response.clientId}<br>
+                     Registration ID: ${response.registrationId}<br>
+                     Status: ${response.status}`, 
+                    'success'
+                );
+
+                log(`Public key registered successfully (ID: ${response.registrationId})`);
+
+                // Enable signature button
+                document.getElementById('signBtn').disabled = false;
+
+            } catch (error) {
+                showStatus('registrationStatus', `Registration failed: ${error.message}`, 'error');
+                log(`Registration failed: ${error.message}`, 'error');
+            }
+        };
+
+        // Generate signature
+        window.generateSignature = async function() {
+            if (!window.sdkState.keyPair) {
+                showStatus('signatureStatus', 'Please generate a key pair first', 'error');
+                return;
+            }
+
+            try {
+                const message = document.getElementById('message').value;
+                const messageEncoding = document.getElementById('messageEncoding').value;
+                
+                if (!message) {
+                    showStatus('signatureStatus', 'Please enter a message to sign', 'error');
+                    return;
+                }
+
+                showStatus('signatureStatus', 'Generating signature...', 'info');
+                log(`Generating signature for message: "${message}"`);
+
+                const signatureResult = await window.sdkState.integration.generateSignature(
+                    message,
+                    window.sdkState.keyPair.privateKey,
+                    { messageEncoding }
+                );
+
+                window.sdkState.signatureResult = signatureResult;
+
+                showStatus('signatureStatus', 
+                    `Signature generated!<br>
+                     <div class="key-display">${signatureResult.signature}</div>
+                     Encoding: ${signatureResult.messageEncoding}<br>
+                     Generated: ${new Date(signatureResult.timestamp).toLocaleString()}`, 
+                    'success'
+                );
+
+                log(`Signature generated: ${signatureResult.signature.substring(0, 20)}...`);
+
+                // Enable verification button
+                document.getElementById('verifyBtn').disabled = false;
+
+            } catch (error) {
+                showStatus('signatureStatus', `Signature generation failed: ${error.message}`, 'error');
+                log(`Signature generation failed: ${error.message}`, 'error');
+            }
+        };
+
+        // Verify signature
+        window.verifySignature = async function() {
+            if (!window.sdkState.signatureResult || !window.sdkState.clientId) {
+                showStatus('verificationStatus', 'Please generate a signature first', 'error');
+                return;
+            }
+
+            try {
+                updateIntegration();
+                showStatus('verificationStatus', 'Verifying signature...', 'info');
+                log('Verifying signature with server...');
+
+                const verificationResult = await window.sdkState.integration.verifySignature({
+                    clientId: window.sdkState.clientId,
+                    message: window.sdkState.signatureResult.message,
+                    signature: window.sdkState.signatureResult.signature,
+                    messageEncoding: window.sdkState.signatureResult.messageEncoding
+                });
+
+                if (verificationResult.verified) {
+                    showStatus('verificationStatus', 
+                        `✅ Signature verified successfully!<br>
+                         Client ID: ${verificationResult.clientId}<br>
+                         Public Key: ${verificationResult.publicKey.substring(0, 20)}...<br>
+                         Message Hash: ${verificationResult.messageHash.substring(0, 20)}...<br>
+                         Verified: ${new Date(verificationResult.verifiedAt).toLocaleString()}`, 
+                        'success'
+                    );
+                    log('Signature verification successful');
+                } else {
+                    showStatus('verificationStatus', '❌ Signature verification failed', 'error');
+                    log('Signature verification failed', 'error');
+                }
+
+            } catch (error) {
+                showStatus('verificationStatus', `Verification failed: ${error.message}`, 'error');
+                log(`Verification failed: ${error.message}`, 'error');
+            }
+        };
+
+        // Run complete workflow
+        window.runCompleteWorkflow = async function() {
+            try {
+                updateIntegration();
+                showStatus('workflowStatus', 'Running complete integration workflow...', 'info');
+                log('Starting complete integration workflow...');
+
+                const result = await quickIntegrationTest({
+                    baseUrl: document.getElementById('serverUrl').value,
+                    timeout: 15000,
+                    retries: 2
+                });
+
+                if (result.success) {
+                    showStatus('workflowStatus', 
+                        `✅ Complete workflow successful!<br>
+                         Key Generation: ${result.results.keyGeneration ? '✅' : '❌'}<br>
+                         Registration: ${result.results.registration ? '✅' : '❌'}<br>
+                         Signature Generation: ${result.results.signatureGeneration ? '✅' : '❌'}<br>
+                         Verification: ${result.results.verification ? '✅' : '❌'}`, 
+                        'success'
+                    );
+                    log('Complete workflow executed successfully');
+                } else {
+                    showStatus('workflowStatus', `❌ Workflow failed: ${result.error}`, 'error');
+                    log(`Complete workflow failed: ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                showStatus('workflowStatus', `Workflow error: ${error.message}`, 'error');
+                log(`Workflow error: ${error.message}`, 'error');
+            }
+        };
+
+        // Clear activity log
+        window.clearLog = function() {
+            document.getElementById('activityLog').value = '';
+        };
+
+        // Initialize
+        updateIntegration();
+        log('DataFold JS SDK Server Integration Example loaded');
+        
+        // Test connection on load
+        window.testConnection();
+    </script>
+</body>
+</html>

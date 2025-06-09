@@ -17,3 +17,4 @@ pub mod regression_prevention_test;
 
 // Crypto workflow integration tests
 pub mod node_crypto_workflow_test;
+pub mod cross_platform_server_integration_test;

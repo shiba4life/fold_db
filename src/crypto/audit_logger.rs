@@ -5,12 +5,11 @@
 //! and security events.
 
 use super::enhanced_error::{EnhancedCryptoError, ErrorSeverity};
-use crate::logging::config::LogConfig;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -343,6 +342,7 @@ impl CryptoAuditLogger {
     }
 
     /// Log a backup or restore operation
+    #[allow(clippy::too_many_arguments)]
     pub async fn log_backup_restore_operation(
         &self,
         operation: &str,
@@ -656,7 +656,7 @@ impl CryptoAuditLogger {
         stats.total_events += 1;
         
         *stats.events_by_type.entry(event.event_type.clone()).or_insert(0) += 1;
-        *stats.events_by_severity.entry(event.severity.clone()).or_insert(0) += 1;
+        *stats.events_by_severity.entry(event.severity).or_insert(0) += 1;
         
         if matches!(event.result, OperationResult::Failure { .. }) {
             stats.failed_operations += 1;
@@ -722,6 +722,7 @@ pub fn init_global_audit_logger(config: AuditConfig) {
 
 /// Get the global audit logger instance
 pub fn get_global_audit_logger() -> Option<Arc<CryptoAuditLogger>> {
+    #[allow(static_mut_refs)]
     unsafe { GLOBAL_AUDIT_LOGGER.as_ref().map(Arc::clone) }
 }
 

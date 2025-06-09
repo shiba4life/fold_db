@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataFold JS SDK - Basic Usage Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .example-section {
+            background: #f5f5f5;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        
+        .error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .key-display {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            word-break: break-all;
+            margin: 10px 0;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .stat-item {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>DataFold JavaScript SDK - Basic Usage Example</h1>
+    
+    <div class="example-section">
+        <h2>SDK Initialization</h2>
+        <p>Check browser compatibility and initialize the SDK:</p>
+        <button id="initButton">Initialize SDK</button>
+        <div id="initResult"></div>
+    </div>
+    
+    <div class="example-section">
+        <h2>Key Generation</h2>
+        <p>Generate Ed25519 key pairs securely in the browser:</p>
+        <button id="generateButton" disabled>Generate Key Pair</button>
+        <button id="generateMultipleButton" disabled>Generate 5 Key Pairs</button>
+        <div id="keyResult"></div>
+    </div>
+    
+    <div class="example-section">
+        <h2>Key Formatting</h2>
+        <p>Convert keys between different formats:</p>
+        <button id="formatButton" disabled>Format Current Key</button>
+        <div id="formatResult"></div>
+    </div>
+    
+    <div class="example-section">
+        <h2>Performance Statistics</h2>
+        <div class="stats" id="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="keysGenerated">0</div>
+                <div class="stat-label">Keys Generated</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="avgTime">0ms</div>
+                <div class="stat-label">Avg Generation Time</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="totalTime">0ms</div>
+                <div class="stat-label">Total Time</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Note: In a real application, you would import from the npm package
+        // import { generateKeyPair, generateMultipleKeyPairs, formatKey, initializeSDK, isCompatible } from '@datafold/js-sdk';
+        
+        // For this example, we'll create a mock implementation
+        const mockSDK = {
+            async initializeSDK() {
+                const compatible = typeof crypto !== 'undefined' && 
+                                 typeof crypto.subtle !== 'undefined' && 
+                                 typeof crypto.getRandomValues !== 'undefined';
+                
+                const warnings = [];
+                if (!compatible) {
+                    warnings.push('WebCrypto API not available');
+                }
+                if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                    warnings.push('HTTPS required for production use');
+                }
+                
+                return { compatible, warnings };
+            },
+            
+            async generateKeyPair() {
+                // Mock implementation for demo
+                const privateKey = new Uint8Array(32);
+                const publicKey = new Uint8Array(32);
+                
+                crypto.getRandomValues(privateKey);
+                crypto.getRandomValues(publicKey);
+                
+                return { privateKey, publicKey };
+            },
+            
+            async generateMultipleKeyPairs(count) {
+                const keyPairs = [];
+                for (let i = 0; i < count; i++) {
+                    keyPairs.push(await this.generateKeyPair());
+                }
+                return keyPairs;
+            },
+            
+            formatKey(key, format) {
+                switch (format) {
+                    case 'hex':
+                        return Array.from(key, byte => byte.toString(16).padStart(2, '0')).join('');
+                    case 'base64':
+                        const binary = String.fromCharCode(...key);
+                        return btoa(binary);
+                    case 'uint8array':
+                        return key.slice();
+                    default:
+                        throw new Error(`Unsupported format: ${format}`);
+                }
+            }
+        };
+        
+        // Application state
+        let currentKeyPair = null;
+        let stats = {
+            keysGenerated: 0,
+            totalTime: 0,
+            times: []
+        };
+        
+        // DOM elements
+        const initButton = document.getElementById('initButton');
+        const generateButton = document.getElementById('generateButton');
+        const generateMultipleButton = document.getElementById('generateMultipleButton');
+        const formatButton = document.getElementById('formatButton');
+        const initResult = document.getElementById('initResult');
+        const keyResult = document.getElementById('keyResult');
+        const formatResult = document.getElementById('formatResult');
+        
+        // Utility functions
+        function showResult(element, content, type = 'success') {
+            element.innerHTML = `<div class="${type}">${content}</div>`;
+        }
+        
+        function updateStats() {
+            document.getElementById('keysGenerated').textContent = stats.keysGenerated;
+            document.getElementById('totalTime').textContent = `${stats.totalTime}ms`;
+            
+            const avgTime = stats.times.length > 0 
+                ? Math.round(stats.times.reduce((a, b) => a + b, 0) / stats.times.length)
+                : 0;
+            document.getElementById('avgTime').textContent = `${avgTime}ms`;
+        }
+        
+        // Event handlers
+        initButton.addEventListener('click', async () => {
+            try {
+                initButton.disabled = true;
+                initButton.textContent = 'Initializing...';
+                
+                const result = await mockSDK.initializeSDK();
+                
+                if (result.compatible) {
+                    showResult(initResult, 
+                        `✅ SDK initialized successfully!<br>
+                        ${result.warnings.length > 0 ? 
+                            `<br><strong>Warnings:</strong><br>• ${result.warnings.join('<br>• ')}` : 
+                            'No compatibility issues detected.'
+                        }`
+                    );
+                    
+                    generateButton.disabled = false;
+                    generateMultipleButton.disabled = false;
+                } else {
+                    showResult(initResult, 
+                        `❌ SDK initialization failed<br>
+                        <strong>Issues:</strong><br>• ${result.warnings.join('<br>• ')}`,
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult(initResult, `❌ Initialization error: ${error.message}`, 'error');
+            } finally {
+                initButton.textContent = 'Re-initialize SDK';
+                initButton.disabled = false;
+            }
+        });
+        
+        generateButton.addEventListener('click', async () => {
+            try {
+                generateButton.disabled = true;
+                generateButton.textContent = 'Generating...';
+                
+                const startTime = Date.now();
+                currentKeyPair = await mockSDK.generateKeyPair();
+                const endTime = Date.now();
+                const duration = endTime - startTime;
+                
+                stats.keysGenerated++;
+                stats.totalTime += duration;
+                stats.times.push(duration);
+                updateStats();
+                
+                showResult(keyResult, 
+                    `✅ Key pair generated successfully in ${duration}ms!<br>
+                    <strong>Private Key (first 16 bytes):</strong>
+                    <div class="key-display">${mockSDK.formatKey(currentKeyPair.privateKey.slice(0, 16), 'hex')}...</div>
+                    <strong>Public Key (first 16 bytes):</strong>
+                    <div class="key-display">${mockSDK.formatKey(currentKeyPair.publicKey.slice(0, 16), 'hex')}...</div>
+                    <small>🔒 Private key never leaves this browser!</small>`
+                );
+                
+                formatButton.disabled = false;
+            } catch (error) {
+                showResult(keyResult, `❌ Key generation error: ${error.message}`, 'error');
+            } finally {
+                generateButton.textContent = 'Generate Key Pair';
+                generateButton.disabled = false;
+            }
+        });
+        
+        generateMultipleButton.addEventListener('click', async () => {
+            try {
+                generateMultipleButton.disabled = true;
+                generateMultipleButton.textContent = 'Generating...';
+                
+                const startTime = Date.now();
+                const keyPairs = await mockSDK.generateMultipleKeyPairs(5);
+                const endTime = Date.now();
+                const duration = endTime - startTime;
+                
+                stats.keysGenerated += 5;
+                stats.totalTime += duration;
+                stats.times.push(duration / 5); // Average per key
+                updateStats();
+                
+                showResult(keyResult, 
+                    `✅ Generated 5 key pairs in ${duration}ms (${Math.round(duration/5)}ms per key)!<br>
+                    <strong>All keys are unique and cryptographically secure.</strong><br>
+                    <small>🔒 All private keys remain in this browser!</small>`
+                );
+                
+                currentKeyPair = keyPairs[0]; // Set first key as current
+                formatButton.disabled = false;
+            } catch (error) {
+                showResult(keyResult, `❌ Multiple key generation error: ${error.message}`, 'error');
+            } finally {
+                generateMultipleButton.textContent = 'Generate 5 Key Pairs';
+                generateMultipleButton.disabled = false;
+            }
+        });
+        
+        formatButton.addEventListener('click', () => {
+            if (!currentKeyPair) {
+                showResult(formatResult, '❌ No key pair available to format', 'error');
+                return;
+            }
+            
+            try {
+                const privateKeyHex = mockSDK.formatKey(currentKeyPair.privateKey, 'hex');
+                const publicKeyHex = mockSDK.formatKey(currentKeyPair.publicKey, 'hex');
+                const privateKeyBase64 = mockSDK.formatKey(currentKeyPair.privateKey, 'base64');
+                const publicKeyBase64 = mockSDK.formatKey(currentKeyPair.publicKey, 'base64');
+                
+                showResult(formatResult, 
+                    `✅ Key formatted in multiple formats:<br><br>
+                    <strong>Private Key (Hex):</strong>
+                    <div class="key-display">${privateKeyHex}</div>
+                    <strong>Public Key (Hex):</strong>
+                    <div class="key-display">${publicKeyHex}</div>
+                    <strong>Private Key (Base64):</strong>
+                    <div class="key-display">${privateKeyBase64}</div>
+                    <strong>Public Key (Base64):</strong>
+                    <div class="key-display">${publicKeyBase64}</div>`
+                );
+            } catch (error) {
+                showResult(formatResult, `❌ Formatting error: ${error.message}`, 'error');
+            }
+        });
+        
+        // Initialize stats display
+        updateStats();
+        
+        // Auto-initialize on page load
+        initButton.click();
+    </script>
+</body>
+</html>

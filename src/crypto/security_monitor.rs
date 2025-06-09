@@ -3,9 +3,9 @@
 //! This module provides real-time security monitoring, anomaly detection,
 //! and alerting for encryption-related security events.
 
-use super::audit_logger::{SecurityEventDetails, OperationResult, CryptoAuditLogger, AuditEventType};
-use super::enhanced_error::{EnhancedCryptoError, ErrorSeverity};
-use chrono::{DateTime, Utc, Duration as ChronoDuration};
+use super::audit_logger::{SecurityEventDetails, OperationResult, CryptoAuditLogger};
+use super::enhanced_error::{EnhancedCryptoError};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -137,6 +137,7 @@ pub struct SecurityStatistics {
 }
 
 /// Pattern tracking for anomaly detection
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct PatternTracker {
     /// Events in the current window
@@ -446,7 +447,7 @@ impl CryptoSecurityMonitor {
 
             for detection in &detections {
                 *stats.threats_by_level.entry(detection.threat_level.clone()).or_insert(0) += 1;
-                *stats.patterns_detected.entry(detection.pattern.clone()).or_insert(0) += 1;
+                *stats.patterns_detected.entry(detection.pattern).or_insert(0) += 1;
             }
 
             // Store detections
@@ -717,6 +718,7 @@ impl CryptoSecurityMonitor {
 
     /// Check if a threat level should trigger an alert
     fn should_alert(&self, threat_level: &ThreatLevel) -> bool {
+        #[allow(clippy::match_like_matches_macro)]
         match (&self.config.alert_threshold, threat_level) {
             (ThreatLevel::Low, _) => true,
             (ThreatLevel::Medium, ThreatLevel::Medium | ThreatLevel::High | ThreatLevel::Critical) => true,
@@ -756,6 +758,7 @@ pub fn init_global_security_monitor(config: SecurityMonitorConfig) {
 
 /// Get the global security monitor instance
 pub fn get_global_security_monitor() -> Option<Arc<CryptoSecurityMonitor>> {
+    #[allow(static_mut_refs)]
     unsafe { GLOBAL_SECURITY_MONITOR.as_ref().map(Arc::clone) }
 }
 

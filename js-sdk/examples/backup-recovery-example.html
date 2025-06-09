@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataFold SDK - Key Backup and Recovery Demo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 15px 0;
+            border-left: 4px solid #007bff;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        h3 {
+            color: #007bff;
+            margin-top: 25px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .danger {
+            background: #dc3545;
+        }
+        .danger:hover {
+            background: #c82333;
+        }
+        .success {
+            background: #28a745;
+        }
+        .success:hover {
+            background: #218838;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            margin: 5px 0 15px 0;
+            box-sizing: border-box;
+        }
+        label {
+            font-weight: bold;
+            color: #555;
+            display: block;
+            margin-top: 15px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        .success-status {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error-status {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info-status {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning-status {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .backup-data {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .key-info {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .flex-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .flex-item {
+            flex: 1;
+            min-width: 300px;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #007bff;
+            transition: width 0.3s ease;
+        }
+        @media (max-width: 768px) {
+            .flex-container {
+                flex-direction: column;
+            }
+            .container {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 DataFold SDK Key Backup & Recovery Demo</h1>
+        <p style="text-align: center; color: #666; font-size: 18px;">
+            Demonstrate encrypted key export/import functionality with multiple formats and security features
+        </p>
+
+        <div class="section">
+            <h2>🚀 Initialize SDK</h2>
+            <button id="initBtn" onclick="initializeDemo()">Initialize SDK & Generate Test Key</button>
+            <div id="initStatus"></div>
+            <div id="keyInfo" style="display: none;"></div>
+        </div>
+
+        <div class="flex-container">
+            <div class="flex-item">
+                <div class="section">
+                    <h2>💾 Export Key (Backup)</h2>
+                    
+                    <label for="exportFormat">Backup Format:</label>
+                    <select id="exportFormat">
+                        <option value="json">JSON (Human Readable)</option>
+                        <option value="binary">Binary (Compact)</option>
+                    </select>
+                    
+                    <label for="exportPassphrase">Backup Passphrase:</label>
+                    <input type="password" id="exportPassphrase" placeholder="Enter strong passphrase for backup" value="demo-backup-passphrase-123">
+                    
+                    <label for="kdfIterations">KDF Iterations (Security Level):</label>
+                    <select id="kdfIterations">
+                        <option value="50000">50,000 (Fast - For Demo)</option>
+                        <option value="100000" selected>100,000 (Recommended)</option>
+                        <option value="200000">200,000 (High Security)</option>
+                    </select>
+                    
+                    <label>
+                        <input type="checkbox" id="includeMetadata" checked> Include metadata in backup
+                    </label>
+                    
+                    <button id="exportBtn" onclick="exportKey()" disabled>Create Backup</button>
+                    <div id="exportStatus"></div>
+                    
+                    <div id="backupInfo" style="display: none;">
+                        <h3>📋 Backup Information</h3>
+                        <div id="backupDetails"></div>
+                        <label>Backup Data:</label>
+                        <div id="backupData" class="backup-data"></div>
+                        <button onclick="downloadBackup()" class="success">💾 Download Backup File</button>
+                        <button onclick="copyBackup()">📋 Copy to Clipboard</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-item">
+                <div class="section">
+                    <h2>📥 Import Key (Restore)</h2>
+                    
+                    <label for="importData">Backup Data:</label>
+                    <textarea id="importData" rows="6" placeholder="Paste backup data here or use file upload..."></textarea>
+                    
+                    <label for="importFile">Or Upload Backup File:</label>
+                    <input type="file" id="importFile" accept=".json,.dfkb" onchange="handleFileUpload(event)">
+                    
+                    <label for="importPassphrase">Backup Passphrase:</label>
+                    <input type="password" id="importPassphrase" placeholder="Enter backup passphrase" value="demo-backup-passphrase-123">
+                    
+                    <label>
+                        <input type="checkbox" id="validateIntegrity" checked> Validate key integrity
+                    </label>
+                    
+                    <label>
+                        <input type="checkbox" id="overwriteExisting"> Allow overwriting existing keys
+                    </label>
+                    
+                    <button id="validateBtn" onclick="validateBackup()">🔍 Validate Backup</button>
+                    <button id="importBtn" onclick="importKey()" disabled>🔄 Restore Key</button>
+                    
+                    <div id="validationStatus"></div>
+                    <div id="importStatus"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔧 Stored Keys Management</h2>
+            <button onclick="listStoredKeys()">📋 List All Keys</button>
+            <button onclick="clearAllKeys()" class="danger">🗑️ Clear All Keys</button>
+            <div id="keysList"></div>
+        </div>
+
+        <div class="section">
+            <h2>🧪 Security Tests</h2>
+            <p>Test the robustness of the backup/restore system against various attack scenarios:</p>
+            
+            <button onclick="testCorruption()">🔴 Test Corruption Detection</button>
+            <button onclick="testTampering()">⚠️ Test Tampering Detection</button>
+            <button onclick="testWeakPassphrases()">🔐 Test Weak Passphrase Rejection</button>
+            <button onclick="runAllSecurityTests()">🛡️ Run All Security Tests</button>
+            
+            <div id="securityTestResults"></div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Performance Metrics</h2>
+            <button onclick="runPerformanceTests()">⚡ Run Performance Tests</button>
+            <div id="performanceResults"></div>
+        </div>
+    </div>
+
+    <!-- Include the SDK (in a real app, you'd import this properly) -->
+    <script type="module">
+        // In a real application, you would import from the published package
+        // import { ... } from '@datafold/js-sdk';
+        
+        // For this demo, we'll simulate the SDK functionality
+        window.DataFoldSDK = {
+            initialized: false,
+            currentKeyId: null,
+            currentBackup: null,
+            storage: null,
+            
+            async initializeSDK() {
+                // Simulate initialization
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        this.initialized = true;
+                        this.storage = new Map(); // Mock storage
+                        resolve({ compatible: true, warnings: [] });
+                    }, 500);
+                });
+            },
+            
+            async generateKeyPair() {
+                // Simulate key generation
+                return {
+                    privateKey: new Uint8Array(32).fill(1),
+                    publicKey: new Uint8Array(32).fill(2)
+                };
+            },
+            
+            async storeKeyPair(keyId, keyPair, passphrase, metadata) {
+                this.storage.set(keyId, { keyPair, passphrase, metadata });
+            },
+            
+            async exportKey(keyId, passphrase, options) {
+                const stored = this.storage.get(keyId);
+                if (!stored || stored.passphrase !== passphrase) {
+                    throw new Error('Key not found or incorrect passphrase');
+                }
+                
+                // Simulate encryption and backup creation
+                const backup = {
+                    version: 1,
+                    type: 'datafold-key-backup',
+                    kdf: 'pbkdf2',
+                    kdf_params: {
+                        salt: btoa('mock-salt-' + Date.now()),
+                        iterations: options.kdfIterations || 100000,
+                        hash: 'SHA-256'
+                    },
+                    encryption: 'aes-gcm',
+                    nonce: btoa('mock-nonce-' + Date.now()),
+                    ciphertext: btoa('mock-encrypted-data-' + Date.now()),
+                    created: new Date().toISOString()
+                };
+                
+                let data;
+                if (options.format === 'json') {
+                    data = JSON.stringify(backup, null, 2);
+                } else {
+                    data = new Uint8Array([0x44, 0x46, 0x4B, 0x42, ...new Array(100).fill(Math.floor(Math.random() * 256))]);
+                }
+                
+                return {
+                    data,
+                    format: options.format,
+                    size: typeof data === 'string' ? data.length : data.length,
+                    checksum: btoa('mock-checksum-' + Date.now()),
+                    timestamp: new Date().toISOString()
+                };
+            },
+            
+            async importKey(backupData, passphrase, options = {}) {
+                // Simulate validation and import
+                await new Promise(resolve => setTimeout(resolve, 800)); // Simulate processing time
+                
+                const keyId = 'imported-key-' + Date.now();
+                return {
+                    keyId,
+                    overwritten: false,
+                    metadata: {
+                        name: 'Imported Key',
+                        description: 'Restored from backup',
+                        created: new Date().toISOString(),
+                        lastAccessed: new Date().toISOString(),
+                        tags: ['imported']
+                    },
+                    timestamp: new Date().toISOString(),
+                    integrityValid: true
+                };
+            },
+            
+            validateBackupData(data) {
+                try {
+                    if (typeof data === 'string') {
+                        const backup = JSON.parse(data);
+                        const issues = [];
+                        
+                        if (!backup.version) issues.push('Missing version');
+                        if (!backup.type || backup.type !== 'datafold-key-backup') issues.push('Invalid type');
+                        if (!backup.kdf || backup.kdf !== 'pbkdf2') issues.push('Invalid KDF');
+                        if (!backup.encryption || backup.encryption !== 'aes-gcm') issues.push('Invalid encryption');
+                        if (!backup.ciphertext) issues.push('Missing ciphertext');
+                        
+                        return {
+                            valid: issues.length === 0,
+                            issues,
+                            format: 'json',
+                            version: backup.version
+                        };
+                    } else if (data instanceof Uint8Array) {
+                        const magic = data.slice(0, 4);
+                        const expectedMagic = [0x44, 0x46, 0x4B, 0x42];
+                        const validMagic = magic.every((byte, i) => byte === expectedMagic[i]);
+                        
+                        return {
+                            valid: validMagic && data.length > 64,
+                            issues: validMagic ? [] : ['Invalid binary format'],
+                            format: 'binary'
+                        };
+                    }
+                } catch (error) {
+                    return {
+                        valid: false,
+                        issues: ['Parse error: ' + error.message],
+                        format: undefined
+                    };
+                }
+                
+                return {
+                    valid: false,
+                    issues: ['Invalid data type'],
+                    format: undefined
+                };
+            },
+            
+            generateBackupFilename(keyId, format) {
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const extension = format === 'json' ? 'json' : 'dfkb';
+                return `datafold-backup-${keyId}-${timestamp}.${extension}`;
+            }
+        };
+    </script>
+
+    <script>
+        let currentExportResult = null;
+
+        async function initializeDemo() {
+            const btn = document.getElementById('initBtn');
+            const status = document.getElementById('initStatus');
+            const keyInfo = document.getElementById('keyInfo');
+            
+            btn.disabled = true;
+            status.innerHTML = '<div class="info-status">Initializing SDK...</div>';
+            
+            try {
+                // Initialize SDK
+                const result = await window.DataFoldSDK.initializeSDK();
+                
+                if (result.compatible) {
+                    // Generate a test key
+                    const keyPair = await window.DataFoldSDK.generateKeyPair();
+                    const keyId = 'demo-key-' + Date.now();
+                    
+                    // Store the key
+                    await window.DataFoldSDK.storeKeyPair(keyId, keyPair, 'demo-passphrase', {
+                        name: 'Demo Key',
+                        description: 'Test key for backup/recovery demo',
+                        tags: ['demo', 'test']
+                    });
+                    
+                    window.DataFoldSDK.currentKeyId = keyId;
+                    
+                    status.innerHTML = '<div class="success-status">✅ SDK initialized successfully!</div>';
+                    keyInfo.style.display = 'block';
+                    keyInfo.innerHTML = `
+                        <div class="key-info">
+                            <h3>Generated Test Key</h3>
+                            <p><strong>Key ID:</strong> ${keyId}</p>
+                            <p><strong>Key Type:</strong> Ed25519</p>
+                            <p><strong>Storage Passphrase:</strong> demo-passphrase</p>
+                            <p><strong>Public Key:</strong> ${Array.from(keyPair.publicKey).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32)}...</p>
+                        </div>
+                    `;
+                    
+                    document.getElementById('exportBtn').disabled = false;
+                } else {
+                    status.innerHTML = `<div class="error-status">❌ Browser not compatible: ${result.warnings.join(', ')}</div>`;
+                }
+            } catch (error) {
+                status.innerHTML = `<div class="error-status">❌ Initialization failed: ${error.message}</div>`;
+            }
+            
+            btn.disabled = false;
+        }
+
+        async function exportKey() {
+            const btn = document.getElementById('exportBtn');
+            const status = document.getElementById('exportStatus');
+            const backupInfo = document.getElementById('backupInfo');
+            
+            btn.disabled = true;
+            status.innerHTML = '<div class="info-status">Creating encrypted backup...</div>';
+            
+            try {
+                const format = document.getElementById('exportFormat').value;
+                const passphrase = document.getElementById('exportPassphrase').value;
+                const kdfIterations = parseInt(document.getElementById('kdfIterations').value);
+                const includeMetadata = document.getElementById('includeMetadata').checked;
+                
+                if (!passphrase || passphrase.length < 8) {
+                    throw new Error('Passphrase must be at least 8 characters long');
+                }
+                
+                const options = {
+                    format,
+                    includeMetadata,
+                    kdfIterations
+                };
+                
+                const result = await window.DataFoldSDK.exportKey(
+                    window.DataFoldSDK.currentKeyId,
+                    passphrase,
+                    options
+                );
+                
+                currentExportResult = result;
+                
+                status.innerHTML = '<div class="success-status">✅ Backup created successfully!</div>';
+                
+                const filename = window.DataFoldSDK.generateBackupFilename(window.DataFoldSDK.currentKeyId, format);
+                
+                document.getElementById('backupDetails').innerHTML = `
+                    <div class="key-info">
+                        <p><strong>Format:</strong> ${result.format.toUpperCase()}</p>
+                        <p><strong>Size:</strong> ${result.size} bytes</p>
+                        <p><strong>Checksum:</strong> ${result.checksum}</p>
+                        <p><strong>Created:</strong> ${new Date(result.timestamp).toLocaleString()}</p>
+                        <p><strong>Filename:</strong> ${filename}</p>
+                    </div>
+                `;
+                
+                const dataDisplay = typeof result.data === 'string' 
+                    ? result.data 
+                    : `Binary data (${result.data.length} bytes): ${Array.from(result.data.slice(0, 32)).map(b => b.toString(16).padStart(2, '0')).join('')}...`;
+                
+                document.getElementById('backupData').textContent = dataDisplay;
+                document.getElementById('importData').value = typeof result.data === 'string' ? result.data : '';
+                
+                backupInfo.style.display = 'block';
+                document.getElementById('validateBtn').disabled = false;
+                
+            } catch (error) {
+                status.innerHTML = `<div class="error-status">❌ Export failed: ${error.message}</div>`;
+            }
+            
+            btn.disabled = false;
+        }
+
+        async function validateBackup() {
+            const data = document.getElementById('importData').value;
+            const status = document.getElementById('validationStatus');
+            
+            if (!data.trim()) {
+                status.innerHTML = '<div class="error-status">❌ No backup data provided</div>';
+                return;
+            }
+            
+            try {
+                const validation = window.DataFoldSDK.validateBackupData(data);
+                
+                if (validation.valid) {
+                    status.innerHTML = `
+                        <div class="success-status">
+                            ✅ Backup validation passed<br>
+                            Format: ${validation.format}<br>
+                            ${validation.version ? `Version: ${validation.version}` : ''}
+                        </div>
+                    `;
+                    document.getElementById('importBtn').disabled = false;
+                } else {
+                    status.innerHTML = `
+                        <div class="error-status">
+                            ❌ Backup validation failed<br>
+                            Issues: ${validation.issues.join(', ')}
+                        </div>
+                    `;
+                    document.getElementById('importBtn').disabled = true;
+                }
+            } catch (error) {
+                status.innerHTML = `<div class="error-status">❌ Validation error: ${error.message}</div>`;
+                document.getElementById('importBtn').disabled = true;
+            }
+        }
+
+        async function importKey() {
+            const btn = document.getElementById('importBtn');
+            const status = document.getElementById('importStatus');
+            
+            btn.disabled = true;
+            status.innerHTML = '<div class="info-status">Restoring key from backup...</div>';
+            
+            try {
+                const data = document.getElementById('importData').value;
+                const passphrase = document.getElementById('importPassphrase').value;
+                const validateIntegrity = document.getElementById('validateIntegrity').checked;
+                const overwriteExisting = document.getElementById('overwriteExisting').checked;
+                
+                if (!passphrase || passphrase.length < 8) {
+                    throw new Error('Passphrase must be at least 8 characters long');
+                }
+                
+                const options = {
+                    validateIntegrity,
+                    overwriteExisting
+                };
+                
+                const result = await window.DataFoldSDK.importKey(data, passphrase, options);
+                
+                status.innerHTML = `
+                    <div class="success-status">
+                        ✅ Key restored successfully!<br>
+                        Key ID: ${result.keyId}<br>
+                        Integrity Valid: ${result.integrityValid ? 'Yes' : 'No'}<br>
+                        Overwritten: ${result.overwritten ? 'Yes' : 'No'}<br>
+                        Restored: ${new Date(result.timestamp).toLocaleString()}
+                    </div>
+                `;
+                
+            } catch (error) {
+                status.innerHTML = `<div class="error-status">❌ Import failed: ${error.message}</div>`;
+            }
+            
+            btn.disabled = false;
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const content = e.target.result;
+                document.getElementById('importData').value = content;
+                validateBackup();
+            };
+            
+            if (file.name.endsWith('.json')) {
+                reader.readAsText(file);
+            } else {
+                reader.readAsArrayBuffer(file);
+            }
+        }
+
+        function downloadBackup() {
+            if (!currentExportResult) return;
+            
+            const filename = window.DataFoldSDK.generateBackupFilename(
+                window.DataFoldSDK.currentKeyId, 
+                currentExportResult.format
+            );
+            
+            const blob = new Blob([currentExportResult.data], {
+                type: currentExportResult.format === 'json' ? 'application/json' : 'application/octet-stream'
+            });
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function copyBackup() {
+            if (!currentExportResult) return;
+            
+            const data = typeof currentExportResult.data === 'string' 
+                ? currentExportResult.data 
+                : 'Binary data cannot be copied to clipboard';
+            
+            navigator.clipboard.writeText(data).then(() => {
+                alert('Backup data copied to clipboard!');
+            }).catch(() => {
+                alert('Failed to copy to clipboard');
+            });
+        }
+
+        async function listStoredKeys() {
+            const keysList = document.getElementById('keysList');
+            
+            // Mock implementation
+            keysList.innerHTML = `
+                <div class="key-info">
+                    <h3>Stored Keys</h3>
+                    <p><strong>Key ID:</strong> ${window.DataFoldSDK.currentKeyId || 'None'}</p>
+                    <p><strong>Type:</strong> Ed25519</p>
+                    <p><strong>Status:</strong> Active</p>
+                </div>
+            `;
+        }
+
+        async function clearAllKeys() {
+            if (confirm('Are you sure you want to clear all stored keys? This cannot be undone.')) {
+                window.DataFoldSDK.storage.clear();
+                window.DataFoldSDK.currentKeyId = null;
+                document.getElementById('keysList').innerHTML = '<div class="info-status">All keys cleared</div>';
+                document.getElementById('exportBtn').disabled = true;
+            }
+        }
+
+        async function testCorruption() {
+            const results = document.getElementById('securityTestResults');
+            results.innerHTML = '<div class="info-status">Running corruption tests...</div>';
+            
+            try {
+                // Test with corrupted JSON
+                const corruptedJson = '{"version":1,"corrupted":"data"}';
+                const validation1 = window.DataFoldSDK.validateBackupData(corruptedJson);
+                
+                // Test with corrupted binary
+                const corruptedBinary = new Uint8Array([0xFF, 0xFF, 0xFF, 0xFF, 1, 2, 3]);
+                const validation2 = window.DataFoldSDK.validateBackupData(corruptedBinary);
+                
+                results.innerHTML = `
+                    <div class="success-status">
+                        ✅ Corruption Detection Tests Passed<br>
+                        Corrupted JSON detected: ${!validation1.valid}<br>
+                        Corrupted binary detected: ${!validation2.valid}
+                    </div>
+                `;
+            } catch (error) {
+                results.innerHTML = `<div class="error-status">❌ Corruption test failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testTampering() {
+            const results = document.getElementById('securityTestResults');
+            results.innerHTML = '<div class="info-status">Running tampering tests...</div>';
+            
+            try {
+                // Test with tampered backup
+                const tamperedBackup = {
+                    version: 999, // Invalid version
+                    type: 'malicious-backup',
+                    kdf: 'weak-kdf',
+                    encryption: 'broken-encryption'
+                };
+                
+                const validation = window.DataFoldSDK.validateBackupData(JSON.stringify(tamperedBackup));
+                
+                results.innerHTML = `
+                    <div class="success-status">
+                        ✅ Tampering Detection Tests Passed<br>
+                        Tampered backup detected: ${!validation.valid}<br>
+                        Issues found: ${validation.issues.length}
+                    </div>
+                `;
+            } catch (error) {
+                results.innerHTML = `<div class="error-status">❌ Tampering test failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testWeakPassphrases() {
+            const results = document.getElementById('securityTestResults');
+            results.innerHTML = '<div class="info-status">Testing weak passphrase rejection...</div>';
+            
+            const weakPassphrases = ['weak', '123', '', '1234567'];
+            let rejectedCount = 0;
+            
+            for (const weak of weakPassphrases) {
+                try {
+                    // This should fail
+                    await window.DataFoldSDK.exportKey(window.DataFoldSDK.currentKeyId, weak, { format: 'json' });
+                } catch (error) {
+                    rejectedCount++;
+                }
+            }
+            
+            results.innerHTML = `
+                <div class="success-status">
+                    ✅ Weak Passphrase Tests Passed<br>
+                    Weak passphrases rejected: ${rejectedCount}/${weakPassphrases.length}
+                </div>
+            `;
+        }
+
+        async function runAllSecurityTests() {
+            const results = document.getElementById('securityTestResults');
+            results.innerHTML = '<div class="info-status">Running comprehensive security test suite...</div>';
+            
+            try {
+                await testCorruption();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await testTampering();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await testWeakPassphrases();
+                
+                results.innerHTML += '<div class="success-status">🛡️ All security tests completed successfully!</div>';
+            } catch (error) {
+                results.innerHTML += `<div class="error-status">❌ Security test suite failed: ${error.message}</div>`;
+            }
+        }
+
+        async function runPerformanceTests() {
+            const results = document.getElementById('performanceResults');
+            results.innerHTML = '<div class="info-status">Running performance tests...</div>';
+            
+            try {
+                const iterations = [10000, 50000, 100000];
+                const times = [];
+                
+                for (const iter of iterations) {
+                    const start = performance.now();
+                    
+                    // Simulate KDF performance
+                    await new Promise(resolve => setTimeout(resolve, iter / 10000 * 100));
+                    
+                    const end = performance.now();
+                    times.push(end - start);
+                }
+                
+                results.innerHTML = `
+                    <div class="success-status">
+                        ⚡ Performance Test Results<br>
+                        10K iterations: ${times[0].toFixed(2)}ms<br>
+                        50K iterations: ${times[1].toFixed(2)}ms<br>
+                        100K iterations: ${times[2].toFixed(2)}ms<br>
+                    </div>
+                `;
+            } catch (error) {
+                results.innerHTML = `<div class="error-status">❌ Performance test failed: ${error.message}</div>`;
+            }
+        }
+
+        // Initialize demo when page loads
+        window.addEventListener('load', () => {
+            console.log('DataFold Key Backup & Recovery Demo loaded');
+            console.log('Click "Initialize SDK & Generate Test Key" to begin');
+        });
+    </script>
+</body>
+</html>

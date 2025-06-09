@@ -34,6 +34,7 @@ pub mod error;
 pub mod enhanced_error;
 pub mod audit_logger;
 pub mod security_monitor;
+pub mod unified_backup;
 
 // Re-export commonly used types
 pub use argon2::{
@@ -55,4 +56,9 @@ pub use audit_logger::{
 pub use security_monitor::{
     CryptoSecurityMonitor, SecurityMonitorConfig, SecurityDetection, ThreatLevel,
     SecurityPattern, init_global_security_monitor, get_global_security_monitor
+};
+pub use unified_backup::{
+    UnifiedBackupManager, UnifiedBackupFormat, BackupMetadata, MigrationResult,
+    TestVector, ExportOptions, CustomKdfParams, BackupError,
+    export_key_unified, import_key_unified
 };

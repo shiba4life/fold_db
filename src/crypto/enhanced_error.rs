@@ -5,7 +5,6 @@
 //! operations in DataFold.
 
 use thiserror::Error;
-use std::fmt;
 use std::time::SystemTime;
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;

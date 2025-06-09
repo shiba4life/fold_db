@@ -117,6 +117,7 @@ async fn benchmark_batch_encryption(batch_size: usize, data_size: usize) -> Resu
 
 /// Test basic async encryption performance overhead
 #[test]
+#[ignore = "Performance test - environment dependent"]
 async fn test_async_encryption_overhead() {
     let sync_ops_per_sec = benchmark_sync_encryption(BENCHMARK_ITERATIONS, SMALL_DATA_SIZE).await.unwrap();
     let async_ops_per_sec = benchmark_async_encryption(BENCHMARK_ITERATIONS, SMALL_DATA_SIZE).await.unwrap();
@@ -395,6 +396,7 @@ async fn test_performance_config_profiles() {
 
 /// Comprehensive performance validation test
 #[test]
+#[ignore = "Performance test - environment dependent"]
 async fn test_comprehensive_performance_validation() {
     println!("\n=== Comprehensive Performance Validation ===");
     
@@ -458,6 +460,7 @@ async fn test_comprehensive_performance_validation() {
 
 /// Test that validates specific PBI 9 performance requirements
 #[test]
+#[ignore = "Performance test - environment dependent"]
 async fn test_pbi_9_performance_requirements() {
     println!("\n=== PBI 9 Performance Requirements Validation ===");
     

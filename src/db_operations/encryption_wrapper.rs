@@ -59,9 +59,8 @@ use crate::datafold_node::encryption_at_rest::{
     EncryptionAtRest, EncryptedData, key_derivation::KeyDerivationManager
 };
 use crate::schema::SchemaError;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
-use std::sync::Arc;
 
 /// Version identifier for encrypted data format
 const ENCRYPTED_DATA_VERSION: u8 = 1;
@@ -308,6 +307,7 @@ pub struct EncryptionWrapper {
     /// The underlying database operations
     db_ops: DbOperations,
     /// Key derivation manager for generating encryption keys
+    #[allow(dead_code)]
     key_manager: KeyDerivationManager,
     /// Cached encryptors for different contexts
     encryptors: HashMap<String, EncryptionAtRest>,
@@ -828,9 +828,9 @@ impl EncryptionWrapper {
     pub fn perform_batch_migration(&self, config: &MigrationConfig) -> Result<u64, SchemaError> {
         match config.mode {
             MigrationMode::ReadOnlyCompatibility => {
-                return Err(SchemaError::InvalidData(
+                Err(SchemaError::InvalidData(
                     "Cannot perform migration in read-only compatibility mode".to_string()
-                ));
+                ))
             }
             MigrationMode::Gradual => {
                 log::info!("Performing gradual migration - new data will be encrypted");

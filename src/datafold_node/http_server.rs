@@ -34,7 +34,7 @@ pub struct DataFoldHttpServer {
 /// Shared application state for the HTTP server.
 pub struct AppState {
     /// The DataFold node
-    pub(crate) node: Arc<tokio::sync::Mutex<DataFoldNode>>,
+    pub node: Arc<tokio::sync::Mutex<DataFoldNode>>,
 }
 
 impl DataFoldHttpServer {
@@ -230,6 +230,9 @@ impl DataFoldHttpServer {
                                 .route("/init/passphrase", web::post().to(crypto_routes::init_passphrase_key))
                                 .route("/status", web::get().to(crypto_routes::get_crypto_status))
                                 .route("/validate", web::post().to(crypto_routes::validate_crypto_config))
+                                .route("/keys/register", web::post().to(crypto_routes::register_public_key))
+                                .route("/keys/status/{client_id}", web::get().to(crypto_routes::get_public_key_status))
+                                .route("/signatures/verify", web::post().to(crypto_routes::verify_signature))
                         )
                         // Network endpoints
                         .service(

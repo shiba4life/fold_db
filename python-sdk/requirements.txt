@@ -1,0 +1,16 @@
+# Core dependencies for DataFold Python SDK
+cryptography>=41.0.0
+# Secure random number generation and cryptographic operations
+
+keyring>=24.0.0
+# Cross-platform secure storage for keys
+
+# Optional dependencies for enhanced functionality
+secretstorage>=3.3.0; sys_platform == "linux"
+# Linux secret service integration
+
+requests>=2.31.0
+# HTTP client for server integration
+
+# Type checking support
+typing-extensions>=4.0.0; python_version < "3.10"

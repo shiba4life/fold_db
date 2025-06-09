@@ -46,12 +46,12 @@
 //! ```
 
 use super::core::DbOperations;
-use super::encryption_wrapper::{EncryptionWrapper, MigrationMode, MigrationConfig, MigrationStatus, contexts};
+use super::encryption_wrapper::{EncryptionWrapper, MigrationMode, MigrationConfig, contexts};
 use crate::crypto::{MasterKeyPair, CryptoError, CryptoResult};
 use crate::config::crypto::CryptoConfig;
-use crate::datafold_node::encryption_at_rest_async::{AsyncEncryptionAtRest, PerformanceConfig, PerformanceMetrics};
+use crate::datafold_node::encryption_at_rest_async::{AsyncEncryptionAtRest, PerformanceConfig};
 use crate::datafold_node::encryption_at_rest::{
-    EncryptionAtRest, EncryptedData, key_derivation::KeyDerivationManager
+    EncryptedData, key_derivation::KeyDerivationManager
 };
 use crate::schema::SchemaError;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};

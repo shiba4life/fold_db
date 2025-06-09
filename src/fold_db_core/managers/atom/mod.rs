@@ -87,6 +87,7 @@ impl AtomManager {
 
     /// Check if encryption is enabled
     pub fn is_encryption_enabled(&self) -> bool {
+        #[allow(clippy::unnecessary_map_or)]
         self.encryption_wrapper.as_ref().map_or(false, |wrapper| wrapper.is_encryption_enabled())
     }
 

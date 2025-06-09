@@ -54,14 +54,13 @@ use crate::config::crypto::CryptoConfig;
 use crate::schema::SchemaError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime};
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
-use tokio::sync::{RwLock, Semaphore, mpsc};
+use tokio::sync::{RwLock, Semaphore};
 use tokio::task;
-use futures::stream::{Stream, StreamExt};
 use sha2::{Sha256, Digest};
 use uuid::Uuid;
 
@@ -270,7 +269,7 @@ pub struct RestoreInfo {
 
 /// Checkpoint information for resume capability
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct CheckpointInfo {
+pub struct CheckpointInfo {
     /// Checkpoint ID
     pub id: String,
     /// Operation type
@@ -294,6 +293,7 @@ pub struct AsyncEncryptedBackup {
     /// Configuration
     config: AsyncBackupConfig,
     /// Semaphore for concurrent operations
+    #[allow(dead_code)]
     operation_semaphore: Arc<Semaphore>,
     /// Progress tracking
     progress: Arc<RwLock<Option<ProgressInfo>>>,
@@ -502,7 +502,7 @@ impl AsyncEncryptedBackup {
         }
         
         // Create target encryption wrapper
-        let crypto_config = CryptoConfig::default();
+        let _crypto_config = CryptoConfig::default();
         let master_keypair = self.get_master_keypair().await
             .map_err(|e| SchemaError::InvalidData(format!("Failed to get master keypair: {}", e)))?;
         let async_wrapper_config = AsyncWrapperConfig::default();
@@ -678,7 +678,7 @@ impl AsyncEncryptedBackup {
         
         for (key, data) in items {
             // Determine appropriate context based on key prefix
-            let context = if key.starts_with("atom:") {
+            let _context = if key.starts_with("atom:") {
                 contexts::ATOM_DATA
             } else if key.starts_with("schema:") {
                 contexts::SCHEMA_DATA
@@ -706,7 +706,7 @@ impl AsyncEncryptedBackup {
     ) -> Result<u64, SchemaError> {
         let mut restored_count = 0u64;
         
-        for (key, encrypted_data) in items {
+        for (key, _encrypted_data) in items {
             // Determine appropriate context based on key prefix
             let context = if key.starts_with("atom:") {
                 contexts::ATOM_DATA

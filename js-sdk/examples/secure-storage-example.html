@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataFold SDK - Secure Storage Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .output {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .info {
+            color: #17a2b8;
+        }
+        .warning {
+            color: #ffc107;
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .compatibility {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .compatible {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .incompatible {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 DataFold SDK - Secure Storage Example</h1>
+        
+        <div id="compatibility-check" class="compatibility">
+            <h3>Environment Compatibility</h3>
+            <div id="compatibility-status">Checking...</div>
+        </div>
+
+        <div class="section">
+            <h2>Step 1: Generate Key Pair</h2>
+            <p>Generate a new Ed25519 key pair for demonstration:</p>
+            <button id="generateKeyBtn">Generate New Key Pair</button>
+            <div id="keyGenOutput" class="output"></div>
+        </div>
+
+        <div class="section">
+            <h2>Step 2: Store Key Securely</h2>
+            <p>Store the generated key pair with encryption in IndexedDB:</p>
+            <input type="text" id="keyIdInput" placeholder="Enter Key ID (e.g., my-key-1)" value="demo-key-1">
+            <input type="password" id="passphraseInput" placeholder="Enter Passphrase (min 8 chars)" value="DemoPassphrase123!">
+            <input type="text" id="keyNameInput" placeholder="Key Name (optional)" value="Demo Key">
+            <textarea id="keyDescInput" placeholder="Key Description (optional)" rows="2">A demonstration key for the DataFold SDK storage example</textarea>
+            <input type="text" id="keyTagsInput" placeholder="Tags (comma-separated, optional)" value="demo,example,test">
+            <br><br>
+            <button id="storeKeyBtn" disabled>Store Key Pair</button>
+            <div id="storeOutput" class="output"></div>
+        </div>
+
+        <div class="section">
+            <h2>Step 3: List Stored Keys</h2>
+            <p>View all keys stored in the secure storage:</p>
+            <button id="listKeysBtn">List All Keys</button>
+            <div id="listOutput" class="output"></div>
+        </div>
+
+        <div class="section">
+            <h2>Step 4: Retrieve Key</h2>
+            <p>Retrieve and decrypt a stored key pair:</p>
+            <input type="text" id="retrieveKeyIdInput" placeholder="Key ID to retrieve" value="demo-key-1">
+            <input type="password" id="retrievePassphraseInput" placeholder="Passphrase" value="DemoPassphrase123!">
+            <button id="retrieveKeyBtn">Retrieve Key Pair</button>
+            <div id="retrieveOutput" class="output"></div>
+        </div>
+
+        <div class="section">
+            <h2>Step 5: Storage Management</h2>
+            <p>Manage storage and view usage information:</p>
+            <button id="storageInfoBtn">Get Storage Info</button>
+            <button id="checkKeyExistsBtn">Check Key Exists</button>
+            <button id="deleteKeyBtn">Delete Key</button>
+            <button id="clearAllBtn" onclick="return confirm('Are you sure you want to delete ALL keys?')">⚠️ Clear All Keys</button>
+            <div id="managementOutput" class="output"></div>
+        </div>
+
+        <div class="section">
+            <h2>Security Features Demonstrated</h2>
+            <ul>
+                <li><strong>Encryption:</strong> Private keys are encrypted using AES-GCM with PBKDF2 key derivation</li>
+                <li><strong>Isolation:</strong> Keys are stored per-origin and not accessible to other websites</li>
+                <li><strong>Validation:</strong> Strong passphrase requirements and input validation</li>
+                <li><strong>Metadata:</strong> Organized key management with names, descriptions, and tags</li>
+                <li><strong>Error Handling:</strong> Comprehensive error handling for all operations</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Load the DataFold SDK -->
+    <script type="module">
+        import { 
+            generateKeyPair,
+            clearKeyMaterial,
+            createStorage,
+            isStorageSupported,
+            validatePassphrase,
+            generateKeyId,
+            initializeSDK
+        } from '../dist/index.esm.js';
+
+        let currentKeyPair = null;
+        let storage = null;
+
+        // Initialize the application
+        async function init() {
+            try {
+                // Check SDK compatibility
+                const sdkCompat = await initializeSDK();
+                
+                // Check storage compatibility
+                const storageCompat = isStorageSupported();
+                
+                const compatibilityDiv = document.getElementById('compatibility-status');
+                
+                if (sdkCompat.compatible && storageCompat.supported) {
+                    compatibilityDiv.innerHTML = `
+                        <div class="success">✅ Environment is fully compatible!</div>
+                        <div class="info">SDK Warnings: ${sdkCompat.warnings.length ? sdkCompat.warnings.join(', ') : 'None'}</div>
+                    `;
+                    document.getElementById('compatibility-check').className = 'compatibility compatible';
+                    
+                    // Initialize storage
+                    storage = await createStorage();
+                } else {
+                    const issues = [...sdkCompat.warnings, ...storageCompat.reasons];
+                    compatibilityDiv.innerHTML = `
+                        <div class="error">❌ Environment compatibility issues:</div>
+                        <ul>${issues.map(issue => `<li>${issue}</li>`).join('')}</ul>
+                    `;
+                    document.getElementById('compatibility-check').className = 'compatibility incompatible';
+                }
+            } catch (error) {
+                document.getElementById('compatibility-status').innerHTML = `
+                    <div class="error">❌ Initialization failed: ${error.message}</div>
+                `;
+            }
+        }
+
+        // Generate key pair
+        document.getElementById('generateKeyBtn').addEventListener('click', async () => {
+            const output = document.getElementById('keyGenOutput');
+            const btn = document.getElementById('generateKeyBtn');
+            
+            try {
+                btn.disabled = true;
+                output.textContent = 'Generating key pair...';
+                
+                currentKeyPair = await generateKeyPair();
+                
+                output.innerHTML = `<span class="success">✅ Key pair generated successfully!</span>
+Private Key Length: ${currentKeyPair.privateKey.length} bytes
+Public Key Length: ${currentKeyPair.publicKey.length} bytes
+Public Key (hex): ${Array.from(currentKeyPair.publicKey, b => b.toString(16).padStart(2, '0')).join('')}`;
+                
+                // Enable store button
+                document.getElementById('storeKeyBtn').disabled = false;
+                
+            } catch (error) {
+                output.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // Store key pair
+        document.getElementById('storeKeyBtn').addEventListener('click', async () => {
+            if (!currentKeyPair || !storage) return;
+            
+            const output = document.getElementById('storeOutput');
+            const btn = document.getElementById('storeKeyBtn');
+            
+            try {
+                btn.disabled = true;
+                output.textContent = 'Storing key pair...';
+                
+                const keyId = document.getElementById('keyIdInput').value;
+                const passphrase = document.getElementById('passphraseInput').value;
+                const name = document.getElementById('keyNameInput').value;
+                const description = document.getElementById('keyDescInput').value;
+                const tags = document.getElementById('keyTagsInput').value.split(',').map(t => t.trim()).filter(t => t);
+                
+                // Validate inputs
+                if (!keyId) throw new Error('Key ID is required');
+                
+                const passphraseValidation = validatePassphrase(passphrase);
+                if (!passphraseValidation.valid) {
+                    throw new Error(`Weak passphrase: ${passphraseValidation.issues.join(', ')}`);
+                }
+                
+                const metadata = {
+                    name: name || keyId,
+                    description: description || '',
+                    tags: tags
+                };
+                
+                await storage.storeKeyPair(keyId, currentKeyPair, passphrase, metadata);
+                
+                output.innerHTML = `<span class="success">✅ Key pair stored successfully!</span>
+Key ID: ${keyId}
+Encryption: AES-GCM with PBKDF2 (100,000 iterations)
+Storage: IndexedDB (encrypted, origin-isolated)`;
+                
+            } catch (error) {
+                output.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // List stored keys
+        document.getElementById('listKeysBtn').addEventListener('click', async () => {
+            if (!storage) return;
+            
+            const output = document.getElementById('listOutput');
+            const btn = document.getElementById('listKeysBtn');
+            
+            try {
+                btn.disabled = true;
+                output.textContent = 'Loading stored keys...';
+                
+                const keys = await storage.listKeys();
+                
+                if (keys.length === 0) {
+                    output.innerHTML = '<span class="info">No keys stored yet.</span>';
+                } else {
+                    const keyList = keys.map(key => `
+📋 Key ID: ${key.id}
+   Name: ${key.metadata.name}
+   Description: ${key.metadata.description || '(none)'}
+   Tags: ${key.metadata.tags.length ? key.metadata.tags.join(', ') : '(none)'}
+   Created: ${new Date(key.metadata.created).toLocaleString()}
+   Last Accessed: ${new Date(key.metadata.lastAccessed).toLocaleString()}
+`).join('\n');
+                    
+                    output.innerHTML = `<span class="success">✅ Found ${keys.length} stored key(s):</span>\n\n${keyList}`;
+                }
+                
+            } catch (error) {
+                output.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // Retrieve key pair
+        document.getElementById('retrieveKeyBtn').addEventListener('click', async () => {
+            if (!storage) return;
+            
+            const output = document.getElementById('retrieveOutput');
+            const btn = document.getElementById('retrieveKeyBtn');
+            
+            try {
+                btn.disabled = true;
+                output.textContent = 'Retrieving and decrypting key pair...';
+                
+                const keyId = document.getElementById('retrieveKeyIdInput').value;
+                const passphrase = document.getElementById('retrievePassphraseInput').value;
+                
+                if (!keyId) throw new Error('Key ID is required');
+                if (!passphrase) throw new Error('Passphrase is required');
+                
+                const retrievedKeyPair = await storage.retrieveKeyPair(keyId, passphrase);
+                
+                output.innerHTML = `<span class="success">✅ Key pair retrieved successfully!</span>
+Key ID: ${keyId}
+Private Key Length: ${retrievedKeyPair.privateKey.length} bytes
+Public Key Length: ${retrievedKeyPair.publicKey.length} bytes
+Public Key (hex): ${Array.from(retrievedKeyPair.publicKey, b => b.toString(16).padStart(2, '0')).join('')}
+
+<span class="info">🔒 Private key is available in memory for cryptographic operations</span>`;
+                
+                // Clear sensitive data after a delay (for demo purposes)
+                setTimeout(() => {
+                    clearKeyMaterial(retrievedKeyPair);
+                    output.innerHTML += '\n\n<span class="info">🧹 Private key cleared from memory after 10 seconds</span>';
+                }, 10000);
+                
+            } catch (error) {
+                output.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // Storage management functions
+        document.getElementById('storageInfoBtn').addEventListener('click', async () => {
+            if (!storage) return;
+            
+            const output = document.getElementById('managementOutput');
+            
+            try {
+                const storageInfo = await storage.getStorageInfo();
+                const quota = storageInfo.available;
+                const used = storageInfo.used;
+                const percentage = quota ? Math.round((used / quota) * 100) : 'Unknown';
+                
+                output.innerHTML = `<span class="success">📊 Storage Information:</span>
+Used: ${formatBytes(used)}
+Available: ${quota ? formatBytes(quota) : 'Unknown'}
+Usage: ${percentage}%`;
+                
+            } catch (error) {
+                output.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        });
+
+        document.getElementById('checkKeyExistsBtn').addEventListener('click', async () => {
+            if (!storage) return;
+            
+            const output = document.getElementById('managementOutput');
+            const keyId = document.getElementById('retrieveKeyIdInput').value;
+            
+            try {
+                if (!keyId) throw new Error('Enter a Key ID first');
+                
+                const exists = await storage.keyExists(keyId);
+                output.innerHTML = `<span class="${exists ? 'success' : 'info'}">
+${exists ? '✅' : 'ℹ️'} Key "${keyId}" ${exists ? 'exists' : 'does not exist'}</span>`;
+                
+            } catch (error) {
+                output.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        });
+
+        document.getElementById('deleteKeyBtn').addEventListener('click', async () => {
+            if (!storage) return;
+            
+            const output = document.getElementById('managementOutput');
+            const keyId = document.getElementById('retrieveKeyIdInput').value;
+            
+            try {
+                if (!keyId) throw new Error('Enter a Key ID first');
+                
+                await storage.deleteKeyPair(keyId);
+                output.innerHTML = `<span class="success">✅ Key "${keyId}" deleted successfully</span>`;
+                
+            } catch (error) {
+                output.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        });
+
+        document.getElementById('clearAllBtn').addEventListener('click', async () => {
+            if (!storage) return;
+            
+            const output = document.getElementById('managementOutput');
+            
+            try {
+                await storage.clearAllKeys();
+                output.innerHTML = `<span class="success">✅ All keys cleared successfully</span>`;
+                
+            } catch (error) {
+                output.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        });
+
+        // Utility function
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Initialize the app
+        init();
+    </script>
+</body>
+</html>
