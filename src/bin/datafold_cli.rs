@@ -95,7 +95,7 @@ enum ExportFormat {
     Binary,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 enum Commands {
     /// Initialize database cryptography
     CryptoInit {
@@ -1098,11 +1098,11 @@ fn handle_retrieve_key(
             .map_err(|e| format!("Failed to generate keypair from stored key: {}", e))?;
         let public_key_bytes = keypair.public_key_bytes();
         let formatted_public = format_key(&public_key_bytes, &format, false)?;
-        output_key(&formatted_public, output_file.as_ref(), "public", 0, 1)?;
+        output_key(&formatted_public, output_file.as_ref(), "public", 0, 1, true)?;
     } else {
         // Output private key
         let formatted_private = format_key(&private_key_bytes, &format, true)?;
-        output_key(&formatted_private, output_file.as_ref(), "private", 0, 1)?;
+        output_key(&formatted_private, output_file.as_ref(), "private", 0, 1, true)?;
     }
     
     info!("✅ Key '{}' retrieved successfully", key_id);
@@ -2843,13 +2843,13 @@ fn handle_generate_key(
         // Output private key if requested
         if !public_only {
             let formatted_private = format_key(&private_key_bytes, &format, true)?;
-            output_key(&formatted_private, private_key_file.as_ref(), "private", i, count)?;
+            output_key(&formatted_private, private_key_file.as_ref(), "private", i, count, true)?;
         }
 
         // Output public key if requested
         if !private_only {
             let formatted_public = format_key(&public_key_bytes, &format, false)?;
-            output_key(&formatted_public, public_key_file.as_ref(), "public", i, count)?;
+            output_key(&formatted_public, public_key_file.as_ref(), "public", i, count, true)?;
         }
 
         // Clear sensitive data
@@ -2893,13 +2893,13 @@ fn handle_derive_key(
     // Output private key if requested
     if !public_only {
         let formatted_private = format_key(&private_key_bytes, &format, true)?;
-        output_key(&formatted_private, private_key_file.as_ref(), "private", 0, 1)?;
+        output_key(&formatted_private, private_key_file.as_ref(), "private", 0, 1, true)?;
     }
 
     // Output public key if requested
     if !private_only {
         let formatted_public = format_key(&public_key_bytes, &format, false)?;
-        output_key(&formatted_public, public_key_file.as_ref(), "public", 0, 1)?;
+        output_key(&formatted_public, public_key_file.as_ref(), "public", 0, 1, true)?;
     }
 
     // Clear sensitive data
@@ -2938,7 +2938,7 @@ fn handle_extract_public_key(
     let public_key_bytes = keypair.public_key_bytes();
     let formatted_public = format_key(&public_key_bytes, &format, false)?;
     
-    output_key(&formatted_public, output_file.as_ref(), "public", 0, 1)?;
+    output_key(&formatted_public, output_file.as_ref(), "public", 0, 1, false)?;
 
     Ok(())
 }
@@ -3047,6 +3047,7 @@ fn output_key(
     key_type: &str,
     index: u32,
     total: u32,
+    include_comments: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match output_file {
         Some(file_path) => {
@@ -3074,8 +3075,12 @@ fn output_key(
             info!("✅ {} key written to: {}", key_type, actual_path.display());
         }
         None => {
-            if total > 1 {
-                println!("# {} key {} of {}", key_type, index + 1, total);
+            if include_comments {
+                if total > 1 {
+                    println!("# {} key {} of {}", key_type, index + 1, total);
+                } else {
+                    println!("# {} key", key_type);
+                }
             }
             println!("{}", formatted_key);
         }

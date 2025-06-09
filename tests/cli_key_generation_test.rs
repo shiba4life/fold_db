@@ -296,7 +296,12 @@ fn test_private_key_security() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     
     // Private key should be present in output (proving it's generated locally)
-    assert!(stdout.contains("64"), "Private key should be present in output");
+    // Look for a 64-character hex string (private key)
+    let has_64_char_hex = stdout.lines().any(|line| {
+        let trimmed = line.trim();
+        trimmed.len() == 64 && trimmed.chars().all(|c| c.is_ascii_hexdigit())
+    });
+    assert!(has_64_char_hex, "Private key should be present in output");
     
     // Verify no network calls were made (this would require more sophisticated testing
     // in a real environment, but the architecture ensures keys are generated locally)

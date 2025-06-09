@@ -609,9 +609,23 @@ impl EncryptionWrapper {
                     Ok(Some(item))
                 } else {
                     // Backward compatibility: try to deserialize as unencrypted JSON
-                    let item = serde_json::from_slice(&bytes)
-                        .map_err(|e| SchemaError::InvalidData(format!("Failed to deserialize unencrypted data: {}", e)))?;
-                    Ok(Some(item))
+                    match serde_json::from_slice(&bytes) {
+                        Ok(item) => Ok(Some(item)),
+                        Err(e) => {
+                            // Enhanced error handling based on migration mode
+                            match self.migration_mode {
+                                MigrationMode::ReadOnlyCompatibility => {
+                                    // In read-only mode, return None for corrupted data instead of error
+                                    log::warn!("Corrupted data in read-only mode for key '{}': {}", key, e);
+                                    Ok(None)
+                                }
+                                _ => {
+                                    // In strict mode (gradual/full), return error for corrupted data
+                                    Err(SchemaError::InvalidData(format!("Failed to deserialize data: {}", e)))
+                                }
+                            }
+                        }
+                    }
                 }
             }
             Ok(None) => Ok(None),
@@ -772,9 +786,17 @@ impl EncryptionWrapper {
             }
         }
         
+        let total_items = encrypted_count + unencrypted_count;
+        let is_mixed = encrypted_count > 0 && unencrypted_count > 0;
+        let is_fully_encrypted = total_items > 0 && unencrypted_count == 0;
+        
         stats.insert("encrypted_items".to_string(), encrypted_count);
         stats.insert("unencrypted_items".to_string(), unencrypted_count);
+        stats.insert("total_items".to_string(), total_items);
         stats.insert("encryption_enabled".to_string(), if self.encryption_enabled { 1 } else { 0 });
+        stats.insert("is_mixed_environment".to_string(), if is_mixed { 1 } else { 0 });
+        stats.insert("is_fully_encrypted".to_string(), if is_fully_encrypted { 1 } else { 0 });
+        stats.insert("migration_mode".to_string(), self.migration_mode as u64);
         stats.insert("available_contexts".to_string(), self.encryptors.len() as u64);
         
         Ok(stats)
@@ -826,6 +848,13 @@ impl EncryptionWrapper {
     
     /// Perform batch migration with comprehensive validation
     pub fn perform_batch_migration(&self, config: &MigrationConfig) -> Result<u64, SchemaError> {
+        // Check if encryption is disabled (read-only compatibility mode)
+        if !self.encryption_enabled {
+            return Err(SchemaError::InvalidData(
+                "Cannot perform migration in read-only compatibility mode".to_string()
+            ));
+        }
+        
         match config.mode {
             MigrationMode::ReadOnlyCompatibility => {
                 Err(SchemaError::InvalidData(
