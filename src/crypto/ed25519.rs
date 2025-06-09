@@ -29,6 +29,13 @@ impl PublicKey {
 
     /// Create a PublicKey from bytes
     pub fn from_bytes(bytes: &[u8; PUBLIC_KEY_LENGTH]) -> CryptoResult<Self> {
+        // Reject cryptographically weak public keys
+        if bytes == &[0u8; PUBLIC_KEY_LENGTH] {
+            return Err(CryptoError::Deserialization {
+                message: "All-zeros public key is not allowed".to_string(),
+            });
+        }
+
         let verifying_key = VerifyingKey::from_bytes(bytes)
             .map_err(|_| CryptoError::Deserialization {
                 message: "Invalid public key bytes".to_string(),

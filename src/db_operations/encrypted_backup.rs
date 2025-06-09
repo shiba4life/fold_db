@@ -454,29 +454,6 @@ impl EncryptedBackupManager {
         Ok(file)
     }
 
-    fn write_backup_header(
-        &self,
-        file: &mut File,
-        metadata: &BackupMetadata,
-    ) -> Result<(), BackupError> {
-        // Write magic bytes
-        file.write_all(BACKUP_MAGIC)?;
-        
-        // Write version
-        file.write_all(&metadata.version.to_le_bytes())?;
-        
-        // Serialize metadata
-        let metadata_bytes = serde_json::to_vec(metadata)?;
-        
-        // Write metadata size
-        file.write_all(&(metadata_bytes.len() as u64).to_le_bytes())?;
-        
-        // Write metadata
-        file.write_all(&metadata_bytes)?;
-        
-        Ok(())
-    }
-
     fn write_backup_data(
         &self,
         file: &mut File,
