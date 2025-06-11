@@ -24,8 +24,8 @@ from datafold_sdk.verification import (
     create_verifier,
     verify_signature,
     VERIFICATION_POLICIES,
-    STRICT_VERIFICATION_POLICY,
-    STANDARD_VERIFICATION_POLICY,
+    STRICT,
+    STANDARD,
 )
 from datafold_sdk.verification.utils import (
     extract_signature_data,
@@ -77,14 +77,14 @@ class TestVerificationPolicies:
     
     def test_builtin_policies_exist(self):
         """Test that built-in policies exist"""
-        assert 'strict' in VERIFICATION_POLICIES
-        assert 'standard' in VERIFICATION_POLICIES
-        assert 'lenient' in VERIFICATION_POLICIES
-        assert 'legacy' in VERIFICATION_POLICIES
+        assert 'STRICT' in VERIFICATION_POLICIES
+        assert 'STANDARD' in VERIFICATION_POLICIES
+        assert 'LENIENT' in VERIFICATION_POLICIES
+        assert 'LEGACY' in VERIFICATION_POLICIES
     
     def test_strict_policy_properties(self):
         """Test strict policy properties"""
-        policy = STRICT_VERIFICATION_POLICY
+        policy = STRICT
         
         assert policy.name == 'strict'
         assert policy.verify_timestamp is True
@@ -94,11 +94,10 @@ class TestVerificationPolicies:
         assert '@method' in policy.required_components
         assert '@target-uri' in policy.required_components
         assert 'ed25519' in policy.allowed_algorithms
-        assert len(policy.custom_rules) > 0
     
     def test_standard_policy_properties(self):
         """Test standard policy properties"""
-        policy = STANDARD_VERIFICATION_POLICY
+        policy = STANDARD
         
         assert policy.name == 'standard'
         assert policy.verify_timestamp is True

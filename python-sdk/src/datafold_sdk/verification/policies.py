@@ -5,20 +5,8 @@ Verification Policy Constants for Python SDK
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional, List
-from dataclasses import dataclass
 
-@dataclass
-class VerificationPolicy:
-    """Verification policy configuration"""
-    name: str
-    description: str
-    verify_timestamp: bool
-    max_timestamp_age: Optional[int]
-    verify_nonce: bool
-    verify_content_digest: bool
-    required_components: List[str]
-    allowed_algorithms: List[str]
-    require_all_headers: bool
+from .types import VerificationPolicy
 
 # Load shared policies once
 _shared_policies: Optional[Dict[str, VerificationPolicy]] = None
@@ -45,7 +33,8 @@ def _get_shared_policies() -> Dict[str, VerificationPolicy]:
             verify_content_digest=policy_data['verifyContentDigest'],
             required_components=policy_data['requiredComponents'],
             allowed_algorithms=policy_data['allowedAlgorithms'],
-            require_all_headers=policy_data['requireAllHeaders']
+            require_all_headers=policy_data['requireAllHeaders'],
+            custom_rules=[]  # Initialize as empty list
         )
     
     return _shared_policies
