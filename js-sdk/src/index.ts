@@ -72,6 +72,30 @@ export {
   calculateContentDigest
 } from './signing/index.js';
 
+// Export unified configuration (new in PBI-16)
+export {
+  UnifiedConfigManager,
+  UnifiedConfigError,
+  createUnifiedConfig,
+  loadUnifiedConfigFromJSON,
+  loadUnifiedConfigFromURL,
+  loadDefaultUnifiedConfig
+} from './config/unified-config.js';
+
+// Export unified configuration types
+export type {
+  UnifiedConfig,
+  EnvironmentConfig,
+  UnifiedSigningConfig,
+  VerificationConfig as UnifiedVerificationConfig,
+  LoggingConfig,
+  AuthenticationConfig,
+  PerformanceConfig,
+  DebugConfig,
+  UnifiedSecurityProfile,
+  DefaultConfig
+} from './config/unified-config.js';
+
 // Export signature verification functionality
 export {
   // Main verification classes and functions

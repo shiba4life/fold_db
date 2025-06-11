@@ -9,6 +9,7 @@ use datafold::datafold_node::crypto_init::{
 };
 use datafold::cli::auth::{CliAuthProfile, CliSigningConfig};
 use datafold::cli::config::{CliConfigManager, ServerConfig};
+use datafold::cli::environment_utils::commands as env_commands;
 use datafold::cli::http_client::{AuthenticatedHttpClient, HttpClientBuilder, RetryConfig};
 use datafold::cli::signing_config::SigningMode;
 use log::{info, warn, error};
@@ -818,6 +819,48 @@ enum Commands {
         /// Action to perform
         #[command(subcommand)]
         action: VerificationConfigAction,
+    },
+    /// Environment management for unified configuration
+    Environment {
+        /// Action to perform
+        #[command(subcommand)]
+        action: EnvironmentAction,
+    },
+}
+
+/// Environment management actions
+#[derive(Subcommand, Debug, Clone)]
+enum EnvironmentAction {
+    /// List all available environments
+    List {},
+    /// Show current environment information
+    Show {
+        /// Specific environment to show (defaults to current)
+        #[arg(long)]
+        environment: Option<String>,
+    },
+    /// Switch to a different environment
+    Switch {
+        /// Environment to switch to
+        #[arg(required = true)]
+        environment: String,
+    },
+    /// Compare two environments
+    Compare {
+        /// First environment
+        #[arg(required = true)]
+        env1: String,
+        /// Second environment
+        #[arg(required = true)]
+        env2: String,
+    },
+    /// Validate all environments
+    Validate {},
+    /// Export environment variables for scripting
+    Export {
+        /// Environment to export (defaults to current)
+        #[arg(long)]
+        environment: Option<String>,
     },
 }
 
@@ -4901,6 +4944,35 @@ async fn handle_verification_config(action: VerificationConfigAction) -> Result<
     Ok(())
 }
 
+/// Handle environment management commands
+fn handle_environment_command(action: EnvironmentAction) -> Result<(), Box<dyn std::error::Error>> {
+    match action {
+        EnvironmentAction::List {} => {
+            env_commands::list_environments()?;
+        }
+        EnvironmentAction::Show { environment } => {
+            if let Some(env) = environment {
+                env_commands::show_environment(&env)?;
+            } else {
+                env_commands::show_current_environment()?;
+            }
+        }
+        EnvironmentAction::Switch { environment } => {
+            env_commands::switch_environment(&environment)?;
+        }
+        EnvironmentAction::Compare { env1, env2 } => {
+            env_commands::compare_environments(&env1, &env2)?;
+        }
+        EnvironmentAction::Validate {} => {
+            env_commands::validate_environments()?;
+        }
+        EnvironmentAction::Export { environment } => {
+            env_commands::export_environment_vars(environment.as_deref())?;
+        }
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     datafold::web_logger::init().ok();
@@ -5319,6 +5391,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::VerifyResponse { url, method, headers, body, body_file, key_id, public_key, public_key_file, policy, output_format, debug, timeout } => {
             return handle_verify_response(url.clone(), method.clone(), headers.clone(), body.clone(), body_file.clone(), key_id.clone(), public_key.clone(), public_key_file.clone(), policy.clone(), output_format.clone(), *debug, *timeout).await;
         }
+        Commands::Environment { action } => {
+            return handle_environment_command(action.clone());
+        }
         Commands::VerificationConfig { action } => {
             return handle_verification_config(action.clone()).await;
         }
@@ -5394,6 +5469,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::InspectSignature { .. } => unreachable!(), // Already handled above
         Commands::VerifyResponse { .. } => unreachable!(), // Already handled above
         Commands::VerificationConfig { .. } => unreachable!(), // Already handled above
+        Commands::Environment { .. } => unreachable!(), // Already handled above
         
     }
 
