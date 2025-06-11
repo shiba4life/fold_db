@@ -35,6 +35,11 @@ data/db*
 *.log
 *.env
 *.bak
+*.enc
+
+# Backup files
+backup.enc
+*.backup
 
 # Generated schema files
 data/schemas/*.json
@@ -48,6 +53,12 @@ data/schema_states/
 fold_node/data/db/
 fold_node/data/schema_states/
 *.sled
+
+# Test and temporary database directories
+async_test_db/
+restored_db/
+source_db/
+test_db/
 
 # Test data directories
 /test_data/
