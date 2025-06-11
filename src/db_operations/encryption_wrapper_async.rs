@@ -17,7 +17,7 @@
 //! ## Example Usage
 //!
 //! ```rust
-//! use datafold::db_operations::{AsyncEncryptionWrapper, PerformanceConfig};
+//! use datafold::db_operations::{AsyncEncryptionWrapper, DbOperations, AsyncWrapperConfig};
 //! use datafold::crypto::generate_master_keypair;
 //!
 //! # #[tokio::main]
@@ -26,8 +26,8 @@
 //! let db = sled::open("async_test_db")?;
 //! let db_ops = DbOperations::new(db)?;
 //! let master_keypair = generate_master_keypair()?;
-//! let config = PerformanceConfig::default();
-//! 
+//! let config = AsyncWrapperConfig::default();
+//!
 //! let encryption_wrapper = AsyncEncryptionWrapper::new(
 //!     db_ops, &master_keypair, config
 //! ).await?;

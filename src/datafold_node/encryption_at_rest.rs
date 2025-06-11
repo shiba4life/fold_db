@@ -16,7 +16,7 @@
 //!
 //! ```rust
 //! use datafold::crypto::generate_master_keypair;
-//! use datafold_node::encryption_at_rest::EncryptionAtRest;
+//! use datafold::datafold_node::encryption_at_rest::EncryptionAtRest;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create encryption manager with a derived encryption key

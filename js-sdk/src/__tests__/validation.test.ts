@@ -211,7 +211,7 @@ describe('Validation Utilities', () => {
     });
 
     it('should reject invalid length', () => {
-      expect(() => validateBase64String('abc'))
+      expect(() => validateBase64String('abc@#$'))
         .toThrow(Ed25519KeyError);
     });
   });

@@ -11,13 +11,13 @@ import json
 import base64
 import time
 from typing import Dict, Any, List
-from src.datafold_sdk.crypto.unified_backup import UnifiedBackupManager, TestVector
+from src.datafold_sdk.crypto.unified_backup import UnifiedBackupManager, ValidationVector
 
 # Test vector data from the specification
 TEST_VECTOR_1 = {
     "passphrase": "correct horse battery staple",
     "salt": "w7Z3pQ2v5Q8v1Q2v5Q8v1Q==",
-    "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",  # 24 bytes for XChaCha20
     "kdf": "argon2id",
     "kdf_params": {
         "iterations": 3,

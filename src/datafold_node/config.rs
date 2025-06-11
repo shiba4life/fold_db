@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use crate::config::crypto::{CryptoConfig, ConfigError};
+use crate::datafold_node::signature_auth::SignatureAuthConfig;
 
 /// Configuration for a DataFoldNode instance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -13,6 +14,9 @@ pub struct NodeConfig {
     /// Cryptographic configuration for database encryption (optional)
     #[serde(default)]
     pub crypto: Option<CryptoConfig>,
+    /// Signature authentication configuration (optional)
+    #[serde(default)]
+    pub signature_auth: Option<SignatureAuthConfig>,
 }
 
 fn default_network_listen_address() -> String {
@@ -25,6 +29,7 @@ impl Default for NodeConfig {
             storage_path: PathBuf::from("data"),
             network_listen_address: default_network_listen_address(),
             crypto: None,
+            signature_auth: None,
         }
     }
 }
@@ -34,6 +39,7 @@ impl NodeConfig {
     pub fn new(storage_path: PathBuf) -> Self {
         Self {
             storage_path,
+            signature_auth: None,
             ..Default::default()
         }
     }
@@ -75,6 +81,62 @@ impl NodeConfig {
     pub fn with_network_listen_address(mut self, address: &str) -> Self {
         self.network_listen_address = address.to_string();
         self
+    }
+
+    /// Enable signature authentication with the provided configuration
+    pub fn enable_signature_auth(mut self, signature_auth_config: SignatureAuthConfig) -> Self {
+        self.signature_auth = Some(signature_auth_config);
+        self
+    }
+
+    /// Check if signature authentication is enabled
+    pub fn is_signature_auth_enabled(&self) -> bool {
+        self.signature_auth.as_ref().is_some_and(|c| c.enabled)
+    }
+
+    /// Get the signature authentication configuration if enabled
+    pub fn signature_auth_config(&self) -> Option<&SignatureAuthConfig> {
+        self.signature_auth.as_ref()
+    }
+
+    /// Create configuration for development with lenient signature auth
+    pub fn development_with_signature_auth(storage_path: PathBuf) -> Self {
+        Self {
+            storage_path,
+            signature_auth: Some(SignatureAuthConfig::lenient()),
+            ..Default::default()
+        }
+    }
+
+    /// Create configuration for production with strict signature auth
+    pub fn production_with_signature_auth(storage_path: PathBuf) -> Self {
+        Self {
+            storage_path,
+            signature_auth: Some(SignatureAuthConfig::strict()),
+            ..Default::default()
+        }
+    }
+
+    /// Create configuration with optional signature auth for gradual rollout
+    pub fn with_optional_signature_auth(storage_path: PathBuf) -> Self {
+        let config = SignatureAuthConfig {
+            security_profile: crate::datafold_node::signature_auth::SecurityProfile::Standard,
+            rate_limiting: crate::datafold_node::signature_auth::RateLimitingConfig {
+                enabled: false, // Disable rate limiting during rollout
+                ..Default::default()
+            },
+            attack_detection: crate::datafold_node::signature_auth::AttackDetectionConfig {
+                enabled: false, // Disable attack detection during rollout
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        
+        Self {
+            storage_path,
+            signature_auth: Some(config),
+            ..Default::default()
+        }
     }
 }
 

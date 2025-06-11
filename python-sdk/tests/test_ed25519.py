@@ -252,7 +252,7 @@ class TestKeyFormatting:
         """Test formatting public key as PEM"""
         # Generate a real key for PEM testing
         key_pair = generate_key_pair()
-        result = format_key(key_pair.public_key, 'pem')
+        result = format_key(key_pair.public_key, 'pem', 'public')
         
         assert isinstance(result, str)
         assert '-----BEGIN PUBLIC KEY-----' in result

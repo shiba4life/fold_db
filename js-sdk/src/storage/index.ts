@@ -7,7 +7,18 @@
 export { IndexedDBKeyStorage } from './indexeddb-storage.js';
 
 // Export storage utilities
-export * from './storage-utils.js';
+export {
+  generateKeyId,
+  validateKeyId,
+  sanitizeKeyId,
+  estimateKeyStorageSize,
+  validateMetadata,
+  withTimeout,
+  formatBytes,
+  isSecureContext,
+  getStoragePersistence,
+  requestPersistentStorage
+} from './storage-utils.js';
 
 // Re-export storage-related types
 export type { 

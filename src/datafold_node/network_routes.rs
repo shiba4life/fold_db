@@ -124,6 +124,7 @@ mod tests {
         let config = NodeConfig::new(dir.path().to_path_buf());
         let node = DataFoldNode::new(config).unwrap();
         let state = web::Data::new(super::super::http_server::AppState {
+            signature_auth: None,
             node: std::sync::Arc::new(tokio::sync::Mutex::new(node)),
         });
         use actix_web::test;
@@ -137,6 +138,7 @@ mod tests {
         let config = NodeConfig::new(dir.path().to_path_buf());
         let node = DataFoldNode::new(config).unwrap();
         web::Data::new(super::super::http_server::AppState {
+            signature_auth: None,
             node: std::sync::Arc::new(tokio::sync::Mutex::new(node)),
         })
     }

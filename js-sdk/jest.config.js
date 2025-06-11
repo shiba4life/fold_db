@@ -6,11 +6,10 @@ module.exports = {
   transform: {
     '^.+\\.ts$': ['ts-jest', {
       useESM: true,
+      tsconfig: 'tsconfig.test.json',
     }],
   },
-  transformIgnorePatterns: [
-    'node_modules/(?!(@noble/ed25519)/)',
-  ],
+  transformIgnorePatterns: [],
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.test.ts',
@@ -21,6 +20,8 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^@noble/ed25519$': '<rootDir>/src/__mocks__/@noble/ed25519.js',
+    '^(.*)\\.js$': '$1.ts',
   },
   extensionsToTreatAsEsm: ['.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],

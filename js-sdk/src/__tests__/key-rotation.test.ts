@@ -18,11 +18,11 @@ import {
 
 // Mock storage implementation for testing
 class MockKeyStorage implements KeyStorageInterface {
-  private storage = new Map<string, { keyPair: Ed25519KeyPair; metadata: StoredKeyMetadata }>();
+  private storage = new Map<string, any>();
 
   async storeKeyPair(
-    keyId: string, 
-    keyPair: Ed25519KeyPair, 
+    keyId: string,
+    keyPair: Ed25519KeyPair,
     passphrase: string,
     metadata: Partial<StoredKeyMetadata> = {}
   ): Promise<void> {
@@ -34,7 +34,13 @@ class MockKeyStorage implements KeyStorageInterface {
       tags: metadata.tags || []
     };
     
-    this.storage.set(keyId, { keyPair, metadata: fullMetadata });
+    // Ensure Uint8Array types are preserved
+    const preservedKeyPair: Ed25519KeyPair = {
+      privateKey: new Uint8Array(keyPair.privateKey),
+      publicKey: new Uint8Array(keyPair.publicKey)
+    };
+    
+    this.storage.set(keyId, { keyPair: preservedKeyPair, metadata: fullMetadata });
   }
 
   async retrieveKeyPair(keyId: string, passphrase: string): Promise<Ed25519KeyPair> {
@@ -210,7 +216,7 @@ describe('Key Rotation', () => {
           publicKey: new Uint8Array(32)
         };
         await rotationManager.createVersionedKeyPair('test-key', keyPair, 'passphrase');
-        await rotationManager.rotateKey('test-key', 'passphrase');
+        await rotationManager.rotateKey('test-key', 'passphrase', { keepOldVersion: true });
       });
 
       it('should retrieve specific key version', async () => {
@@ -243,8 +249,8 @@ describe('Key Rotation', () => {
           publicKey: new Uint8Array(32)
         };
         await rotationManager.createVersionedKeyPair('test-key', keyPair, 'passphrase');
-        await rotationManager.rotateKey('test-key', 'passphrase', { reason: 'first_rotation' });
-        await rotationManager.rotateKey('test-key', 'passphrase', { reason: 'second_rotation' });
+        await rotationManager.rotateKey('test-key', 'passphrase', { reason: 'first_rotation', keepOldVersion: true });
+        await rotationManager.rotateKey('test-key', 'passphrase', { reason: 'second_rotation', keepOldVersion: true });
       });
 
       it('should list all versions', async () => {
@@ -381,8 +387,8 @@ describe('Key Rotation', () => {
         publicKey: new Uint8Array(32)
       };
       await rotationManager.createVersionedKeyPair('test-key', keyPair, 'passphrase');
-      await rotationManager.rotateKey('test-key', 'passphrase', { reason: 'scheduled' });
-      await rotationManager.rotateKey('test-key', 'passphrase', { reason: 'security' });
+      await rotationManager.rotateKey('test-key', 'passphrase', { reason: 'scheduled', keepOldVersion: true });
+      await rotationManager.rotateKey('test-key', 'passphrase', { reason: 'security', keepOldVersion: true });
     });
 
     it('should validate correct rotation history', async () => {

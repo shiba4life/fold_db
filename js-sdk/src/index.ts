@@ -27,6 +27,89 @@ export * from './crypto/key-export-import.js';
 // Export server integration functionality
 export * from './server/index.js';
 
+// Export enhanced HTTP client functionality
+export {
+  createFluentHttpClient,
+  createSignedHttpClient,
+  createSigningMiddleware,
+  createCorrelationMiddleware,
+  createLoggingMiddleware,
+  createPerformanceMiddleware
+} from './server/http-client.js';
+
+// Export request signing functionality (selective to avoid conflicts)
+export {
+  // Main signing classes and functions
+  RFC9421Signer,
+  createSigner,
+  signRequest,
+  
+  // Configuration
+  SigningConfigBuilder,
+  createSigningConfig,
+  createFromProfile,
+  
+  // Types for signing
+  RFC9421SignatureResult,
+  SigningConfig,
+  SignableRequest,
+  SigningOptions,
+  SignatureComponents,
+  SigningError,
+  
+  // Canonical message functions
+  buildCanonicalMessage,
+  buildSignatureInput,
+  
+  // Security profiles
+  SECURITY_PROFILES,
+  
+  // Signing utilities (renamed to avoid conflicts)
+  generateNonce,
+  generateTimestamp,
+  validateSigningPrivateKey,
+  validateSigningPublicKey,
+  calculateContentDigest
+} from './signing/index.js';
+
+// Export signature verification functionality
+export {
+  // Main verification classes and functions
+  RFC9421Verifier,
+  createVerifier,
+  verifySignature as verifySignatureQuick,
+  
+  // Verification policies
+  VERIFICATION_POLICIES,
+  STRICT_VERIFICATION_POLICY,
+  STANDARD_VERIFICATION_POLICY,
+  LENIENT_VERIFICATION_POLICY,
+  LEGACY_VERIFICATION_POLICY,
+  createVerificationPolicy,
+  getVerificationPolicy,
+  
+  // Inspector utilities
+  RFC9421Inspector,
+  createInspector,
+  validateSignatureFormat,
+  quickDiagnostic,
+  
+  // Middleware
+  createResponseVerificationMiddleware,
+  createRequestVerificationMiddleware,
+  createExpressVerificationMiddleware,
+  createFetchInterceptor,
+  createBatchVerifier,
+  
+  // Verification types
+  VerificationResult,
+  VerificationConfig,
+  VerificationPolicy,
+  VerificationError,
+  VerifiableResponse,
+  ExtractedSignatureData
+} from './verification/index.js';
+
 // Export version information
 export const SDK_VERSION = '0.1.0';
 

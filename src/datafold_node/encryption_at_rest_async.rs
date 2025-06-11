@@ -17,7 +17,7 @@
 //! ## Example Usage
 //!
 //! ```rust
-//! use datafold_node::encryption_at_rest_async::{AsyncEncryptionAtRest, PerformanceConfig};
+//! use datafold::datafold_node::encryption_at_rest_async::{AsyncEncryptionAtRest, PerformanceConfig};
 //! use datafold::crypto::generate_master_keypair;
 //!
 //! # #[tokio::main]

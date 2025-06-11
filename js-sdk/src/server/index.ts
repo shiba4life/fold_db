@@ -21,3 +21,14 @@ export type {
   SignatureVerificationResponse,
   ServerIntegrationInterface
 } from '../types.js';
+
+// Re-export enhanced HTTP client types
+export type {
+  SigningMode,
+  EndpointSigningConfig,
+  RequestInterceptor,
+  ResponseInterceptor,
+  RequestContext,
+  SigningMetrics,
+  HttpClientConfig
+} from './http-client.js';

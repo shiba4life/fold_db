@@ -94,6 +94,7 @@ mod tests {
         let node = DataFoldNode::new(config).unwrap();
 
         let state = web::Data::new(AppState {
+            signature_auth: None,
             node: Arc::new(tokio::sync::Mutex::new(node)),
         });
 
@@ -109,6 +110,7 @@ mod tests {
         let node = DataFoldNode::new(config).unwrap();
 
         let state = web::Data::new(AppState {
+            signature_auth: None,
             node: Arc::new(tokio::sync::Mutex::new(node)),
         });
 
@@ -128,6 +130,7 @@ mod tests {
         let node = DataFoldNode::new(config).unwrap();
 
         let state = web::Data::new(AppState {
+            signature_auth: None,
             node: Arc::new(tokio::sync::Mutex::new(node)),
         });
 

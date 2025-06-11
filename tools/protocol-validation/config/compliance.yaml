@@ -1,0 +1,113 @@
+# RFC 9421 HTTP Message Signatures Compliance Configuration
+
+rfc9421:
+  # Header format validation settings
+  strict_header_validation: true
+  validate_component_ordering: true
+  validate_signature_format: true
+  validate_canonical_message: true
+  
+  # Required signature components that must be present
+  required_components:
+    - "@method"
+    - "@target-uri" 
+    - "content-type"
+    - "content-digest"
+    
+  # Optional components to validate if present
+  optional_components:
+    - "authorization"
+    - "@authority"
+    - "@path"
+    - "@query"
+    - "date"
+    - "x-datafold-client-id"
+    - "x-datafold-user-id"
+    - "x-datafold-metadata"
+    
+  # Supported signature algorithms
+  supported_algorithms:
+    - "ed25519"
+    
+  # Test vector validation
+  enable_test_vectors: true
+  custom_test_vectors_path: null
+
+# Security validation settings
+security:
+  enable_timestamp_tests: true
+  enable_nonce_tests: true
+  enable_attack_simulation: true
+  enable_parameter_validation: true
+  enable_replay_detection: true
+  
+  # Time window configurations to test
+  test_time_windows: [60, 300, 600]  # 1min, 5min, 10min
+  
+  # Clock skew values to test
+  test_clock_skews: [0, 5, 30, 120]  # 0s, 5s, 30s, 2min
+  
+  # Attack simulation settings
+  concurrent_attack_count: 100
+  attack_duration_secs: 30
+  enable_dos_simulation: false  # Disabled for safety
+  max_memory_usage_mb: 512
+  
+  # Rate limiting test configurations
+  rate_limit_configs:
+    - requests_per_second: 10
+      burst_size: 5
+      test_duration_secs: 10
+      expected_success_rate: 0.9
+    - requests_per_second: 100
+      burst_size: 20
+      test_duration_secs: 5
+      expected_success_rate: 0.5
+
+# Cross-platform validation settings
+cross_platform:
+  enable_signature_interop: true
+  enable_canonicalization_tests: true
+  enable_config_compatibility: true
+  enable_error_handling_tests: true
+  
+  # SDK paths for testing
+  js_sdk_path: "../../js-sdk"
+  python_sdk_path: "../../python-sdk"
+  server_path: "../../target/release/datafold_node"
+  
+  # Server configuration
+  server_url: "http://localhost:8080"
+  
+  # Test settings
+  test_vectors_path: "test-vectors/interop-tests"
+  random_test_count: 100
+  test_key_variations: true
+  test_message_variations: true
+  enable_performance_comparison: false
+
+# Performance validation settings
+performance:
+  enable_signature_benchmarks: true
+  enable_throughput_tests: true
+  enable_memory_tests: true
+  benchmark_iterations: 1000
+  throughput_duration_secs: 60
+  max_memory_usage_mb: 1024
+
+# Output and reporting configuration
+output:
+  generate_html_report: true
+  generate_json_report: true
+  generate_junit_xml: true
+  output_directory: "reports"
+  include_debug_info: false
+  include_test_vectors: true
+
+# Enabled validation categories
+enabled_categories:
+  - "RFC9421Compliance"
+  - "CrossPlatform"
+  - "Security"
+  - "Performance"
+  - "TestVectors"

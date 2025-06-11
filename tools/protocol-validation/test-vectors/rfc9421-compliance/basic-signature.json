@@ -1,0 +1,36 @@
+{
+  "test_vector": {
+    "name": "Basic Ed25519 Signature",
+    "description": "Basic RFC 9421 signature with required components",
+    "request": {
+      "method": "POST",
+      "uri": "https://api.datafold.com/v1/schemas",
+      "headers": {
+        "content-type": "application/json",
+        "content-digest": "sha-256=:X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=:"
+      },
+      "body": "{\"name\":\"test-schema\",\"version\":\"1.0\"}"
+    },
+    "signing_config": {
+      "algorithm": "ed25519",
+      "key_id": "test-key-ed25519",
+      "private_key": "b11e398dc80327a1c8013b94449af7c7e266eb6c6dd5cb13e2d4b5c2f20dc35a",
+      "public_key": "8ba6c7bb9f2d2e1b1e4a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e",
+      "created": 1618884473,
+      "nonce": "550e8400e29b41d4a716446655440000",
+      "signature_components": [
+        "@method",
+        "@target-uri", 
+        "content-type",
+        "content-digest"
+      ]
+    },
+    "expected_output": {
+      "signature_input": "sig1=(\"@method\" \"@target-uri\" \"content-type\" \"content-digest\");created=1618884473;nonce=\"550e8400e29b41d4a716446655440000\";keyid=\"test-key-ed25519\";alg=\"ed25519\"",
+      "signature": "sig1=:iP8QqVo8mfq7UQWMxVYuEl5HPgQrydV7F+Gv2jA8O7N7vCN9WOPbVjFnvUjNh8QXi2Hm2cTEfqEi3JqOgRDnlJ8w=:",
+      "canonical_message": "\"@method\": POST\n\"@target-uri\": https://api.datafold.com/v1/schemas\n\"content-type\": application/json\n\"content-digest\": sha-256=:X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=:\n\"@signature-params\": (\"@method\" \"@target-uri\" \"content-type\" \"content-digest\");created=1618884473;nonce=\"550e8400e29b41d4a716446655440000\";keyid=\"test-key-ed25519\";alg=\"ed25519\"",
+      "verification_result": true
+    },
+    "should_pass": true
+  }
+}

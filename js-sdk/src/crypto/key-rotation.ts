@@ -212,9 +212,13 @@ export class KeyRotationManager {
           }
         }
 
-        // Clear key pair
-        version.keyPair.privateKey.fill(0);
-        version.keyPair.publicKey.fill(0);
+        // Clear key pair (defensively handle non-Uint8Array types)
+        if (version.keyPair.privateKey instanceof Uint8Array) {
+          version.keyPair.privateKey.fill(0);
+        }
+        if (version.keyPair.publicKey instanceof Uint8Array) {
+          version.keyPair.publicKey.fill(0);
+        }
 
         // Remove from versions
         delete versionedKeyPair.versions[version.version];
@@ -341,7 +345,26 @@ export class KeyRotationManager {
       // The keyPair.privateKey will contain serialized versioned data
       // This is a simplified approach - in production, you'd want a more sophisticated storage format
       const serializedData = new TextDecoder().decode(keyPair.privateKey);
-      return JSON.parse(serializedData) as VersionedKeyPair;
+      const parsed = JSON.parse(serializedData) as any;
+      
+      // Restore Uint8Array objects from plain objects
+      const versionedKeyPair: VersionedKeyPair = {
+        ...parsed,
+        versions: {}
+      };
+      
+      // Restore each version's key pairs
+      for (const [versionNum, version] of Object.entries(parsed.versions)) {
+        versionedKeyPair.versions[parseInt(versionNum)] = {
+          ...version as any,
+          keyPair: {
+            privateKey: new Uint8Array(Object.values((version as any).keyPair.privateKey)),
+            publicKey: new Uint8Array(Object.values((version as any).keyPair.publicKey))
+          }
+        };
+      }
+      
+      return versionedKeyPair;
     } catch {
       return null;
     }

@@ -1,0 +1,94 @@
+[package]
+name = "datafold-protocol-validation"
+version = "1.0.0"
+edition = "2021"
+description = "Protocol compliance validation tools for DataFold message signing"
+authors = ["DataFold Team"]
+
+[dependencies]
+# Core dependencies
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+anyhow = "1.0"
+thiserror = "1.0"
+clap = { version = "4.0", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json"] }
+
+# Cryptography
+ed25519-dalek = { version = "2.0", features = ["rand_core"] }
+sha2 = "0.10"
+base64 = "0.21"
+hex = "0.4"
+rand = "0.8"
+uuid = { version = "1.0", features = ["v4"] }
+
+# HTTP and networking
+reqwest = { version = "0.11", features = ["json"] }
+actix-web = "4.0"
+hyper = "0.14"
+http = "0.2"
+
+# Testing and validation
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.0"
+quickcheck = "1.0"
+assertables = "7.0"
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1.0"
+once_cell = "1.0"
+dashmap = "5.0"
+parking_lot = "0.12"
+
+# Platform-specific dependencies for interop testing
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = "0.26"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.9"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = { version = "0.3", features = ["processenv"] }
+
+[dev-dependencies]
+tempfile = "3.0"
+mockito = "1.0"
+serial_test = "2.0"
+
+[[bin]]
+name = "validate-protocol"
+path = "src/bin/validate_protocol.rs"
+
+[[bin]]
+name = "generate-test-vectors"
+path = "src/bin/generate_test_vectors.rs"
+
+[[bin]]
+name = "run-security-tests"
+path = "src/bin/run_security_tests.rs"
+
+[[bin]]
+name = "benchmark-performance"
+path = "src/bin/benchmark_performance.rs"
+
+[features]
+default = ["rfc9421", "security", "performance", "cross-platform"]
+rfc9421 = []
+security = []
+performance = ["criterion"]
+cross-platform = []
+report-generation = ["serde_json", "serde_yaml"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.bench]
+opt-level = 3
+debug = true

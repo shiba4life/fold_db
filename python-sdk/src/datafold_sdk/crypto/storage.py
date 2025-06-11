@@ -276,6 +276,9 @@ class SecureKeyStorage:
             if platform.system() != "Windows":
                 os.chmod(file_path, KEY_FILE_PERMISSIONS)
                 
+        except UnsupportedPlatformError:
+            # Let platform compatibility errors bubble up
+            raise
         except Exception as e:
             # Clean up partial file
             if file_path.exists():
@@ -329,8 +332,8 @@ class SecureKeyStorage:
     
     def _get_timestamp(self) -> str:
         """Get current timestamp as ISO string"""
-        from datetime import datetime
-        return datetime.utcnow().isoformat() + 'Z'
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc).isoformat() + 'Z'
     
     def store_key(self, key_id: str, key_pair: Ed25519KeyPair, 
                   passphrase: Optional[str] = None) -> StorageMetadata:

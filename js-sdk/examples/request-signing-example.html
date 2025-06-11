@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataFold SDK - Request Signing Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 20px;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        .result {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .output {
+            min-height: 100px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background: #f9f9f9;
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>DataFold SDK - RFC 9421 Request Signing Example</h1>
+        
+        <div class="section">
+            <h2>1. Initialize SDK and Generate Key Pair</h2>
+            <button onclick="initializeSDK()">Initialize SDK</button>
+            <button onclick="generateKeyPair()">Generate Key Pair</button>
+            <div id="init-output" class="output"></div>
+        </div>
+
+        <div class="section">
+            <h2>2. Configure Request Signing</h2>
+            <button onclick="configureSigning()">Configure Signing</button>
+            <div id="config-output" class="output"></div>
+        </div>
+
+        <div class="section">
+            <h2>3. Sign GET Request</h2>
+            <button onclick="signGetRequest()">Sign GET Request</button>
+            <div id="get-output" class="output"></div>
+        </div>
+
+        <div class="section">
+            <h2>4. Sign POST Request with Body</h2>
+            <button onclick="signPostRequest()">Sign POST Request</button>
+            <div id="post-output" class="output"></div>
+        </div>
+
+        <div class="section">
+            <h2>5. HTTP Client with Automatic Signing</h2>
+            <button onclick="httpClientExample()">Test HTTP Client</button>
+            <div id="http-output" class="output"></div>
+        </div>
+
+        <div class="section">
+            <h2>6. Performance Test</h2>
+            <button onclick="performanceTest()">Run Performance Test</button>
+            <div id="perf-output" class="output"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import the DataFold SDK
+        import {
+            initializeSDK,
+            generateKeyPair,
+            RFC9421Signer,
+            createSigningConfig,
+            createFromProfile,
+            SECURITY_PROFILES,
+            DataFoldHttpClient
+        } from '../dist/index.esm.js';
+
+        // Global variables for the example
+        let keyPair = null;
+        let signingConfig = null;
+        let signer = null;
+        let httpClient = null;
+
+        // Make functions available globally for the buttons
+        window.initializeSDK = async function() {
+            const output = document.getElementById('init-output');
+            try {
+                output.textContent = 'Initializing SDK...\n';
+
+                const result = await initializeSDK();
+                output.textContent += `SDK initialized successfully!\n`;
+                output.textContent += `Compatible: ${result.compatible}\n`;
+                if (result.warnings.length > 0) {
+                    output.textContent += `Warnings: ${result.warnings.join(', ')}\n`;
+                }
+
+                output.textContent += '\nAvailable Security Profiles:\n';
+                Object.entries(SECURITY_PROFILES).forEach(([name, profile]) => {
+                    output.textContent += `- ${name}: ${profile.description}\n`;
+                });
+
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+                output.className = 'output error';
+            }
+        };
+
+        window.generateKeyPair = async function() {
+            const output = document.getElementById('init-output');
+            try {
+                output.textContent += '\nGenerating Ed25519 key pair...\n';
+
+                keyPair = await generateKeyPair();
+                
+                output.textContent += `Key pair generated successfully!\n`;
+                output.textContent += `Private key length: ${keyPair.privateKey.length} bytes\n`;
+                output.textContent += `Public key length: ${keyPair.publicKey.length} bytes\n`;
+                
+                // Show public key for registration
+                const publicKeyHex = Array.from(keyPair.publicKey, b => b.toString(16).padStart(2, '0')).join('');
+                output.textContent += `Public key (hex): ${publicKeyHex}\n`;
+
+            } catch (error) {
+                output.textContent += `Error: ${error.message}`;
+                output.className = 'output error';
+            }
+        };
+
+        window.configureSigning = function() {
+            const output = document.getElementById('config-output');
+            try {
+                if (!keyPair) {
+                    throw new Error('Please generate a key pair first');
+                }
+
+                output.textContent = 'Configuring request signing...\n';
+
+                // Create signing configuration
+                signingConfig = createSigningConfig()
+                    .algorithm('ed25519')
+                    .keyId('example-client-001')
+                    .privateKey(keyPair.privateKey)
+                    .profile('standard')
+                    .build();
+
+                // Create signer
+                signer = new RFC9421Signer(signingConfig);
+
+                output.textContent += `Signing configuration created:\n`;
+                output.textContent += `- Algorithm: ${signingConfig.algorithm}\n`;
+                output.textContent += `- Key ID: ${signingConfig.keyId}\n`;
+                output.textContent += `- Security Profile: standard\n`;
+                output.textContent += `- Components: ${JSON.stringify(signingConfig.components, null, 2)}\n`;
+
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+                output.className = 'output error';
+            }
+        };
+
+        window.signGetRequest = async function() {
+            const output = document.getElementById('get-output');
+            try {
+                if (!signer) {
+                    throw new Error('Please configure signing first');
+                }
+
+                output.textContent = 'Signing GET request...\n';
+
+                const request = {
+                    method: 'GET',
+                    url: 'https://api.datafold.com/api/crypto/keys/status/example-client-001',
+                    headers: {
+                        'user-agent': 'DataFold-JS-SDK/0.1.0'
+                    }
+                };
+
+                const start = performance.now();
+                const result = await signer.signRequest(request);
+                const elapsed = performance.now() - start;
+
+                output.textContent += `Request signed successfully in ${elapsed.toFixed(2)}ms\n\n`;
+                output.textContent += `Signature Headers:\n`;
+                Object.entries(result.headers).forEach(([key, value]) => {
+                    output.textContent += `${key}: ${value}\n`;
+                });
+
+                output.textContent += `\nCanonical Message:\n${result.canonicalMessage}\n`;
+
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+                output.className = 'output error';
+            }
+        };
+
+        window.signPostRequest = async function() {
+            const output = document.getElementById('post-output');
+            try {
+                if (!signer) {
+                    throw new Error('Please configure signing first');
+                }
+
+                output.textContent = 'Signing POST request with body...\n';
+
+                const requestBody = {
+                    clientId: 'example-client-001',
+                    publicKey: Array.from(keyPair.publicKey, b => b.toString(16).padStart(2, '0')).join(''),
+                    keyName: 'Example Key'
+                };
+
+                const request = {
+                    method: 'POST',
+                    url: 'https://api.datafold.com/api/crypto/keys/register',
+                    headers: {
+                        'content-type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                };
+
+                const start = performance.now();
+                const result = await signer.signRequest(request);
+                const elapsed = performance.now() - start;
+
+                output.textContent += `Request signed successfully in ${elapsed.toFixed(2)}ms\n\n`;
+                output.textContent += `Signature Headers:\n`;
+                Object.entries(result.headers).forEach(([key, value]) => {
+                    output.textContent += `${key}: ${value}\n`;
+                });
+
+                output.textContent += `\nCanonical Message:\n${result.canonicalMessage}\n`;
+
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+                output.className = 'output error';
+            }
+        };
+
+        window.httpClientExample = function() {
+            const output = document.getElementById('http-output');
+            try {
+                if (!signingConfig) {
+                    throw new Error('Please configure signing first');
+                }
+
+                output.textContent = 'Setting up HTTP client with automatic signing...\n';
+
+                // Create HTTP client
+                httpClient = new DataFoldHttpClient({
+                    baseUrl: 'https://api.datafold.com',
+                    timeout: 30000
+                });
+
+                // Configure automatic signing
+                httpClient.configureSigning(signingConfig);
+
+                output.textContent += `HTTP client configured with automatic signing!\n`;
+                output.textContent += `Base URL: https://api.datafold.com\n`;
+                output.textContent += `Signing enabled: ${httpClient.isSigningEnabled()}\n`;
+                output.textContent += `\nNow all requests will be automatically signed with RFC 9421 signatures.\n`;
+
+                // Note: Actual HTTP requests would require a running server
+                output.textContent += `\nNote: To test actual requests, you would need:\n`;
+                output.textContent += `1. A running DataFold server\n`;
+                output.textContent += `2. The public key registered with the server\n`;
+                output.textContent += `3. Proper CORS configuration\n`;
+
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+                output.className = 'output error';
+            }
+        };
+
+        window.performanceTest = async function() {
+            const output = document.getElementById('perf-output');
+            try {
+                if (!signer) {
+                    throw new Error('Please configure signing first');
+                }
+
+                output.textContent = 'Running performance test...\n';
+
+                const testRequests = Array(50).fill(null).map((_, i) => ({
+                    method: 'GET',
+                    url: `https://api.datafold.com/api/crypto/test${i}`,
+                    headers: {
+                        'user-agent': 'DataFold-JS-SDK/0.1.0'
+                    }
+                }));
+
+                // Test individual signing performance
+                const singleStart = performance.now();
+                await signer.signRequest(testRequests[0]);
+                const singleElapsed = performance.now() - singleStart;
+
+                // Test batch signing performance
+                const batchStart = performance.now();
+                const results = await signer.signRequests(testRequests);
+                const batchElapsed = performance.now() - batchStart;
+
+                output.textContent += `Performance Results:\n`;
+                output.textContent += `- Single request: ${singleElapsed.toFixed(2)}ms\n`;
+                output.textContent += `- 50 requests: ${batchElapsed.toFixed(2)}ms\n`;
+                output.textContent += `- Average per request: ${(batchElapsed / 50).toFixed(2)}ms\n`;
+                output.textContent += `- Requests per second: ${(50 / (batchElapsed / 1000)).toFixed(0)}\n`;
+
+                if (singleElapsed < 10) {
+                    output.textContent += `\n✅ Single request performance target met (<10ms)\n`;
+                } else {
+                    output.textContent += `\n⚠️  Single request performance target missed (${singleElapsed.toFixed(2)}ms >= 10ms)\n`;
+                }
+
+                output.textContent += `\nAll ${results.length} requests signed successfully!\n`;
+
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+                output.className = 'output error';
+            }
+        };
+
+    </script>
+</body>
+</html>

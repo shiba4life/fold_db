@@ -2,6 +2,7 @@
 Tests for key backup and restore functionality
 """
 
+import base64
 import json
 import os
 import tempfile

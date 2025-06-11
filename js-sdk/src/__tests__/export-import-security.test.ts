@@ -10,12 +10,13 @@ import {
 } from '../crypto/key-export-import.js';
 import { generateKeyPair } from '../crypto/ed25519.js';
 import { createStorage } from '../storage/index.js';
-import { 
-  Ed25519KeyPair, 
-  KeyStorageInterface, 
+import {
+  Ed25519KeyPair,
+  KeyStorageInterface,
   KeyExportOptions,
   KeyImportError,
-  EncryptedBackupFormat 
+  KeyExportError,
+  EncryptedBackupFormat
 } from '../types.js';
 
 // Test with actual IndexedDB storage if available, otherwise skip
@@ -296,7 +297,7 @@ describe('Export/Import Security and Corruption Tests', () => {
         const options: KeyExportOptions = { format: 'json' };
         
         await expect(manager.exportKey(testKeyId, weakPassphrase, options))
-          .rejects.toThrow(KeyImportError);
+          .rejects.toThrow(KeyExportError);
       }
     });
   });
@@ -310,7 +311,7 @@ describe('Export/Import Security and Corruption Tests', () => {
         await manager.importKey(exportResult.data, 'wrong-passphrase');
         fail('Expected import to fail');
       } catch (error) {
-        const errorMessage = error.message.toLowerCase();
+        const errorMessage = (error as Error).message.toLowerCase();
         
         // Should not contain sensitive data
         expect(errorMessage).not.toContain(testPassphrase);
@@ -335,7 +336,7 @@ describe('Export/Import Security and Corruption Tests', () => {
         await manager.importKey(JSON.stringify(backup), testPassphrase);
         fail('Expected import to fail');
       } catch (error) {
-        const errorMessage = error.message.toLowerCase();
+        const errorMessage = (error as Error).message.toLowerCase();
         
         // Should not expose cryptographic implementation details
         expect(errorMessage).not.toContain('aes');

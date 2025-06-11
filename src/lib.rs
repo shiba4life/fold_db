@@ -26,6 +26,7 @@
 //! permissions and payment requirements.
 
 pub mod atom;
+pub mod cli;
 pub mod config;
 pub mod config_utils;
 pub mod crypto;
@@ -44,6 +45,8 @@ pub mod testing_utils;
 pub mod transform;
 pub mod validation_utils;
 pub mod web_logger;
+
+pub mod tests;
 
 // Re-export main types for convenience
 pub use datafold_node::config::load_node_config;
@@ -81,4 +84,15 @@ pub use datafold_node::{
     CryptoInitContext, CryptoInitError, CryptoInitResult, CryptoInitStatus,
     validate_crypto_config_comprehensive, validate_for_database_creation,
     validate_crypto_config_quick,
+};
+
+// Re-export CLI types for authentication and signing
+pub use cli::{
+    auth::{CliAuthProfile, CliAuthStatus, CliRequestSigner, CliSigningConfig},
+    config::{CliConfigManager, ServerConfig, CliConfig, CliSettings},
+    http_client::{AuthenticatedHttpClient, HttpClientBuilder, RetryConfig},
+    signing_config::{
+        EnhancedSigningConfig, AutoSigningConfig, SigningMode, CommandSigningContext,
+        SigningDebugConfig, SigningPerformanceConfig
+    }
 };

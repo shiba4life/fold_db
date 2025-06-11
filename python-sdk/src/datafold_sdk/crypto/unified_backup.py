@@ -11,7 +11,7 @@ import secrets
 import base64
 from typing import Dict, List, Optional, Tuple, Union, Any
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Import cryptography components
 try:
@@ -83,7 +83,7 @@ class MigrationResult:
 
 
 @dataclass
-class TestVector:
+class ValidationVector:
     """Test vector for cross-platform validation"""
     passphrase: str
     salt: str
@@ -174,7 +174,7 @@ class UnifiedBackupManager:
             'encryption': encryption,
             'nonce': base64.b64encode(nonce).decode('ascii'),
             'ciphertext': base64.b64encode(ciphertext).decode('ascii'),
-            'created': datetime.utcnow().isoformat() + 'Z'
+            'created': datetime.now(timezone.utc).isoformat() + 'Z'
         }
         
         # Add Argon2id specific parameters
@@ -326,7 +326,7 @@ class UnifiedBackupManager:
                 warnings=[f'Migration failed: {str(e)}']
             )
     
-    def generate_test_vector(self) -> TestVector:
+    def generate_test_vector(self) -> ValidationVector:
         """
         Generate test vector for cross-platform validation
         
@@ -356,7 +356,7 @@ class UnifiedBackupManager:
         plaintext = self._prepare_key_plaintext(test_key_pair)
         ciphertext = self._encrypt_xchacha20_poly1305(plaintext, derived_key, nonce)
         
-        return TestVector(
+        return ValidationVector(
             passphrase=passphrase,
             salt=base64.b64encode(salt).decode('ascii'),
             nonce=base64.b64encode(nonce).decode('ascii'),
@@ -368,7 +368,7 @@ class UnifiedBackupManager:
             created='2025-06-08T17:00:00Z'
         )
     
-    def validate_test_vector(self, test_vector: TestVector) -> bool:
+    def validate_test_vector(self, test_vector: ValidationVector) -> bool:
         """
         Validate cross-platform compatibility with test vector
         

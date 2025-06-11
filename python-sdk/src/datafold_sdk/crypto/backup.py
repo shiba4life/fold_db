@@ -293,7 +293,8 @@ class KeyBackupManager:
     
     def _get_timestamp(self) -> str:
         """Get current timestamp as ISO string"""
-        return datetime.utcnow().isoformat() + 'Z'
+        from datetime import timezone
+        return datetime.now(timezone.utc).isoformat() + 'Z'
     
     def _prepare_key_data(self, key_pair: Ed25519KeyPair) -> bytes:
         """Prepare key data for backup (combine private and public keys)"""

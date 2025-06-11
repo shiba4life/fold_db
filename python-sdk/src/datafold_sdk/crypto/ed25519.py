@@ -277,13 +277,14 @@ def generate_multiple_key_pairs(count: int, *, validate: bool = True) -> List[Ed
     return key_pairs
 
 
-def format_key(key: bytes, format_type: str) -> Union[str, bytes]:
+def format_key(key: bytes, format_type: str, key_type: Optional[str] = None) -> Union[str, bytes]:
     """
     Convert key to different formats.
     
     Args:
         key: The key bytes to format
         format_type: Output format ('hex', 'base64', 'bytes', 'pem')
+        key_type: Type of key ('private' or 'public') - required for PEM format
         
     Returns:
         Union[str, bytes]: Formatted key
@@ -299,11 +300,23 @@ def format_key(key: bytes, format_type: str) -> Union[str, bytes]:
     elif format_type == 'base64':
         return base64.b64encode(key).decode('ascii')
     elif format_type == 'bytes':
-        return bytes(key)  # Return a copy
+        return bytes(bytearray(key))  # Return a proper copy
     elif format_type == 'pem':
         # For PEM format, we need to reconstruct the key object
-        if len(key) == ED25519_PRIVATE_KEY_LENGTH:
-            # Private key
+        if len(key) != 32:
+            raise Ed25519KeyError("Invalid key length for PEM format", "INVALID_KEY_LENGTH")
+            
+        # Use key_type if provided, otherwise try to detect
+        if key_type == 'public':
+            try:
+                public_key_obj = Ed25519PublicKey.from_public_bytes(key)
+                return public_key_obj.public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
+                ).decode('ascii')
+            except Exception as e:
+                raise Ed25519KeyError(f"Failed to format public key as PEM: {e}", "PEM_FORMAT_FAILED")
+        elif key_type == 'private':
             try:
                 private_key_obj = Ed25519PrivateKey.from_private_bytes(key)
                 return private_key_obj.private_bytes(
@@ -313,18 +326,25 @@ def format_key(key: bytes, format_type: str) -> Union[str, bytes]:
                 ).decode('ascii')
             except Exception as e:
                 raise Ed25519KeyError(f"Failed to format private key as PEM: {e}", "PEM_FORMAT_FAILED")
-        elif len(key) == ED25519_PUBLIC_KEY_LENGTH:
-            # Public key
-            try:
-                public_key_obj = Ed25519PublicKey.from_public_bytes(key)
-                return public_key_obj.public_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PublicFormat.SubjectPublicKeyInfo
-                ).decode('ascii')
-            except Exception as e:
-                raise Ed25519KeyError(f"Failed to format public key as PEM: {e}", "PEM_FORMAT_FAILED")
         else:
-            raise Ed25519KeyError("Invalid key length for PEM format", "INVALID_KEY_LENGTH")
+            # Auto-detect: Try as private key first, then public key
+            try:
+                private_key_obj = Ed25519PrivateKey.from_private_bytes(key)
+                return private_key_obj.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.PKCS8,
+                    encryption_algorithm=serialization.NoEncryption()
+                ).decode('ascii')
+            except Exception:
+                # If private key fails, try as public key
+                try:
+                    public_key_obj = Ed25519PublicKey.from_public_bytes(key)
+                    return public_key_obj.public_bytes(
+                        encoding=serialization.Encoding.PEM,
+                        format=serialization.PublicFormat.SubjectPublicKeyInfo
+                    ).decode('ascii')
+                except Exception as e:
+                    raise Ed25519KeyError(f"Failed to format key as PEM: {e}", "PEM_FORMAT_FAILED")
     else:
         raise Ed25519KeyError(f"Unsupported format: {format_type}", "UNSUPPORTED_FORMAT")
 
@@ -365,7 +385,7 @@ def parse_key(key_data: Union[str, bytes], format_type: str) -> bytes:
         if not isinstance(key_data, bytes):
             raise Ed25519KeyError("Bytes format requires bytes input", "INVALID_BYTES_INPUT")
         
-        return bytes(key_data)  # Return a copy
+        return bytes(bytearray(key_data))  # Return a proper copy
         
     elif format_type == 'pem':
         if not isinstance(key_data, str):

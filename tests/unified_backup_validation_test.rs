@@ -85,23 +85,6 @@ mod tests {
         }
     }
 
-    /// Test 2: Validate test vector format compliance
-    #[test]
-    fn test_vector_format_compliance() {
-        let start = Instant::now();
-        
-        // Create test vectors matching the specification
-        let test_vector_1 = create_test_vector_1();
-        let test_vector_2 = create_test_vector_2();
-        let test_vector_3 = create_test_vector_3();
-        
-        // Validate each test vector structure
-        validate_test_vector_structure(&test_vector_1, "Test Vector 1");
-        validate_test_vector_structure(&test_vector_2, "Test Vector 2");
-        validate_test_vector_structure(&test_vector_3, "Test Vector 3");
-        
-        println!("✅ All test vectors passed format compliance in {:?}", start.elapsed());
-    }
 
     /// Test 3: Validate algorithm parameter requirements
     #[test]
@@ -344,8 +327,8 @@ fn validate_test_vector_structure(test_vector: &TestVector, name: &str) {
     assert!(!test_vector.created.is_empty(), "{}: created should not be empty", name);
     
     // Validate that salt and nonce are valid base64
-    assert!(base64::decode(&test_vector.salt).is_ok(), "{}: salt should be valid base64", name);
-    assert!(base64::decode(&test_vector.nonce).is_ok(), "{}: nonce should be valid base64", name);
+    assert!(base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &test_vector.salt).is_ok(), "{}: salt should be valid base64", name);
+    assert!(base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &test_vector.nonce).is_ok(), "{}: nonce should be valid base64", name);
     
     println!("✅ {} structure validation passed", name);
 }

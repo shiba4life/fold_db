@@ -134,6 +134,7 @@ mod tests {
     fn trusted_node_management() {
         let dir = tempdir().unwrap();
         let config = NodeConfig {
+            signature_auth: None,
             storage_path: dir.path().to_path_buf(),
             network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
             crypto: None,

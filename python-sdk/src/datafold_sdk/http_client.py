@@ -9,25 +9,51 @@ import json
 import time
 import hashlib
 import uuid
-from typing import Dict, Optional, Any, List, Union
+from typing import Dict, Optional, Any, List, Union, TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
 from dataclasses import dataclass, field
 import logging
+
+if TYPE_CHECKING:
+    from .signing import SigningConfig
 
 # HTTP client imports with fallback
 try:
     import requests
     from requests.adapters import HTTPAdapter
     from requests.packages.urllib3.util.retry import Retry
+    import requests.exceptions as req_exceptions
     REQUESTS_AVAILABLE = True
+    Timeout = req_exceptions.Timeout
+    ConnectionError = req_exceptions.ConnectionError
+    RequestException = req_exceptions.RequestException
 except ImportError:
     REQUESTS_AVAILABLE = False
     requests = None
     HTTPAdapter = None
     Retry = None
+    # Create dummy exception classes for when requests is not available
+    class _FallbackTimeout(Exception):
+        pass
+    class _FallbackConnectionError(Exception):
+        pass
+    class _FallbackRequestException(Exception):
+        pass
+    Timeout = _FallbackTimeout
+    ConnectionError = _FallbackConnectionError
+    RequestException = _FallbackRequestException
 
 from .exceptions import ServerCommunicationError, ValidationError
 from .crypto.ed25519 import Ed25519KeyPair
+
+try:
+    from .signing import SigningConfig, SigningSession, SigningError
+    SIGNING_AVAILABLE = True
+except ImportError:
+    SIGNING_AVAILABLE = False
+    SigningConfig = None
+    SigningSession = None
+    SigningError = None
 
 logger = logging.getLogger(__name__)
 
@@ -92,12 +118,13 @@ class DataFoldHttpClient:
     with automatic retry logic and error handling.
     """
     
-    def __init__(self, config: ServerConfig):
+    def __init__(self, config: ServerConfig, signing_config: Optional['SigningConfig'] = None):
         """
         Initialize the HTTP client.
         
         Args:
             config: Server configuration settings
+            signing_config: Optional request signing configuration
         """
         if not REQUESTS_AVAILABLE:
             raise ServerCommunicationError(
@@ -105,6 +132,7 @@ class DataFoldHttpClient:
             )
         
         self.config = config
+        self.signing_config = signing_config
         self.session = self._create_session()
         
         # API endpoints
@@ -115,16 +143,31 @@ class DataFoldHttpClient:
         }
         
         logger.info(f"Initialized DataFold HTTP client for server: {config.base_url}")
+        if signing_config:
+            logger.info(f"Request signing enabled with key ID: {signing_config.key_id}")
     
     def _create_session(self):
-        """Create HTTP session with retry logic."""
-        session = requests.Session()
+        """Create HTTP session with retry logic and optional signing."""
+        if self.signing_config:
+            # Create signing session if signing is configured
+            try:
+                session = SigningSession(
+                    signing_config=self.signing_config,
+                    auto_sign=True
+                )
+                logger.debug("Created signing session for HTTP client")
+            except Exception as e:
+                logger.warning(f"Failed to create signing session: {e}")
+                # Fall back to regular session
+                session = requests.Session()
+        else:
+            session = requests.Session()
         
         # Configure retry strategy
         retry_strategy = Retry(
             total=self.config.retry_attempts,
             status_forcelist=[429, 500, 502, 503, 504],
-            method_whitelist=["HEAD", "GET", "PUT", "DELETE", "OPTIONS", "TRACE", "POST"],
+            allowed_methods=["HEAD", "GET", "PUT", "DELETE", "OPTIONS", "TRACE", "POST"],
             backoff_factor=self.config.retry_backoff_factor,
         )
         
@@ -192,11 +235,11 @@ class DataFoldHttpClient:
             except json.JSONDecodeError as e:
                 raise ServerCommunicationError(f"Invalid JSON response: {e}")
                 
-        except requests.exceptions.Timeout:
+        except Timeout:
             raise ServerCommunicationError(f"Request timeout after {self.config.timeout} seconds")
-        except requests.exceptions.ConnectionError as e:
+        except ConnectionError as e:
             raise ServerCommunicationError(f"Connection error: {e}")
-        except requests.exceptions.RequestException as e:
+        except RequestException as e:
             raise ServerCommunicationError(f"Request failed: {e}")
     
     def register_public_key(
@@ -407,6 +450,52 @@ class DataFoldHttpClient:
             verified_at=data.get('verified_at'),
             message_hash=data.get('message_hash')
         )
+    
+    def configure_signing(self, signing_config: 'SigningConfig') -> None:
+        """
+        Configure request signing for this client.
+        
+        Args:
+            signing_config: Signing configuration to use
+        """
+        self.signing_config = signing_config
+        
+        # Recreate session with signing capability
+        old_session = self.session
+        try:
+            self.session = self._create_session()
+            old_session.close()
+            logger.info(f"Request signing configured with key ID: {signing_config.key_id}")
+        except Exception as e:
+            # If signing setup fails, keep the old session
+            self.session = old_session
+            logger.error(f"Failed to configure request signing: {e}")
+            raise ServerCommunicationError(f"Failed to configure request signing: {e}")
+    
+    def disable_signing(self) -> None:
+        """Disable request signing for this client."""
+        if self.signing_config:
+            self.signing_config = None
+            
+            # Recreate session without signing
+            old_session = self.session
+            try:
+                self.session = self._create_session()
+                old_session.close()
+                logger.info("Request signing disabled")
+            except Exception as e:
+                # If recreation fails, keep the old session
+                self.session = old_session
+                logger.error(f"Failed to disable request signing: {e}")
+    
+    def is_signing_enabled(self) -> bool:
+        """
+        Check if request signing is enabled.
+        
+        Returns:
+            bool: True if signing is configured and enabled
+        """
+        return self.signing_config is not None
     
     def close(self):
         """Close the HTTP session."""

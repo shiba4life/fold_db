@@ -16,8 +16,8 @@
 //!
 //! ## Example Usage
 //!
-//! ```rust
-//! use datafold::db_operations::{AsyncEncryptedBackup, BackupConfig};
+//! ```rust,no_run
+//! use datafold::db_operations::{AsyncEncryptedBackup, DbOperations, AsyncBackupConfig};
 //! use datafold::crypto::generate_master_keypair;
 //!
 //! # #[tokio::main]
@@ -26,8 +26,8 @@
 //! let db = sled::open("source_db")?;
 //! let db_ops = DbOperations::new(db)?;
 //! let master_keypair = generate_master_keypair()?;
-//! let config = BackupConfig::default();
-//! 
+//! let config = AsyncBackupConfig::default();
+//!
 //! let backup_manager = AsyncEncryptedBackup::new(
 //!     db_ops, &master_keypair, config
 //! ).await?;
@@ -35,7 +35,7 @@
 //! // Create encrypted backup asynchronously
 //! let backup_path = "backup.enc";
 //! let backup_info = backup_manager.create_backup_async(backup_path).await?;
-//! println!("Backup created: {} bytes", backup_info.total_size);
+//! println!("Backup created: {} bytes", backup_info.metadata.total_size);
 //!
 //! // Restore from backup asynchronously
 //! let restore_db = sled::open("restored_db")?;

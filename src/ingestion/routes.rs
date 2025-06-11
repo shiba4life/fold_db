@@ -308,6 +308,7 @@ mod tests {
         let node = DataFoldNode::load(config).await.unwrap();
 
         web::Data::new(AppState {
+            signature_auth: None,
             node: Arc::new(tokio::sync::Mutex::new(node)),
         })
     }

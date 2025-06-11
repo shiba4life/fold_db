@@ -21,6 +21,64 @@ pub struct PublicKey {
     inner: VerifyingKey,
 }
 
+/// A wrapper around Ed25519 private key for DataFold database operations
+#[derive(Debug)]
+pub struct PrivateKey {
+    inner: SigningKey,
+}
+
+impl Clone for PrivateKey {
+    fn clone(&self) -> Self {
+        // Clone by converting to bytes and back
+        let bytes = self.inner.to_bytes();
+        Self {
+            inner: SigningKey::from_bytes(&bytes),
+        }
+    }
+}
+
+impl PrivateKey {
+    /// Create a PrivateKey from a SigningKey
+    pub fn from_signing_key(key: SigningKey) -> Self {
+        Self { inner: key }
+    }
+
+    /// Create a PrivateKey from bytes
+    pub fn from_bytes(bytes: &[u8; SECRET_KEY_LENGTH]) -> CryptoResult<Self> {
+        let signing_key = SigningKey::from_bytes(bytes);
+        Ok(Self { inner: signing_key })
+    }
+
+    /// Convert to bytes for storage
+    pub fn to_bytes(&self) -> [u8; SECRET_KEY_LENGTH] {
+        self.inner.to_bytes()
+    }
+
+    /// Sign data with this private key
+    pub fn sign(&self, message: &[u8]) -> CryptoResult<[u8; SIGNATURE_LENGTH]> {
+        let signature = self.inner.sign(message);
+        Ok(signature.to_bytes())
+    }
+
+    /// Get the corresponding public key
+    pub fn public_key(&self) -> PublicKey {
+        PublicKey::from_verifying_key(self.inner.verifying_key())
+    }
+
+    /// Get the inner SigningKey (for advanced use cases)
+    pub fn inner(&self) -> &SigningKey {
+        &self.inner
+    }
+}
+
+impl Drop for PrivateKey {
+    fn drop(&mut self) {
+        // Zeroize the signing key bytes manually since SigningKey doesn't implement Zeroize
+        let mut secret_bytes = self.inner.to_bytes();
+        secret_bytes.zeroize();
+    }
+}
+
 impl PublicKey {
     /// Create a PublicKey from a VerifyingKey
     pub fn from_verifying_key(key: VerifyingKey) -> Self {
@@ -154,6 +212,11 @@ impl MasterKeyPair {
     /// Get the inner SigningKey (for advanced use cases)
     pub fn signing_key(&self) -> &SigningKey {
         &self.signing_key
+    }
+
+    /// Get the private key (for backward compatibility with tests)
+    pub fn private_key(&self) -> PrivateKey {
+        PrivateKey::from_signing_key(self.signing_key.clone())
     }
 }
 

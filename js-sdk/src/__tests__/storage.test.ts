@@ -1,41 +1,70 @@
-import { 
+import {
   IndexedDBKeyStorage,
   createStorage,
   isStorageSupported,
   getStorageQuota,
-  validatePassphrase
-} from '../storage/index';
-import { 
+  validatePassphrase,
   generateKeyId,
   validateKeyId,
   sanitizeKeyId,
   estimateKeyStorageSize,
   validateMetadata,
   withTimeout
-} from '../storage/storage-utils';
+} from '../storage/index';
 import { generateKeyPair } from '../crypto/ed25519';
-import { StorageError, Ed25519KeyPair } from '../types';
+import { StorageError, Ed25519KeyPair, StoredKeyMetadata } from '../types';
 
 // Mock IndexedDB for testing
 class MockIDBDatabase {
   objectStoreNames = { contains: jest.fn() };
-  transaction = jest.fn();
+  transaction = jest.fn(() => new MockIDBTransaction());
   close = jest.fn();
   onerror = null;
 }
 
+const createMockRequest = (result: any = null) => ({
+  result,
+  error: null,
+  onsuccess: null as any,
+  onerror: null as any
+});
+
 class MockIDBObjectStore {
-  put = jest.fn();
-  get = jest.fn();
-  delete = jest.fn();
-  getAll = jest.fn();
-  count = jest.fn();
-  clear = jest.fn();
+  put = jest.fn().mockImplementation(() => {
+    const request = createMockRequest();
+    setTimeout(() => request.onsuccess && request.onsuccess(), 0);
+    return request;
+  });
+  get = jest.fn().mockImplementation(() => {
+    const request = createMockRequest();
+    setTimeout(() => request.onsuccess && request.onsuccess(), 0);
+    return request;
+  });
+  delete = jest.fn().mockImplementation(() => {
+    const request = createMockRequest();
+    setTimeout(() => request.onsuccess && request.onsuccess(), 0);
+    return request;
+  });
+  getAll = jest.fn().mockImplementation(() => {
+    const request = createMockRequest([]);
+    setTimeout(() => request.onsuccess && request.onsuccess(), 0);
+    return request;
+  });
+  count = jest.fn().mockImplementation(() => {
+    const request = createMockRequest(1);
+    setTimeout(() => request.onsuccess && request.onsuccess(), 0);
+    return request;
+  });
+  clear = jest.fn().mockImplementation(() => {
+    const request = createMockRequest();
+    setTimeout(() => request.onsuccess && request.onsuccess(), 0);
+    return request;
+  });
   createIndex = jest.fn();
 }
 
 class MockIDBTransaction {
-  objectStore = jest.fn();
+  objectStore = jest.fn(() => new MockIDBObjectStore());
 }
 
 const mockIDBRequest = {
@@ -633,7 +662,14 @@ describe('Secure Storage', () => {
   });
 
   describe('Security Properties', () => {
-    it('should use strong encryption parameters', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should use strong encryption parameters', async () => {
+      // Trigger encryption by storing a key
+      await storage.storeKeyPair('security-test', testKeyPair, 'test-passphrase');
+      
       // Verify PBKDF2 parameters
       expect(mockSubtle.deriveKey).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -652,19 +688,25 @@ describe('Secure Storage', () => {
     });
 
     it('should generate random IV and salt for each encryption', async () => {
+      // Trigger multiple encryption operations
+      await storage.storeKeyPair('random-test-1', testKeyPair, 'test-passphrase');
+      await storage.storeKeyPair('random-test-2', testKeyPair, 'test-passphrase');
+      
       const calls = mockCrypto.getRandomValues.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
       
       // Should generate different random values each time
-      const firstCall = calls[0][0];
-      const secondCall = calls[1] ? calls[1][0] : null;
-      
-      if (secondCall) {
+      if (calls.length >= 2) {
+        const firstCall = calls[0][0];
+        const secondCall = calls[1][0];
         expect(firstCall).not.toEqual(secondCall);
       }
     });
 
     it('should not store plaintext private keys', async () => {
+      // Trigger encryption by storing a key
+      await storage.storeKeyPair('encryption-test', testKeyPair, 'test-passphrase');
+      
       // Verify that encryption is called before storage
       expect(mockSubtle.encrypt).toHaveBeenCalled();
     });

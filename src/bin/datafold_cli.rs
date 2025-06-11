@@ -7,6 +7,10 @@ use datafold::crypto::MasterKeyPair;
 use datafold::datafold_node::crypto_init::{
     initialize_database_crypto, get_crypto_init_status, validate_crypto_config_for_init
 };
+use datafold::cli::auth::{CliAuthProfile, CliSigningConfig};
+use datafold::cli::config::{CliConfigManager, ServerConfig};
+use datafold::cli::http_client::{AuthenticatedHttpClient, HttpClientBuilder, RetryConfig};
+use datafold::cli::signing_config::SigningMode;
 use log::{info, warn, error};
 use rpassword::read_password;
 use serde_json::{Value, json};
@@ -19,6 +23,7 @@ use rand::{RngCore, rngs::OsRng};
 use reqwest::Client;
 use std::time::Duration;
 use base64::{Engine as _, engine::general_purpose};
+use std::collections::HashMap;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -27,6 +32,26 @@ struct Cli {
     /// Path to the node configuration file
     #[arg(short, long, default_value = "config/node_config.json")]
     config: String,
+
+    /// Enable request signing (overrides configuration)
+    #[arg(long, global = true)]
+    sign: bool,
+
+    /// Disable request signing (overrides configuration)
+    #[arg(long, global = true, conflicts_with = "sign")]
+    no_sign: bool,
+
+    /// Authentication profile to use for signing
+    #[arg(long, global = true)]
+    profile: Option<String>,
+
+    /// Enable debug logging for signature operations
+    #[arg(long, global = true)]
+    sign_debug: bool,
+
+    /// Verbose output for debugging
+    #[arg(short, long, global = true)]
+    verbose: bool,
 
     #[command(subcommand)]
     command: Commands,
@@ -158,6 +183,9 @@ enum Commands {
         /// Only output the private key (use with caution)
         #[arg(long)]
         private_only: bool,
+        /// Passphrase for key derivation (if not provided, will prompt)
+        #[arg(long)]
+        passphrase: Option<String>,
     },
     /// Extract public key from private key
     ExtractPublicKey {
@@ -209,6 +237,9 @@ enum Commands {
         /// Security level for encryption
         #[arg(long, value_enum, default_value = "balanced")]
         security_level: CliSecurityLevel,
+        /// Passphrase for key encryption (if not provided, will prompt)
+        #[arg(long)]
+        passphrase: Option<String>,
     },
     /// Retrieve a private key from encrypted storage
     RetrieveKey {
@@ -576,6 +607,384 @@ enum Commands {
         #[arg(long)]
         cleanup: bool,
     },
+    /// Initialize CLI authentication configuration
+    AuthInit {
+        /// Server URL for authentication
+        #[arg(long, default_value = "http://localhost:8080")]
+        server_url: String,
+        /// Profile name for this configuration
+        #[arg(long, default_value = "default")]
+        profile: String,
+        /// Key identifier to use for authentication (must exist in storage)
+        #[arg(long, required = true)]
+        key_id: String,
+        /// Storage directory (defaults to ~/.datafold/keys)
+        #[arg(long)]
+        storage_dir: Option<PathBuf>,
+        /// User ID for registration (optional)
+        #[arg(long)]
+        user_id: Option<String>,
+        /// Force overwrite existing profile
+        #[arg(long)]
+        force: bool,
+    },
+    /// Show CLI authentication status
+    AuthStatus {
+        /// Show detailed status information
+        #[arg(long)]
+        verbose: bool,
+        /// Profile name to check (defaults to current profile)
+        #[arg(long)]
+        profile: Option<String>,
+    },
+    /// Manage authentication profiles
+    AuthProfile {
+        #[command(subcommand)]
+        action: ProfileAction,
+    },
+    /// Generate a new key pair specifically for CLI authentication
+    AuthKeygen {
+        /// Key identifier for the new key
+        #[arg(long, required = true)]
+        key_id: String,
+        /// Storage directory (defaults to ~/.datafold/keys)
+        #[arg(long)]
+        storage_dir: Option<PathBuf>,
+        /// Security level for key encryption
+        #[arg(long, value_enum, default_value = "balanced")]
+        security_level: CliSecurityLevel,
+        /// Force overwrite if key already exists
+        #[arg(long)]
+        force: bool,
+        /// Automatically register the key with the server
+        #[arg(long)]
+        auto_register: bool,
+        /// Server URL for auto-registration
+        #[arg(long)]
+        server_url: Option<String>,
+        /// Passphrase for key encryption (if not provided, will prompt)
+        #[arg(long)]
+        passphrase: Option<String>,
+    },
+    /// Test authenticated request to server
+    AuthTest {
+        /// Server endpoint to test (defaults to /api/test)
+        #[arg(long, default_value = "/api/test")]
+        endpoint: String,
+        /// Profile name to use for authentication
+        #[arg(long)]
+        profile: Option<String>,
+        /// HTTP method to use for test
+        #[arg(long, value_enum, default_value = "get")]
+        method: HttpMethod,
+        /// Test payload for POST/PUT requests
+        #[arg(long)]
+        payload: Option<String>,
+        /// Connection timeout in seconds
+        #[arg(long, default_value = "30")]
+        timeout: u64,
+    },
+    /// Configure automatic signature injection
+    AuthConfigure {
+        /// Enable or disable automatic signing globally
+        #[arg(long)]
+        enable_auto_sign: Option<bool>,
+        /// Set default signing mode (auto, manual, disabled)
+        #[arg(long, value_enum)]
+        default_mode: Option<CliSigningMode>,
+        /// Set signing mode for a specific command
+        #[arg(long)]
+        command: Option<String>,
+        /// Signing mode to set for the command
+        #[arg(long, value_enum, requires = "command")]
+        command_mode: Option<CliSigningMode>,
+        /// Remove command-specific signing override
+        #[arg(long)]
+        remove_command_override: Option<String>,
+        /// Enable or disable debug logging for signatures
+        #[arg(long)]
+        debug: Option<bool>,
+        /// Set environment variable for signing preference
+        #[arg(long)]
+        env_var: Option<String>,
+        /// Show current configuration
+        #[arg(long)]
+        show: bool,
+    },
+    /// Setup authentication with interactive configuration
+    AuthSetup {
+        /// Create default configuration file
+        #[arg(long)]
+        create_config: bool,
+        /// Server URL for default profile
+        #[arg(long)]
+        server_url: Option<String>,
+        /// Interactive setup mode
+        #[arg(long)]
+        interactive: bool,
+    },
+    /// Verify a signature against a message
+    VerifySignature {
+        /// Message to verify (as string)
+        #[arg(long)]
+        message: Option<String>,
+        /// Message file path
+        #[arg(long)]
+        message_file: Option<PathBuf>,
+        /// Signature to verify (base64 encoded)
+        #[arg(long, required = true)]
+        signature: String,
+        /// Key ID for verification
+        #[arg(long, required = true)]
+        key_id: String,
+        /// Public key for verification (hex, base64, or PEM format)
+        #[arg(long)]
+        public_key: Option<String>,
+        /// Public key file path
+        #[arg(long)]
+        public_key_file: Option<PathBuf>,
+        /// Verification policy to use
+        #[arg(long)]
+        policy: Option<String>,
+        /// Output format (json, table, or compact)
+        #[arg(long, value_enum, default_value = "table")]
+        output_format: VerificationOutputFormat,
+        /// Enable debug output
+        #[arg(long)]
+        debug: bool,
+    },
+    /// Inspect signature format and analyze components
+    InspectSignature {
+        /// Signature headers as JSON or individual values
+        #[arg(long)]
+        signature_input: Option<String>,
+        /// Signature value (base64 encoded)
+        #[arg(long)]
+        signature: Option<String>,
+        /// Headers file (JSON format)
+        #[arg(long)]
+        headers_file: Option<PathBuf>,
+        /// Output format (json, table, or compact)
+        #[arg(long, value_enum, default_value = "table")]
+        output_format: VerificationOutputFormat,
+        /// Show detailed analysis
+        #[arg(long)]
+        detailed: bool,
+        /// Enable debug output
+        #[arg(long)]
+        debug: bool,
+    },
+    /// Verify server response signatures
+    VerifyResponse {
+        /// Server URL to test
+        #[arg(long, required = true)]
+        url: String,
+        /// HTTP method to use
+        #[arg(long, value_enum, default_value = "get")]
+        method: HttpMethod,
+        /// Request headers (JSON format)
+        #[arg(long)]
+        headers: Option<String>,
+        /// Request body for POST/PUT requests
+        #[arg(long)]
+        body: Option<String>,
+        /// Request body file
+        #[arg(long)]
+        body_file: Option<PathBuf>,
+        /// Key ID for verification
+        #[arg(long, required = true)]
+        key_id: String,
+        /// Public key for verification (hex, base64, or PEM format)
+        #[arg(long)]
+        public_key: Option<String>,
+        /// Public key file path
+        #[arg(long)]
+        public_key_file: Option<PathBuf>,
+        /// Verification policy to use
+        #[arg(long)]
+        policy: Option<String>,
+        /// Output format (json, table, or compact)
+        #[arg(long, value_enum, default_value = "table")]
+        output_format: VerificationOutputFormat,
+        /// Enable debug output
+        #[arg(long)]
+        debug: bool,
+        /// Timeout in seconds
+        #[arg(long, default_value = "30")]
+        timeout: u64,
+    },
+    /// Configure verification settings
+    VerificationConfig {
+        /// Action to perform
+        #[command(subcommand)]
+        action: VerificationConfigAction,
+    },
+}
+
+/// Output format for verification results
+#[derive(Debug, Clone, ValueEnum)]
+enum VerificationOutputFormat {
+    /// JSON format
+    Json,
+    /// Table format (human-readable)
+    Table,
+    /// Compact format (one line)
+    Compact,
+}
+
+/// Verification configuration actions
+#[derive(Subcommand, Debug, Clone)]
+enum VerificationConfigAction {
+    /// Show current verification configuration
+    Show {
+        /// Show all policies
+        #[arg(long)]
+        policies: bool,
+        /// Show public keys
+        #[arg(long)]
+        keys: bool,
+    },
+    /// Add a verification policy
+    AddPolicy {
+        /// Policy name
+        #[arg(required = true)]
+        name: String,
+        /// Policy configuration file (JSON)
+        #[arg(long, required = true)]
+        config_file: PathBuf,
+    },
+    /// Remove a verification policy
+    RemovePolicy {
+        /// Policy name
+        #[arg(required = true)]
+        name: String,
+    },
+    /// Set default verification policy
+    SetDefaultPolicy {
+        /// Policy name
+        #[arg(required = true)]
+        name: String,
+    },
+    /// Add a public key for verification
+    AddPublicKey {
+        /// Key identifier
+        #[arg(long, required = true)]
+        key_id: String,
+        /// Public key (hex, base64, or PEM format)
+        #[arg(long)]
+        public_key: Option<String>,
+        /// Public key file path
+        #[arg(long)]
+        public_key_file: Option<PathBuf>,
+    },
+    /// Remove a public key
+    RemovePublicKey {
+        /// Key identifier
+        #[arg(long, required = true)]
+        key_id: String,
+    },
+    /// List all configured public keys
+    ListPublicKeys {
+        /// Show detailed information
+        #[arg(long)]
+        verbose: bool,
+    },
+}
+
+/// Profile management actions
+#[derive(Subcommand, Debug, Clone)]
+enum ProfileAction {
+    /// Create a new authentication profile
+    Create {
+        /// Profile name
+        #[arg(required = true)]
+        name: String,
+        /// Server URL
+        #[arg(long, required = true)]
+        server_url: String,
+        /// Key identifier
+        #[arg(long, required = true)]
+        key_id: String,
+        /// User ID (optional)
+        #[arg(long)]
+        user_id: Option<String>,
+        /// Set as default profile
+        #[arg(long)]
+        set_default: bool,
+    },
+    /// List all authentication profiles
+    List {
+        /// Show detailed information
+        #[arg(long)]
+        verbose: bool,
+    },
+    /// Show details of a specific profile
+    Show {
+        /// Profile name
+        #[arg(required = true)]
+        name: String,
+    },
+    /// Update an existing profile
+    Update {
+        /// Profile name
+        #[arg(required = true)]
+        name: String,
+        /// New server URL
+        #[arg(long)]
+        server_url: Option<String>,
+        /// New key identifier
+        #[arg(long)]
+        key_id: Option<String>,
+        /// New user ID
+        #[arg(long)]
+        user_id: Option<String>,
+    },
+    /// Delete a profile
+    Delete {
+        /// Profile name
+        #[arg(required = true)]
+        name: String,
+        /// Force deletion without confirmation
+        #[arg(long)]
+        force: bool,
+    },
+    /// Set default profile
+    SetDefault {
+        /// Profile name
+        #[arg(required = true)]
+        name: String,
+    },
+}
+
+/// HTTP methods for testing
+#[derive(Debug, Clone, ValueEnum)]
+enum HttpMethod {
+    Get,
+    Post,
+    Put,
+    Patch,
+    Delete,
+}
+
+/// CLI wrapper for signing mode
+#[derive(Debug, Clone, ValueEnum)]
+enum CliSigningMode {
+    /// Automatically sign all requests
+    Auto,
+    /// Only sign when explicitly requested
+    Manual,
+    /// Never sign requests
+    Disabled,
+}
+
+impl From<CliSigningMode> for SigningMode {
+    fn from(cli_mode: CliSigningMode) -> Self {
+        match cli_mode {
+            CliSigningMode::Auto => SigningMode::Auto,
+            CliSigningMode::Manual => SigningMode::Manual,
+            CliSigningMode::Disabled => SigningMode::Disabled,
+        }
+    }
 }
 
 /// Message encoding options for server communication
@@ -907,6 +1316,136 @@ where
 }
 
 /// Get the default storage directory for keys
+/// Build an HTTP client with automatic signing support
+#[allow(dead_code)]
+async fn build_authenticated_client(
+    cli: &Cli,
+    command_name: &str,
+    config_manager: &CliConfigManager,
+) -> Result<AuthenticatedHttpClient, Box<dyn std::error::Error>> {
+    let signing_context = config_manager.signing_config().for_command(command_name);
+    
+    // Determine if we should sign this request
+    let explicit_sign = if cli.sign {
+        Some(true)
+    } else if cli.no_sign {
+        Some(false)
+    } else {
+        None
+    };
+    
+    let should_sign = signing_context.should_sign_request(explicit_sign);
+    
+    if cli.verbose {
+        println!("🔐 Signing status for '{}': {}", command_name,
+                if should_sign { "enabled" } else { "disabled" });
+        if signing_context.debug_enabled {
+            println!("🐛 Debug mode enabled for signature operations");
+        }
+    }
+    
+    // Get timeout from CLI config
+    let timeout = config_manager.config().settings.default_timeout_secs;
+    let retry_config = RetryConfig {
+        max_retries: config_manager.config().settings.default_max_retries,
+        initial_delay_ms: 1000,
+        max_delay_ms: 30000,
+        retry_server_errors: true,
+        retry_network_errors: true,
+    };
+    
+    if !should_sign {
+        // Return unauthenticated client
+        return Ok(HttpClientBuilder::new()
+            .timeout_secs(timeout)
+            .retry_config(retry_config)
+            .build()?);
+    }
+    
+    // Get profile to use
+    let profile_name = cli.profile.as_ref()
+        .or(signing_context.profile.as_ref())
+        .or(config_manager.config().default_profile.as_ref())
+        .ok_or("No authentication profile specified and no default profile set")?;
+    
+    let profile = config_manager.get_profile(profile_name)
+        .ok_or_else(|| format!("Authentication profile '{}' not found", profile_name))?;
+    
+    if cli.verbose {
+        println!("🔑 Using authentication profile: {}", profile_name);
+        println!("🌐 Server URL: {}", profile.server_url);
+        println!("🆔 Client ID: {}", profile.client_id);
+    }
+    
+    // Load key from storage
+    let storage_dir = CliConfigManager::default_keys_dir()?;
+    let key_content = handle_retrieve_key_internal(&profile.key_id, &storage_dir, false)?;
+    
+    // Parse the key
+    let private_key_bytes = parse_key_input(&key_content, true)?;
+    let keypair = MasterKeyPair::from_secret_bytes(&private_key_bytes)
+        .map_err(|e| format!("Failed to load keypair: {}", e))?;
+    
+    // Create signing configuration
+    let signing_config = signing_context.get_signing_config().clone();
+    
+    // Apply CLI debug override
+    if cli.sign_debug {
+        // Enable debug logging for this request
+        if cli.verbose {
+            println!("🐛 Enabling debug mode for signature generation");
+        }
+    }
+    
+    // Build authenticated client
+    let client = HttpClientBuilder::new()
+        .timeout_secs(timeout)
+        .retry_config(retry_config)
+        .build_authenticated(keypair, profile.clone(), Some(signing_config))?;
+    
+    if cli.verbose {
+        println!("✅ Authenticated HTTP client ready");
+    }
+    
+    Ok(client)
+}
+
+/// Internal helper for retrieving keys without authentication
+#[allow(dead_code)]
+#[allow(clippy::ptr_arg)]
+fn handle_retrieve_key_internal(
+    key_id: &str,
+    storage_dir: &PathBuf,
+    public_only: bool,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let key_file = storage_dir.join(format!("{}.json", key_id));
+    
+    if !key_file.exists() {
+        return Err(format!("Key '{}' not found in storage", key_id).into());
+    }
+    
+    let content = fs::read_to_string(&key_file)?;
+    let key_config: KeyStorageConfig = serde_json::from_str(&content)?;
+    
+    // Prompt for passphrase
+    print!("Enter passphrase for key '{}': ", key_id);
+    io::stdout().flush()?;
+    let passphrase = read_password()?;
+    
+    // Decrypt the key
+    let decrypted_bytes = decrypt_key(&key_config, &passphrase)?;
+    
+    if public_only {
+        // Extract public key from private key
+        let keypair = MasterKeyPair::from_secret_bytes(&decrypted_bytes)
+            .map_err(|e| format!("Failed to parse private key: {}", e))?;
+        let public_key_bytes = keypair.public_key_bytes();
+        Ok(general_purpose::STANDARD.encode(public_key_bytes))
+    } else {
+        Ok(general_purpose::STANDARD.encode(decrypted_bytes))
+    }
+}
+
 fn get_default_storage_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let home_dir = dirs::home_dir().ok_or("Unable to determine home directory")?;
     Ok(home_dir.join(".datafold").join("keys"))
@@ -1006,6 +1545,7 @@ fn handle_store_key(
     storage_dir: Option<PathBuf>,
     force: bool,
     security_level: CliSecurityLevel,
+    passphrase: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Get storage directory
     let storage_path = storage_dir.unwrap_or(get_default_storage_dir()?);
@@ -1034,7 +1574,10 @@ fn handle_store_key(
     }
     
     // Get passphrase for encryption
-    let passphrase = get_secure_passphrase()?;
+    let passphrase = match passphrase {
+        Some(p) => p,
+        None => get_secure_passphrase()?,
+    };
     
     // Convert security level to Argon2 parameters
     let argon2_params = match security_level {
@@ -2203,6 +2746,847 @@ async fn handle_sign_and_verify(
     Ok(())
 }
 
+/// Handle CLI authentication initialization
+async fn handle_auth_init(
+    server_url: String,
+    profile: String,
+    key_id: String,
+    storage_dir: Option<PathBuf>,
+    user_id: Option<String>,
+    force: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("🔐 Initializing CLI authentication...");
+    
+    // Load or create CLI configuration
+    let mut config_manager = CliConfigManager::new()?;
+    
+    // Check if profile already exists
+    if config_manager.get_profile(&profile).is_some() && !force {
+        return Err(format!(
+            "Profile '{}' already exists. Use --force to overwrite.",
+            profile
+        ).into());
+    }
+    
+    // Verify the key exists in storage
+    let storage_dir = storage_dir.unwrap_or_else(|| get_default_storage_dir().unwrap());
+    let key_file = storage_dir.join(format!("{}.json", key_id));
+    if !key_file.exists() {
+        return Err(format!(
+            "Key '{}' not found in storage. Use 'auth-keygen' or 'store-key' to create it first.",
+            key_id
+        ).into());
+    }
+    
+    // Generate client ID
+    let client_id = format!("cli_{}", uuid::Uuid::new_v4());
+    
+    // Create authentication profile
+    let mut metadata = HashMap::new();
+    metadata.insert("source".to_string(), "datafold-cli".to_string());
+    metadata.insert("created_by".to_string(), "auth-init".to_string());
+    
+    let auth_profile = CliAuthProfile {
+        client_id: client_id.clone(),
+        key_id: key_id.clone(),
+        user_id,
+        server_url: server_url.clone(),
+        metadata,
+    };
+    
+    // Add profile to configuration
+    config_manager.add_profile(profile.clone(), auth_profile)?;
+    config_manager.save()?;
+    
+    println!("✅ Authentication profile '{}' created successfully!", profile);
+    println!("Client ID: {}", client_id);
+    println!("Key ID: {}", key_id);
+    println!("Server URL: {}", server_url);
+    
+    if config_manager.config().default_profile.as_ref() == Some(&profile) {
+        println!("✨ Set as default profile");
+    }
+    
+    println!("\n💡 Next steps:");
+    println!("1. Register your public key: datafold register-key --key-id {} --client-id {}", key_id, client_id);
+    println!("2. Test authentication: datafold auth-test");
+    
+    Ok(())
+}
+
+/// Handle CLI authentication status
+async fn handle_auth_status(
+    verbose: bool,
+    profile: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("🔐 CLI Authentication Status");
+    println!("============================");
+    
+    let config_manager = CliConfigManager::new()?;
+    let status = config_manager.auth_status();
+    
+    if !status.configured {
+        println!("❌ Authentication not configured");
+        println!("\n💡 To get started:");
+        println!("1. Generate a key: datafold auth-keygen --key-id my-key");
+        println!("2. Initialize auth: datafold auth-init --key-id my-key --server-url https://your-server.com");
+        return Ok(());
+    }
+    
+    println!("✅ Authentication configured");
+    
+    if let Some(profile_name) = &profile {
+        // Show specific profile
+        if let Some(prof) = config_manager.get_profile(profile_name) {
+            println!("\n📋 Profile: {}", profile_name);
+            println!("   Client ID: {}", prof.client_id);
+            println!("   Key ID: {}", prof.key_id);
+            println!("   Server URL: {}", prof.server_url);
+            
+            if let Some(user_id) = &prof.user_id {
+                println!("   User ID: {}", user_id);
+            }
+            
+            if verbose {
+                println!("   Metadata:");
+                for (key, value) in &prof.metadata {
+                    println!("     {}: {}", key, value);
+                }
+            }
+        } else {
+            return Err(format!("Profile '{}' not found", profile_name).into());
+        }
+    } else {
+        // Show default profile and overall status
+        if let Some(client_id) = &status.client_id {
+            println!("   Client ID: {}", client_id);
+        }
+        if let Some(key_id) = &status.key_id {
+            println!("   Key ID: {}", key_id);
+        }
+        if let Some(server_url) = &status.server_url {
+            println!("   Server URL: {}", server_url);
+        }
+        
+        if verbose {
+            println!("\n📋 All Profiles:");
+            let profiles = config_manager.list_profiles();
+            if profiles.is_empty() {
+                println!("   No profiles configured");
+            } else {
+                for profile_name in profiles {
+                    let is_default = config_manager.config().default_profile.as_ref() == Some(profile_name);
+                    let marker = if is_default { " (default)" } else { "" };
+                    println!("   • {}{}", profile_name, marker);
+                    
+                    if let Some(prof) = config_manager.get_profile(profile_name) {
+                        println!("     Client ID: {}", prof.client_id);
+                        println!("     Key ID: {}", prof.key_id);
+                        println!("     Server: {}", prof.server_url);
+                    }
+                }
+            }
+        }
+    }
+    
+    println!("\n🔧 Configuration file: {}", config_manager.config_path().display());
+    
+    Ok(())
+}
+
+/// Handle authentication profile management
+async fn handle_auth_profile(action: ProfileAction) -> Result<(), Box<dyn std::error::Error>> {
+    let mut config_manager = CliConfigManager::new()?;
+    
+    match action {
+        ProfileAction::Create { name, server_url, key_id, user_id, set_default } => {
+            // Check if profile already exists
+            if config_manager.get_profile(&name).is_some() {
+                return Err(format!("Profile '{}' already exists", name).into());
+            }
+            
+            // Generate client ID
+            let client_id = format!("cli_{}", uuid::Uuid::new_v4());
+            
+            // Create profile
+            let mut metadata = HashMap::new();
+            metadata.insert("source".to_string(), "datafold-cli".to_string());
+            metadata.insert("created_by".to_string(), "profile-create".to_string());
+            
+            let profile = CliAuthProfile {
+                client_id: client_id.clone(),
+                key_id: key_id.clone(),
+                user_id,
+                server_url: server_url.clone(),
+                metadata,
+            };
+            
+            config_manager.add_profile(name.clone(), profile)?;
+            
+            if set_default {
+                config_manager.set_default_profile(name.clone())?;
+            }
+            
+            config_manager.save()?;
+            
+            println!("✅ Profile '{}' created successfully!", name);
+            println!("   Client ID: {}", client_id);
+            println!("   Key ID: {}", key_id);
+            println!("   Server URL: {}", server_url);
+            
+            if set_default {
+                println!("   ✨ Set as default profile");
+            }
+        }
+        
+        ProfileAction::List { verbose } => {
+            let profiles = config_manager.list_profiles();
+            
+            if profiles.is_empty() {
+                println!("No authentication profiles configured");
+                return Ok(());
+            }
+            
+            println!("📋 Authentication Profiles:");
+            println!("===========================");
+            
+            for profile_name in profiles {
+                let is_default = config_manager.config().default_profile.as_ref() == Some(profile_name);
+                let marker = if is_default { " (default)" } else { "" };
+                
+                println!("\n• {}{}", profile_name, marker);
+                
+                if let Some(prof) = config_manager.get_profile(profile_name) {
+                    println!("  Client ID: {}", prof.client_id);
+                    println!("  Key ID: {}", prof.key_id);
+                    println!("  Server: {}", prof.server_url);
+                    
+                    if let Some(user_id) = &prof.user_id {
+                        println!("  User ID: {}", user_id);
+                    }
+                    
+                    if verbose {
+                        println!("  Metadata:");
+                        for (key, value) in &prof.metadata {
+                            println!("    {}: {}", key, value);
+                        }
+                    }
+                }
+            }
+        }
+        
+        ProfileAction::Show { name } => {
+            if let Some(prof) = config_manager.get_profile(&name) {
+                let is_default = config_manager.config().default_profile.as_ref() == Some(&name);
+                
+                println!("📋 Profile: {}", name);
+                if is_default {
+                    println!("   Status: Default profile");
+                }
+                println!("   Client ID: {}", prof.client_id);
+                println!("   Key ID: {}", prof.key_id);
+                println!("   Server URL: {}", prof.server_url);
+                
+                if let Some(user_id) = &prof.user_id {
+                    println!("   User ID: {}", user_id);
+                }
+                
+                println!("   Metadata:");
+                for (key, value) in &prof.metadata {
+                    println!("     {}: {}", key, value);
+                }
+            } else {
+                return Err(format!("Profile '{}' not found", name).into());
+            }
+        }
+        
+        ProfileAction::Update { name, server_url, key_id, user_id } => {
+            if let Some(mut prof) = config_manager.get_profile(&name).cloned() {
+                let mut updated = false;
+                
+                if let Some(new_url) = server_url {
+                    prof.server_url = new_url;
+                    updated = true;
+                }
+                
+                if let Some(new_key_id) = key_id {
+                    prof.key_id = new_key_id;
+                    updated = true;
+                }
+                
+                if let Some(new_user_id) = user_id {
+                    prof.user_id = Some(new_user_id);
+                    updated = true;
+                }
+                
+                if updated {
+                    config_manager.add_profile(name.clone(), prof)?;
+                    config_manager.save()?;
+                    println!("✅ Profile '{}' updated successfully!", name);
+                } else {
+                    println!("ℹ️  No changes specified for profile '{}'", name);
+                }
+            } else {
+                return Err(format!("Profile '{}' not found", name).into());
+            }
+        }
+        
+        ProfileAction::Delete { name, force } => {
+            if config_manager.get_profile(&name).is_none() {
+                return Err(format!("Profile '{}' not found", name).into());
+            }
+            
+            if !force {
+                print!("Are you sure you want to delete profile '{}'? (y/N): ", name);
+                io::stdout().flush()?;
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+                
+                if !input.trim().to_lowercase().starts_with('y') {
+                    println!("❌ Cancelled");
+                    return Ok(());
+                }
+            }
+            
+            config_manager.remove_profile(&name)?;
+            config_manager.save()?;
+            
+            println!("✅ Profile '{}' deleted successfully!", name);
+        }
+        
+        ProfileAction::SetDefault { name } => {
+            if config_manager.get_profile(&name).is_none() {
+                return Err(format!("Profile '{}' not found", name).into());
+            }
+            
+            config_manager.set_default_profile(name.clone())?;
+            config_manager.save()?;
+            
+            println!("✅ Profile '{}' set as default!", name);
+        }
+    }
+    
+    Ok(())
+}
+
+/// Handle CLI authentication key generation
+async fn handle_auth_keygen(
+    key_id: String,
+    storage_dir: Option<PathBuf>,
+    security_level: CliSecurityLevel,
+    force: bool,
+    auto_register: bool,
+    server_url: Option<String>,
+    passphrase: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("🔑 Generating authentication key pair...");
+    
+    // Get storage directory
+    let storage_dir = storage_dir.unwrap_or_else(|| get_default_storage_dir().unwrap());
+    ensure_storage_dir(&storage_dir)?;
+    
+    // Check if key already exists
+    let key_file = storage_dir.join(format!("{}.json", key_id));
+    if key_file.exists() && !force {
+        return Err(format!(
+            "Key '{}' already exists. Use --force to overwrite.",
+            key_id
+        ).into());
+    }
+    
+    // Generate key pair
+    let master_keypair = generate_master_keypair()?;
+    
+    // Get passphrase for key encryption
+    let _passphrase = match passphrase {
+        Some(p) => p,
+        None => {
+            print!("Enter passphrase to encrypt the key: ");
+            io::stdout().flush()?;
+            get_secure_passphrase()?
+        }
+    };
+    
+    // Store the key
+    handle_store_key(
+        key_id.clone(),
+        Some(hex::encode(master_keypair.secret_key_bytes())),
+        None,
+        Some(storage_dir.clone()),
+        force,
+        security_level,
+        Some(_passphrase),
+    )?;
+    
+    println!("✅ Key pair generated and stored!");
+    println!("   Key ID: {}", key_id);
+    println!("   Public Key: {}", hex::encode(master_keypair.public_key_bytes()));
+    println!("   Storage: {}", key_file.display());
+    
+    // Auto-register if requested
+    if auto_register {
+        if let Some(server) = server_url {
+            println!("\n🔄 Auto-registering key with server...");
+            
+            let client_id = format!("cli_{}", uuid::Uuid::new_v4());
+            
+            match handle_register_key(
+                server,
+                key_id.clone(),
+                Some(storage_dir),
+                Some(client_id.clone()),
+                None,
+                Some(format!("CLI Key: {}", key_id)),
+                30, // timeout
+                3,  // retries
+            ).await {
+                Ok(()) => {
+                    println!("✅ Key registered successfully!");
+                    println!("   Client ID: {}", client_id);
+                    println!("\n💡 To use this key for authentication:");
+                    println!("   datafold auth-init --key-id {} --server-url <server-url>", key_id);
+                }
+                Err(e) => {
+                    println!("⚠️  Key generation successful but registration failed: {}", e);
+                    println!("   You can register manually later with:");
+                    println!("   datafold register-key --key-id {}", key_id);
+                }
+            }
+        } else {
+            println!("\n💡 To register this key:");
+            println!("   datafold register-key --key-id {} --server-url <server-url>", key_id);
+        }
+    } else {
+        println!("\n💡 Next steps:");
+        println!("1. Register key: datafold register-key --key-id {}", key_id);
+        println!("2. Initialize auth: datafold auth-init --key-id {}", key_id);
+    }
+    
+    Ok(())
+}
+
+/// Handle authenticated request test
+async fn handle_auth_test(
+    endpoint: String,
+    profile: Option<String>,
+    method: HttpMethod,
+    payload: Option<String>,
+    timeout: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("🧪 Testing authenticated request...");
+    
+    // Load CLI configuration
+    let config_manager = CliConfigManager::new()?;
+    
+    // Get profile to use
+    let auth_profile = if let Some(profile_name) = &profile {
+        config_manager.get_profile(profile_name)
+            .ok_or_else(|| format!("Profile '{}' not found", profile_name))?
+    } else {
+        config_manager.get_default_profile()
+            .ok_or("No default profile configured. Use 'auth-init' to set up authentication.")?
+    };
+    
+    // Get storage directory and load key
+    let storage_dir = CliConfigManager::default_keys_dir()?;
+    let key_file = storage_dir.join(format!("{}.json", auth_profile.key_id));
+    
+    if !key_file.exists() {
+        return Err(format!(
+            "Key '{}' not found in storage",
+            auth_profile.key_id
+        ).into());
+    }
+    
+    // Load and decrypt the key
+    let key_content = fs::read_to_string(&key_file)?;
+    let key_config: KeyStorageConfig = serde_json::from_str(&key_content)?;
+    
+    print!("Enter passphrase to unlock key: ");
+    io::stdout().flush()?;
+    let passphrase = get_secure_passphrase()?;
+    
+    let private_key_bytes = decrypt_key(&key_config, &passphrase)?;
+    let master_keypair = MasterKeyPair::from_secret_bytes(&private_key_bytes)?;
+    
+    // Create authenticated HTTP client
+    let signing_config = CliSigningConfig::default();
+    let client = HttpClientBuilder::new()
+        .timeout_secs(timeout)
+        .build_authenticated(
+            master_keypair,
+            auth_profile.clone(),
+            Some(signing_config),
+        )?;
+    
+    // Build request URL
+    let full_url = if endpoint.starts_with("http") {
+        endpoint.to_string()
+    } else {
+        let path = if endpoint.starts_with('/') {
+            endpoint.to_string()
+        } else {
+            format!("/{}", endpoint)
+        };
+        format!("{}{}", auth_profile.server_url.trim_end_matches('/'), path)
+    };
+    
+    println!("Making {} request to: {}", method_to_string(&method), full_url);
+    
+    // Execute request based on method
+    let response = match method {
+        HttpMethod::Get => client.get(&full_url).await?,
+        HttpMethod::Post => {
+            let body = payload.unwrap_or_else(|| "{}".to_string());
+            client.post_json(&full_url, &serde_json::from_str::<serde_json::Value>(&body)?).await?
+        }
+        HttpMethod::Put => {
+            let body = payload.unwrap_or_else(|| "{}".to_string());
+            client.put_json(&full_url, &serde_json::from_str::<serde_json::Value>(&body)?).await?
+        }
+        HttpMethod::Patch => {
+            let body = payload.unwrap_or_else(|| "{}".to_string());
+            client.patch_json(&full_url, &serde_json::from_str::<serde_json::Value>(&body)?).await?
+        }
+        HttpMethod::Delete => client.delete(&full_url).await?,
+    };
+    
+    // Display response
+    let status = response.status();
+    let headers = response.headers().clone();
+    let body = response.text().await?;
+    
+    println!("\n📄 Response:");
+    println!("   Status: {}", status);
+    
+    if status.is_success() {
+        println!("   ✅ Request successful!");
+    } else {
+        println!("   ❌ Request failed!");
+    }
+    
+    println!("   Headers:");
+    for (name, value) in headers.iter() {
+        if let Ok(value_str) = value.to_str() {
+            println!("     {}: {}", name, value_str);
+        }
+    }
+    
+    println!("   Body:");
+    if body.is_empty() {
+        println!("     (empty)");
+    } else {
+        // Try to pretty-print JSON, otherwise show as-is
+        match serde_json::from_str::<serde_json::Value>(&body) {
+            Ok(json) => {
+                println!("{}", serde_json::to_string_pretty(&json)?);
+            }
+            Err(_) => {
+                println!("{}", body);
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+/// Convert HttpMethod enum to string
+fn method_to_string(method: &HttpMethod) -> &'static str {
+    match method {
+        HttpMethod::Get => "GET",
+        HttpMethod::Post => "POST",
+        HttpMethod::Put => "PUT",
+        HttpMethod::Patch => "PATCH",
+        HttpMethod::Delete => "DELETE",
+    }
+}
+
+/// Handle authentication configuration commands
+#[allow(clippy::too_many_arguments)]
+async fn handle_auth_configure(
+    enable_auto_sign: Option<bool>,
+    default_mode: Option<CliSigningMode>,
+    command: Option<String>,
+    command_mode: Option<CliSigningMode>,
+    remove_command_override: Option<String>,
+    debug: Option<bool>,
+    env_var: Option<String>,
+    show: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut config_manager = CliConfigManager::load_with_migration()?;
+    
+    if show {
+        // Show current configuration
+        let signing_config = config_manager.signing_config();
+        println!("📋 DataFold CLI Signing Configuration");
+        println!("=====================================");
+        println!();
+        println!("🔐 Global Settings:");
+        println!("  Auto-signing enabled: {}", signing_config.auto_signing.enabled);
+        println!("  Default mode: {}", signing_config.auto_signing.default_mode.as_str());
+        println!("  Debug logging: {}", signing_config.debug.enabled);
+        
+        if let Some(env) = &signing_config.auto_signing.env_override {
+            println!("  Environment override: {}", env);
+            if let Ok(value) = std::env::var(env) {
+                println!("    Current value: {}", value);
+            } else {
+                println!("    Current value: (not set)");
+            }
+        }
+        
+        println!();
+        println!("📝 Command Overrides:");
+        if signing_config.auto_signing.command_overrides.is_empty() {
+            println!("  (none configured)");
+        } else {
+            for (cmd, mode) in &signing_config.auto_signing.command_overrides {
+                println!("  {}: {}", cmd, mode.as_str());
+            }
+        }
+        
+        println!();
+        println!("🎛️  Performance Settings:");
+        println!("  Max signing time: {}ms", signing_config.performance.max_signing_time_ms);
+        println!("  Cache keys: {}", signing_config.performance.cache_keys);
+        println!("  Max concurrent signs: {}", signing_config.performance.max_concurrent_signs);
+        
+        return Ok(());
+    }
+    
+    let mut modified = false;
+    
+    // Apply configuration changes
+    if let Some(enabled) = enable_auto_sign {
+        config_manager.set_auto_signing_enabled(enabled);
+        println!("✅ Auto-signing {}", if enabled { "enabled" } else { "disabled" });
+        modified = true;
+    }
+    
+    if let Some(mode) = default_mode {
+        let mode_str = SigningMode::from(mode.clone()).as_str();
+        config_manager.set_default_signing_mode(mode.into());
+        println!("✅ Default signing mode set to: {}", mode_str);
+        modified = true;
+    }
+    
+    if let Some(cmd) = command {
+        if let Some(mode) = command_mode {
+            let mode_str = SigningMode::from(mode.clone()).as_str();
+            config_manager.set_command_signing_mode(cmd.clone(), mode.into())?;
+            println!("✅ Signing mode for '{}' set to: {}", cmd, mode_str);
+            modified = true;
+        }
+    }
+    
+    if let Some(cmd) = remove_command_override {
+        config_manager.signing_config_mut().auto_signing.remove_command_override(&cmd);
+        println!("✅ Removed signing override for command: {}", cmd);
+        modified = true;
+    }
+    
+    if let Some(debug_enabled) = debug {
+        config_manager.set_signing_debug(debug_enabled);
+        println!("✅ Debug logging {}", if debug_enabled { "enabled" } else { "disabled" });
+        modified = true;
+    }
+    
+    if let Some(env) = env_var {
+        config_manager.signing_config_mut().auto_signing.env_override = Some(env.clone());
+        println!("✅ Environment variable override set to: {}", env);
+        modified = true;
+    }
+    
+    if modified {
+        config_manager.save()?;
+        println!("💾 Configuration saved");
+    } else {
+        println!("ℹ️  No changes specified. Use --show to view current configuration.");
+    }
+    
+    Ok(())
+}
+
+/// Handle authentication initialization
+async fn handle_auth_init_enhanced(
+    create_config: bool,
+    server_url: Option<String>,
+    interactive: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if interactive {
+        return handle_interactive_auth_setup(server_url).await;
+    }
+    
+    if create_config {
+        let config_path = CliConfigManager::default_config_path()?;
+        
+        if config_path.exists() {
+            println!("⚠️  Configuration file already exists at: {}", config_path.display());
+            print!("Do you want to overwrite it? (y/N): ");
+            io::stdout().flush()?;
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            
+            if !input.trim().to_lowercase().starts_with('y') {
+                println!("❌ Aborted");
+                return Ok(());
+            }
+        }
+        
+        let mut config_manager = CliConfigManager::new()?;
+        
+        // Set default server URL if provided
+        if let Some(url) = server_url {
+            let server_config = ServerConfig {
+                url: url.clone(),
+                name: "Default DataFold Server".to_string(),
+                api_version: Some("v1".to_string()),
+                headers: HashMap::new(),
+                timeout_secs: 30,
+                max_retries: 3,
+                verify_ssl: true,
+            };
+            config_manager.add_server("default".to_string(), server_config);
+            println!("✅ Added default server: {}", url);
+        }
+        
+        config_manager.save()?;
+        println!("✅ Created configuration file: {}", config_path.display());
+        
+        println!();
+        println!("🎯 Next steps:");
+        println!("1. Generate a key pair: datafold auth-keygen --key-id my-key");
+        println!("2. Create a profile: datafold auth-profile create my-profile --server-url <URL> --key-id my-key");
+        println!("3. Test authentication: datafold auth-test");
+    } else {
+        println!("ℹ️  Use --create-config to create default configuration");
+        println!("ℹ️  Use --interactive for guided setup");
+    }
+    
+    Ok(())
+}
+
+/// Handle interactive authentication setup
+async fn handle_interactive_auth_setup(default_server_url: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+    println!("🚀 DataFold CLI Authentication Setup");
+    println!("====================================");
+    println!();
+    
+    // Check if configuration exists
+    let config_path = CliConfigManager::default_config_path()?;
+    let mut config_manager = if config_path.exists() {
+        println!("📁 Found existing configuration");
+        CliConfigManager::load_with_migration()?
+    } else {
+        println!("📝 Creating new configuration");
+        CliConfigManager::new()?
+    };
+    
+    // Get server URL
+    let server_url = if let Some(url) = default_server_url {
+        println!("🌐 Using provided server URL: {}", url);
+        url
+    } else {
+        print!("🌐 Enter DataFold server URL: ");
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        input.trim().to_string()
+    };
+    
+    if server_url.is_empty() {
+        return Err("Server URL is required".into());
+    }
+    
+    // Get profile name
+    print!("📛 Enter profile name (default: default): ");
+    io::stdout().flush()?;
+    let mut profile_name = String::new();
+    io::stdin().read_line(&mut profile_name)?;
+    let profile_name = profile_name.trim();
+    let profile_name = if profile_name.is_empty() { "default" } else { profile_name };
+    
+    // Get key ID
+    print!("🔑 Enter key ID (default: {}): ", profile_name);
+    io::stdout().flush()?;
+    let mut key_id = String::new();
+    io::stdin().read_line(&mut key_id)?;
+    let key_id = key_id.trim();
+    let key_id = if key_id.is_empty() { profile_name } else { key_id };
+    
+    // Check if key exists
+    let storage_dir = CliConfigManager::default_keys_dir()?;
+    let storage_dir_display = storage_dir.clone();
+    let key_file = storage_dir.join(format!("{}.json", key_id));
+    
+    if !key_file.exists() {
+        println!("🔧 Key '{}' not found. Generating new key pair...", key_id);
+        
+        // Generate new key
+        handle_store_key(
+            key_id.to_string(),
+            None,
+            None,
+            Some(storage_dir),
+            false,
+            CliSecurityLevel::Balanced,
+            None,
+        )?;
+        
+        println!("✅ Generated and stored key: {}", key_id);
+    } else {
+        println!("✅ Using existing key: {}", key_id);
+    }
+    
+    // Create profile
+    let mut metadata = HashMap::new();
+    metadata.insert("created_by".to_string(), "interactive_setup".to_string());
+    metadata.insert("created_at".to_string(), chrono::Utc::now().to_rfc3339());
+    
+    let profile = CliAuthProfile {
+        client_id: format!("datafold-cli-{}", profile_name),
+        key_id: key_id.to_string(),
+        user_id: None,
+        server_url: server_url.clone(),
+        metadata,
+    };
+    
+    config_manager.add_profile(profile_name.to_string(), profile)?;
+    
+    // Configure signing
+    println!();
+    println!("🔐 Configure automatic signing:");
+    print!("Enable automatic request signing? (Y/n): ");
+    io::stdout().flush()?;
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    
+    let enable_auto = !input.trim().to_lowercase().starts_with('n');
+    config_manager.set_auto_signing_enabled(enable_auto);
+    
+    if enable_auto {
+        config_manager.set_default_signing_mode(SigningMode::Auto);
+        println!("✅ Automatic signing enabled");
+    } else {
+        config_manager.set_default_signing_mode(SigningMode::Manual);
+        println!("✅ Manual signing mode (use --sign flag to sign requests)");
+    }
+    
+    // Save configuration
+    config_manager.save()?;
+    
+    println!();
+    println!("🎉 Setup complete!");
+    println!("📁 Configuration saved to: {}", config_path.display());
+    println!("🔑 Key stored in: {}", storage_dir_display.display());
+    println!();
+    println!("🧪 Test your setup:");
+    println!("  datafold auth-status");
+    println!("  datafold auth-test");
+    
+    Ok(())
+}
+
 /// Handle end-to-end server integration test
 #[allow(clippy::too_many_arguments)]
 async fn handle_test_server_integration(
@@ -2240,6 +3624,7 @@ async fn handle_test_server_integration(
         Some(storage_dir.clone()),
         true, // force
         security_level.clone(),
+        Some(_passphrase),
     )?;
     
     println!("✅ Test key generated and stored");
@@ -2870,6 +4255,7 @@ fn handle_derive_key(
     security_level: CliSecurityLevel,
     public_only: bool,
     private_only: bool,
+    passphrase: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use datafold::crypto::argon2::{generate_salt_and_derive_keypair, Argon2Params};
 
@@ -2877,7 +4263,10 @@ fn handle_derive_key(
         return Err("Cannot specify both --public-only and --private-only".into());
     }
 
-    let passphrase = get_secure_passphrase()?;
+    let passphrase = match passphrase {
+        Some(p) => p,
+        None => get_secure_passphrase()?,
+    };
     
     // Convert security level to Argon2 parameters
     let argon2_params = match security_level {
@@ -3167,6 +4556,351 @@ fn parse_key_input(input: &str, is_private: bool) -> Result<[u8; 32], Box<dyn st
 /// * The configuration file cannot be read or parsed
 /// * The node cannot be initialized
 /// * There is an error executing the requested command
+///
+/// Handle signature verification command
+#[allow(clippy::too_many_arguments)]
+async fn handle_verify_signature(
+    message: Option<String>,
+    message_file: Option<PathBuf>,
+    signature: String,
+    key_id: String,
+    public_key: Option<String>,
+    public_key_file: Option<PathBuf>,
+    policy: Option<String>,
+    output_format: VerificationOutputFormat,
+    debug: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use datafold::cli::verification::{CliSignatureVerifier, CliVerificationConfig};
+    
+    // Get message bytes
+    let message_bytes = match (message, message_file) {
+        (Some(msg), None) => msg.into_bytes(),
+        (None, Some(file)) => fs::read(file)?,
+        (Some(_), Some(_)) => return Err("Cannot specify both message and message-file".into()),
+        (None, None) => return Err("Must specify either message or message-file".into()),
+    };
+
+    // Create verifier
+    let config = CliVerificationConfig::default();
+    
+    // Add public key
+    let public_key_bytes = match (public_key, public_key_file) {
+        (Some(key), None) => parse_key_input(&key, false)?.to_vec(),
+        (None, Some(file)) => {
+            let key_str = fs::read_to_string(file)?;
+            parse_key_input(key_str.trim(), false)?.to_vec()
+        }
+        (Some(_), Some(_)) => return Err("Cannot specify both public-key and public-key-file".into()),
+        (None, None) => return Err("Must specify either public-key or public-key-file".into()),
+    };
+
+    let mut verifier = CliSignatureVerifier::new(config);
+    verifier.add_public_key(key_id.clone(), public_key_bytes)?;
+
+    // Perform verification
+    let result = verifier.verify_message_signature(&message_bytes, &signature, &key_id, policy.as_deref()).await?;
+
+    // Output result
+    match output_format {
+        VerificationOutputFormat::Json => {
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        VerificationOutputFormat::Table => {
+            println!("=== Signature Verification Result ===");
+            println!("Status: {}", result.status);
+            println!("Signature Valid: {}", result.signature_valid);
+            println!("Total Time: {}ms", result.performance.total_time_ms);
+            
+            if debug {
+                let inspector = datafold::cli::verification::SignatureInspector::new(true);
+                let report = inspector.generate_diagnostic_report(&result);
+                println!("\n{}", report);
+            }
+        }
+        VerificationOutputFormat::Compact => {
+            println!("{}: {}", result.status, if result.signature_valid { "✓" } else { "✗" });
+        }
+    }
+
+    if !result.signature_valid {
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
+
+/// Handle signature inspection command
+async fn handle_inspect_signature(
+    signature_input: Option<String>,
+    signature: Option<String>,
+    headers_file: Option<PathBuf>,
+    output_format: VerificationOutputFormat,
+    _detailed: bool,
+    debug: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use datafold::cli::verification::SignatureInspector;
+    use std::collections::HashMap;
+
+    let inspector = SignatureInspector::new(debug);
+    let mut headers = HashMap::new();
+
+    // Build headers from inputs
+    if let Some(input) = signature_input {
+        headers.insert("signature-input".to_string(), input);
+    }
+    if let Some(sig) = signature {
+        headers.insert("signature".to_string(), sig);
+    }
+    if let Some(file) = headers_file {
+        let content = fs::read_to_string(file)?;
+        let file_headers: HashMap<String, String> = serde_json::from_str(&content)?;
+        headers.extend(file_headers);
+    }
+
+    if headers.is_empty() {
+        return Err("Must provide signature headers via signature-input, signature, or headers-file".into());
+    }
+
+    // Inspect signature format
+    let analysis = inspector.inspect_signature_format(&headers);
+
+    // Output results
+    match output_format {
+        VerificationOutputFormat::Json => {
+            println!("{}", serde_json::to_string_pretty(&analysis)?);
+        }
+        VerificationOutputFormat::Table => {
+            println!("=== Signature Format Analysis ===");
+            println!("RFC 9421 Compliant: {}", analysis.is_valid_rfc9421);
+            println!("Signature Headers: {}", analysis.signature_headers.join(", "));
+            println!("Signature IDs: {}", analysis.signature_ids.join(", "));
+            
+            if !analysis.issues.is_empty() {
+                println!("\n=== Issues Found ===");
+                for issue in &analysis.issues {
+                    println!("{:?}: {} - {}", issue.severity, issue.code, issue.message);
+                    if let Some(component) = &issue.component {
+                        println!("  Component: {}", component);
+                    }
+                }
+            }
+        }
+        VerificationOutputFormat::Compact => {
+            println!("RFC9421: {} | Issues: {}",
+                if analysis.is_valid_rfc9421 { "✓" } else { "✗" },
+                analysis.issues.len()
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle response verification command
+#[allow(clippy::too_many_arguments)]
+async fn handle_verify_response(
+    url: String,
+    method: HttpMethod,
+    headers: Option<String>,
+    body: Option<String>,
+    body_file: Option<PathBuf>,
+    key_id: String,
+    public_key: Option<String>,
+    public_key_file: Option<PathBuf>,
+    policy: Option<String>,
+    output_format: VerificationOutputFormat,
+    debug: bool,
+    timeout: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use datafold::cli::verification::{CliSignatureVerifier, CliVerificationConfig};
+    use reqwest::Client;
+    use std::time::Duration;
+
+    // Create HTTP client
+    let client = Client::builder()
+        .timeout(Duration::from_secs(timeout))
+        .build()?;
+
+    // Build request
+    let method_str = method_to_string(&method);
+    let mut request_builder = match method {
+        HttpMethod::Get => client.get(&url),
+        HttpMethod::Post => client.post(&url),
+        HttpMethod::Put => client.put(&url),
+        HttpMethod::Patch => client.patch(&url),
+        HttpMethod::Delete => client.delete(&url),
+    };
+
+    // Add headers if provided
+    if let Some(headers_json) = headers {
+        let headers_map: std::collections::HashMap<String, String> = serde_json::from_str(&headers_json)?;
+        for (key, value) in headers_map {
+            request_builder = request_builder.header(key, value);
+        }
+    }
+
+    // Add body if provided
+    let request_body = match (body, body_file) {
+        (Some(body_str), None) => Some(body_str),
+        (None, Some(file)) => Some(fs::read_to_string(file)?),
+        (Some(_), Some(_)) => return Err("Cannot specify both body and body-file".into()),
+        (None, None) => None,
+    };
+
+    if let Some(body_content) = request_body {
+        request_builder = request_builder.body(body_content);
+    }
+
+    // Send request
+    let response = request_builder.send().await?;
+    
+    // Setup verifier
+    let config = CliVerificationConfig::default();
+    
+    // Add public key
+    let public_key_bytes = match (public_key, public_key_file) {
+        (Some(key), None) => parse_key_input(&key, false)?.to_vec(),
+        (None, Some(file)) => {
+            let key_str = fs::read_to_string(file)?;
+            parse_key_input(key_str.trim(), false)?.to_vec()
+        }
+        (Some(_), Some(_)) => return Err("Cannot specify both public-key and public-key-file".into()),
+        (None, None) => return Err("Must specify either public-key or public-key-file".into()),
+    };
+
+    let mut verifier = CliSignatureVerifier::new(config);
+    verifier.add_public_key(key_id.clone(), public_key_bytes)?;
+
+    // Verify response
+    let result = verifier.verify_response_with_context(&response, method_str, &url, policy.as_deref()).await?;
+
+    // Output result
+    match output_format {
+        VerificationOutputFormat::Json => {
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        VerificationOutputFormat::Table => {
+            println!("=== Response Verification Result ===");
+            println!("Status: {}", result.status);
+            println!("Signature Valid: {}", result.signature_valid);
+            println!("Total Time: {}ms", result.performance.total_time_ms);
+            
+            if debug {
+                let inspector = datafold::cli::verification::SignatureInspector::new(true);
+                let report = inspector.generate_diagnostic_report(&result);
+                println!("\n{}", report);
+            }
+        }
+        VerificationOutputFormat::Compact => {
+            println!("{}: {}", result.status, if result.signature_valid { "✓" } else { "✗" });
+        }
+    }
+
+    if !result.signature_valid {
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
+
+/// Handle verification configuration command
+async fn handle_verification_config(action: VerificationConfigAction) -> Result<(), Box<dyn std::error::Error>> {
+    use datafold::cli::verification::{CliVerificationConfig, VerificationPolicy};
+
+    match action {
+        VerificationConfigAction::Show { policies, keys } => {
+            let config = CliVerificationConfig::default();
+            
+            if policies {
+                println!("=== Verification Policies ===");
+                for (name, policy) in &config.policies {
+                    println!("Policy: {}", name);
+                    println!("  Description: {}", policy.description);
+                    println!("  Verify Timestamp: {}", policy.verify_timestamp);
+                    println!("  Verify Nonce: {}", policy.verify_nonce);
+                    println!("  Verify Content Digest: {}", policy.verify_content_digest);
+                    println!("  Required Components: {:?}", policy.required_components);
+                    println!("  Allowed Algorithms: {:?}", policy.allowed_algorithms);
+                    if name == &config.default_policy {
+                        println!("  (Default Policy)");
+                    }
+                    println!();
+                }
+            }
+            
+            if keys {
+                println!("=== Public Keys ===");
+                if config.public_keys.is_empty() {
+                    println!("No public keys configured");
+                } else {
+                    for (key_id, key_bytes) in &config.public_keys {
+                        println!("Key ID: {}", key_id);
+                        println!("  Length: {} bytes", key_bytes.len());
+                        println!("  Fingerprint: {}", hex::encode(&key_bytes[..8]));
+                        println!();
+                    }
+                }
+            }
+            
+            if !policies && !keys {
+                println!("=== Verification Configuration ===");
+                println!("Default Policy: {}", config.default_policy);
+                println!("Available Policies: {}", config.policies.len());
+                println!("Configured Keys: {}", config.public_keys.len());
+                println!("Performance Monitoring: {}", config.performance_monitoring.enabled);
+                println!("Debug Enabled: {}", config.debug.enabled);
+            }
+        }
+        VerificationConfigAction::AddPolicy { name, config_file } => {
+            let policy_json = fs::read_to_string(config_file)?;
+            let _policy: VerificationPolicy = serde_json::from_str(&policy_json)?;
+            println!("Policy '{}' would be added (not implemented in this demo)", name);
+        }
+        VerificationConfigAction::RemovePolicy { name } => {
+            println!("Policy '{}' would be removed (not implemented in this demo)", name);
+        }
+        VerificationConfigAction::SetDefaultPolicy { name } => {
+            println!("Default policy would be set to '{}' (not implemented in this demo)", name);
+        }
+        VerificationConfigAction::AddPublicKey { key_id, public_key, public_key_file } => {
+            let _key_bytes = match (public_key, public_key_file) {
+                (Some(key), None) => parse_key_input(&key, false)?.to_vec(),
+                (None, Some(file)) => {
+                    let key_str = fs::read_to_string(file)?;
+                    parse_key_input(key_str.trim(), false)?.to_vec()
+                }
+                (Some(_), Some(_)) => return Err("Cannot specify both public-key and public-key-file".into()),
+                (None, None) => return Err("Must specify either public-key or public-key-file".into()),
+            };
+            println!("Public key '{}' would be added (not implemented in this demo)", key_id);
+        }
+        VerificationConfigAction::RemovePublicKey { key_id } => {
+            println!("Public key '{}' would be removed (not implemented in this demo)", key_id);
+        }
+        VerificationConfigAction::ListPublicKeys { verbose } => {
+            let config = CliVerificationConfig::default();
+            println!("=== Public Keys ===");
+            if config.public_keys.is_empty() {
+                println!("No public keys configured");
+            } else {
+                for (key_id, key_bytes) in &config.public_keys {
+                    if verbose {
+                        println!("Key ID: {}", key_id);
+                        println!("  Length: {} bytes", key_bytes.len());
+                        println!("  Fingerprint: {}", hex::encode(&key_bytes[..8]));
+                        println!("  Full Key: {}", hex::encode(key_bytes));
+                        println!();
+                    } else {
+                        println!("{} ({}B)", key_id, key_bytes.len());
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     datafold::web_logger::init().ok();
@@ -3203,7 +4937,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             public_key_file,
             security_level,
             public_only,
-            private_only
+            private_only,
+            passphrase
         } => {
             return handle_derive_key(
                 format.clone(),
@@ -3211,7 +4946,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 public_key_file.clone(),
                 security_level.clone(),
                 *public_only,
-                *private_only
+                *private_only,
+                passphrase.clone()
             );
         }
         Commands::ExtractPublicKey {
@@ -3246,7 +4982,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             private_key_file,
             storage_dir,
             force,
-            security_level
+            security_level,
+            passphrase
         } => {
             return handle_store_key(
                 key_id.clone(),
@@ -3254,7 +4991,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 private_key_file.clone(),
                 storage_dir.clone(),
                 *force,
-                security_level.clone()
+                security_level.clone(),
+                passphrase.clone()
             );
         }
         Commands::RetrieveKey {
@@ -3477,6 +5215,113 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 *cleanup
             ).await;
         }
+        Commands::AuthInit {
+            server_url,
+            profile,
+            key_id,
+            storage_dir,
+            user_id,
+            force
+        } => {
+            return handle_auth_init(
+                server_url.clone(),
+                profile.clone(),
+                key_id.clone(),
+                storage_dir.clone(),
+                user_id.clone(),
+                *force
+            ).await;
+        }
+        Commands::AuthStatus {
+            verbose,
+            profile
+        } => {
+            return handle_auth_status(
+                *verbose,
+                profile.clone()
+            ).await;
+        }
+        Commands::AuthProfile { action } => {
+            return handle_auth_profile((*action).clone()).await;
+        }
+        Commands::AuthKeygen {
+            key_id,
+            storage_dir,
+            security_level,
+            force,
+            auto_register,
+            server_url,
+            passphrase
+        } => {
+            return handle_auth_keygen(
+                key_id.clone(),
+                storage_dir.clone(),
+                security_level.clone(),
+                *force,
+                *auto_register,
+                server_url.clone(),
+                passphrase.clone()
+            ).await;
+        }
+        Commands::AuthTest {
+            endpoint,
+            profile,
+            method,
+            payload,
+            timeout
+        } => {
+            return handle_auth_test(
+                endpoint.clone(),
+                profile.clone(),
+                method.clone(),
+                payload.clone(),
+                *timeout
+            ).await;
+        }
+        Commands::AuthConfigure {
+            enable_auto_sign,
+            default_mode,
+            command,
+            command_mode,
+            remove_command_override,
+            debug,
+            env_var,
+            show
+        } => {
+            return handle_auth_configure(
+                *enable_auto_sign,
+                default_mode.clone(),
+                command.clone(),
+                command_mode.clone(),
+                remove_command_override.clone(),
+                *debug,
+                env_var.clone(),
+                *show
+            ).await;
+        }
+        Commands::AuthSetup {
+            create_config,
+            server_url,
+            interactive
+        } => {
+            return handle_auth_init_enhanced(
+                *create_config,
+                server_url.clone(),
+                *interactive
+            ).await;
+        }
+        Commands::VerifySignature { message, message_file, signature, key_id, public_key, public_key_file, policy, output_format, debug } => {
+            return handle_verify_signature(message.clone(), message_file.clone(), signature.clone(), key_id.clone(), public_key.clone(), public_key_file.clone(), policy.clone(), output_format.clone(), *debug).await;
+        }
+        Commands::InspectSignature { signature_input, signature, headers_file, output_format, detailed, debug } => {
+            return handle_inspect_signature(signature_input.clone(), signature.clone(), headers_file.clone(), output_format.clone(), *detailed, *debug).await;
+        }
+        Commands::VerifyResponse { url, method, headers, body, body_file, key_id, public_key, public_key_file, policy, output_format, debug, timeout } => {
+            return handle_verify_response(url.clone(), method.clone(), headers.clone(), body.clone(), body_file.clone(), key_id.clone(), public_key.clone(), public_key_file.clone(), policy.clone(), output_format.clone(), *debug, *timeout).await;
+        }
+        Commands::VerificationConfig { action } => {
+            return handle_verification_config(action.clone()).await;
+        }
         _ => {}
     }
 
@@ -3538,6 +5383,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::CheckRegistration { .. } => unreachable!(), // Already handled above
         Commands::SignAndVerify { .. } => unreachable!(), // Already handled above
         Commands::TestServerIntegration { .. } => unreachable!(), // Already handled above
+        Commands::AuthInit { .. } => unreachable!(), // Already handled above
+        Commands::AuthStatus { .. } => unreachable!(), // Already handled above
+        Commands::AuthProfile { .. } => unreachable!(), // Already handled above
+        Commands::AuthKeygen { .. } => unreachable!(), // Already handled above
+        Commands::AuthTest { .. } => unreachable!(), // Already handled above
+        Commands::AuthConfigure { .. } => unreachable!(), // Already handled above
+        Commands::AuthSetup { .. } => unreachable!(), // Already handled above
+        Commands::VerifySignature { .. } => unreachable!(), // Already handled above
+        Commands::InspectSignature { .. } => unreachable!(), // Already handled above
+        Commands::VerifyResponse { .. } => unreachable!(), // Already handled above
+        Commands::VerificationConfig { .. } => unreachable!(), // Already handled above
+        
     }
 
     Ok(())

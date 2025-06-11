@@ -143,9 +143,16 @@ export function validateBase64String(base64: string): void {
     throw new Ed25519KeyError('Invalid base64 string format', 'INVALID_BASE64_FORMAT');
   }
 
-  // Check length is valid for base64
-  if (base64.length % 4 !== 0) {
-    throw new Ed25519KeyError('Base64 string length must be multiple of 4', 'INVALID_BASE64_LENGTH');
+  // Check length is valid for base64 (allow missing padding)
+  const paddedLength = base64.length + (4 - (base64.length % 4)) % 4;
+  if (paddedLength !== base64.length && base64.length % 4 !== 0) {
+    // Only throw if it's genuinely invalid, not just missing padding
+    const testString = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    try {
+      atob(testString);
+    } catch {
+      throw new Ed25519KeyError('Invalid base64 string format', 'INVALID_BASE64_FORMAT');
+    }
   }
 }
 

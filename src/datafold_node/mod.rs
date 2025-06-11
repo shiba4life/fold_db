@@ -24,6 +24,7 @@ pub mod node;
 mod permissions;
 pub mod query_routes;
 pub mod schema_routes;
+pub mod signature_auth;
 pub mod system_routes;
 pub mod tcp_command_router;
 pub mod tcp_connections;

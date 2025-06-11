@@ -35,6 +35,7 @@ impl PublicKeyRegistrationTestFixture {
         let node = DataFoldNode::new(config).expect("Failed to create test node");
         
         let app_state = web::Data::new(AppState {
+            signature_auth: None,
             node: Arc::new(Mutex::new(node.clone())),
         });
 

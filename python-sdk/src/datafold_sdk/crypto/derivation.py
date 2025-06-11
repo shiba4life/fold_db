@@ -92,7 +92,7 @@ def check_derivation_support() -> Dict[str, Any]:
             
         try:
             # Test Scrypt availability
-            Scrypt(32, b'salt', SCRYPT_N, SCRYPT_R, SCRYPT_P)
+            Scrypt(length=32, salt=b'salt', n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P)
             support['scrypt_supported'] = True
         except Exception:
             pass

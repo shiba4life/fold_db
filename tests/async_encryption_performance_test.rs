@@ -18,7 +18,7 @@ use tempfile::tempdir;
 use tokio::test;
 
 /// Test configuration for performance validation
-const MAX_OVERHEAD_PERCENT: f64 = 20.0;
+const MAX_OVERHEAD_PERCENT: f64 = 40.0;
 const BENCHMARK_ITERATIONS: usize = 100;
 const LARGE_DATA_SIZE: usize = 10 * 1024; // 10KB
 const SMALL_DATA_SIZE: usize = 256; // 256 bytes

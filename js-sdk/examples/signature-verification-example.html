@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataFold JS SDK - Signature Verification Example</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .example-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+        .example-section h3 {
+            color: #495057;
+            margin-top: 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input, .input-group textarea, .input-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .input-group textarea {
+            height: 80px;
+            resize: vertical;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+        }
+        .tab.active {
+            border-bottom-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 DataFold JS SDK - Signature Verification Example</h1>
+        
+        <p>This example demonstrates the signature verification utilities provided by the DataFold JavaScript SDK. 
+        The verification module allows you to validate RFC 9421 HTTP Message Signatures.</p>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('basic')">Basic Verification</button>
+            <button class="tab" onclick="showTab('inspector')">Signature Inspector</button>
+            <button class="tab" onclick="showTab('policies')">Verification Policies</button>
+            <button class="tab" onclick="showTab('middleware')">Middleware Demo</button>
+        </div>
+
+        <!-- Basic Verification Tab -->
+        <div id="basic" class="tab-content active">
+            <div class="example-section">
+                <h3>🔍 Basic Signature Verification</h3>
+                <p>Verify the cryptographic signature of an HTTP request or response.</p>
+                
+                <div class="input-group">
+                    <label>Request Method:</label>
+                    <select id="basicMethod">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label>Request URL:</label>
+                    <input type="text" id="basicUrl" value="https://api.example.com/data" />
+                </div>
+                
+                <div class="input-group">
+                    <label>Request Headers (JSON):</label>
+                    <textarea id="basicHeaders">{"content-type": "application/json", "user-agent": "DataFold-JS-SDK/0.1.0"}</textarea>
+                </div>
+                
+                <div class="input-group">
+                    <label>Request Body (optional):</label>
+                    <textarea id="basicBody">{"name": "John Doe", "email": "john@example.com"}</textarea>
+                </div>
+                
+                <div class="input-group">
+                    <label>Signature Headers (JSON):</label>
+                    <textarea id="basicSignatureHeaders">{
+  "signature-input": "sig1=(\"@method\" \"@target-uri\" \"content-type\");created=1640995200;keyid=\"test-key-ed25519\";alg=\"ed25519\";nonce=\"550e8400-e29b-41d4-a716-446655440000\"",
+  "signature": "sig1=:d2pmTvmbncD3xQm8E9ZV2828BjQWGgiwAaw5bAkgibUopemLJcWDy/lkbbHAve7I2l1nirKIcOpxD4DBMq8hBg==:"
+}</textarea>
+                </div>
+                
+                <div class="input-group">
+                    <label>Verification Policy:</label>
+                    <select id="basicPolicy">
+                        <option value="lenient">Lenient (Development)</option>
+                        <option value="standard" selected>Standard (Recommended)</option>
+                        <option value="strict">Strict (High Security)</option>
+                    </select>
+                </div>
+                
+                <button onclick="runBasicVerification()" id="basicVerifyBtn">Verify Signature</button>
+                <button onclick="runQuickVerification()">Quick Verify</button>
+                
+                <div id="basicResult" class="result" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Inspector Tab -->
+        <div id="inspector" class="tab-content">
+            <div class="example-section">
+                <h3>🔍 Signature Inspector & Diagnostics</h3>
+                <p>Analyze signature format, components, and generate diagnostic reports.</p>
+                
+                <div class="input-group">
+                    <label>Signature Headers to Inspect (JSON):</label>
+                    <textarea id="inspectorHeaders">{
+  "signature-input": "sig1=(\"@method\" \"@target-uri\" \"content-type\" \"content-digest\");created=1640995200;keyid=\"test-key-ed25519\";alg=\"ed25519\";nonce=\"550e8400-e29b-41d4-a716-446655440000\"",
+  "signature": "sig1=:d2pmTvmbncD3xQm8E9ZV2828BjQWGgiwAaw5bAkgibUopemLJcWDy/lkbbHAve7I2l1nirKIcOpxD4DBMq8hBg==:",
+  "content-digest": "sha-256=:X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=:"
+}</textarea>
+                </div>
+                
+                <button onclick="inspectSignatureFormat()">Inspect Format</button>
+                <button onclick="analyzeComponents()">Analyze Components</button>
+                <button onclick="validateParameters()">Validate Parameters</button>
+                <button onclick="generateDiagnosticReport()">Generate Report</button>
+                
+                <div id="inspectorResult" class="result" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Policies Tab -->
+        <div id="policies" class="tab-content">
+            <div class="example-section">
+                <h3>📋 Verification Policies</h3>
+                <p>Compare different verification policies and their requirements.</p>
+                
+                <div class="input-group">
+                    <label>Select Policy to View:</label>
+                    <select id="policySelect" onchange="showPolicyDetails()">
+                        <option value="strict">Strict Policy</option>
+                        <option value="standard">Standard Policy</option>
+                        <option value="lenient">Lenient Policy</option>
+                        <option value="legacy">Legacy Policy</option>
+                    </select>
+                </div>
+                
+                <button onclick="showAllPolicies()">Compare All Policies</button>
+                <button onclick="createCustomPolicy()">Create Custom Policy</button>
+                
+                <div id="policyResult" class="result" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Middleware Tab -->
+        <div id="middleware" class="tab-content">
+            <div class="example-section">
+                <h3>🔧 Verification Middleware</h3>
+                <p>Demonstrate automatic verification middleware for HTTP requests and responses.</p>
+                
+                <div class="input-group">
+                    <label>Middleware Type:</label>
+                    <select id="middlewareType">
+                        <option value="response">Response Verification</option>
+                        <option value="request">Request Verification</option>
+                        <option value="batch">Batch Verification</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label>Test URL:</label>
+                    <input type="text" id="middlewareUrl" value="https://api.example.com/test" />
+                </div>
+                
+                <button onclick="testResponseMiddleware()">Test Response Middleware</button>
+                <button onclick="testRequestMiddleware()">Test Request Middleware</button>
+                <button onclick="testBatchVerification()">Test Batch Verification</button>
+                
+                <div id="middlewareResult" class="result" style="display: none;"></div>
+            </div>
+        </div>
+
+        <div class="example-section">
+            <h3>📊 Performance Metrics</h3>
+            <p>Real-time performance monitoring for verification operations.</p>
+            
+            <button onclick="runPerformanceTest()">Run Performance Test</button>
+            <button onclick="clearMetrics()">Clear Metrics</button>
+            
+            <div id="performanceResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Note: This is a demo that simulates the verification API
+        // In a real implementation, you would import from the actual SDK
+        
+        let performanceMetrics = {
+            totalVerifications: 0,
+            totalTime: 0,
+            successfulVerifications: 0,
+            failedVerifications: 0
+        };
+
+        // Mock SDK functions for demonstration
+        window.mockSDK = {
+            // Simulate verification result
+            createMockVerificationResult: (isValid = true) => ({
+                status: isValid ? 'valid' : 'invalid',
+                signatureValid: isValid,
+                checks: {
+                    formatValid: isValid,
+                    cryptographicValid: isValid,
+                    timestampValid: isValid,
+                    nonceValid: isValid,
+                    contentDigestValid: isValid,
+                    componentCoverageValid: isValid,
+                    customRulesValid: isValid
+                },
+                diagnostics: {
+                    signatureAnalysis: {
+                        algorithm: 'ed25519',
+                        keyId: 'test-key-ed25519',
+                        created: 1640995200,
+                        age: Math.floor(Date.now() / 1000) - 1640995200,
+                        nonce: '550e8400-e29b-41d4-a716-446655440000',
+                        coveredComponents: ['@method', '@target-uri', 'content-type']
+                    },
+                    contentAnalysis: {
+                        hasContentDigest: false,
+                        contentSize: 45
+                    },
+                    policyCompliance: {
+                        policyName: 'standard',
+                        missingRequiredComponents: isValid ? [] : ['content-digest'],
+                        extraComponents: [],
+                        ruleResults: []
+                    },
+                    securityAnalysis: {
+                        securityLevel: isValid ? 'high' : 'medium',
+                        concerns: isValid ? [] : ['Missing content digest'],
+                        recommendations: isValid ? [] : ['Include content-digest for better security']
+                    }
+                },
+                performance: {
+                    totalTime: Math.random() * 8 + 2, // 2-10ms
+                    stepTimings: {
+                        extraction: Math.random() * 2 + 0.5,
+                        verification: Math.random() * 5 + 1.5,
+                        policyCheck: Math.random() * 1 + 0.2
+                    }
+                },
+                error: isValid ? undefined : {
+                    code: 'SIGNATURE_INVALID',
+                    message: 'Cryptographic signature verification failed'
+                }
+            }),
+
+            policies: {
+                strict: {
+                    name: 'strict',
+                    description: 'Maximum security with comprehensive signature coverage',
+                    verifyTimestamp: true,
+                    maxTimestampAge: 300,
+                    verifyNonce: true,
+                    verifyContentDigest: true,
+                    requiredComponents: ['@method', '@target-uri', 'content-type', 'content-digest'],
+                    allowedAlgorithms: ['ed25519'],
+                    requireAllHeaders: true
+                },
+                standard: {
+                    name: 'standard',
+                    description: 'Balanced security suitable for most applications',
+                    verifyTimestamp: true,
+                    maxTimestampAge: 900,
+                    verifyNonce: true,
+                    verifyContentDigest: true,
+                    requiredComponents: ['@method', '@target-uri'],
+                    allowedAlgorithms: ['ed25519'],
+                    requireAllHeaders: false
+                },
+                lenient: {
+                    name: 'lenient',
+                    description: 'Relaxed verification for development and testing',
+                    verifyTimestamp: true,
+                    maxTimestampAge: 3600,
+                    verifyNonce: false,
+                    verifyContentDigest: false,
+                    requiredComponents: ['@method'],
+                    allowedAlgorithms: ['ed25519'],
+                    requireAllHeaders: false
+                }
+            }
+        };
+
+        // Tab switching
+        window.showTab = (tabName) => {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        };
+
+        // Basic verification functions
+        window.runBasicVerification = async () => {
+            const btn = document.getElementById('basicVerifyBtn');
+            const result = document.getElementById('basicResult');
+            
+            btn.disabled = true;
+            btn.textContent = 'Verifying...';
+            
+            try {
+                const method = document.getElementById('basicMethod').value;
+                const url = document.getElementById('basicUrl').value;
+                const headers = JSON.parse(document.getElementById('basicHeaders').value);
+                const body = document.getElementById('basicBody').value.trim();
+                const signatureHeaders = JSON.parse(document.getElementById('basicSignatureHeaders').value);
+                const policy = document.getElementById('basicPolicy').value;
+                
+                // Simulate verification delay
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                const request = {
+                    method,
+                    url,
+                    headers,
+                    body: body || undefined
+                };
+                
+                // Mock verification (in real implementation, this would use the actual SDK)
+                const verificationResult = window.mockSDK.createMockVerificationResult(Math.random() > 0.3);
+                
+                // Update performance metrics
+                performanceMetrics.totalVerifications++;
+                performanceMetrics.totalTime += verificationResult.performance.totalTime;
+                if (verificationResult.signatureValid) {
+                    performanceMetrics.successfulVerifications++;
+                } else {
+                    performanceMetrics.failedVerifications++;
+                }
+                
+                result.className = `result ${verificationResult.signatureValid ? 'success' : 'error'}`;
+                result.style.display = 'block';
+                result.textContent = `Verification Result:
+Status: ${verificationResult.status}
+Signature Valid: ${verificationResult.signatureValid}
+Policy: ${policy}
+Performance: ${verificationResult.performance.totalTime.toFixed(2)}ms
+
+Checks:
+${Object.entries(verificationResult.checks)
+  .map(([check, passed]) => `  ${check}: ${passed ? '✓' : '✗'}`)
+  .join('\n')}
+
+Security Analysis:
+  Level: ${verificationResult.diagnostics.securityAnalysis.securityLevel}
+  Concerns: ${verificationResult.diagnostics.securityAnalysis.concerns.join(', ') || 'None'}
+  
+${verificationResult.error ? `Error: ${verificationResult.error.message}` : ''}`;
+                
+            } catch (error) {
+                result.className = 'result error';
+                result.style.display = 'block';
+                result.textContent = `Error: ${error.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Verify Signature';
+            }
+        };
+
+        window.runQuickVerification = async () => {
+            const result = document.getElementById('basicResult');
+            
+            try {
+                // Simulate quick verification
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                const isValid = Math.random() > 0.5;
+                result.className = `result ${isValid ? 'success' : 'error'}`;
+                result.style.display = 'block';
+                result.textContent = `Quick Verification: ${isValid ? 'VALID' : 'INVALID'}
+This is a simplified verification that only checks cryptographic validity.`;
+                
+            } catch (error) {
+                result.className = 'result error';
+                result.style.display = 'block';
+                result.textContent = `Error: ${error.message}`;
+            }
+        };
+
+        // Inspector functions
+        window.inspectSignatureFormat = () => {
+            const headers = JSON.parse(document.getElementById('inspectorHeaders').value);
+            const result = document.getElementById('inspectorResult');
+            
+            const analysis = {
+                isValidRFC9421: true,
+                signatureHeaders: Object.keys(headers),
+                signatureIds: ['sig1'],
+                issues: []
+            };
+            
+            // Simulate format analysis
+            if (!headers['signature-input']) {
+                analysis.issues.push({ severity: 'error', code: 'MISSING_SIGNATURE_INPUT', message: 'Missing signature-input header' });
+                analysis.isValidRFC9421 = false;
+            }
+            if (!headers['signature']) {
+                analysis.issues.push({ severity: 'error', code: 'MISSING_SIGNATURE', message: 'Missing signature header' });
+                analysis.isValidRFC9421 = false;
+            }
+            
+            result.className = `result ${analysis.isValidRFC9421 ? 'success' : 'warning'}`;
+            result.style.display = 'block';
+            result.textContent = `Format Analysis:
+RFC 9421 Compliant: ${analysis.isValidRFC9421}
+Signature Headers Found: ${analysis.signatureHeaders.join(', ')}
+Signature IDs: ${analysis.signatureIds.join(', ')}
+
+Issues Found: ${analysis.issues.length}
+${analysis.issues.map(issue => `  ${issue.severity.toUpperCase()}: ${issue.message}`).join('\n')}`;
+        };
+
+        window.analyzeComponents = () => {
+            const result = document.getElementById('inspectorResult');
+            
+            const analysis = {
+                validComponents: ['@method', '@target-uri', 'content-type', 'content-digest'],
+                invalidComponents: [],
+                missingComponents: [],
+                securityAssessment: {
+                    level: 'high',
+                    score: 85,
+                    strengths: ['HTTP method covered', 'Target URI covered', 'Content integrity protected'],
+                    weaknesses: []
+                }
+            };
+            
+            result.className = 'result success';
+            result.style.display = 'block';
+            result.textContent = `Component Analysis:
+Valid Components: ${analysis.validComponents.join(', ')}
+Invalid Components: ${analysis.invalidComponents.length || 'None'}
+Missing Recommended: ${analysis.missingComponents.length || 'None'}
+
+Security Assessment:
+  Level: ${analysis.securityAssessment.level.toUpperCase()}
+  Score: ${analysis.securityAssessment.score}/100
+  
+Strengths:
+${analysis.securityAssessment.strengths.map(s => `  + ${s}`).join('\n')}
+
+${analysis.securityAssessment.weaknesses.length ? 
+  'Weaknesses:\n' + analysis.securityAssessment.weaknesses.map(w => `  - ${w}`).join('\n') : 
+  'No significant weaknesses found'}`;
+        };
+
+        window.validateParameters = () => {
+            const result = document.getElementById('inspectorResult');
+            
+            const validation = {
+                allValid: true,
+                parameters: {
+                    created: { valid: true, message: 'Valid timestamp' },
+                    keyid: { valid: true, message: 'Valid key identifier' },
+                    alg: { valid: true, message: 'Supported algorithm' },
+                    nonce: { valid: true, message: 'Valid UUID v4 format' }
+                },
+                insights: ['Timestamp is 5 hours old', 'Using recommended Ed25519 algorithm']
+            };
+            
+            result.className = 'result success';
+            result.style.display = 'block';
+            result.textContent = `Parameter Validation:
+Overall Valid: ${validation.allValid}
+
+Parameter Details:
+${Object.entries(validation.parameters)
+  .map(([param, details]) => `  ${param}: ${details.valid ? '✓' : '✗'} ${details.message}`)
+  .join('\n')}
+
+Insights:
+${validation.insights.map(insight => `  • ${insight}`).join('\n')}`;
+        };
+
+        window.generateDiagnosticReport = () => {
+            const result = document.getElementById('inspectorResult');
+            
+            const mockResult = window.mockSDK.createMockVerificationResult(true);
+            
+            result.className = 'result info';
+            result.style.display = 'block';
+            result.textContent = `=== RFC 9421 Signature Verification Report ===
+
+Overall Status: VALID
+Signature Valid: YES
+
+=== Individual Checks ===
+✓ format valid
+✓ cryptographic valid
+✓ timestamp valid
+✓ nonce valid
+✓ content digest valid
+✓ component coverage valid
+✓ custom rules valid
+
+=== Signature Analysis ===
+Algorithm: ed25519
+Key ID: test-key-ed25519
+Created: ${new Date(mockResult.diagnostics.signatureAnalysis.created * 1000).toISOString()}
+Age: ${mockResult.diagnostics.signatureAnalysis.age} seconds
+Nonce: ${mockResult.diagnostics.signatureAnalysis.nonce}
+Covered Components: ${mockResult.diagnostics.signatureAnalysis.coveredComponents.join(', ')}
+
+=== Security Analysis ===
+Security Level: HIGH
+No security concerns detected
+
+=== Performance ===
+Total Time: ${mockResult.performance.totalTime.toFixed(2)}ms
+Step Timings:
+  - extraction: ${mockResult.performance.stepTimings.extraction.toFixed(2)}ms
+  - verification: ${mockResult.performance.stepTimings.verification.toFixed(2)}ms
+  - policyCheck: ${mockResult.performance.stepTimings.policyCheck.toFixed(2)}ms`;
+        };
+
+        // Policy functions
+        window.showPolicyDetails = () => {
+            const policyName = document.getElementById('policySelect').value;
+            const policy = window.mockSDK.policies[policyName];
+            const result = document.getElementById('policyResult');
+            
+            result.className = 'result info';
+            result.style.display = 'block';
+            result.textContent = `Policy: ${policy.name}
+Description: ${policy.description}
+
+Configuration:
+  Verify Timestamp: ${policy.verifyTimestamp}
+  Max Timestamp Age: ${policy.maxTimestampAge} seconds
+  Verify Nonce: ${policy.verifyNonce}
+  Verify Content Digest: ${policy.verifyContentDigest}
+  Required Components: ${policy.requiredComponents.join(', ')}
+  Allowed Algorithms: ${policy.allowedAlgorithms.join(', ')}
+  Require All Headers: ${policy.requireAllHeaders}`;
+        };
+
+        window.showAllPolicies = () => {
+            const result = document.getElementById('policyResult');
+            
+            result.className = 'result info';
+            result.style.display = 'block';
+            result.textContent = `Policy Comparison:
+
+STRICT POLICY:
+  - Maximum security verification
+  - 5 minute timestamp window
+  - Requires content digest
+  - All headers must be present
+  - Best for: High-security APIs
+
+STANDARD POLICY:
+  - Balanced security approach
+  - 15 minute timestamp window
+  - Content digest recommended
+  - Flexible header requirements
+  - Best for: General applications
+
+LENIENT POLICY:
+  - Development-friendly
+  - 1 hour timestamp window
+  - Optional content digest
+  - Minimal requirements
+  - Best for: Testing and development`;
+        };
+
+        window.createCustomPolicy = () => {
+            const result = document.getElementById('policyResult');
+            
+            result.className = 'result success';
+            result.style.display = 'block';
+            result.textContent = `Custom Policy Created:
+
+{
+  "name": "api-gateway",
+  "description": "Policy for API gateway requests",
+  "verifyTimestamp": true,
+  "maxTimestampAge": 600,
+  "verifyNonce": true,
+  "verifyContentDigest": true,
+  "requiredComponents": ["@method", "@target-uri", "authorization"],
+  "allowedAlgorithms": ["ed25519"],
+  "requireAllHeaders": false,
+  "customRules": [
+    {
+      "name": "api-key-validation",
+      "description": "Validate API key in authorization header"
+    }
+  ]
+}
+
+This custom policy is optimized for API gateway scenarios where:
+- Authentication headers must be signed
+- 10-minute replay protection window
+- Flexible component requirements
+- Custom validation rules`;
+        };
+
+        // Middleware functions
+        window.testResponseMiddleware = async () => {
+            const result = document.getElementById('middlewareResult');
+            
+            result.className = 'result info';
+            result.style.display = 'block';
+            result.textContent = 'Testing response verification middleware...\n';
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const mockResponse = {
+                url: document.getElementById('middlewareUrl').value,
+                status: 200,
+                headers: {
+                    'content-type': 'application/json',
+                    'signature-input': 'sig1=("@status" "content-type");created=1640995200;keyid="server-key";alg="ed25519"',
+                    'signature': 'sig1=:serverSignatureExample123456789=='
+                }
+            };
+            
+            result.textContent += `Response received from: ${mockResponse.url}
+Status: ${mockResponse.status}
+Headers with signature found: ✓
+
+Middleware processing...
+✓ Signature format validated
+✓ Public key retrieved
+✓ Cryptographic verification passed
+✓ Policy compliance checked
+
+Response verification: PASSED
+Verification time: 3.2ms
+Security level: HIGH`;
+        };
+
+        window.testRequestMiddleware = async () => {
+            const result = document.getElementById('middlewareResult');
+            
+            result.className = 'result success';
+            result.style.display = 'block';
+            result.textContent = 'Testing request verification middleware...\n';
+            
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            result.textContent += `Incoming request to: ${document.getElementById('middlewareUrl').value}
+Method: POST
+Content-Type: application/json
+
+Middleware validation:
+✓ Request signature detected
+✓ Format validation passed
+✓ Client key verified
+✓ Timestamp within window
+✓ Nonce validation passed
+
+Request allowed to proceed
+Validation time: 2.8ms
+Client identity verified`;
+        };
+
+        window.testBatchVerification = async () => {
+            const result = document.getElementById('middlewareResult');
+            
+            result.className = 'result info';
+            result.style.display = 'block';
+            result.textContent = 'Running batch verification test...\n';
+            
+            for (let i = 1; i <= 5; i++) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                result.textContent += `Batch ${i}/5: ${Math.random() > 0.2 ? 'VALID' : 'INVALID'} (${(Math.random() * 5 + 2).toFixed(1)}ms)\n`;
+            }
+            
+            result.textContent += `
+Batch Results:
+Total Requests: 5
+Valid Signatures: 4
+Invalid Signatures: 1
+Average Time: 3.7ms
+Success Rate: 80%
+
+Performance within targets ✓`;
+        };
+
+        // Performance test
+        window.runPerformanceTest = async () => {
+            const result = document.getElementById('performanceResult');
+            
+            result.className = 'result info';
+            result.style.display = 'block';
+            result.textContent = 'Running performance test...\n';
+            
+            const iterations = 100;
+            let totalTime = 0;
+            
+            for (let i = 1; i <= iterations; i++) {
+                const start = performance.now();
+                
+                // Simulate verification work
+                await new Promise(resolve => setTimeout(resolve, Math.random() * 5 + 2));
+                
+                const elapsed = performance.now() - start;
+                totalTime += elapsed;
+                
+                if (i % 10 === 0) {
+                    result.textContent += `Completed ${i}/${iterations} verifications\n`;
+                }
+            }
+            
+            const avgTime = totalTime / iterations;
+            performanceMetrics.totalVerifications += iterations;
+            performanceMetrics.totalTime += totalTime;
+            performanceMetrics.successfulVerifications += Math.floor(iterations * 0.95);
+            performanceMetrics.failedVerifications += Math.ceil(iterations * 0.05);
+            
+            result.textContent += `
+Performance Test Results:
+Total Verifications: ${iterations}
+Total Time: ${totalTime.toFixed(2)}ms
+Average Time: ${avgTime.toFixed(2)}ms
+Min Time: 2.1ms
+Max Time: 7.3ms
+Target: <10ms ✓
+
+Throughput: ${(1000 / avgTime).toFixed(0)} verifications/second
+
+Overall Performance: ${avgTime < 10 ? 'EXCELLENT' : avgTime < 50 ? 'GOOD' : 'NEEDS IMPROVEMENT'}`;
+        };
+
+        window.clearMetrics = () => {
+            performanceMetrics = {
+                totalVerifications: 0,
+                totalTime: 0,
+                successfulVerifications: 0,
+                failedVerifications: 0
+            };
+            
+            const result = document.getElementById('performanceResult');
+            result.className = 'result info';
+            result.style.display = 'block';
+            result.textContent = 'Performance metrics cleared.';
+        };
+
+        // Initialize with first policy
+        window.showPolicyDetails();
+    </script>
+</body>
+</html>

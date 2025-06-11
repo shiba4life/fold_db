@@ -8,12 +8,16 @@ import {
 } from '../crypto/ed25519';
 import { Ed25519KeyError } from '../types';
 
+// Counter for generating unique keys in tests
+let keyGenerationCounter = 0;
+
 // Mock crypto for testing environment
 const mockCrypto = {
   getRandomValues: jest.fn((array: Uint8Array) => {
-    // Fill with deterministic but varied values for testing
+    // Generate unique random values using counter for each test
+    keyGenerationCounter++;
     for (let i = 0; i < array.length; i++) {
-      array[i] = (i * 7 + 42) % 256;
+      array[i] = (i * 7 + 42 + keyGenerationCounter * 13) % 256;
     }
     return array;
   }),
@@ -27,10 +31,10 @@ const mockCrypto = {
 // Mock @noble/ed25519
 jest.mock('@noble/ed25519', () => ({
   getPublicKeyAsync: jest.fn(async (privateKey: Uint8Array) => {
-    // Mock public key generation - create a deterministic public key
+    // Mock public key generation - create a unique public key based on private key
     const publicKey = new Uint8Array(32);
     for (let i = 0; i < 32; i++) {
-      publicKey[i] = (privateKey[i] * 3 + 17) % 256;
+      publicKey[i] = (privateKey[i] * 3 + 17 + keyGenerationCounter) % 256;
     }
     return publicKey;
   }),
