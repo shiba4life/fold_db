@@ -307,10 +307,9 @@ async def custom_policy_example():
     """Demonstrate creating custom verification policies"""
     print("=== Custom Verification Policy Example ===")
     
-    from datafold_sdk.verification.policies import (
-        create_verification_policy,
-        VerificationRules,
-        register_verification_policy
+    from datafold_sdk.verification.unified_policies import (
+        create_unified_validator,
+        UNIFIED_VERIFICATION_POLICIES
     )
     
     # Create custom policy with specific rules

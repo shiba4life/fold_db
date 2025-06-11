@@ -6,8 +6,9 @@
 // Export types
 export * from './types.js';
 
-// Export policies
-export * from './policies.js';
+// Export policy constants
+// Export policy constants (selective to avoid type conflicts)
+export { STRICT, STANDARD, LENIENT, LEGACY, getVerificationPolicy, getAvailableVerificationPolicies, VERIFICATION_POLICIES } from './policies.js';
 
 // Export core verifier
 export * from './verifier.js';

@@ -45,9 +45,11 @@ def test_module_imports():
         )
         print("✓ Core verification modules imported successfully")
         
-        from datafold_sdk.verification.policies import (
-            STRICT_VERIFICATION_POLICY, STANDARD_VERIFICATION_POLICY
+        from datafold_sdk.verification.unified_policies import (
+            UNIFIED_VERIFICATION_POLICIES
         )
+        STRICT_VERIFICATION_POLICY = UNIFIED_VERIFICATION_POLICIES.get('strict')
+        STANDARD_VERIFICATION_POLICY = UNIFIED_VERIFICATION_POLICIES.get('standard')
         print("✓ Verification policies imported successfully")
         
         from datafold_sdk.verification.middleware import (

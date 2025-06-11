@@ -1029,6 +1029,8 @@ impl SignatureVerificationState {
             }
         };
 
+        // TODO: Integrate unified validation once security module is stable
+        // For now, use existing legacy validation flow
         // Validate timestamp with enhanced error details
         if let Err(e) = self.validate_timestamp_enhanced(components.created, &correlation_id) {
             self.log_authentication_failure(&e, &client_info, &request_info, start_time);
@@ -1378,6 +1380,7 @@ impl SignatureVerificationState {
         }
     }
 
+
     // Test helper methods - these should only be used in tests
     #[cfg(test)]
     pub fn generate_correlation_id_for_test(&self) -> String {
@@ -1393,6 +1396,7 @@ impl SignatureVerificationState {
     pub fn validate_timestamp_enhanced_for_test(&self, created: u64, correlation_id: &str) -> Result<(), AuthenticationError> {
         self.validate_timestamp_enhanced(created, correlation_id)
     }
+
 
     #[cfg(test)]
     pub fn get_config(&self) -> &SignatureAuthConfig {

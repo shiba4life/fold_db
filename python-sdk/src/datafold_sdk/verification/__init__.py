@@ -33,19 +33,15 @@ from .types import (
     VerificationTestVector,
 )
 
-# Export policies
+# Export policy constants
 from .policies import (
-    STRICT_VERIFICATION_POLICY,
-    STANDARD_VERIFICATION_POLICY,
-    LENIENT_VERIFICATION_POLICY,
-    LEGACY_VERIFICATION_POLICY,
-    VERIFICATION_POLICIES,
-    VERIFICATION_RULES,
-    create_verification_policy,
-    merge_verification_policies,
+    STRICT,
+    STANDARD,
+    LENIENT,
+    LEGACY,
     get_verification_policy,
     get_available_verification_policies,
-    validate_verification_policy,
+    VERIFICATION_POLICIES,
 )
 
 # Export core verifier
@@ -109,18 +105,14 @@ __all__ = [
     'ComponentSecurityAssessment',
     'VerificationTestVector',
     
-    # Policies
-    'STRICT_VERIFICATION_POLICY',
-    'STANDARD_VERIFICATION_POLICY',
-    'LENIENT_VERIFICATION_POLICY',
-    'LEGACY_VERIFICATION_POLICY',
-    'VERIFICATION_POLICIES',
-    'VERIFICATION_RULES',
-    'create_verification_policy',
-    'merge_verification_policies',
+    # Policy Constants
+    'STRICT',
+    'STANDARD',
+    'LENIENT',
+    'LEGACY',
     'get_verification_policy',
     'get_available_verification_policies',
-    'validate_verification_policy',
+    'VERIFICATION_POLICIES',
     
     # Core verifier
     'RFC9421Verifier',
