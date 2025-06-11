@@ -81,11 +81,10 @@ export {
   
   // Verification policies
   VERIFICATION_POLICIES,
-  STRICT_VERIFICATION_POLICY,
-  STANDARD_VERIFICATION_POLICY,
-  LENIENT_VERIFICATION_POLICY,
-  LEGACY_VERIFICATION_POLICY,
-  createVerificationPolicy,
+  STRICT,
+  STANDARD,
+  LENIENT,
+  LEGACY,
   getVerificationPolicy,
   
   // Inspector utilities

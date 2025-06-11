@@ -1,5 +1,5 @@
 {
-  "timestamp": 1749603311,
+  "timestamp": 1749615417,
   "execution_metrics": {
     "total_tests": 3,
     "tests_passed": 2,
@@ -20,8 +20,8 @@
     "derivation_time_ms": {},
     "backup_restore_time_ms": {},
     "memory_usage_mb": {
-      "python_storage_operation": 75,
-      "javascript_key_generation": 50
+      "javascript_key_generation": 50,
+      "python_storage_operation": 75
     },
     "cpu_usage_percent": {},
     "performance_regressions": []
@@ -34,20 +34,11 @@
     "side_channel_resistance_tests": 0,
     "security_vulnerabilities_found": [],
     "compliance_checks": {
-      "key_storage_security": true,
-      "cryptographic_strength": true
+      "cryptographic_strength": true,
+      "key_storage_security": true
     }
   },
   "platform_metrics": {
-    "python": {
-      "platform_name": "python",
-      "tests_run": 1,
-      "success_rate": 100.0,
-      "average_execution_time_ms": 0,
-      "memory_usage_mb": 0,
-      "compatibility_score": 100.0,
-      "platform_specific_issues": []
-    },
     "cli": {
       "platform_name": "cli",
       "tests_run": 1,
@@ -59,6 +50,15 @@
     },
     "javascript": {
       "platform_name": "javascript",
+      "tests_run": 1,
+      "success_rate": 100.0,
+      "average_execution_time_ms": 0,
+      "memory_usage_mb": 0,
+      "compatibility_score": 100.0,
+      "platform_specific_issues": []
+    },
+    "python": {
+      "platform_name": "python",
       "tests_run": 1,
       "success_rate": 100.0,
       "average_execution_time_ms": 0,

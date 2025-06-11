@@ -22,7 +22,7 @@ let _sharedPolicies: Record<string, VerificationPolicy> | null = null;
 
 function getSharedPolicies(): Record<string, VerificationPolicy> {
   if (!_sharedPolicies) {
-    const configPath = path.join(__dirname, '..', '..', '..', 'config', 'shared-policies.json');
+    const configPath = path.join(__dirname, '..', '..', 'config', 'shared-policies.json');
     const configData = fs.readFileSync(configPath, 'utf8');
     const rawPolicies = JSON.parse(configData);
     
