@@ -34,6 +34,7 @@ pub mod datafold_node;
 pub mod db_operations;
 pub mod error;
 pub mod error_handling;
+pub mod events;
 pub mod fees;
 pub mod fold_db_core;
 pub mod ingestion;
