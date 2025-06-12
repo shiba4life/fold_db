@@ -5,4 +5,5 @@ pub mod config;
 pub mod environment_utils;
 pub mod http_client;
 pub mod signing_config;
+pub mod unified_integration;
 pub mod verification;

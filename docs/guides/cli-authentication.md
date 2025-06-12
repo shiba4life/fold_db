@@ -1,10 +1,20 @@
 # DataFold CLI Authentication Guide
 
-This guide explains how to set up and use automatic signature injection with the DataFold CLI for seamless authentication.
+This guide explains how to set up and use **mandatory signature authentication** with the DataFold CLI. All DataFold requests require RFC 9421 HTTP Message Signatures for authentication.
 
 ## Overview
 
-The DataFold CLI now supports automatic RFC 9421 HTTP Message Signatures for transparent authentication. Once configured, requests are automatically signed without manual intervention while providing fine-grained control over signing behavior.
+The DataFold CLI requires RFC 9421 HTTP Message Signatures for all authenticated requests. Signature authentication is **mandatory** and cannot be disabled. Once configured, requests are automatically signed using Ed25519 cryptography with configurable security profiles.
+
+## ⚠️ Important: Mandatory Authentication
+
+**Signature authentication is required for all DataFold operations.** You cannot disable authentication or make unsigned requests. All CLI commands that interact with a DataFold server must be properly configured with:
+
+- A valid Ed25519 key pair
+- An authentication profile
+- Appropriate security settings
+
+Attempting to make requests without proper authentication will result in immediate failure.
 
 ## Quick Start
 
@@ -56,22 +66,24 @@ The CLI uses a TOML configuration file located at `~/.datafold/config.toml`. You
 cp config/cli-config-template.toml ~/.datafold/config.toml
 ```
 
-### Signing Modes
+### Security Profiles
 
-The CLI supports three signing modes:
+The CLI supports three security profiles that determine authentication strictness:
 
-- **`auto`**: Automatically sign all requests
-- **`manual`**: Only sign when explicitly requested with `--sign`
-- **`disabled`**: Never sign requests
+- **`strict`**: Maximum security with tight time windows (production recommended)
+- **`standard`**: Balanced security settings (default)
+- **`lenient`**: Relaxed validation for development environments
 
-### Global Signing Configuration
+**Note**: All requests are automatically signed. You cannot disable signature authentication.
+
+### Global Authentication Configuration
 
 ```bash
-# Enable automatic signing globally
-datafold auth-configure --enable-auto-sign true
+# Configure security profile
+datafold auth-configure --security-profile strict
 
-# Set default signing mode
-datafold auth-configure --default-mode auto
+# Set environment-specific settings
+datafold auth-configure --environment production
 
 # Enable debug logging for troubleshooting
 datafold auth-configure --debug true
@@ -80,57 +92,59 @@ datafold auth-configure --debug true
 datafold auth-configure --show
 ```
 
-### Per-Command Signing
+### Environment-Specific Configuration
 
-You can configure signing behavior for specific commands:
+Configure different security settings for different environments:
 
 ```bash
-# Always sign query commands
-datafold auth-configure --command query --command-mode auto
+# Production environment with strict security
+datafold auth-configure --environment production --security-profile strict
 
-# Never sign status commands
-datafold auth-configure --command auth-status --command-mode disabled
+# Development environment with lenient settings
+datafold auth-configure --environment development --security-profile lenient
 
-# Remove command-specific override
-datafold auth-configure --remove-command-override query
+# Staging environment with standard settings
+datafold auth-configure --environment staging --security-profile standard
 ```
 
 ## Using the CLI with Authentication
 
 ### Global Flags
 
-The CLI provides global flags to control signing behavior:
+The CLI provides global flags for authentication configuration:
 
 ```bash
-# Force signing for this request
-datafold query --sign --schema my-schema --fields id,name
-
-# Force no signing for this request
-datafold query --no-sign --schema my-schema --fields id,name
-
 # Use specific profile
 datafold query --profile production --schema my-schema --fields id,name
 
-# Enable debug logging
-datafold query --sign-debug --schema my-schema --fields id,name
+# Use specific environment
+datafold query --environment production --schema my-schema --fields id,name
 
-# Verbose output
+# Enable debug logging
+datafold query --auth-debug --schema my-schema --fields id,name
+
+# Verbose output (includes authentication details)
 datafold query --verbose --schema my-schema --fields id,name
 ```
 
+**Note**: All requests are automatically signed. The `--sign` and `--no-sign` flags are no longer supported since authentication is mandatory.
+
 ### Environment Variables
 
-You can use environment variables to control signing:
+You can use environment variables to control authentication settings:
 
 ```bash
-# Enable automatic signing for all commands
-export DATAFOLD_AUTO_SIGN=auto
+# Set security profile for all commands
+export DATAFOLD_SECURITY_PROFILE=strict
 
-# Disable signing for all commands
-export DATAFOLD_AUTO_SIGN=disabled
+# Set environment for all commands
+export DATAFOLD_ENVIRONMENT=production
 
-# Use manual signing mode
-export DATAFOLD_AUTO_SIGN=manual
+# Enable debug authentication logging
+export DATAFOLD_AUTH_DEBUG=true
+
+# Set default profile
+export DATAFOLD_DEFAULT_PROFILE=production
 ```
 
 ## Key Management
@@ -305,21 +319,31 @@ max_concurrent_signs = 20
    - Use strong passphrases for key encryption
    - Store keys in secure locations with proper file permissions
    - Regularly rotate keys using `datafold rotate-key`
+   - Never share private keys between environments
 
-2. **Use appropriate signing modes**
-   - Use `auto` mode for trusted environments
-   - Use `manual` mode for shared systems
-   - Use `disabled` mode for debugging only
+2. **Use appropriate security profiles**
+   - Use `strict` profile for production environments
+   - Use `standard` profile for staging environments
+   - Use `lenient` profile only for development
+   - Never use lenient settings in production
 
 3. **Monitor authentication**
-   - Regularly check authentication status
+   - Regularly check authentication status with `datafold auth-status`
    - Monitor for failed authentication attempts
-   - Use debug mode only when necessary
+   - Review authentication logs regularly
+   - Set up alerts for authentication failures
 
-4. **Profile management**
-   - Use different profiles for different environments
+4. **Environment and profile management**
+   - Use separate profiles for different environments
    - Regularly review and clean up unused profiles
    - Set appropriate user IDs for audit trails
+   - Implement key rotation policies for production
+
+5. **Network security**
+   - Always use HTTPS for server communications
+   - Verify server certificates
+   - Monitor for man-in-the-middle attacks
+   - Use secure networks for key operations
 
 ## Examples
 
@@ -371,36 +395,49 @@ datafold --profile staging --sign mutate --schema users --mutation-type create -
 datafold --profile prod --sign query --schema orders --fields id,total
 ```
 
-## Migration from Manual Authentication
+## Migration from Optional Authentication
 
-If you're upgrading from manual authentication:
+If you're upgrading from a previous version where authentication was optional:
 
-1. **Create configuration file**
+1. **Verify existing configuration**
    ```bash
-   datafold auth-setup --create-config
+   datafold auth-status --verbose
    ```
 
-2. **Import existing keys**
+2. **Update configuration for mandatory authentication**
+   ```bash
+   datafold auth-setup --upgrade-config
+   ```
+
+3. **Import existing keys if needed**
    ```bash
    datafold import-key --export-file my-old-key.json --key-id imported-key
    ```
 
-3. **Create profiles for existing setups**
+4. **Create environment-specific profiles**
    ```bash
-   datafold auth-profile create existing \
-     --server-url https://your-existing-server.com \
-     --key-id imported-key
+   # Production profile with strict security
+   datafold auth-profile create production \
+     --server-url https://api.yourcompany.com \
+     --key-id prod-key \
+     --security-profile strict
+   
+   # Development profile with lenient security
+   datafold auth-profile create development \
+     --server-url http://localhost:8080 \
+     --key-id dev-key \
+     --security-profile lenient
    ```
 
-4. **Configure automatic signing**
+5. **Test mandatory authentication**
    ```bash
-   datafold auth-configure --enable-auto-sign true --default-mode manual
+   datafold auth-test --profile production
+   datafold query --schema test --fields id  # Authentication is automatic
    ```
 
-5. **Test the setup**
-   ```bash
-   datafold auth-test
-   datafold --sign query --schema test --fields id
-   ```
+6. **Update scripts and automation**
+   - Remove any `--no-sign` flags from scripts
+   - Update environment variables to use new authentication settings
+   - Ensure all automation has proper authentication profiles configured
 
-For more information, see the [API Authentication Guide](./api-authentication.md) and [Security Best Practices](./security-best-practices.md).
+For more information, see the [Migration Guide](../migration/migration-guide.md) and [Production Deployment Guide](../deployment-guide.md).

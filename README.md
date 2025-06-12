@@ -4,10 +4,12 @@
 [![Documentation](https://docs.rs/datafold/badge.svg)](https://docs.rs/datafold)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/yourusername/datafold)
 
-A Rust-based distributed data platform with schema-based storage, AI-powered ingestion, and real-time data processing capabilities. DataFold provides a complete solution for distributed data management with automatic schema generation, field mapping, and extensible ingestion pipelines.
+A Rust-based distributed data platform with **mandatory signature authentication**, schema-based storage, AI-powered ingestion, and real-time data processing capabilities. DataFold provides a complete solution for distributed data management with automatic schema generation, field mapping, and extensible ingestion pipelines.
 
 ## ✨ Features
 
+- **🔐 Mandatory Signature Authentication** - RFC 9421 HTTP Message Signatures with Ed25519 cryptography [production-ready]
+- **🛡️ Enterprise Security** - Multi-tier security profiles with comprehensive audit logging [production-ready]
 - **🤖 AI-Powered Data Ingestion** - Automatic schema creation and field mapping using AI [Initial prototype]
 - **🔄 Real-Time Processing** - Event-driven architecture with automatic transform execution [working]
 - **🌐 Distributed Architecture** - P2P networking with automatic peer discovery [untested]
@@ -16,7 +18,17 @@ A Rust-based distributed data platform with schema-based storage, AI-powered ing
 - **⚡ High Performance** - Rust-based core with optimized storage and query execution [maybe]
 - **🔌 Extensible Ingestion** - Plugin system for social media and external data sources [not yet begun]
 
-## 🚀 Quick Start
+## 🔒 Security Notice
+
+**All DataFold operations require signature authentication.** This is a mandatory security feature that cannot be disabled. Before using DataFold, you must:
+
+1. **Configure Authentication**: Set up Ed25519 key pairs and authentication profiles
+2. **Choose Security Profile**: Select appropriate security level (strict/standard/lenient)
+3. **Verify Setup**: Test authentication configuration before production use
+
+See the [Authentication Guide](docs/guides/cli-authentication.md) for setup instructions.
+
+## � Quick Start
 
 ### Installation
 
@@ -42,18 +54,23 @@ This provides three binaries:
 
 ```rust
 use datafold::{DataFoldNode, IngestionCore, Schema};
+use datafold::datafold_node::config::{NodeConfig, SecurityProfile};
 use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize a DataFold node
-    let node = DataFoldNode::new_with_defaults().await?;
+    // Initialize a DataFold node with mandatory authentication
+    let config = NodeConfig::production(std::path::PathBuf::from("data"))
+        .with_signature_auth_security_profile(SecurityProfile::Standard);
     
-    // Create an ingestion pipeline
-    let config = datafold::IngestionConfig::from_env_allow_empty();
-    let ingestion = IngestionCore::new(config)?;
+    let node = DataFoldNode::new(config).await?;
+    
+    // All operations require authentication - configure your client accordingly
+    let auth_config = datafold::IngestionConfig::from_env_with_auth();
+    let ingestion = IngestionCore::new_with_authentication(auth_config)?;
     
     // Process JSON data with automatic schema generation
+    // Note: All requests are automatically signed with your configured key
     let data = json!({
         "name": "John Doe",
         "email": "john@example.com",
@@ -73,14 +90,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### First-Time Setup
+
+Before using DataFold, configure authentication:
+
+```bash
+# Generate authentication keys
+datafold auth-keygen --key-id production-key
+
+# Create authentication profile
+datafold auth-profile create default \
+  --server-url https://your-datafold-server.com \
+  --key-id production-key \
+  --security-profile standard
+
+# Test authentication setup
+datafold auth-test
+```
+
 ### Running the HTTP Server
 
 ```bash
-# Start the HTTP server with web UI
-datafold_http_server --port 9001
+# Start the HTTP server with mandatory authentication
+datafold_http_server --port 9001 --auth-required
+
+# For development with lenient security (not recommended for production)
+datafold_http_server --port 9001 --security-profile lenient
 ```
 
-Then visit `http://localhost:9001` for the web interface.
+Then visit `http://localhost:9001` for the web interface. **Note**: All web requests require proper authentication headers.
 
 ## 📖 Core Concepts
 
@@ -188,13 +226,16 @@ The UI will be available at `http://localhost:5173`.
 ### Loading Sample Data
 
 ```bash
-# Use the CLI to load a schema
+# All CLI operations require authentication setup first
+datafold auth-setup --interactive
+
+# Use the CLI to load a schema (automatically signed)
 datafold_cli load-schema examples/user_schema.json
 
-# Query data
+# Query data (authentication automatic)
 datafold_cli query examples/user_query.json
 
-# Execute mutations
+# Execute mutations (signature authentication required)
 datafold_cli mutate examples/user_mutation.json
 ```
 
@@ -209,12 +250,19 @@ See [`datafold_api_examples/`](datafold_api_examples/) for Python scripts demons
 
 ## 🔧 Configuration
 
-DataFold uses JSON configuration files. Default config:
+DataFold uses JSON configuration files with **mandatory authentication settings**. Default config:
 
 ```json
 {
   "storage_path": "data/db",
   "default_trust_distance": 1,
+  "signature_auth": {
+    "security_profile": "standard",
+    "allowed_time_window_secs": 300,
+    "clock_skew_tolerance_secs": 30,
+    "nonce_ttl_secs": 600,
+    "required_signature_components": ["@method", "@target-uri", "content-digest"]
+  },
   "network": {
     "port": 9000,
     "enable_mdns": true
@@ -226,17 +274,33 @@ DataFold uses JSON configuration files. Default config:
 }
 ```
 
-Environment variables:
+**Required Environment Variables:**
+- `DATAFOLD_PRIVATE_KEY` - Path to your Ed25519 private key (required)
+- `DATAFOLD_KEY_ID` - Your registered key identifier (required)
+
+**Optional Environment Variables:**
 - `OPENROUTER_API_KEY` - API key for AI-powered ingestion
 - `DATAFOLD_CONFIG` - Path to configuration file
 - `DATAFOLD_LOG_LEVEL` - Logging level (trace, debug, info, warn, error)
+- `DATAFOLD_SECURITY_PROFILE` - Security profile (strict/standard/lenient)
 
 ## 📚 Documentation
 
+### Security & Authentication (Required Reading)
+- **[Authentication Guide](docs/guides/cli-authentication.md)** - **Required**: Setting up mandatory authentication
+- **[Signature Verification Guide](docs/guides/cli-signature-verification.md)** - Understanding signature verification
+- **[Security Best Practices](docs/security/recipes/authentication-flow.md)** - Production security recommendations
+- **[Troubleshooting Guide](docs/guides/troubleshooting.md)** - Resolving authentication issues
+
+### API & Development
 - **[API Documentation](https://docs.rs/datafold)** - Complete API reference
 - **[CLI Guide](README_CLI.md)** - Command-line interface usage
 - **[Ingestion Guide](INGESTION_README.md)** - AI-powered data ingestion
 - **[Architecture](docs/Unified_Architecture.md)** - System design and patterns
+
+### Deployment & Operations
+- **[Production Deployment](docs/deployment-guide.md)** - Production setup with mandatory authentication
+- **[Migration Guide](docs/migration/migration-guide.md)** - Upgrading to mandatory authentication
 
 ## 🤝 Contributing
 

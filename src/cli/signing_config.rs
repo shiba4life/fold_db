@@ -32,8 +32,6 @@ pub enum SigningMode {
     Auto,
     /// Only sign when explicitly requested with --sign
     Manual,
-    /// Never sign requests
-    Disabled,
 }
 
 
@@ -44,8 +42,7 @@ impl FromStr for SigningMode {
         match s.to_lowercase().as_str() {
             "auto" | "automatic" | "always" => Ok(SigningMode::Auto),
             "manual" | "explicit" | "on-demand" => Ok(SigningMode::Manual),
-            "disabled" | "never" | "off" => Ok(SigningMode::Disabled),
-            _ => Err(format!("Invalid signing mode: {}. Valid options: auto, manual, disabled", s)),
+            _ => Err(format!("Invalid signing mode: {}. Valid options: auto, manual", s)),
         }
     }
 }
@@ -125,7 +122,6 @@ impl SigningMode {
         match self {
             SigningMode::Auto => "auto",
             SigningMode::Manual => "manual",
-            SigningMode::Disabled => "disabled",
         }
     }
 
@@ -203,7 +199,7 @@ impl EnhancedSigningConfig {
             if sign {
                 self.auto_signing.default_mode = SigningMode::Auto;
             } else {
-                self.auto_signing.default_mode = SigningMode::Disabled;
+                self.auto_signing.default_mode = SigningMode::Manual;
             }
         }
 
@@ -279,7 +275,7 @@ mod tests {
     fn test_signing_mode_parsing() {
         assert_eq!("auto".parse::<SigningMode>().unwrap(), SigningMode::Auto);
         assert_eq!("MANUAL".parse::<SigningMode>().unwrap(), SigningMode::Manual);
-        assert_eq!("disabled".parse::<SigningMode>().unwrap(), SigningMode::Disabled);
+        assert!("disabled".parse::<SigningMode>().is_err());
         assert!("invalid".parse::<SigningMode>().is_err());
     }
 
@@ -287,11 +283,9 @@ mod tests {
     fn test_signing_mode_behavior() {
         assert!(SigningMode::Auto.should_auto_sign());
         assert!(!SigningMode::Manual.should_auto_sign());
-        assert!(!SigningMode::Disabled.should_auto_sign());
 
         assert!(SigningMode::Auto.allows_explicit_sign());
         assert!(SigningMode::Manual.allows_explicit_sign());
-        assert!(!SigningMode::Disabled.allows_explicit_sign());
     }
 
     #[test]

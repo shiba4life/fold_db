@@ -115,7 +115,9 @@ pub async fn list_nodes(state: web::Data<AppState>) -> impl Responder {
 mod tests {
     use super::*;
     use crate::datafold_node::{config::NodeConfig, DataFoldNode};
+    use crate::datafold_node::signature_auth::{SignatureAuthConfig, SignatureVerificationState};
     use actix_web::web;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     #[tokio::test]
@@ -123,9 +125,14 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = NodeConfig::new(dir.path().to_path_buf());
         let node = DataFoldNode::new(config).unwrap();
+        // Create default signature auth for testing
+        let sig_config = SignatureAuthConfig::default();
+        let signature_auth = SignatureVerificationState::new(sig_config)
+            .expect("Failed to create signature verification state for test");
+        
         let state = web::Data::new(super::super::http_server::AppState {
-            signature_auth: None,
-            node: std::sync::Arc::new(tokio::sync::Mutex::new(node)),
+            signature_auth: Arc::new(signature_auth),
+            node: Arc::new(tokio::sync::Mutex::new(node)),
         });
         use actix_web::test;
         let req = test::TestRequest::default().to_http_request();
@@ -137,9 +144,14 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = NodeConfig::new(dir.path().to_path_buf());
         let node = DataFoldNode::new(config).unwrap();
+        // Create default signature auth for testing
+        let sig_config = SignatureAuthConfig::default();
+        let signature_auth = SignatureVerificationState::new(sig_config)
+            .expect("Failed to create signature verification state for test");
+        
         web::Data::new(super::super::http_server::AppState {
-            signature_auth: None,
-            node: std::sync::Arc::new(tokio::sync::Mutex::new(node)),
+            signature_auth: Arc::new(signature_auth),
+            node: Arc::new(tokio::sync::Mutex::new(node)),
         })
     }
 

@@ -298,6 +298,7 @@ async fn create_simple_ingestion_service(
 mod tests {
     use super::*;
     use crate::datafold_node::{DataFoldNode, NodeConfig};
+    use crate::datafold_node::signature_auth::{SignatureAuthConfig, SignatureVerificationState};
     use actix_web::{test, App};
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -307,8 +308,13 @@ mod tests {
         let config = NodeConfig::new(temp_dir.path().to_path_buf());
         let node = DataFoldNode::load(config).await.unwrap();
 
+        // Create default signature auth for testing
+        let sig_config = SignatureAuthConfig::default();
+        let signature_auth = SignatureVerificationState::new(sig_config)
+            .expect("Failed to create signature verification state for test");
+        
         web::Data::new(AppState {
-            signature_auth: None,
+            signature_auth: Arc::new(signature_auth),
             node: Arc::new(tokio::sync::Mutex::new(node)),
         })
     }

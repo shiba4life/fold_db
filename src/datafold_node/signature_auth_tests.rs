@@ -14,7 +14,6 @@ mod tests {
     #[tokio::test]
     async fn test_signature_auth_config_default() {
         let config = SignatureAuthConfig::default();
-        assert!(config.enabled);
         assert_eq!(config.allowed_time_window_secs, 300);
         assert_eq!(config.nonce_ttl_secs, 300);
         assert!(config.required_signature_components.contains(&"@method".to_string()));
@@ -29,7 +28,6 @@ mod tests {
         let state = SignatureVerificationState::new(config.clone()).expect("Config should be valid");
         
         // Test that state is created successfully
-        assert_eq!(state.config.enabled, config.enabled);
         assert_eq!(state.config.allowed_time_window_secs, config.allowed_time_window_secs);
     }
 
@@ -97,9 +95,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_middleware_with_disabled_config() {
-        let mut config = SignatureAuthConfig::default();
-        config.enabled = false;
+    async fn test_mandatory_signature_verification() {
+        let config = SignatureAuthConfig::default();
         let state = SignatureVerificationState::new(config).expect("Config should be valid");
         
         let app = test::init_service(
@@ -108,10 +105,10 @@ mod tests {
                 .route("/test", web::get().to(test_handler))
         ).await;
         
-        // Request should pass through when verification is disabled
+        // Request should be rejected since signature verification is mandatory
         let req = test::TestRequest::get().uri("/test").to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert_eq!(resp.status().as_u16(), 400); // Bad request due to missing signature headers
     }
 
     #[tokio::test]

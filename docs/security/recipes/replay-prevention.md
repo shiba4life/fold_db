@@ -1,13 +1,25 @@
-# Replay Attack Prevention Security Recipe
+# Mandatory Replay Attack Prevention Security Recipe
 
 ## Overview
 
-This recipe provides comprehensive strategies and implementations for preventing replay attacks in DataFold signature authentication. Replay attacks occur when attackers intercept valid signed requests and replay them to perform unauthorized actions.
+This recipe provides comprehensive strategies and implementations for preventing replay attacks in DataFold's **mandatory** signature authentication system. Since all DataFold communications require signature authentication, robust replay attack prevention is critical for system security.
 
 ## Security Level
-- **Complexity**: Intermediate
-- **Security Rating**: Critical
-- **Implementation Time**: 45-90 minutes
+- **Complexity**: Intermediate to Advanced
+- **Security Rating**: Critical (Mandatory Implementation)
+- **Implementation Time**: 60-120 minutes
+- **Compliance**: Required for all DataFold deployments
+
+## ⚠️ Critical Security Notice
+
+**Replay attack prevention is mandatory** in DataFold's authentication system. Since signature authentication cannot be disabled, proper replay prevention implementation is essential for:
+
+- **Security**: Preventing unauthorized replay of valid requests
+- **Compliance**: Meeting security framework requirements
+- **Integrity**: Ensuring request authenticity and freshness
+- **Audit**: Maintaining proper security logs and correlation IDs
+
+All production deployments must implement comprehensive replay prevention controls.
 
 ## Prerequisites
 
@@ -63,9 +75,19 @@ This recipe provides comprehensive strategies and implementations for preventing
 - **Operational**: Service disruption, resource exhaustion
 - **Compliance**: Audit failures, regulatory violations
 
+## Mandatory Implementation Requirements
+
+Before implementing replay prevention strategies, ensure:
+
+1. **Authentication Infrastructure**: Mandatory signature authentication is properly configured
+2. **Time Synchronization**: NTP synchronization across all systems (critical for timestamp validation)
+3. **Distributed Storage**: Redis or equivalent for distributed nonce tracking
+4. **Monitoring**: Security event logging and alerting infrastructure
+5. **Performance**: Adequate resources for cryptographic operations and nonce storage
+
 ## Implementation Strategies
 
-### Strategy 1: Timestamp-Based Windows
+### Strategy 1: Mandatory Timestamp-Based Windows
 
 #### Basic Timestamp Validation
 ```javascript
@@ -382,62 +404,132 @@ class AdvancedNonceValidator extends NonceValidator {
 }
 ```
 
-### Strategy 3: Combined Validation Middleware
+### Strategy 3: Mandatory Combined Validation Middleware
 
-#### Express.js Replay Prevention Middleware
+#### Express.js Mandatory Replay Prevention Middleware
 ```javascript
-// server/middleware/replay-prevention.js
+// server/middleware/mandatory-replay-prevention.js
 const { AdvancedTimestampValidator } = require('./advanced-timestamp-validation');
 const { AdvancedNonceValidator } = require('./advanced-nonce-validation');
 
-class ReplayPreventionMiddleware {
+class MandatoryReplayPreventionMiddleware {
   constructor(config = {}) {
     this.timestampValidator = new AdvancedTimestampValidator(config.timestamp);
     this.nonceValidator = new AdvancedNonceValidator(config.nonce);
-    this.enabled = config.enabled !== false;
-    this.strictMode = config.strictMode || false;
+    // Always enabled - cannot be disabled
+    this.enabled = true;
+    this.strictMode = config.strictMode !== false; // Default to strict
+    this.securityProfile = config.securityProfile || 'standard';
   }
   
   middleware() {
     return async (req, res, next) => {
-      if (!this.enabled) {
-        return next();
-      }
+      // Always enabled - no bypass possible
+      const correlationId = req.get('x-correlation-id') || this.generateCorrelationId();
+      req.correlationId = correlationId;
       
       try {
         const replayCheck = await this.validateRequest(req);
         
         if (!replayCheck.valid) {
-          // Log security event
-          console.warn('Replay prevention blocked request:', {
+          // Mandatory security event logging
+          this.logSecurityEvent('REPLAY_PREVENTION_BLOCKED', {
+            correlationId,
             ip: req.ip,
             userAgent: req.get('User-Agent'),
             url: req.originalUrl,
+            method: req.method,
             reason: replayCheck.reason,
-            details: replayCheck.details
+            details: replayCheck.details,
+            severity: 'CRITICAL',
+            timestamp: new Date().toISOString()
           });
           
-          // Return error response
+          // Always return structured error response
           return res.status(401).json({
-            error: 'Request validation failed',
-            message: this.strictMode ? replayCheck.message : 'Authentication failed'
+            error: 'Replay prevention validation failed',
+            correlationId: correlationId,
+            message: this.getPublicErrorMessage(replayCheck),
+            errorCode: replayCheck.reason,
+            timestamp: new Date().toISOString()
           });
         }
         
-        // Store validation results for audit
+        // Store validation results for mandatory audit trail
         req.replayValidation = replayCheck;
+        req.replayValidation.correlationId = correlationId;
+        
+        // Log successful validation for audit
+        this.logSecurityEvent('REPLAY_PREVENTION_SUCCESS', {
+          correlationId,
+          ip: req.ip,
+          keyId: replayCheck.keyId,
+          timestamp: new Date().toISOString()
+        });
         
         next();
       } catch (error) {
-        console.error('Replay prevention middleware error:', error);
+        console.error('Mandatory replay prevention middleware error:', error);
         
-        // Fail securely
+        // Log security error
+        this.logSecurityEvent('REPLAY_PREVENTION_ERROR', {
+          correlationId,
+          error: error.message,
+          severity: 'CRITICAL',
+          timestamp: new Date().toISOString()
+        });
+        
+        // Fail securely - never allow requests through on error
         res.status(500).json({
-          error: 'Authentication validation failed',
-          message: 'Unable to validate request authenticity'
+          error: 'Security validation failed',
+          correlationId: correlationId,
+          message: 'Unable to validate request security',
+          timestamp: new Date().toISOString()
         });
       }
     };
+  }
+  
+  generateCorrelationId() {
+    return `rp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+  
+  getPublicErrorMessage(replayCheck) {
+    // Provide helpful but not overly detailed error messages
+    switch (replayCheck.reason) {
+      case 'timestamp_too_old':
+        return 'Request timestamp is too old. Ensure system clock is synchronized.';
+      case 'timestamp_too_future':
+        return 'Request timestamp is too far in the future. Check system clock.';
+      case 'nonce_already_used':
+        return 'Request nonce has been used before. Use a unique nonce for each request.';
+      case 'invalid_nonce_format':
+        return 'Request nonce format is invalid. Use a proper UUID4 format.';
+      default:
+        return 'Request failed security validation. Check authentication configuration.';
+    }
+  }
+  
+  logSecurityEvent(eventType, details) {
+    // Mandatory security logging - integrate with your security system
+    const logEntry = {
+      eventType,
+      service: 'datafold-replay-prevention',
+      ...details
+    };
+    
+    // Log to multiple destinations for security
+    console.log(JSON.stringify(logEntry));
+    
+    // Send to security monitoring system
+    if (this.securityLogger) {
+      this.securityLogger.log(logEntry);
+    }
+    
+    // Send critical events to alerting system
+    if (details.severity === 'CRITICAL' && this.alertingSystem) {
+      this.alertingSystem.sendAlert(logEntry);
+    }
   }
   
   async validateRequest(req) {

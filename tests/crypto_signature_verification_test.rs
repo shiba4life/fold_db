@@ -23,8 +23,13 @@ async fn register_test_key() -> (String, MasterKeyPair, Arc<tokio::sync::Mutex<D
     let node = DataFoldNode::new(config).expect("Failed to create DataFold node");
     let node_arc = Arc::new(tokio::sync::Mutex::new(node));
     
+    // Create default signature auth for testing
+    let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
+    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+        .expect("Failed to create signature verification state for test");
+    
     let app_state = web::Data::new(AppState {
-        signature_auth: None,
+        signature_auth: Arc::new(signature_auth),
         node: node_arc.clone(),
     });
 
@@ -66,7 +71,12 @@ async fn register_test_key() -> (String, MasterKeyPair, Arc<tokio::sync::Mutex<D
 async fn test_signature_verification_success_utf8() {
     let (client_id, keypair, node_arc) = register_test_key().await;
 
-    let app_state = web::Data::new(AppState { signature_auth: None, node: node_arc });
+    // Create default signature auth for testing
+    let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
+    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+        .expect("Failed to create signature verification state for test");
+    
+    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
     let app = test::init_service(
         App::new()
             .app_data(app_state)
@@ -108,7 +118,12 @@ async fn test_signature_verification_success_utf8() {
 async fn test_signature_verification_success_hex() {
     let (client_id, keypair, node_arc) = register_test_key().await;
 
-    let app_state = web::Data::new(AppState { signature_auth: None, node: node_arc });
+    // Create default signature auth for testing
+    let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
+    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+        .expect("Failed to create signature verification state for test");
+    
+    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
     let app = test::init_service(
         App::new()
             .app_data(app_state)
@@ -150,7 +165,12 @@ async fn test_signature_verification_success_hex() {
 async fn test_signature_verification_invalid_signature() {
     let (client_id, _keypair, node_arc) = register_test_key().await;
 
-    let app_state = web::Data::new(AppState { signature_auth: None, node: node_arc });
+    // Create default signature auth for testing
+    let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
+    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+        .expect("Failed to create signature verification state for test");
+    
+    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
     let app = test::init_service(
         App::new()
             .app_data(app_state)
@@ -192,7 +212,12 @@ async fn test_signature_verification_unregistered_client() {
     let node = DataFoldNode::new(config).expect("Failed to create DataFold node");
     let node_arc = Arc::new(tokio::sync::Mutex::new(node));
 
-    let app_state = web::Data::new(AppState { signature_auth: None, node: node_arc });
+    // Create default signature auth for testing
+    let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
+    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+        .expect("Failed to create signature verification state for test");
+    
+    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
     let app = test::init_service(
         App::new()
             .app_data(app_state)
@@ -231,7 +256,12 @@ async fn test_signature_verification_unregistered_client() {
 async fn test_signature_verification_invalid_encoding() {
     let (client_id, keypair, node_arc) = register_test_key().await;
 
-    let app_state = web::Data::new(AppState { signature_auth: None, node: node_arc });
+    // Create default signature auth for testing
+    let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
+    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+        .expect("Failed to create signature verification state for test");
+    
+    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
     let app = test::init_service(
         App::new()
             .app_data(app_state)
@@ -274,7 +304,12 @@ async fn test_signature_verification_empty_fields() {
     let node = DataFoldNode::new(config).expect("Failed to create DataFold node");
     let node_arc = Arc::new(tokio::sync::Mutex::new(node));
 
-    let app_state = web::Data::new(AppState { signature_auth: None, node: node_arc });
+    // Create default signature auth for testing
+    let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
+    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+        .expect("Failed to create signature verification state for test");
+    
+    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
     let app = test::init_service(
         App::new()
             .app_data(app_state)
@@ -308,7 +343,12 @@ async fn test_signature_verification_empty_fields() {
 async fn test_signature_verification_response_format() {
     let (client_id, keypair, node_arc) = register_test_key().await;
 
-    let app_state = web::Data::new(AppState { signature_auth: None, node: node_arc });
+    // Create default signature auth for testing
+    let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
+    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+        .expect("Failed to create signature verification state for test");
+    
+    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
     let app = test::init_service(
         App::new()
             .app_data(app_state)

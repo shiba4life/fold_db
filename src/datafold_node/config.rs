@@ -14,9 +14,9 @@ pub struct NodeConfig {
     /// Cryptographic configuration for database encryption (optional)
     #[serde(default)]
     pub crypto: Option<CryptoConfig>,
-    /// Signature authentication configuration (optional)
-    #[serde(default)]
-    pub signature_auth: Option<SignatureAuthConfig>,
+    /// Signature authentication configuration (mandatory)
+    #[serde(default = "SignatureAuthConfig::default")]
+    pub signature_auth: SignatureAuthConfig,
 }
 
 fn default_network_listen_address() -> String {
@@ -29,26 +29,29 @@ impl Default for NodeConfig {
             storage_path: PathBuf::from("data"),
             network_listen_address: default_network_listen_address(),
             crypto: None,
-            signature_auth: None,
+            signature_auth: SignatureAuthConfig::default(),
         }
     }
 }
 
 impl NodeConfig {
     /// Create a new node configuration with the specified storage path
+    /// Signature authentication is enabled by default with standard security profile
     pub fn new(storage_path: PathBuf) -> Self {
         Self {
             storage_path,
-            signature_auth: None,
+            signature_auth: SignatureAuthConfig::default(),
             ..Default::default()
         }
     }
     
     /// Create a new node configuration with cryptographic encryption enabled
+    /// Signature authentication is enabled by default with standard security profile
     pub fn with_crypto(storage_path: PathBuf, crypto_config: CryptoConfig) -> Self {
         Self {
             storage_path,
             crypto: Some(crypto_config),
+            signature_auth: SignatureAuthConfig::default(),
             ..Default::default()
         }
     }
@@ -69,11 +72,19 @@ impl NodeConfig {
         self.crypto.as_ref()
     }
     
-    /// Validate the configuration (including crypto settings)
+    /// Validate the configuration (including crypto and signature auth settings)
     pub fn validate(&self) -> Result<(), ConfigError> {
+        // Validate crypto configuration if enabled
         if let Some(crypto) = &self.crypto {
             crypto.validate().map_err(ConfigError::CryptoValidation)?;
         }
+        
+        // Validate signature authentication configuration (mandatory)
+        self.signature_auth.validate()
+            .map_err(|e| ConfigError::InvalidParameter {
+                message: format!("Signature auth validation failed: {}", e)
+            })?;
+        
         Ok(())
     }
 
@@ -83,58 +94,37 @@ impl NodeConfig {
         self
     }
 
-    /// Enable signature authentication with the provided configuration
-    pub fn enable_signature_auth(mut self, signature_auth_config: SignatureAuthConfig) -> Self {
-        self.signature_auth = Some(signature_auth_config);
+    /// Update signature authentication configuration
+    /// Note: Signature auth is always enabled and cannot be disabled
+    pub fn with_signature_auth(mut self, signature_auth_config: SignatureAuthConfig) -> Self {
+        self.signature_auth = signature_auth_config;
         self
     }
 
-    /// Check if signature authentication is enabled
+    /// Check if signature authentication is enabled (always true)
     pub fn is_signature_auth_enabled(&self) -> bool {
-        self.signature_auth.as_ref().is_some_and(|c| c.enabled)
+        true
     }
 
-    /// Get the signature authentication configuration if enabled
-    pub fn signature_auth_config(&self) -> Option<&SignatureAuthConfig> {
-        self.signature_auth.as_ref()
+    /// Get the signature authentication configuration
+    pub fn signature_auth_config(&self) -> &SignatureAuthConfig {
+        &self.signature_auth
     }
 
     /// Create configuration for development with lenient signature auth
-    pub fn development_with_signature_auth(storage_path: PathBuf) -> Self {
+    pub fn development(storage_path: PathBuf) -> Self {
         Self {
             storage_path,
-            signature_auth: Some(SignatureAuthConfig::lenient()),
+            signature_auth: SignatureAuthConfig::lenient(),
             ..Default::default()
         }
     }
 
     /// Create configuration for production with strict signature auth
-    pub fn production_with_signature_auth(storage_path: PathBuf) -> Self {
+    pub fn production(storage_path: PathBuf) -> Self {
         Self {
             storage_path,
-            signature_auth: Some(SignatureAuthConfig::strict()),
-            ..Default::default()
-        }
-    }
-
-    /// Create configuration with optional signature auth for gradual rollout
-    pub fn with_optional_signature_auth(storage_path: PathBuf) -> Self {
-        let config = SignatureAuthConfig {
-            security_profile: crate::datafold_node::signature_auth::SecurityProfile::Standard,
-            rate_limiting: crate::datafold_node::signature_auth::RateLimitingConfig {
-                enabled: false, // Disable rate limiting during rollout
-                ..Default::default()
-            },
-            attack_detection: crate::datafold_node::signature_auth::AttackDetectionConfig {
-                enabled: false, // Disable attack detection during rollout
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        
-        Self {
-            storage_path,
-            signature_auth: Some(config),
+            signature_auth: SignatureAuthConfig::strict(),
             ..Default::default()
         }
     }

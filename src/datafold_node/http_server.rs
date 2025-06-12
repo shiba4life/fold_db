@@ -36,8 +36,8 @@ pub struct DataFoldHttpServer {
 pub struct AppState {
     /// The DataFold node
     pub node: Arc<tokio::sync::Mutex<DataFoldNode>>,
-    /// Signature verification state
-    pub signature_auth: Option<Arc<SignatureVerificationState>>,
+    /// Signature verification state (mandatory)
+    pub signature_auth: Arc<SignatureVerificationState>,
 }
 
 impl DataFoldHttpServer {
@@ -94,29 +94,20 @@ impl DataFoldHttpServer {
     pub async fn run(&self) -> FoldDbResult<()> {
         info!("HTTP server running on {}", self.bind_address);
 
-        // Initialize signature verification if configured
+        // Initialize signature verification (always enabled)
         let signature_auth = {
             let node = self.node.lock().await;
-            if let Some(sig_config) = node.config.signature_auth_config() {
-                if sig_config.enabled {
-                    info!("Initializing signature verification middleware with {:?} security profile", sig_config.security_profile);
-                    match SignatureVerificationState::new(sig_config.clone()) {
-                        Ok(state) => {
-                            info!("Signature verification middleware initialized successfully");
-                            Some(Arc::new(state))
-                        }
-                        Err(e) => {
-                            log::error!("Failed to initialize signature verification: {}", e);
-                            return Err(e);
-                        }
-                    }
-                } else {
-                    info!("Signature verification is disabled in configuration");
-                    None
+            let sig_config = node.config.signature_auth_config();
+            info!("Initializing signature verification middleware with {:?} security profile", sig_config.security_profile);
+            match SignatureVerificationState::new(sig_config.clone()) {
+                Ok(state) => {
+                    info!("Signature verification middleware initialized successfully");
+                    Arc::new(state)
                 }
-            } else {
-                info!("Signature verification not configured");
-                None
+                Err(e) => {
+                    log::error!("Failed to initialize signature verification: {}", e);
+                    return Err(e);
+                }
             }
         };
 
@@ -139,20 +130,14 @@ impl DataFoldHttpServer {
                 .wrap(cors)
                 .app_data(app_state.clone());
 
-            // Add signature verification middleware if enabled - temporarily disabled for compilation
-            // TODO: Re-enable once middleware integration is complete
-            /*
-            if let Some(sig_auth) = &app_state.signature_auth {
-                info!("Activating signature verification middleware for API endpoints");
-                let middleware = SignatureVerificationMiddleware::new((**sig_auth).clone());
-                app = app.wrap(middleware);
-                info!("Signature verification middleware activated");
-            }
-            */
-
+            // Apply signature verification middleware to all API route scopes (mandatory)
+            info!("Activating signature verification middleware for all API route scopes");
+            
             app.service(
                     web::scope("/api")
-                        // Schema endpoints
+                       // Apply signature verification middleware at main API scope level
+                        .wrap(super::signature_auth::SignatureVerificationMiddleware::new((*app_state.signature_auth).clone()))
+                        // Schema endpoints - all protected except where exempted by should_skip_verification
                         .route("/schemas", web::get().to(schema_routes::list_schemas))
                         .route(
                             "/schemas/status",
@@ -196,40 +181,11 @@ impl DataFoldHttpServer {
                             "/schema/{name}/state",
                             web::get().to(schema_routes::get_schema_state),
                         )
-                        // Operation endpoints
+                        // Operation endpoints - all protected
                         .route("/execute", web::post().to(query_routes::execute_operation))
                         .route("/query", web::post().to(query_routes::execute_query))
                         .route("/mutation", web::post().to(query_routes::execute_mutation))
-                        // Ingestion endpoints
-                        .route(
-                            "/ingestion/process",
-                            web::post().to(ingestion_routes::process_json),
-                        )
-                        .route(
-                            "/ingestion/status",
-                            web::get().to(ingestion_routes::get_status),
-                        )
-                        .route(
-                            "/ingestion/health",
-                            web::get().to(ingestion_routes::health_check),
-                        )
-                        .route(
-                            "/ingestion/config",
-                            web::get().to(ingestion_routes::get_config),
-                        )
-                        .route(
-                            "/ingestion/validate",
-                            web::post().to(ingestion_routes::validate_json),
-                        )
-                        .route(
-                            "/ingestion/openrouter-config",
-                            web::get().to(ingestion_routes::get_openrouter_config),
-                        )
-                        .route(
-                            "/ingestion/openrouter-config",
-                            web::post().to(ingestion_routes::save_openrouter_config),
-                        )
-                        // Transform endpoints
+                        // Transform endpoints - all protected
                         .route("/transforms", web::get().to(query_routes::list_transforms))
                         .route(
                             "/transform/{id}/run",
@@ -243,7 +199,7 @@ impl DataFoldHttpServer {
                             "/transforms/queue/{id}",
                             web::post().to(query_routes::add_to_transform_queue),
                         )
-                        // Log endpoints
+                        // Log endpoints - all protected
                         .route("/logs", web::get().to(log_routes::list_logs))
                         .route("/logs/stream", web::get().to(log_routes::stream_logs))
                         .route("/logs/config", web::get().to(log_routes::get_config))
@@ -256,16 +212,51 @@ impl DataFoldHttpServer {
                             "/logs/level",
                             web::put().to(log_routes::update_feature_level),
                         )
-                        // System endpoints
-                        .route(
-                            "/system/status",
-                            web::get().to(system_routes::get_system_status),
+                        // System endpoints - /api/system/status is exempted by should_skip_verification
+                        .service(
+                            web::scope("/system")
+                                .route(
+                                    "/status",
+                                    web::get().to(system_routes::get_system_status),
+                                )
+                                .route(
+                                    "/reset-database",
+                                    web::post().to(system_routes::reset_database),
+                                )
                         )
-                        .route(
-                            "/system/reset-database",
-                            web::post().to(system_routes::reset_database),
+                        // Ingestion endpoints - all protected
+                        .service(
+                            web::scope("/ingestion")
+                                .route(
+                                    "/process",
+                                    web::post().to(ingestion_routes::process_json),
+                                )
+                                .route(
+                                    "/status",
+                                    web::get().to(ingestion_routes::get_status),
+                                )
+                                .route(
+                                    "/health",
+                                    web::get().to(ingestion_routes::health_check),
+                                )
+                                .route(
+                                    "/config",
+                                    web::get().to(ingestion_routes::get_config),
+                                )
+                                .route(
+                                    "/validate",
+                                    web::post().to(ingestion_routes::validate_json),
+                                )
+                                .route(
+                                    "/openrouter-config",
+                                    web::get().to(ingestion_routes::get_openrouter_config),
+                                )
+                                .route(
+                                    "/openrouter-config",
+                                    web::post().to(ingestion_routes::save_openrouter_config),
+                                )
                         )
-                        // Crypto endpoints
+                        // Crypto endpoints - /api/crypto/keys/register is exempted by should_skip_verification
                         .service(
                             web::scope("/crypto")
                                 .route("/init/random", web::post().to(crypto_routes::init_random_key))
@@ -276,7 +267,7 @@ impl DataFoldHttpServer {
                                 .route("/keys/status/{client_id}", web::get().to(crypto_routes::get_public_key_status))
                                 .route("/signatures/verify", web::post().to(crypto_routes::verify_signature))
                         )
-                        // Network endpoints
+                        // Network endpoints - all protected
                         .service(
                             web::scope("/network")
                                 .route("/init", web::post().to(network_routes::init_network))
@@ -285,7 +276,7 @@ impl DataFoldHttpServer {
                                 .route("/status", web::get().to(network_routes::get_network_status))
                                 .route("/connect", web::post().to(network_routes::connect_to_node))
                                 .route("/discover", web::post().to(network_routes::discover_nodes))
-                                .route("/nodes", web::get().to(network_routes::list_nodes)),
+                                .route("/nodes", web::get().to(network_routes::list_nodes))
                         ),
                 )
                 // Serve the built React UI if it exists

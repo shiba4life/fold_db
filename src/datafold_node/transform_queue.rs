@@ -41,7 +41,7 @@ mod tests {
     fn queue_info_works() {
         let dir = tempdir().unwrap();
         let config = NodeConfig {
-            signature_auth: None,
+            signature_auth: crate::datafold_node::signature_auth::SignatureAuthConfig::default(),
             storage_path: dir.path().to_path_buf(),
             network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
             crypto: None,

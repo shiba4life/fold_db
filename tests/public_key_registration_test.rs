@@ -34,8 +34,13 @@ impl PublicKeyRegistrationTestFixture {
         let config = NodeConfig::new(temp_dir.path().to_path_buf());
         let node = DataFoldNode::new(config).expect("Failed to create test node");
         
+        // Create default signature auth config for testing
+        let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
+        let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+            .expect("Failed to create signature verification state for test");
+        
         let app_state = web::Data::new(AppState {
-            signature_auth: None,
+            signature_auth: Arc::new(signature_auth),
             node: Arc::new(Mutex::new(node.clone())),
         });
 

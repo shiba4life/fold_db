@@ -12,6 +12,7 @@ use datafold::cli::config::{CliConfigManager, ServerConfig};
 use datafold::cli::environment_utils::commands as env_commands;
 use datafold::cli::http_client::{AuthenticatedHttpClient, HttpClientBuilder, RetryConfig};
 use datafold::cli::signing_config::SigningMode;
+use datafold::cli::unified_integration::{UnifiedCliConfig, integration_utils};
 use log::{info, warn, error};
 use rpassword::read_password;
 use serde_json::{Value, json};
@@ -34,17 +35,13 @@ struct Cli {
     #[arg(short, long, default_value = "config/node_config.json")]
     config: String,
 
-    /// Enable request signing (overrides configuration)
-    #[arg(long, global = true)]
-    sign: bool,
-
-    /// Disable request signing (overrides configuration)
-    #[arg(long, global = true, conflicts_with = "sign")]
-    no_sign: bool,
-
-    /// Authentication profile to use for signing
+    /// Authentication profile to use for signing (mandatory authentication enabled)
     #[arg(long, global = true)]
     profile: Option<String>,
+
+    /// Environment to use for unified configuration (dev/staging/prod)
+    #[arg(long, global = true)]
+    environment: Option<String>,
 
     /// Enable debug logging for signature operations
     #[arg(long, global = true)]
@@ -608,7 +605,7 @@ enum Commands {
         #[arg(long)]
         cleanup: bool,
     },
-    /// Initialize CLI authentication configuration
+    /// Initialize CLI authentication configuration with unified config support
     AuthInit {
         /// Server URL for authentication
         #[arg(long, default_value = "http://localhost:8080")]
@@ -625,11 +622,14 @@ enum Commands {
         /// User ID for registration (optional)
         #[arg(long)]
         user_id: Option<String>,
+        /// Environment to configure (dev/staging/prod)
+        #[arg(long)]
+        environment: Option<String>,
         /// Force overwrite existing profile
         #[arg(long)]
         force: bool,
     },
-    /// Show CLI authentication status
+    /// Show CLI authentication status with unified configuration
     AuthStatus {
         /// Show detailed status information
         #[arg(long)]
@@ -637,6 +637,9 @@ enum Commands {
         /// Profile name to check (defaults to current profile)
         #[arg(long)]
         profile: Option<String>,
+        /// Environment to check (dev/staging/prod)
+        #[arg(long)]
+        environment: Option<String>,
     },
     /// Manage authentication profiles
     AuthProfile {
@@ -690,7 +693,7 @@ enum Commands {
         /// Enable or disable automatic signing globally
         #[arg(long)]
         enable_auto_sign: Option<bool>,
-        /// Set default signing mode (auto, manual, disabled)
+        /// Set default signing mode (auto, manual)
         #[arg(long, value_enum)]
         default_mode: Option<CliSigningMode>,
         /// Set signing mode for a specific command
@@ -1016,8 +1019,6 @@ enum CliSigningMode {
     Auto,
     /// Only sign when explicitly requested
     Manual,
-    /// Never sign requests
-    Disabled,
 }
 
 impl From<CliSigningMode> for SigningMode {
@@ -1025,7 +1026,6 @@ impl From<CliSigningMode> for SigningMode {
         match cli_mode {
             CliSigningMode::Auto => SigningMode::Auto,
             CliSigningMode::Manual => SigningMode::Manual,
-            CliSigningMode::Disabled => SigningMode::Disabled,
         }
     }
 }
@@ -1368,16 +1368,8 @@ async fn build_authenticated_client(
 ) -> Result<AuthenticatedHttpClient, Box<dyn std::error::Error>> {
     let signing_context = config_manager.signing_config().for_command(command_name);
     
-    // Determine if we should sign this request
-    let explicit_sign = if cli.sign {
-        Some(true)
-    } else if cli.no_sign {
-        Some(false)
-    } else {
-        None
-    };
-    
-    let should_sign = signing_context.should_sign_request(explicit_sign);
+    // With mandatory authentication, all requests must be signed
+    let should_sign = true;
     
     if cli.verbose {
         println!("🔐 Signing status for '{}': {}", command_name,
@@ -2796,6 +2788,7 @@ async fn handle_auth_init(
     key_id: String,
     storage_dir: Option<PathBuf>,
     user_id: Option<String>,
+    environment: Option<String>,
     force: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔐 Initializing CLI authentication...");
@@ -2861,6 +2854,7 @@ async fn handle_auth_init(
 async fn handle_auth_status(
     verbose: bool,
     profile: Option<String>,
+    environment: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔐 CLI Authentication Status");
     println!("============================");
@@ -5293,6 +5287,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             key_id,
             storage_dir,
             user_id,
+            environment,
             force
         } => {
             return handle_auth_init(
@@ -5301,16 +5296,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 key_id.clone(),
                 storage_dir.clone(),
                 user_id.clone(),
+                environment.clone(),
                 *force
             ).await;
         }
         Commands::AuthStatus {
             verbose,
-            profile
+            profile,
+            environment
         } => {
             return handle_auth_status(
                 *verbose,
-                profile.clone()
+                profile.clone(),
+                environment.clone()
             ).await;
         }
         Commands::AuthProfile { action } => {
@@ -5475,3 +5473,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+

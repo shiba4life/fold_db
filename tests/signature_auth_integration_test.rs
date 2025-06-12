@@ -7,7 +7,7 @@ use actix_web::{test, web, App, HttpResponse, middleware::Logger};
 use datafold::crypto::ed25519::{generate_master_keypair, PublicKey};
 use datafold::datafold_node::config::NodeConfig;
 use datafold::datafold_node::signature_auth::{
-    SignatureAuthConfig, SignatureVerificationMiddleware, SecurityProfile
+    SignatureAuthConfig, SignatureVerificationMiddleware, SignatureVerificationState, SecurityProfile
 };
 use datafold::datafold_node::DataFoldNode;
 use datafold::datafold_node::http_server::AppState;
@@ -34,21 +34,24 @@ async fn test_signature_auth_integration_basic() {
 
     // Create temporary directory for test node
     let temp_dir = tempdir().expect("Failed to create temp directory");
-    let config = NodeConfig::development_with_signature_auth(temp_dir.path().to_path_buf());
+    let config = NodeConfig::development(temp_dir.path().to_path_buf());
     
     // Create DataFold node
     let node = DataFoldNode::new(config).expect("Failed to create DataFold node");
     
+    // Create signature auth configuration for testing
+    let mut sig_config = SignatureAuthConfig::lenient();
+    sig_config.security_profile = SecurityProfile::Lenient;
+    
+    // Create signature verification state
+    let signature_auth = SignatureVerificationState::new(sig_config)
+        .expect("Failed to create signature verification state");
+
     // Create application state
     let app_state = web::Data::new(AppState {
         node: Arc::new(Mutex::new(node)),
-        signature_auth: None, // Will be initialized when middleware is created
+        signature_auth: Arc::new(signature_auth),
     });
-
-    // Create signature auth configuration for testing
-    let mut sig_config = SignatureAuthConfig::lenient();
-    sig_config.enabled = true;
-    sig_config.security_profile = SecurityProfile::Lenient;
 
     // Create test app with signature verification middleware
     let app = test::init_service(
@@ -93,19 +96,19 @@ async fn test_node_config_signature_auth_methods() {
     let temp_dir = tempdir().expect("Failed to create temp directory");
     
     // Test development configuration
-    let dev_config = NodeConfig::development_with_signature_auth(temp_dir.path().to_path_buf());
+    let dev_config = NodeConfig::development(temp_dir.path().to_path_buf());
     assert!(dev_config.is_signature_auth_enabled(), "Development config should have signature auth enabled");
-    assert_eq!(dev_config.signature_auth_config().unwrap().security_profile, SecurityProfile::Lenient);
+    assert_eq!(dev_config.signature_auth_config().security_profile, SecurityProfile::Lenient);
 
     // Test production configuration
-    let prod_config = NodeConfig::production_with_signature_auth(temp_dir.path().to_path_buf());
+    let prod_config = NodeConfig::production(temp_dir.path().to_path_buf());
     assert!(prod_config.is_signature_auth_enabled(), "Production config should have signature auth enabled");
-    assert_eq!(prod_config.signature_auth_config().unwrap().security_profile, SecurityProfile::Strict);
+    assert_eq!(prod_config.signature_auth_config().security_profile, SecurityProfile::Strict);
 
     // Test optional signature auth configuration
-    let optional_config = NodeConfig::with_optional_signature_auth(temp_dir.path().to_path_buf());
+    let optional_config = NodeConfig::new(temp_dir.path().to_path_buf());
     assert!(optional_config.is_signature_auth_enabled(), "Optional config should have signature auth enabled");
-    assert_eq!(optional_config.signature_auth_config().unwrap().security_profile, SecurityProfile::Standard);
+    assert_eq!(optional_config.signature_auth_config().security_profile, SecurityProfile::Standard);
 
     println!("✓ Node configuration signature auth methods test passed");
 }
@@ -139,9 +142,14 @@ async fn test_public_key_registration_for_auth() {
     let config = NodeConfig::new(temp_dir.path().to_path_buf());
     let node = DataFoldNode::new(config).expect("Failed to create DataFold node");
     
+    // Create default signature auth for testing
+    let sig_config = SignatureAuthConfig::default();
+    let signature_auth = SignatureVerificationState::new(sig_config)
+        .expect("Failed to create signature verification state");
+    
     let app_state = web::Data::new(AppState {
         node: Arc::new(Mutex::new(node)),
-        signature_auth: None,
+        signature_auth: Arc::new(signature_auth),
     });
 
     // Generate a test key pair
@@ -253,16 +261,20 @@ async fn test_complete_signature_auth_integration() {
     let temp_dir = tempdir().expect("Failed to create temp directory");
     
     // Step 1: Configure node with signature authentication
-    let config = NodeConfig::with_optional_signature_auth(temp_dir.path().to_path_buf());
+    let config = NodeConfig::new(temp_dir.path().to_path_buf());
     assert!(config.is_signature_auth_enabled());
     
     // Step 2: Create DataFold node
     let node = DataFoldNode::new(config).expect("Failed to create DataFold node");
     
-    // Step 3: Create application state
+    // Step 3: Create signature auth and application state
+    let sig_config = SignatureAuthConfig::default();
+    let signature_auth = SignatureVerificationState::new(sig_config)
+        .expect("Failed to create signature verification state");
+    
     let app_state = web::Data::new(AppState {
         node: Arc::new(Mutex::new(node)),
-        signature_auth: None,
+        signature_auth: Arc::new(signature_auth),
     });
 
     // Step 4: Generate test credentials

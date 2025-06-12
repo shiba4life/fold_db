@@ -1,30 +1,45 @@
-# Basic Authentication Flow Security Recipe
+# Mandatory Authentication Flow Security Recipe
 
 ## Overview
 
-This recipe provides a comprehensive, secure implementation of the basic DataFold signature authentication flow using RFC 9421 HTTP Message Signatures. It covers the complete end-to-end authentication process from key generation to request verification.
+This recipe provides a comprehensive implementation of **mandatory** DataFold signature authentication using RFC 9421 HTTP Message Signatures with Ed25519 cryptography. All DataFold communications require signature authentication - this cannot be disabled or bypassed.
 
 ## Security Level
-- **Complexity**: Basic to Intermediate
-- **Security Rating**: High
-- **Implementation Time**: 30-60 minutes
+- **Complexity**: Intermediate
+- **Security Rating**: Critical (Mandatory)
+- **Implementation Time**: 45-90 minutes
+- **Compliance**: Required for all DataFold deployments
+
+## Important: Mandatory Authentication
+
+**Authentication is mandatory for all DataFold operations.** This recipe covers the required authentication implementation that cannot be disabled. All clients must:
+
+- Implement RFC 9421 HTTP Message Signatures
+- Use Ed25519 cryptographic signatures
+- Follow security profile requirements
+- Handle authentication failures appropriately
+
+Attempting to communicate without proper authentication will result in immediate rejection.
 
 ## Prerequisites
 
 ### Technical Requirements
 - Understanding of HTTP request/response cycle
-- Basic cryptography concepts (public/private keys)
-- Familiarity with your chosen programming language
+- RFC 9421 HTTP Message Signatures knowledge
+- Ed25519 cryptography understanding
+- Security profile configuration knowledge
 
 ### Infrastructure Requirements
-- DataFold server with signature authentication enabled
-- Secure key storage mechanism
-- Network connectivity with proper TLS
+- DataFold server with **mandatory** signature authentication
+- Hardware Security Module (HSM) or secure key vault
+- Network connectivity with TLS 1.3+ encryption
+- Network Time Protocol (NTP) for clock synchronization
 
 ### Dependencies
-- DataFold SDK (JavaScript, Python, or Rust CLI)
-- Cryptographically secure random number generator
-- HTTP client library
+- DataFold SDK (JavaScript, Python, or Rust CLI) with signature support
+- Ed25519 cryptographic library
+- Secure key management system
+- Monitoring and alerting infrastructure for authentication failures
 
 ## Implementation
 
@@ -97,22 +112,26 @@ datafold auth-register --key-id production-key --server-url https://api.yourcomp
 
 #### JavaScript/TypeScript
 ```typescript
-import { DataFoldHttpClient } from '@datafold/client';
+import { DataFoldHttpClient, SecurityProfile } from '@datafold/client';
 
 const client = new DataFoldHttpClient({
   baseUrl: 'https://api.yourcompany.com',
-  signingMode: 'auto',
+  // Signing is always enabled - no configuration option to disable
+  authenticationRequired: true, // Always true, cannot be disabled
+  securityProfile: SecurityProfile.STRICT, // Required security level
   signingConfig: {
     keyId: keyId,
     privateKey: await loadPrivateKeySecurely(keyId),
-    requiredComponents: ['@method', '@target-uri', 'content-digest'],
-    includeTimestamp: true,
-    includeNonce: true
+    requiredComponents: ['@method', '@target-uri', 'content-digest', '@authority'],
+    includeTimestamp: true, // Mandatory for strict profile
+    includeNonce: true, // Mandatory for replay prevention
+    maxClockSkew: 30 // 30 seconds for strict profile
   },
-  // Security settings
+  // Mandatory security settings
   enableSignatureCache: true,
-  signatureCacheTtl: 60000, // 1 minute
-  debugLogging: false // Set to true for debugging
+  signatureCacheTtl: 60000, // 1 minute maximum for security
+  mandatoryVerification: true, // Server response verification required
+  debugLogging: false // Only enable in development environments
 });
 ```
 

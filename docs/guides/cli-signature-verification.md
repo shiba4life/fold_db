@@ -1,16 +1,28 @@
 # CLI Signature Verification Guide
 
-This guide covers the signature verification utilities available in the DataFold CLI, which enable validation of signed responses and command-line signature verification tools.
+This guide covers the **mandatory signature verification** utilities in the DataFold CLI. All DataFold communication requires RFC 9421 HTTP Message Signatures using Ed25519 cryptography.
 
 ## Overview
 
-The DataFold CLI includes comprehensive signature verification capabilities that complement the existing signing functionality. These tools allow you to:
+The DataFold CLI includes comprehensive signature verification capabilities that are **required** for all server communication. These tools allow you to:
 
-- Verify message signatures using Ed25519 cryptography
+- Verify message signatures using Ed25519 cryptography (mandatory for all requests)
 - Inspect signature format and analyze components
-- Verify server response signatures
+- Verify server response signatures (automatic in all CLI operations)
 - Manage verification policies and public keys
 - Debug signature-related issues
+- Validate authentication configuration
+
+## ⚠️ Important: Mandatory Verification
+
+**Signature verification is mandatory** for all DataFold CLI operations. The CLI automatically:
+
+- Verifies all server responses
+- Validates signature format and cryptographic authenticity
+- Enforces security policies based on your environment configuration
+- Rejects communications with invalid signatures
+
+You cannot disable signature verification as it is a core security requirement.
 
 ## Commands
 
@@ -270,67 +282,94 @@ VALID: ✓
 
 ## Integration with Existing CLI Features
 
-### Automatic Verification with `--verify` Flag
+### Automatic Verification (Always Enabled)
 
-Add automatic verification to existing CLI commands:
+All CLI commands automatically perform signature verification:
 
 ```bash
-# Query with response verification
-datafold query --schema users --fields name,email --verify
+# All queries automatically verify server responses
+datafold query --schema users --fields name,email
 
-# Enable debug verification output
-datafold query --schema users --fields name,email --verify-debug
+# Enable debug verification output to see verification details
+datafold query --schema users --fields name,email --auth-debug
+
+# Use verbose mode to see full authentication flow
+datafold query --schema users --fields name,email --verbose
 ```
 
-### Signing and Verification Workflow
+**Note**: The `--verify` flag is no longer needed since verification is always performed.
 
-1. **Setup Authentication Profile** (if not already done):
+### Complete Authentication and Verification Workflow
+
+1. **Setup Authentication Profile** (mandatory):
    ```bash
-   datafold auth-profile create \
-     --name "production" \
+   datafold auth-profile create production \
      --server-url "https://api.example.com" \
-     --key-id "client-key-1"
+     --key-id "client-key-1" \
+     --security-profile "strict"
    ```
 
-2. **Configure Verification Keys**:
+2. **Configure Server Verification Keys** (required for response verification):
    ```bash
    datafold verification-config add-public-key \
      --key-id "server-key-1" \
      --public-key-file server_public_key.hex
    ```
 
-3. **Test End-to-End Verification**:
+3. **Test Complete Authentication Flow**:
    ```bash
+   # Test both client authentication and server verification
+   datafold auth-test --profile production --full-verification
+   
+   # Test specific endpoint with full verification
    datafold verify-response \
      --url "https://api.example.com/health" \
      --method get \
-     --key-id "server-key-1" \
-     --public-key-file server_public_key.hex
+     --profile production
+   ```
+
+4. **Verify Environment Configuration**:
+   ```bash
+   # Check authentication and verification status
+   datafold auth-status --verification-details
+   
+   # Validate all security settings
+   datafold auth-validate --environment production
    ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-**Signature verification fails with "Invalid signature format":**
-- Check that the signature is properly base64 encoded
-- Verify the signature-input header format follows RFC 9421
-- Use `inspect-signature` to analyze format issues
+**Authentication fails with "Signature verification failed":**
+- Verify your authentication profile is correctly configured: `datafold auth-status`
+- Check key registration with server: `datafold auth-test`
+- Ensure security profile matches server requirements
+- Use `--auth-debug` to see detailed signature analysis
+
+**Server response verification fails:**
+- Verify server public keys are configured: `datafold verification-config show --keys`
+- Check server signature format with: `datafold inspect-signature`
+- Ensure server is using compatible signature algorithms
+- Use `--verbose` to see detailed verification process
 
 **Timestamp verification fails:**
-- Check system clock synchronization
-- Adjust verification policy timestamp tolerance
-- Use `--debug` to see detailed timestamp analysis
+- Check system clock synchronization with NTP
+- Verify security profile timestamp tolerances
+- Use `datafold auth-test --timestamp-check` to diagnose clock issues
+- Consider adjusting security profile for development environments
 
-**Content digest mismatch:**
-- Verify request/response body hasn't been modified
-- Check content-type header matches actual content
-- Enable debug output to see digest calculation details
+**Environment configuration issues:**
+- Validate configuration: `datafold auth-validate --environment [env]`
+- Check environment switching: `datafold auth-configure --show`
+- Verify security profile settings match requirements
+- Use `datafold auth-setup --interactive` to reconfigure
 
-**Key not found errors:**
-- Verify the key ID matches the configured keys
-- Check public key format (hex, base64, or PEM)
-- Use `verification-config list-public-keys` to see configured keys
+**Key management errors:**
+- List available keys: `datafold list-keys --verbose`
+- Verify key permissions and accessibility
+- Check key format and encryption status
+- Use `datafold auth-keygen` to regenerate if necessary
 
 ### Debug Output
 
@@ -354,12 +393,29 @@ This will show:
 
 ## Security Considerations
 
-1. **Key Management**: Store public keys securely and verify their authenticity
-2. **Policy Selection**: Use appropriate verification policies for your security requirements
-3. **Timestamp Tolerance**: Balance security with clock synchronization realities
-4. **Error Handling**: Don't expose sensitive verification details in production logs
-5. **Performance**: Verification adds latency - monitor performance in production
+1. **Mandatory Security**: Signature verification cannot be disabled - this is by design for security
+2. **Key Management**: Store all keys securely and verify their authenticity before configuration
+3. **Security Profile Selection**: Use appropriate profiles for each environment:
+   - **Production**: Use `strict` profile for maximum security
+   - **Staging**: Use `standard` profile for testing
+   - **Development**: Use `lenient` profile only for local development
+4. **Timestamp Management**: Ensure system clocks are synchronized across all environments
+5. **Error Monitoring**: Monitor authentication failures and implement alerting
+6. **Performance Impact**: Signature verification adds security but monitor latency in high-throughput scenarios
+
+## Compliance and Auditing
+
+The mandatory signature verification supports compliance requirements:
+
+- **Audit Trails**: All authentication attempts are logged with correlation IDs
+- **Non-Repudiation**: Ed25519 signatures provide cryptographic proof of authenticity
+- **Compliance Standards**: Supports SOC 2, HIPAA, and other security frameworks
+- **Monitoring Integration**: Compatible with security information and event management (SIEM) systems
 
 ## Examples
 
-See the `examples/` directory for complete examples of using the CLI verification utilities in various scenarios.
+See the `examples/` directory for complete examples of:
+- Setting up mandatory authentication in different environments
+- Configuring security profiles for compliance requirements
+- Implementing monitoring and alerting for authentication events
+- Troubleshooting common authentication and verification issues

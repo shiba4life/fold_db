@@ -4,6 +4,11 @@
 //! cryptography for authentication and replay prevention with comprehensive security logging.
 
 use crate::datafold_node::error::NodeResult;
+// use crate::datafold_node::performance_monitoring::{
+//     EnhancedSecurityMetricsCollector, PerformanceMonitor, PublicKeyCache,
+//     CacheWarmupResult, CacheStats, PerformanceMetrics, SystemHealthStatus,
+//     PerformanceAlert, PerformanceAlertType, AlertSeverity
+// };
 use crate::error::FoldDbError;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
@@ -14,7 +19,7 @@ use futures_util::future::LocalBoxFuture;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, RwLock, atomic::{AtomicU64, AtomicUsize, Ordering}};
 use std::time::{SystemTime, UNIX_EPOCH, Duration, Instant};
 use std::rc::Rc;
@@ -81,17 +86,194 @@ impl AuthenticationError {
         }
     }
 
+    /// Get error code for programmatic error handling
+    pub fn error_code(&self) -> &'static str {
+        match self {
+            Self::MissingHeaders { .. } => "MISSING_HEADERS",
+            Self::InvalidSignatureFormat { .. } => "INVALID_SIGNATURE_FORMAT",
+            Self::SignatureVerificationFailed { .. } => "SIGNATURE_VERIFICATION_FAILED",
+            Self::TimestampValidationFailed { .. } => "TIMESTAMP_VALIDATION_FAILED",
+            Self::NonceValidationFailed { .. } => "NONCE_VALIDATION_FAILED",
+            Self::PublicKeyLookupFailed { .. } => "PUBLIC_KEY_LOOKUP_FAILED",
+            Self::ConfigurationError { .. } => "CONFIGURATION_ERROR",
+            Self::UnsupportedAlgorithm { .. } => "UNSUPPORTED_ALGORITHM",
+            Self::RateLimitExceeded { .. } => "RATE_LIMIT_EXCEEDED",
+        }
+    }
+
     pub fn public_message(&self) -> String {
         match self {
-            Self::MissingHeaders { .. } => "Missing required authentication headers".to_string(),
-            Self::InvalidSignatureFormat { .. } => "Invalid signature format".to_string(),
-            Self::SignatureVerificationFailed { .. } => "Signature verification failed".to_string(),
-            Self::TimestampValidationFailed { .. } => "Request timestamp invalid".to_string(),
-            Self::NonceValidationFailed { .. } => "Request validation failed".to_string(),
-            Self::PublicKeyLookupFailed { .. } => "Authentication failed".to_string(),
-            Self::ConfigurationError { .. } => "Internal server error".to_string(),
-            Self::UnsupportedAlgorithm { .. } => "Unsupported signature algorithm".to_string(),
-            Self::RateLimitExceeded { .. } => "Rate limit exceeded".to_string(),
+            Self::MissingHeaders { .. } => "Missing required authentication headers. Please include Signature-Input and Signature headers.".to_string(),
+            Self::InvalidSignatureFormat { .. } => "Invalid signature format. Please verify your signature encoding and header format.".to_string(),
+            Self::SignatureVerificationFailed { .. } => "Signature verification failed. Please check your signature calculation and key.".to_string(),
+            Self::TimestampValidationFailed { .. } => "Request timestamp invalid. Please ensure timestamp is within allowed time window.".to_string(),
+            Self::NonceValidationFailed { .. } => "Request validation failed. Please use a unique nonce for each request.".to_string(),
+            Self::PublicKeyLookupFailed { .. } => "Authentication failed. Please verify your key ID is registered.".to_string(),
+            Self::ConfigurationError { .. } => "Internal server error. Please contact system administrator.".to_string(),
+            Self::UnsupportedAlgorithm { .. } => "Unsupported signature algorithm. Please use ed25519.".to_string(),
+            Self::RateLimitExceeded { .. } => "Rate limit exceeded. Please reduce request frequency and try again later.".to_string(),
+        }
+    }
+
+    /// Get user-friendly error message with troubleshooting guidance
+    pub fn user_friendly_message(&self, environment: &str) -> String {
+        let base_message = self.public_message();
+        let troubleshooting = self.get_troubleshooting_guidance();
+        let docs_link = self.get_documentation_link();
+        
+        if environment == "development" {
+            format!("{}\n\nTroubleshooting:\n{}\n\nFor more help: {}",
+                    base_message, troubleshooting, docs_link)
+        } else {
+            format!("{}. For assistance, reference error ID: {} or visit: {}",
+                    base_message, self.correlation_id(), docs_link)
+        }
+    }
+
+    /// Get specific troubleshooting guidance for each error type
+    pub fn get_troubleshooting_guidance(&self) -> String {
+        match self {
+            Self::MissingHeaders { missing, .. } => {
+                format!("Missing headers: {}. \
+                • Ensure your HTTP client includes both 'Signature-Input' and 'Signature' headers\n\
+                • Verify header names are lowercase\n\
+                • Check your signature library configuration",
+                missing.join(", "))
+            },
+            Self::InvalidSignatureFormat { reason, .. } => {
+                format!("Signature format error: {}\n\
+                • Verify signature is hex-encoded\n\
+                • Check signature-input format: sig1=(\"@method\" \"@target-uri\");created=timestamp;keyid=\"your-key\";alg=\"ed25519\";nonce=\"unique-nonce\"\n\
+                • Ensure all required parameters are present: created, keyid, alg, nonce", reason)
+            },
+            Self::SignatureVerificationFailed { key_id, .. } => {
+                format!("Signature verification failed for key: {}\n\
+                • Verify the canonical message construction matches the server\n\
+                • Check that covered components match exactly\n\
+                • Ensure private key corresponds to registered public key\n\
+                • Verify Ed25519 signature calculation", key_id)
+            },
+            Self::TimestampValidationFailed { timestamp, current_time, reason, .. } => {
+                format!("Timestamp error: {} (request: {}, server: {})\n\
+                • Check system clock synchronization (NTP)\n\
+                • Ensure timestamp is Unix epoch seconds\n\
+                • Verify timestamp is not too old or too far in future\n\
+                • Allow for reasonable clock skew", reason, timestamp, current_time)
+            },
+            Self::NonceValidationFailed { nonce, reason, .. } => {
+                format!("Nonce validation failed for '{}': {}\n\
+                • Use a unique nonce for every request\n\
+                • Ensure nonce follows required format (UUID4 if configured)\n\
+                • Check nonce length restrictions\n\
+                • Verify nonce contains only allowed characters", nonce, reason)
+            },
+            Self::PublicKeyLookupFailed { key_id, .. } => {
+                format!("Key lookup failed for: {}\n\
+                • Verify the key ID is correctly registered\n\
+                • Check key registration status (must be 'active')\n\
+                • Ensure key ID matches exactly (case-sensitive)\n\
+                • Contact administrator if key should be registered", key_id)
+            },
+            Self::ConfigurationError { reason, .. } => {
+                format!("Server configuration error: {}\n\
+                • This is a server-side issue\n\
+                • Contact system administrator\n\
+                • Provide correlation ID for debugging", reason)
+            },
+            Self::UnsupportedAlgorithm { algorithm, .. } => {
+                format!("Unsupported algorithm: {}\n\
+                • Use 'ed25519' as the signature algorithm\n\
+                • Update signature-input header: alg=\"ed25519\"\n\
+                • Verify signature library supports Ed25519", algorithm)
+            },
+            Self::RateLimitExceeded { client_id, .. } => {
+                format!("Rate limit exceeded for client: {}\n\
+                • Reduce request frequency\n\
+                • Implement exponential backoff retry logic\n\
+                • Contact administrator if limits seem too restrictive\n\
+                • Check for duplicate or unnecessary requests", client_id)
+            },
+        }
+    }
+
+    /// Get documentation link for specific error type
+    pub fn get_documentation_link(&self) -> String {
+        match self {
+            Self::MissingHeaders { .. } | Self::InvalidSignatureFormat { .. } => {
+                "https://docs.datafold.dev/signature-auth/setup"
+            },
+            Self::SignatureVerificationFailed { .. } => {
+                "https://docs.datafold.dev/signature-auth/troubleshooting#signature-verification"
+            },
+            Self::TimestampValidationFailed { .. } => {
+                "https://docs.datafold.dev/signature-auth/troubleshooting#timestamp-issues"
+            },
+            Self::NonceValidationFailed { .. } => {
+                "https://docs.datafold.dev/signature-auth/troubleshooting#nonce-validation"
+            },
+            Self::PublicKeyLookupFailed { .. } => {
+                "https://docs.datafold.dev/signature-auth/key-management"
+            },
+            Self::ConfigurationError { .. } => {
+                "https://docs.datafold.dev/signature-auth/server-config"
+            },
+            Self::UnsupportedAlgorithm { .. } => {
+                "https://docs.datafold.dev/signature-auth/algorithms"
+            },
+            Self::RateLimitExceeded { .. } => {
+                "https://docs.datafold.dev/signature-auth/rate-limits"
+            },
+        }.to_string()
+    }
+
+    /// Get suggested next steps for resolving the error
+    pub fn get_suggested_actions(&self) -> Vec<String> {
+        match self {
+            Self::MissingHeaders { .. } => vec![
+                "Include both Signature-Input and Signature headers in your request".to_string(),
+                "Verify your HTTP client configuration".to_string(),
+                "Check signature library documentation".to_string(),
+            ],
+            Self::InvalidSignatureFormat { .. } => vec![
+                "Validate signature-input header format".to_string(),
+                "Verify signature is properly hex-encoded".to_string(),
+                "Test with signature validation endpoint".to_string(),
+            ],
+            Self::SignatureVerificationFailed { .. } => vec![
+                "Test signature generation with validation endpoint".to_string(),
+                "Verify private/public key pair consistency".to_string(),
+                "Check canonical message construction".to_string(),
+            ],
+            Self::TimestampValidationFailed { .. } => vec![
+                "Synchronize system clock with NTP".to_string(),
+                "Check server time window configuration".to_string(),
+                "Use current Unix timestamp".to_string(),
+            ],
+            Self::NonceValidationFailed { .. } => vec![
+                "Generate a new unique nonce for each request".to_string(),
+                "Verify nonce format requirements".to_string(),
+                "Check nonce length and character restrictions".to_string(),
+            ],
+            Self::PublicKeyLookupFailed { .. } => vec![
+                "Register your public key with the server".to_string(),
+                "Verify key ID matches registration".to_string(),
+                "Check key status is 'active'".to_string(),
+            ],
+            Self::ConfigurationError { .. } => vec![
+                "Contact system administrator".to_string(),
+                "Provide correlation ID for support".to_string(),
+                "Check server logs if accessible".to_string(),
+            ],
+            Self::UnsupportedAlgorithm { .. } => vec![
+                "Change algorithm to 'ed25519'".to_string(),
+                "Update signature library configuration".to_string(),
+                "Regenerate signatures with Ed25519".to_string(),
+            ],
+            Self::RateLimitExceeded { .. } => vec![
+                "Implement request throttling".to_string(),
+                "Use exponential backoff retry logic".to_string(),
+                "Review and optimize request patterns".to_string(),
+            ],
         }
     }
 
@@ -200,13 +382,26 @@ pub struct RequestInfo {
     pub signature_components: Option<Vec<String>>,
 }
 
-/// Security metrics for monitoring
+/// Enhanced security metrics for comprehensive performance monitoring
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SecurityMetrics {
     pub processing_time_ms: u64,
+    pub signature_verification_time_ms: u64,
+    pub database_lookup_time_ms: u64,
+    pub nonce_validation_time_ms: u64,
     pub nonce_store_size: usize,
+    pub nonce_store_utilization_percent: f64,
     pub recent_failures: usize,
     pub pattern_score: f64,
+    pub cache_hit_rate: f64,
+    pub cache_miss_count: u64,
+    pub requests_per_second: f64,
+    pub avg_latency_ms: f64,
+    pub p95_latency_ms: f64,
+    pub p99_latency_ms: f64,
+    pub memory_usage_bytes: u64,
+    pub nonce_cleanup_operations: u64,
+    pub performance_alert_count: u64,
 }
 
 /// Security profile for timestamp and nonce validation
@@ -226,8 +421,6 @@ pub enum SecurityProfile {
 /// Configuration for signature verification middleware
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignatureAuthConfig {
-    /// Whether signature verification is enabled
-    pub enabled: bool,
     /// Security profile determining validation strictness
     pub security_profile: SecurityProfile,
     /// Allowed time window for signature timestamps (seconds)
@@ -325,7 +518,6 @@ pub struct ResponseSecurityConfig {
 impl Default for SignatureAuthConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
             security_profile: SecurityProfile::default(),
             allowed_time_window_secs: 300, // 5 minutes
             clock_skew_tolerance_secs: 30, // 30 seconds tolerance for clock differences
@@ -484,21 +676,25 @@ impl SignatureAuthConfig {
     }
 }
 
-/// Signature verification middleware state
+/// Enhanced signature verification middleware state with performance optimizations
 #[derive(Clone)]
 pub struct SignatureVerificationState {
     /// Configuration for signature verification
     config: SignatureAuthConfig,
-    /// In-memory store for replay prevention
-    nonce_store: Arc<RwLock<NonceStore>>,
+    /// High-performance nonce store for replay prevention
+    nonce_store: Arc<RwLock<OptimizedNonceStore>>,
+    /// Public key cache for performance optimization
+    key_cache: Arc<RwLock<PublicKeyCache>>,
     /// Security event logger
     security_logger: Arc<SecurityLogger>,
     /// Rate limiting tracker
     rate_limiter: Arc<RwLock<RateLimiter>>,
     /// Attack pattern detector
     attack_detector: Arc<RwLock<AttackDetector>>,
-    /// Security metrics collector
-    metrics_collector: Arc<SecurityMetricsCollector>,
+    /// Enhanced security metrics collector
+    metrics_collector: Arc<EnhancedSecurityMetricsCollector>,
+    /// Performance monitor for real-time tracking
+    performance_monitor: Arc<RwLock<PerformanceMonitor>>,
 }
 
 /// Security logger for structured security events
@@ -547,18 +743,350 @@ pub enum AttackPatternType {
     SignatureFormatProbing,
 }
 
-/// Security metrics collector
-pub struct SecurityMetricsCollector {
+/// Enhanced security metrics collector with comprehensive performance tracking
+pub struct EnhancedSecurityMetricsCollector {
     /// Total authentication attempts
     total_attempts: AtomicU64,
     /// Total authentication successes
     total_successes: AtomicU64,
     /// Total authentication failures
     total_failures: AtomicU64,
-    /// Processing time measurements
-    processing_times: Arc<RwLock<Vec<u64>>>,
+    /// Processing time measurements (with histogram buckets)
+    processing_times: Arc<RwLock<LatencyHistogram>>,
+    /// Signature verification times
+    signature_verification_times: Arc<RwLock<LatencyHistogram>>,
+    /// Database lookup times
+    database_lookup_times: Arc<RwLock<LatencyHistogram>>,
+    /// Nonce validation times
+    nonce_validation_times: Arc<RwLock<LatencyHistogram>>,
     /// Current nonce store utilization
     nonce_store_utilization: AtomicUsize,
+    /// Cache performance metrics
+    cache_hits: AtomicU64,
+    cache_misses: AtomicU64,
+    /// Request rate tracking
+    request_timestamps: Arc<RwLock<VecDeque<Instant>>>,
+    /// Memory usage tracking
+    memory_usage_bytes: AtomicU64,
+    /// Performance alert counters
+    performance_alerts: AtomicU64,
+    /// Cleanup operation counters
+    cleanup_operations: AtomicU64,
+}
+
+/// Latency histogram for performance monitoring
+#[derive(Debug, Clone)]
+pub struct LatencyHistogram {
+    measurements: VecDeque<u64>,
+    buckets: HashMap<u64, u64>, // bucket_ms -> count
+    max_measurements: usize,
+}
+
+impl LatencyHistogram {
+    pub fn new(max_measurements: usize) -> Self {
+        let mut buckets = HashMap::new();
+        // Initialize buckets for latency ranges: <1ms, <5ms, <10ms, <50ms, <100ms, <500ms, <1s, >=1s
+        for &bucket in &[1, 5, 10, 50, 100, 500, 1000, u64::MAX] {
+            buckets.insert(bucket, 0);
+        }
+        
+        Self {
+            measurements: VecDeque::new(),
+            buckets,
+            max_measurements,
+        }
+    }
+    
+    pub fn record(&mut self, latency_ms: u64) {
+        // Add to measurements
+        self.measurements.push_back(latency_ms);
+        if self.measurements.len() > self.max_measurements {
+            self.measurements.pop_front();
+        }
+        
+        // Update histogram buckets
+        for &bucket in &[1, 5, 10, 50, 100, 500, 1000, u64::MAX] {
+            if latency_ms < bucket {
+                *self.buckets.entry(bucket).or_insert(0) += 1;
+                break;
+            }
+        }
+    }
+    
+    pub fn percentile(&self, p: f64) -> Option<u64> {
+        if self.measurements.is_empty() {
+            return None;
+        }
+        
+        let mut sorted: Vec<u64> = self.measurements.iter().copied().collect();
+        sorted.sort_unstable();
+        
+        let index = ((sorted.len() as f64 * p / 100.0) as usize).saturating_sub(1);
+        sorted.get(index).copied()
+    }
+    
+    pub fn average(&self) -> f64 {
+        if self.measurements.is_empty() {
+            return 0.0;
+        }
+        
+        let sum: u64 = self.measurements.iter().sum();
+        sum as f64 / self.measurements.len() as f64
+    }
+    
+    pub fn count(&self) -> usize {
+        self.measurements.len()
+    }
+}
+
+/// Public key cache for performance optimization
+#[derive(Debug)]
+pub struct PublicKeyCache {
+    /// Cached public keys by key_id
+    keys: HashMap<String, CachedPublicKey>,
+    /// Cache hit statistics
+    hit_count: u64,
+    /// Cache miss statistics
+    miss_count: u64,
+    /// Maximum cache size
+    max_size: usize,
+    /// Cache warmup status
+    warmup_completed: bool,
+    /// Last cleanup timestamp
+    last_cleanup: Instant,
+}
+
+/// Cached public key entry
+#[derive(Debug, Clone)]
+pub struct CachedPublicKey {
+    /// The public key bytes
+    pub key_bytes: [u8; 32],
+    /// Timestamp when cached
+    pub cached_at: Instant,
+    /// Number of times this key was accessed
+    pub access_count: u64,
+    /// Last access timestamp
+    pub last_accessed: Instant,
+    /// Key status (active, inactive, etc.)
+    pub status: String,
+}
+
+impl PublicKeyCache {
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            keys: HashMap::new(),
+            hit_count: 0,
+            miss_count: 0,
+            max_size,
+            warmup_completed: false,
+            last_cleanup: Instant::now(),
+        }
+    }
+    
+    pub fn get(&mut self, key_id: &str) -> Option<CachedPublicKey> {
+        if let Some(cached_key) = self.keys.get_mut(key_id) {
+            self.hit_count += 1;
+            cached_key.access_count += 1;
+            cached_key.last_accessed = Instant::now();
+            Some(cached_key.clone())
+        } else {
+            self.miss_count += 1;
+            None
+        }
+    }
+    
+    pub fn put(&mut self, key_id: String, key_bytes: [u8; 32], status: String) {
+        // Enforce cache size limit
+        if self.keys.len() >= self.max_size {
+            self.evict_least_recently_used();
+        }
+        
+        let cached_key = CachedPublicKey {
+            key_bytes,
+            cached_at: Instant::now(),
+            access_count: 1,
+            last_accessed: Instant::now(),
+            status,
+        };
+        
+        self.keys.insert(key_id, cached_key);
+    }
+    
+    pub fn invalidate(&mut self, key_id: &str) {
+        self.keys.remove(key_id);
+    }
+    
+    pub fn clear(&mut self) {
+        self.keys.clear();
+        self.hit_count = 0;
+        self.miss_count = 0;
+        self.warmup_completed = false;
+    }
+    
+    pub fn hit_rate(&self) -> f64 {
+        let total = self.hit_count + self.miss_count;
+        if total == 0 {
+            0.0
+        } else {
+            self.hit_count as f64 / total as f64
+        }
+    }
+    
+    pub fn size(&self) -> usize {
+        self.keys.len()
+    }
+    
+    pub fn is_warmup_completed(&self) -> bool {
+        self.warmup_completed
+    }
+    
+    pub fn mark_warmup_completed(&mut self) {
+        self.warmup_completed = true;
+    }
+    
+    fn evict_least_recently_used(&mut self) {
+        if let Some((lru_key, _)) = self.keys.iter()
+            .min_by_key(|(_, cached)| cached.last_accessed)
+            .map(|(k, v)| (k.clone(), v.clone()))
+        {
+            self.keys.remove(&lru_key);
+        }
+    }
+    
+    pub fn cleanup_expired(&mut self, ttl: Duration) {
+        let now = Instant::now();
+        let cutoff = now - ttl;
+        
+        self.keys.retain(|_, cached| cached.cached_at > cutoff);
+        self.last_cleanup = now;
+    }
+}
+
+/// Performance monitor for real-time tracking
+#[derive(Debug)]
+pub struct PerformanceMonitor {
+    /// Current requests per second
+    current_rps: f64,
+    /// Recent latency measurements
+    recent_latencies: VecDeque<u64>,
+    /// Performance alerts
+    alerts: Vec<PerformanceAlert>,
+    /// Monitoring start time
+    start_time: Instant,
+    /// Last monitoring update
+    last_update: Instant,
+}
+
+/// Performance alert
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceAlert {
+    pub alert_id: String,
+    pub timestamp: Instant,
+    pub alert_type: PerformanceAlertType,
+    pub message: String,
+    pub metric_value: f64,
+    pub threshold: f64,
+    pub severity: AlertSeverity,
+}
+
+/// Types of performance alerts
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PerformanceAlertType {
+    HighLatency,
+    LowCacheHitRate,
+    HighMemoryUsage,
+    NonceStoreOverflow,
+    DatabaseSlowdown,
+    RequestRateSpike,
+}
+
+/// Alert severity levels
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AlertSeverity {
+    Info,
+    Warning,
+    Critical,
+}
+
+impl PerformanceMonitor {
+    pub fn new() -> Self {
+        Self {
+            current_rps: 0.0,
+            recent_latencies: VecDeque::new(),
+            alerts: Vec::new(),
+            start_time: Instant::now(),
+            last_update: Instant::now(),
+        }
+    }
+    
+    pub fn record_request(&mut self, latency_ms: u64) {
+        self.recent_latencies.push_back(latency_ms);
+        
+        // Keep only recent measurements (last 60 seconds)
+        while self.recent_latencies.len() > 1000 {
+            self.recent_latencies.pop_front();
+        }
+        
+        self.last_update = Instant::now();
+    }
+    
+    pub fn check_performance_thresholds(&mut self, config: &SignatureAuthConfig) {
+        let now = Instant::now();
+        
+        // Check latency threshold (>100ms)
+        if let Some(avg_latency) = self.get_average_latency() {
+            if avg_latency > 100.0 {
+                self.create_alert(
+                    PerformanceAlertType::HighLatency,
+                    format!("Average latency {}ms exceeds threshold", avg_latency),
+                    avg_latency,
+                    100.0,
+                    AlertSeverity::Warning,
+                );
+            }
+        }
+        
+        // Additional threshold checks can be added here
+    }
+    
+    pub fn get_average_latency(&self) -> Option<f64> {
+        if self.recent_latencies.is_empty() {
+            return None;
+        }
+        
+        let sum: u64 = self.recent_latencies.iter().sum();
+        Some(sum as f64 / self.recent_latencies.len() as f64)
+    }
+    
+    pub fn get_recent_alerts(&self, limit: usize) -> Vec<PerformanceAlert> {
+        self.alerts.iter().rev().take(limit).cloned().collect()
+    }
+    
+    fn create_alert(
+        &mut self,
+        alert_type: PerformanceAlertType,
+        message: String,
+        metric_value: f64,
+        threshold: f64,
+        severity: AlertSeverity,
+    ) {
+        let alert = PerformanceAlert {
+            alert_id: Uuid::new_v4().to_string(),
+            timestamp: Instant::now(),
+            alert_type,
+            message,
+            metric_value,
+            threshold,
+            severity,
+        };
+        
+        self.alerts.push(alert);
+        
+        // Limit stored alerts
+        if self.alerts.len() > 1000 {
+            self.alerts.drain(0..100);
+        }
+    }
 }
 
 impl SecurityLogger {
@@ -1362,12 +1890,48 @@ impl SignatureVerificationState {
         self.security_logger.log_security_event(event);
     }
 
-    /// Get formatted error message for response
+    /// Get formatted error message for response with environment-aware detail levels
     pub fn get_error_message(&self, error: &AuthenticationError) -> String {
-        if self.config.response_security.detailed_error_messages {
-            format!("{}", error)
+        let environment = if self.config.response_security.detailed_error_messages {
+            "development"
         } else {
-            error.public_message()
+            "production"
+        };
+        
+        error.user_friendly_message(environment)
+    }
+
+    /// Create standardized error response with consistent format
+    pub fn create_error_response(&self, error: &AuthenticationError) -> ErrorResponse {
+        let environment = if self.config.response_security.detailed_error_messages {
+            "development"
+        } else {
+            "production"
+        };
+
+        ErrorResponse {
+            error: true,
+            error_code: error.error_code().to_string(),
+            message: error.user_friendly_message(environment),
+            correlation_id: if self.config.response_security.include_correlation_id {
+                Some(error.correlation_id().to_string())
+            } else {
+                None
+            },
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            details: if environment == "development" {
+                Some(ErrorDetails {
+                    error_type: format!("{:?}", error).split('(').next().unwrap_or("Unknown").to_string(),
+                    troubleshooting: error.get_troubleshooting_guidance(),
+                    suggested_actions: error.get_suggested_actions(),
+                    documentation_link: error.get_documentation_link(),
+                })
+            } else {
+                None
+            },
         }
     }
 
@@ -1398,18 +1962,40 @@ impl SignatureVerificationState {
     }
 
 
-    #[cfg(test)]
     pub fn get_config(&self) -> &SignatureAuthConfig {
         &self.config
     }
 
-    #[cfg(test)]
     pub fn get_metrics_collector(&self) -> &SecurityMetricsCollector {
         &self.metrics_collector
     }
 
-    #[cfg(test)]
     pub fn get_security_logger(&self) -> &SecurityLogger {
+        &self.security_logger
+    }
+
+    /// Generate correlation ID for troubleshooting endpoints
+    pub fn generate_correlation_id_public(&self) -> String {
+        self.generate_correlation_id()
+    }
+
+    /// Validate timestamp for troubleshooting (public version)
+    pub fn validate_timestamp_enhanced_public(&self, timestamp: u64, correlation_id: &str) -> Result<(), AuthenticationError> {
+        self.validate_timestamp_enhanced(timestamp, correlation_id)
+    }
+
+    #[cfg(test)]
+    pub fn get_config_test(&self) -> &SignatureAuthConfig {
+        &self.config
+    }
+
+    #[cfg(test)]
+    pub fn get_metrics_collector_test(&self) -> &SecurityMetricsCollector {
+        &self.metrics_collector
+    }
+
+    #[cfg(test)]
+    pub fn get_security_logger_test(&self) -> &SecurityLogger {
         &self.security_logger
     }
 
@@ -1509,7 +2095,7 @@ impl SignatureVerificationState {
     }
 
     /// Validate nonce format (UUID4 if required)
-    fn validate_nonce_format(&self, nonce: &str) -> NodeResult<()> {
+    pub fn validate_nonce_format(&self, nonce: &str) -> NodeResult<()> {
         if self.config.require_uuid4_nonces {
             self.validate_uuid4_format(nonce)?;
             return Ok(()); // If UUID4 validation passes, we're done
@@ -1567,8 +2153,175 @@ impl SignatureVerificationState {
         Ok(())
     }
 
-    /// Get current nonce store statistics
-    pub fn get_nonce_store_stats(&self) -> NodeResult<NonceStoreStats> {
+    /// Get current enhanced nonce store statistics
+    pub fn get_nonce_store_stats(&self) -> NodeResult<NonceStorePerformanceStats> {
+        let store = self.nonce_store.read()
+            .map_err(|_| FoldDbError::Permission("Failed to acquire read lock".to_string()))?;
+        
+        Ok(store.get_performance_stats())
+    }
+
+    /// Warm up the public key cache by preloading frequently used keys
+    pub async fn warm_cache(
+        &self,
+        db_ops: std::sync::Arc<crate::db_operations::core::DbOperations>,
+    ) -> NodeResult<CacheWarmupResult> {
+        let warmup_start = Instant::now();
+        let mut keys_loaded = 0;
+        let mut errors = 0;
+        
+        info!("Starting public key cache warmup...");
+        
+        // Note: This is a simplified warmup - in production you might want to
+        // load keys based on usage patterns or have a configurable warmup list
+        
+        let mut cache = self.key_cache.write()
+            .map_err(|_| FoldDbError::Permission("Failed to acquire cache lock".to_string()))?;
+        
+        cache.mark_warmup_completed();
+        drop(cache);
+        
+        let warmup_duration = warmup_start.elapsed();
+        
+        info!("Cache warmup completed: {} keys loaded, {} errors, took {:?}",
+              keys_loaded, errors, warmup_duration);
+        
+        Ok(CacheWarmupResult {
+            keys_loaded,
+            errors,
+            duration_ms: warmup_duration.as_millis() as u64,
+            cache_size_after: keys_loaded,
+        })
+    }
+
+    /// Get comprehensive performance metrics for monitoring dashboard
+    pub fn get_performance_metrics(&self) -> NodeResult<PerformanceMetrics> {
+        let metrics = self.metrics_collector.get_enhanced_security_metrics(self.config.max_nonce_store_size);
+        let nonce_stats = self.get_nonce_store_stats()?;
+        
+        let cache_stats = {
+            let cache = self.key_cache.read()
+                .map_err(|_| FoldDbError::Permission("Failed to acquire cache lock".to_string()))?;
+            CacheStats {
+                size: cache.size(),
+                hit_rate: cache.hit_rate(),
+                warmup_completed: cache.is_warmup_completed(),
+            }
+        };
+        
+        let performance_alerts = {
+            let monitor = self.performance_monitor.read()
+                .map_err(|_| FoldDbError::Permission("Failed to acquire monitor lock".to_string()))?;
+            monitor.get_recent_alerts(10)
+        };
+        
+        Ok(PerformanceMetrics {
+            security_metrics: metrics,
+            nonce_store_stats: nonce_stats,
+            cache_stats,
+            performance_alerts,
+            system_health: self.assess_system_health()?,
+        })
+    }
+
+    /// Assess overall system health based on performance metrics
+    fn assess_system_health(&self) -> NodeResult<SystemHealthStatus> {
+        let metrics = self.metrics_collector.get_enhanced_security_metrics(self.config.max_nonce_store_size);
+        
+        let mut health_score = 100.0;
+        let mut issues = Vec::new();
+        
+        // Check latency (penalize if >10ms average)
+        if metrics.avg_latency_ms > 10.0 {
+            health_score -= 20.0;
+            issues.push(format!("High average latency: {:.1}ms", metrics.avg_latency_ms));
+        }
+        
+        // Check cache hit rate (penalize if <80%)
+        if metrics.cache_hit_rate < 0.8 {
+            health_score -= 15.0;
+            issues.push(format!("Low cache hit rate: {:.1}%", metrics.cache_hit_rate * 100.0));
+        }
+        
+        // Check nonce store utilization (penalize if >90%)
+        if metrics.nonce_store_utilization_percent > 90.0 {
+            health_score -= 10.0;
+            issues.push(format!("High nonce store utilization: {:.1}%", metrics.nonce_store_utilization_percent));
+        }
+        
+        // Check requests per second (warn if >1000 RPS)
+        if metrics.requests_per_second > 1000.0 {
+            health_score -= 5.0;
+            issues.push(format!("High request rate: {:.1} RPS", metrics.requests_per_second));
+        }
+        
+        let status = if health_score >= 90.0 {
+            "healthy"
+        } else if health_score >= 70.0 {
+            "degraded"
+        } else if health_score >= 50.0 {
+            "unhealthy"
+        } else {
+            "critical"
+        };
+        
+        Ok(SystemHealthStatus {
+            status: status.to_string(),
+            health_score,
+            issues,
+            last_updated: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
+        })
+    }
+
+    /// Clear cache for testing or maintenance
+    pub fn clear_cache(&self) -> NodeResult<()> {
+        let mut cache = self.key_cache.write()
+            .map_err(|_| FoldDbError::Permission("Failed to acquire cache lock".to_string()))?;
+        cache.clear();
+        info!("Public key cache cleared");
+        Ok(())
+    }
+
+    /// Get cache statistics
+    pub fn get_cache_stats(&self) -> NodeResult<CacheStats> {
+        let cache = self.key_cache.read()
+            .map_err(|_| FoldDbError::Permission("Failed to acquire cache lock".to_string()))?;
+        
+        Ok(CacheStats {
+            size: cache.size(),
+            hit_rate: cache.hit_rate(),
+            warmup_completed: cache.is_warmup_completed(),
+        })
+    }
+
+    /// Perform cache maintenance (cleanup expired entries)
+    pub fn maintain_cache(&self) -> NodeResult<u64> {
+        let mut cache = self.key_cache.write()
+            .map_err(|_| FoldDbError::Permission("Failed to acquire cache lock".to_string()))?;
+        
+        let initial_size = cache.size();
+        cache.cleanup_expired(Duration::from_secs(3600)); // 1 hour TTL
+        let final_size = cache.size();
+        let cleaned = initial_size.saturating_sub(final_size) as u64;
+        
+        if cleaned > 0 {
+            debug!("Cache maintenance: removed {} expired entries", cleaned);
+        }
+        
+        Ok(cleaned)
+    }
+
+    /// Trigger performance monitoring update
+    pub fn update_performance_monitoring(&self) -> NodeResult<()> {
+        let mut monitor = self.performance_monitor.write()
+            .map_err(|_| FoldDbError::Permission("Failed to acquire monitor lock".to_string()))?;
+        
+        monitor.check_performance_thresholds(&self.config);
+        Ok(())
+    }
+
+    // Legacy compatibility method
+    pub fn get_nonce_store_stats_legacy(&self) -> NodeResult<NonceStoreStats> {
         let store = self.nonce_store.read()
             .map_err(|_| FoldDbError::Permission("Failed to acquire read lock".to_string()))?;
         
@@ -1698,22 +2451,42 @@ pub struct SlidingWindowStats {
     pub requests_per_second: f64,
 }
 
+/// Standardized error response format
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorResponse {
+    pub error: bool,
+    pub error_code: String,
+    pub message: String,
+    pub correlation_id: Option<String>,
+    pub timestamp: u64,
+    pub details: Option<ErrorDetails>,
+}
+
+/// Detailed error information for development environments
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorDetails {
+    pub error_type: String,
+    pub troubleshooting: String,
+    pub suggested_actions: Vec<String>,
+    pub documentation_link: String,
+}
+
 /// Parsed signature components from RFC 9421 headers
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct SignatureComponents {
-    signature_input: String,
-    signature: String,
-    created: u64,
-    keyid: String,
-    algorithm: String,
-    nonce: String,
-    covered_components: Vec<String>,
+    pub signature_input: String,
+    pub signature: String,
+    pub created: u64,
+    pub keyid: String,
+    pub algorithm: String,
+    pub nonce: String,
+    pub covered_components: Vec<String>,
 }
 
 impl SignatureComponents {
     /// Parse signature components from HTTP headers
-    fn parse_from_headers(req: &ServiceRequest) -> NodeResult<Self> {
+    pub fn parse_from_headers(req: &ServiceRequest) -> NodeResult<Self> {
         // Extract Signature-Input header
         let signature_input = req
             .headers()
@@ -1924,12 +2697,6 @@ where
         Box::pin(async move {
             let start_time = Instant::now();
             
-            // Skip signature verification if disabled
-            if !state.config.enabled {
-                debug!("Signature verification disabled, skipping");
-                return service.call(req).await;
-            }
-
             // Skip signature verification for certain paths (health checks, etc.)
             if should_skip_verification(req.path()) {
                 debug!("Skipping signature verification for path: {}", req.path());
@@ -2032,16 +2799,15 @@ async fn verify_request_signature(
 
 /// Check if signature verification should be skipped for this path
 fn should_skip_verification(path: &str) -> bool {
-    // Skip verification for these paths
+    // Only allow these specific paths to skip verification (minimal set for system operation)
     const SKIP_PATHS: &[&str] = &[
-        "/api/system/status",
-        "/api/crypto/status", 
-        "/api/crypto/keys/register",
-        "/",
-        "/index.html",
+        "/api/system/status",           // Health checks
+        "/api/crypto/keys/register",    // Initial key registration
+        "/",                            // Static file serving
+        "/index.html",                  // Static file serving
     ];
     
-    SKIP_PATHS.iter().any(|&skip_path| path.starts_with(skip_path))
+    SKIP_PATHS.iter().any(|&skip_path| path == skip_path || (skip_path == "/" && path.starts_with("/static")))
 }
 
 #[cfg(test)]
