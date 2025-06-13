@@ -7,11 +7,11 @@
 //! - Field processing utilities
 //! - Helper methods
 
+pub mod async_operations;
 mod event_processing;
-mod request_handlers;
 mod field_processing;
 mod helpers;
-pub mod async_operations;
+mod request_handlers;
 
 use crate::atom::{Atom, AtomRef, AtomRefCollection, AtomRefRange};
 use crate::db_operations::{DbOperations, EncryptionWrapper};
@@ -88,7 +88,9 @@ impl AtomManager {
     /// Check if encryption is enabled
     pub fn is_encryption_enabled(&self) -> bool {
         #[allow(clippy::unnecessary_map_or)]
-        self.encryption_wrapper.as_ref().map_or(false, |wrapper| wrapper.is_encryption_enabled())
+        self.encryption_wrapper
+            .as_ref()
+            .map_or(false, |wrapper| wrapper.is_encryption_enabled())
     }
 
     /// Public API methods for direct access (for backward compatibility)
@@ -99,7 +101,13 @@ impl AtomManager {
         content: serde_json::Value,
     ) -> Result<Atom, Box<dyn std::error::Error>> {
         if let Some(encryption_wrapper) = &self.encryption_wrapper {
-            helpers::create_atom_encrypted(&self.db_ops, encryption_wrapper, schema_name, source_pub_key, content)
+            helpers::create_atom_encrypted(
+                &self.db_ops,
+                encryption_wrapper,
+                schema_name,
+                source_pub_key,
+                content,
+            )
         } else {
             helpers::create_atom(&self.db_ops, schema_name, source_pub_key, content)
         }
@@ -112,7 +120,13 @@ impl AtomManager {
         source_pub_key: String,
     ) -> Result<AtomRef, Box<dyn std::error::Error>> {
         if let Some(encryption_wrapper) = &self.encryption_wrapper {
-            helpers::update_atom_ref_encrypted(&self.db_ops, encryption_wrapper, aref_uuid, atom_uuid, source_pub_key)
+            helpers::update_atom_ref_encrypted(
+                &self.db_ops,
+                encryption_wrapper,
+                aref_uuid,
+                atom_uuid,
+                source_pub_key,
+            )
         } else {
             helpers::update_atom_ref(&self.db_ops, aref_uuid, atom_uuid, source_pub_key)
         }
@@ -126,7 +140,14 @@ impl AtomManager {
         source_pub_key: String,
     ) -> Result<AtomRefRange, Box<dyn std::error::Error>> {
         if let Some(encryption_wrapper) = &self.encryption_wrapper {
-            helpers::update_atom_ref_range_encrypted(&self.db_ops, encryption_wrapper, aref_uuid, atom_uuid, key, source_pub_key)
+            helpers::update_atom_ref_range_encrypted(
+                &self.db_ops,
+                encryption_wrapper,
+                aref_uuid,
+                atom_uuid,
+                key,
+                source_pub_key,
+            )
         } else {
             helpers::update_atom_ref_range(&self.db_ops, aref_uuid, atom_uuid, key, source_pub_key)
         }
@@ -152,19 +173,19 @@ impl AtomManager {
     ) -> Result<Vec<crate::atom::Atom>, Box<dyn std::error::Error>> {
         // Load the atom ref from database using encryption wrapper
         let key = format!("ref:{}", aref_uuid);
-        
+
         // Try to get AtomRef first
         if let Ok(Some(atom_ref)) = encryption_wrapper.get_encrypted_item::<crate::atom::AtomRef>(
             &key,
-            crate::db_operations::contexts::ATOM_DATA
+            crate::db_operations::contexts::ATOM_DATA,
         ) {
             let atom_uuid = atom_ref.get_atom_uuid();
-            
+
             // Get the current atom using encryption wrapper
             let atom_key = format!("atom:{}", atom_uuid);
             match encryption_wrapper.get_encrypted_item::<crate::atom::Atom>(
                 &atom_key,
-                crate::db_operations::contexts::ATOM_DATA
+                crate::db_operations::contexts::ATOM_DATA,
             ) {
                 Ok(Some(atom)) => Ok(vec![atom]),
                 Ok(None) => Ok(vec![]),
@@ -172,10 +193,12 @@ impl AtomManager {
             }
         } else {
             // Try as AtomRefRange
-            if let Ok(Some(_range)) = encryption_wrapper.get_encrypted_item::<crate::atom::AtomRefRange>(
-                &key,
-                crate::db_operations::contexts::ATOM_DATA
-            ) {
+            if let Ok(Some(_range)) = encryption_wrapper
+                .get_encrypted_item::<crate::atom::AtomRefRange>(
+                    &key,
+                    crate::db_operations::contexts::ATOM_DATA,
+                )
+            {
                 // For ranges, we would need to iterate through all atoms in the range
                 // For now, return empty vector
                 Ok(vec![])

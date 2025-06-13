@@ -7,7 +7,7 @@ use super::ast::Value;
 use super::interpreter::Interpreter;
 use super::parser::TransformParser;
 use crate::schema::types::{SchemaError, Transform};
-use log::{info, error};
+use log::{error, info};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 
@@ -31,18 +31,18 @@ impl TransformExecutor {
     ) -> Result<JsonValue, SchemaError> {
         info!("🧮 TransformExecutor: Starting computation");
         info!("🔧 Transform logic: {}", transform.logic);
-        
+
         // Log individual input values
         info!("📊 Input values for computation:");
         for (key, value) in &input_values {
             info!("  📋 {}: {}", key, value);
         }
-        
+
         // Log a simplified computation description
         info!("🧮 Computing with logic: {}", transform.logic);
-        
+
         let result = Self::execute_transform_with_expr(transform, input_values);
-        
+
         match &result {
             Ok(value) => {
                 info!("✨ Computation result: {}", value);
@@ -52,7 +52,7 @@ impl TransformExecutor {
                 error!("❌ Transform execution failed: {}", e);
             }
         }
-        
+
         result
     }
 
@@ -173,7 +173,7 @@ impl TransformExecutor {
         })?;
 
         info!("🎯 Raw evaluation result: {:?}", evaluated);
-        
+
         let json_result = Self::convert_result_value(evaluated)?;
         info!("✨ Final JSON result: {}", json_result);
         Ok(json_result)
@@ -202,7 +202,6 @@ impl TransformExecutor {
     fn convert_result_value(value: Value) -> Result<JsonValue, SchemaError> {
         Ok(JsonValue::from(value))
     }
-
 
     /// Validates a transform.
     ///

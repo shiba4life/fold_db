@@ -1,6 +1,6 @@
-use super::{crypto_routes, log_routes};
-use super::{network_routes, query_routes, schema_routes, system_routes};
 use super::signature_auth::SignatureVerificationState;
+use super::{crypto_routes, key_rotation_routes, log_routes};
+use super::{network_routes, query_routes, schema_routes, system_routes};
 use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
 use crate::ingestion::routes as ingestion_routes;
@@ -98,7 +98,10 @@ impl DataFoldHttpServer {
         let signature_auth = {
             let node = self.node.lock().await;
             let sig_config = node.config.signature_auth_config();
-            info!("Initializing signature verification middleware with {:?} security profile", sig_config.security_profile);
+            info!(
+                "Initializing signature verification middleware with {:?} security profile",
+                sig_config.security_profile
+            );
             match SignatureVerificationState::new(sig_config.clone()) {
                 Ok(state) => {
                     info!("Signature verification middleware initialized successfully");
@@ -126,163 +129,184 @@ impl DataFoldHttpServer {
                 .allow_any_header()
                 .max_age(3600);
 
-            let app = App::new()
-                .wrap(cors)
-                .app_data(app_state.clone());
+            let app = App::new().wrap(cors).app_data(app_state.clone());
 
             // Apply signature verification middleware to all API route scopes (mandatory)
             info!("Activating signature verification middleware for all API route scopes");
-            
+
             app.service(
-                    web::scope("/api")
-                       // Apply signature verification middleware at main API scope level
-                        .wrap(super::signature_auth::SignatureVerificationMiddleware::new((*app_state.signature_auth).clone()))
-                        // Schema endpoints - all protected except where exempted by should_skip_verification
-                        .route("/schemas", web::get().to(schema_routes::list_schemas))
-                        .route(
-                            "/schemas/status",
-                            web::get().to(schema_routes::get_schema_status),
-                        )
-                        .route(
-                            "/schemas/refresh",
-                            web::post().to(schema_routes::refresh_schemas),
-                        )
-                        .route(
-                            "/schemas/available",
-                            web::get().to(schema_routes::list_available_schemas),
-                        )
-                        .route(
-                            "/schemas/available/add",
-                            web::post().to(schema_routes::add_schema_to_available),
-                        )
-                        .route(
-                            "/schemas/by-state/{state}",
-                            web::get().to(schema_routes::list_schemas_by_state),
-                        )
-                        .route("/schema/{name}", web::get().to(schema_routes::get_schema))
-                        .route("/schema", web::post().to(schema_routes::create_schema))
-                        .route(
-                            "/schema/{name}",
-                            web::delete().to(schema_routes::unload_schema_route),
-                        )
-                        .route(
-                            "/schema/{name}/load",
-                            web::post().to(schema_routes::load_schema_route),
-                        )
-                        .route(
-                            "/schema/{name}/approve",
-                            web::post().to(schema_routes::approve_schema),
-                        )
-                        .route(
-                            "/schema/{name}/block",
-                            web::post().to(schema_routes::block_schema),
-                        )
-                        .route(
-                            "/schema/{name}/state",
-                            web::get().to(schema_routes::get_schema_state),
-                        )
-                        // Operation endpoints - all protected
-                        .route("/execute", web::post().to(query_routes::execute_operation))
-                        .route("/query", web::post().to(query_routes::execute_query))
-                        .route("/mutation", web::post().to(query_routes::execute_mutation))
-                        // Transform endpoints - all protected
-                        .route("/transforms", web::get().to(query_routes::list_transforms))
-                        .route(
-                            "/transform/{id}/run",
-                            web::post().to(query_routes::run_transform),
-                        )
-                        .route(
-                            "/transforms/queue",
-                            web::get().to(query_routes::get_transform_queue),
-                        )
-                        .route(
-                            "/transforms/queue/{id}",
-                            web::post().to(query_routes::add_to_transform_queue),
-                        )
-                        // Log endpoints - all protected
-                        .route("/logs", web::get().to(log_routes::list_logs))
-                        .route("/logs/stream", web::get().to(log_routes::stream_logs))
-                        .route("/logs/config", web::get().to(log_routes::get_config))
-                        .route(
-                            "/logs/config/reload",
-                            web::post().to(log_routes::reload_config),
-                        )
-                        .route("/logs/features", web::get().to(log_routes::get_features))
-                        .route(
-                            "/logs/level",
-                            web::put().to(log_routes::update_feature_level),
-                        )
-                        // System endpoints - /api/system/status is exempted by should_skip_verification
-                        .service(
-                            web::scope("/system")
-                                .route(
-                                    "/status",
-                                    web::get().to(system_routes::get_system_status),
-                                )
-                                .route(
-                                    "/reset-database",
-                                    web::post().to(system_routes::reset_database),
-                                )
-                        )
-                        // Ingestion endpoints - all protected
-                        .service(
-                            web::scope("/ingestion")
-                                .route(
-                                    "/process",
-                                    web::post().to(ingestion_routes::process_json),
-                                )
-                                .route(
-                                    "/status",
-                                    web::get().to(ingestion_routes::get_status),
-                                )
-                                .route(
-                                    "/health",
-                                    web::get().to(ingestion_routes::health_check),
-                                )
-                                .route(
-                                    "/config",
-                                    web::get().to(ingestion_routes::get_config),
-                                )
-                                .route(
-                                    "/validate",
-                                    web::post().to(ingestion_routes::validate_json),
-                                )
-                                .route(
-                                    "/openrouter-config",
-                                    web::get().to(ingestion_routes::get_openrouter_config),
-                                )
-                                .route(
-                                    "/openrouter-config",
-                                    web::post().to(ingestion_routes::save_openrouter_config),
-                                )
-                        )
-                        // Crypto endpoints - /api/crypto/keys/register is exempted by should_skip_verification
-                        .service(
-                            web::scope("/crypto")
-                                .route("/init/random", web::post().to(crypto_routes::init_random_key))
-                                .route("/init/passphrase", web::post().to(crypto_routes::init_passphrase_key))
-                                .route("/status", web::get().to(crypto_routes::get_crypto_status))
-                                .route("/validate", web::post().to(crypto_routes::validate_crypto_config))
-                                .route("/keys/register", web::post().to(crypto_routes::register_public_key))
-                                .route("/keys/status/{client_id}", web::get().to(crypto_routes::get_public_key_status))
-                                .route("/signatures/verify", web::post().to(crypto_routes::verify_signature))
-                        )
-                        // Network endpoints - all protected
-                        .service(
-                            web::scope("/network")
-                                .route("/init", web::post().to(network_routes::init_network))
-                                .route("/start", web::post().to(network_routes::start_network))
-                                .route("/stop", web::post().to(network_routes::stop_network))
-                                .route("/status", web::get().to(network_routes::get_network_status))
-                                .route("/connect", web::post().to(network_routes::connect_to_node))
-                                .route("/discover", web::post().to(network_routes::discover_nodes))
-                                .route("/nodes", web::get().to(network_routes::list_nodes))
-                        ),
-                )
-                // Serve the built React UI if it exists
-                .service(
-                    Files::new("/", "src/datafold_node/static-react/dist").index_file("index.html"),
-                )
+                web::scope("/api")
+                    // Apply signature verification middleware at main API scope level
+                    .wrap(super::signature_auth::SignatureVerificationMiddleware::new(
+                        (*app_state.signature_auth).clone(),
+                    ))
+                    // Schema endpoints - all protected except where exempted by should_skip_verification
+                    .route("/schemas", web::get().to(schema_routes::list_schemas))
+                    .route(
+                        "/schemas/status",
+                        web::get().to(schema_routes::get_schema_status),
+                    )
+                    .route(
+                        "/schemas/refresh",
+                        web::post().to(schema_routes::refresh_schemas),
+                    )
+                    .route(
+                        "/schemas/available",
+                        web::get().to(schema_routes::list_available_schemas),
+                    )
+                    .route(
+                        "/schemas/available/add",
+                        web::post().to(schema_routes::add_schema_to_available),
+                    )
+                    .route(
+                        "/schemas/by-state/{state}",
+                        web::get().to(schema_routes::list_schemas_by_state),
+                    )
+                    .route("/schema/{name}", web::get().to(schema_routes::get_schema))
+                    .route("/schema", web::post().to(schema_routes::create_schema))
+                    .route(
+                        "/schema/{name}",
+                        web::delete().to(schema_routes::unload_schema_route),
+                    )
+                    .route(
+                        "/schema/{name}/load",
+                        web::post().to(schema_routes::load_schema_route),
+                    )
+                    .route(
+                        "/schema/{name}/approve",
+                        web::post().to(schema_routes::approve_schema),
+                    )
+                    .route(
+                        "/schema/{name}/block",
+                        web::post().to(schema_routes::block_schema),
+                    )
+                    .route(
+                        "/schema/{name}/state",
+                        web::get().to(schema_routes::get_schema_state),
+                    )
+                    // Operation endpoints - all protected
+                    .route("/execute", web::post().to(query_routes::execute_operation))
+                    .route("/query", web::post().to(query_routes::execute_query))
+                    .route("/mutation", web::post().to(query_routes::execute_mutation))
+                    // Transform endpoints - all protected
+                    .route("/transforms", web::get().to(query_routes::list_transforms))
+                    .route(
+                        "/transform/{id}/run",
+                        web::post().to(query_routes::run_transform),
+                    )
+                    .route(
+                        "/transforms/queue",
+                        web::get().to(query_routes::get_transform_queue),
+                    )
+                    .route(
+                        "/transforms/queue/{id}",
+                        web::post().to(query_routes::add_to_transform_queue),
+                    )
+                    // Log endpoints - all protected
+                    .route("/logs", web::get().to(log_routes::list_logs))
+                    .route("/logs/stream", web::get().to(log_routes::stream_logs))
+                    .route("/logs/config", web::get().to(log_routes::get_config))
+                    .route(
+                        "/logs/config/reload",
+                        web::post().to(log_routes::reload_config),
+                    )
+                    .route("/logs/features", web::get().to(log_routes::get_features))
+                    .route(
+                        "/logs/level",
+                        web::put().to(log_routes::update_feature_level),
+                    )
+                    // System endpoints - /api/system/status is exempted by should_skip_verification
+                    .service(
+                        web::scope("/system")
+                            .route("/status", web::get().to(system_routes::get_system_status))
+                            .route(
+                                "/reset-database",
+                                web::post().to(system_routes::reset_database),
+                            ),
+                    )
+                    // Ingestion endpoints - all protected
+                    .service(
+                        web::scope("/ingestion")
+                            .route("/process", web::post().to(ingestion_routes::process_json))
+                            .route("/status", web::get().to(ingestion_routes::get_status))
+                            .route("/health", web::get().to(ingestion_routes::health_check))
+                            .route("/config", web::get().to(ingestion_routes::get_config))
+                            .route("/validate", web::post().to(ingestion_routes::validate_json))
+                            .route(
+                                "/openrouter-config",
+                                web::get().to(ingestion_routes::get_openrouter_config),
+                            )
+                            .route(
+                                "/openrouter-config",
+                                web::post().to(ingestion_routes::save_openrouter_config),
+                            ),
+                    )
+                    // Crypto endpoints - /api/crypto/keys/register is exempted by should_skip_verification
+                    .service(
+                        web::scope("/crypto")
+                            .route(
+                                "/init/random",
+                                web::post().to(crypto_routes::init_random_key),
+                            )
+                            .route(
+                                "/init/passphrase",
+                                web::post().to(crypto_routes::init_passphrase_key),
+                            )
+                            .route("/status", web::get().to(crypto_routes::get_crypto_status))
+                            .route(
+                                "/validate",
+                                web::post().to(crypto_routes::validate_crypto_config),
+                            )
+                            .route(
+                                "/keys/register",
+                                web::post().to(crypto_routes::register_public_key),
+                            )
+                            .route(
+                                "/keys/status/{client_id}",
+                                web::get().to(crypto_routes::get_public_key_status),
+                            )
+                            .route(
+                                "/signatures/verify",
+                                web::post().to(crypto_routes::verify_signature),
+                            )
+                            // Key rotation endpoints - all protected with mandatory signature verification
+                            .route(
+                                "/keys/rotate",
+                                web::post().to(key_rotation_routes::rotate_key),
+                            )
+                            .route(
+                                "/keys/rotate/status",
+                                web::post().to(key_rotation_routes::get_rotation_status),
+                            )
+                            .route(
+                                "/keys/rotate/history",
+                                web::post().to(key_rotation_routes::get_rotation_history),
+                            )
+                            .route(
+                                "/keys/rotate/stats",
+                                web::get().to(key_rotation_routes::get_rotation_statistics),
+                            )
+                            .route(
+                                "/keys/rotate/validate",
+                                web::post().to(key_rotation_routes::validate_rotation_request),
+                            ),
+                    )
+                    // Network endpoints - all protected
+                    .service(
+                        web::scope("/network")
+                            .route("/init", web::post().to(network_routes::init_network))
+                            .route("/start", web::post().to(network_routes::start_network))
+                            .route("/stop", web::post().to(network_routes::stop_network))
+                            .route("/status", web::get().to(network_routes::get_network_status))
+                            .route("/connect", web::post().to(network_routes::connect_to_node))
+                            .route("/discover", web::post().to(network_routes::discover_nodes))
+                            .route("/nodes", web::get().to(network_routes::list_nodes)),
+                    ),
+            )
+            // Serve the built React UI if it exists
+            .service(
+                Files::new("/", "src/datafold_node/static-react/dist").index_file("index.html"),
+            )
         })
         .bind(&self.bind_address)
         .map_err(|e| FoldDbError::Config(format!("Failed to bind HTTP server: {}", e)))?
@@ -300,24 +324,24 @@ impl DataFoldHttpServer {
 #[cfg(test)]
 mod tests {
     use super::DataFoldHttpServer;
-    use crate::datafold_node::{DataFoldNode, NodeConfig};
     use crate::cli::auth::{CliAuthProfile, CliRequestSigner, CliSigningConfig};
     use crate::crypto::ed25519::generate_master_keypair;
+    use crate::datafold_node::{DataFoldNode, NodeConfig};
     use reqwest::{Client, Response};
     use serde_json::json;
     use std::collections::HashMap;
     use std::net::TcpListener;
     use tempfile::tempdir;
-    
+
     /// Helper function to create an authenticated HTTP client for testing
     async fn create_authenticated_client(server_base_url: &str) -> (Client, CliRequestSigner) {
         // Generate a test keypair
         let keypair = generate_master_keypair().expect("Failed to generate test keypair");
-        
+
         // Create a test authentication profile
         let mut metadata = HashMap::new();
         metadata.insert("source".to_string(), "test".to_string());
-        
+
         let profile = CliAuthProfile {
             client_id: "test-client-123".to_string(),
             key_id: "test-key".to_string(),
@@ -325,38 +349,42 @@ mod tests {
             server_url: server_base_url.to_string(),
             metadata,
         };
-        
+
         // Create signing config
         let signing_config = CliSigningConfig::default();
-        
+
         // Create the request signer (recreate keypair from secret bytes for ownership)
-        let keypair_copy = crate::crypto::ed25519::MasterKeyPair::from_secret_bytes(&keypair.secret_key_bytes())
-            .expect("Failed to recreate keypair");
+        let keypair_copy =
+            crate::crypto::ed25519::MasterKeyPair::from_secret_bytes(&keypair.secret_key_bytes())
+                .expect("Failed to recreate keypair");
         let signer = CliRequestSigner::new(keypair_copy, profile.clone(), signing_config);
-        
+
         // Create a basic HTTP client
         let client = Client::new();
-        
+
         // Register the public key with the server (skip signature verification for registration)
         let registration_request = json!({
             "client_id": profile.client_id,
             "public_key": hex::encode(keypair.public_key().to_bytes()),
             "metadata": profile.metadata
         });
-        
+
         let registration_response = client
-            .post(&format!("{}/api/crypto/keys/register", server_base_url))
+            .post(format!("{}/api/crypto/keys/register", server_base_url))
             .json(&registration_request)
             .send()
             .await
             .expect("Failed to register public key");
-        
-        assert!(registration_response.status().is_success(),
-                "Public key registration failed: {}", registration_response.status());
-        
+
+        assert!(
+            registration_response.status().is_success(),
+            "Public key registration failed: {}",
+            registration_response.status()
+        );
+
         (client, signer)
     }
-    
+
     /// Helper function to make an authenticated request
     async fn make_authenticated_request(
         client: &Client,
@@ -371,15 +399,15 @@ mod tests {
             "DELETE" => client.delete(url),
             _ => return Err(format!("Unsupported HTTP method: {}", method).into()),
         };
-        
+
         // Add required content-type header (even for GET requests since it's required by signature auth)
         request_builder = request_builder.header("content-type", "application/json");
-        
+
         let mut request = request_builder.build()?;
-        
+
         // Sign the request
         signer.sign_request(&mut request)?;
-        
+
         // Execute the signed request
         let response = client.execute(request).await?;
         Ok(response)
@@ -463,10 +491,7 @@ mod tests {
 
         assert!(response.status().is_success());
 
-        let logs: serde_json::Value = response
-            .json()
-            .await
-            .expect("invalid json");
+        let logs: serde_json::Value = response.json().await.expect("invalid json");
 
         assert!(logs.as_array().map(|v| !v.is_empty()).unwrap_or(false));
 

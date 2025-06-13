@@ -78,7 +78,6 @@ As a client application user, I want to rotate my access keys without service in
 #### Authentication and Authorization
 - Cryptographic proof of old key ownership for replacement
 - Protection against unauthorized key changes
-- Multi-factor authentication for sensitive operations
 - Emergency override procedures with enhanced logging
 
 #### Audit and Compliance
@@ -86,6 +85,13 @@ As a client application user, I want to rotate my access keys without service in
 - Tamper-proof logging of key operations
 - Compliance reporting for key rotation policies
 - Security metrics and monitoring
+
+#### Security Model
+- **Client-side key generation**: New keys are generated on the client side for maximum security
+- **Server-side coordination**: Server coordinates atomic key replacement across the system
+- **Signature-based authentication**: All key rotation requests must be signed with the old private key
+- **Rate limiting**: Configurable rate limits prevent abuse
+- **Risk assessment**: Behavioral analysis to detect unusual rotation patterns
 
 ## UX/UI Considerations
 
@@ -132,6 +138,7 @@ As a client application user, I want to rotate my access keys without service in
    - ✅ Protection against unauthorized key changes
    - ✅ Audit logging for all key lifecycle events
    - ✅ Secure handling of key material during transitions
+   - ✅ Rate limiting and risk assessment to prevent abuse
 
 5. **Performance Requirements**
    - ✅ Key replacement completes within 30 seconds under normal conditions
@@ -158,6 +165,18 @@ As a client application user, I want to rotate my access keys without service in
   - Monitoring and alerting systems for key events
 - **Infrastructure**: High availability database setup for critical key operations
 
+## Current Security Features
+
+The key rotation system provides comprehensive security through:
+
+1. **Cryptographic Authentication**: All operations require valid Ed25519 signatures
+2. **Signature-based Authorization**: Old private key must sign rotation requests
+3. **Rate Limiting**: Configurable limits prevent rotation abuse
+4. **Risk Assessment**: Behavioral analysis detects unusual patterns
+5. **Audit Logging**: Complete trail of all security events
+6. **Client-side Key Control**: Private keys never leave client environment
+7. **Emergency Procedures**: Documented bypass workflows with enhanced logging
+
 ## Open Questions
 
 1. **Grace Period**: Should there be a grace period where both old and new keys are valid?
@@ -168,4 +187,4 @@ As a client application user, I want to rotate my access keys without service in
 
 ## Related Tasks
 
-Tasks will be created in [tasks.md](./tasks.md) upon PBI approval. 
+Tasks will be created in [tasks.md](./tasks.md) upon PBI approval.

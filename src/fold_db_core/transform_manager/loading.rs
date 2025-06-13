@@ -1,7 +1,7 @@
 use super::manager::TransformManager;
+use crate::fold_db_core::transform_manager::utils::*;
 use crate::schema::types::{SchemaError, Transform, TransformRegistration};
 use crate::transform::TransformExecutor;
-use crate::fold_db_core::transform_manager::utils::*;
 use log::info;
 use std::collections::{HashMap, HashSet};
 
@@ -12,15 +12,21 @@ impl TransformManager {
 
         // Get fresh list of transform IDs
         let transform_ids = self.db_ops.list_transforms()?;
-        
+
         // Load transforms into memory
-        let mut registered_transforms = self.registered_transforms.write()
+        let mut registered_transforms = self
+            .registered_transforms
+            .write()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire write lock".to_string()))?;
 
-        let mut field_to_transforms = self.field_to_transforms.write()
+        let mut field_to_transforms = self
+            .field_to_transforms
+            .write()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire write lock".to_string()))?;
 
-        let mut transform_to_fields = self.transform_to_fields.write()
+        let mut transform_to_fields = self
+            .transform_to_fields
+            .write()
             .map_err(|_| SchemaError::InvalidData("Failed to acquire write lock".to_string()))?;
 
         for transform_id in transform_ids {
@@ -28,20 +34,32 @@ impl TransformManager {
             if registered_transforms.contains_key(&transform_id) {
                 continue;
             }
-            
+
             match self.db_ops.get_transform(&transform_id) {
                 Ok(Some(transform)) => {
                     info!(
                         "📋 Loaded new transform '{}' with inputs: {:?}, output: {}",
-                        transform_id, transform.get_inputs(), transform.get_output()
+                        transform_id,
+                        transform.get_inputs(),
+                        transform.get_output()
                     );
                     registered_transforms.insert(transform_id.clone(), transform.clone());
-                    
+
                     // Register field mappings for the new transform
-                    LoggingHelper::log_transform_registration(&transform_id, transform.get_inputs(), transform.get_output());
+                    LoggingHelper::log_transform_registration(
+                        &transform_id,
+                        transform.get_inputs(),
+                        transform.get_output(),
+                    );
                     for input in transform.get_inputs() {
-                        field_to_transforms.entry(input.clone()).or_insert_with(HashSet::new).insert(transform_id.clone());
-                        transform_to_fields.entry(transform_id.clone()).or_insert_with(HashSet::new).insert(input.to_string());
+                        field_to_transforms
+                            .entry(input.clone())
+                            .or_insert_with(HashSet::new)
+                            .insert(transform_id.clone());
+                        transform_to_fields
+                            .entry(transform_id.clone())
+                            .or_insert_with(HashSet::new)
+                            .insert(input.to_string());
                         LoggingHelper::log_field_mapping_creation(input, &transform_id);
                     }
                 }
@@ -150,7 +168,8 @@ impl TransformManager {
             let mut transform_input_names = self.transform_input_names.write().map_err(|_| {
                 SchemaError::InvalidData("Failed to acquire transform_input_names lock".to_string())
             })?;
-            let name_map: HashMap<String, String> = input_arefs.iter()
+            let name_map: HashMap<String, String> = input_arefs
+                .iter()
                 .zip(input_names.iter())
                 .map(|(aref, name)| (aref.clone(), name.clone()))
                 .collect();
@@ -180,14 +199,20 @@ impl TransformManager {
         })?;
 
         let field_set: HashSet<String> = trigger_fields.iter().cloned().collect();
-        info!("🔍 DEBUG: Registering field mappings for transform '{}' with trigger_fields: {:?}", transform_id, trigger_fields);
+        info!(
+            "🔍 DEBUG: Registering field mappings for transform '{}' with trigger_fields: {:?}",
+            transform_id, trigger_fields
+        );
         for field_key in trigger_fields {
             let set = field_to_transforms.entry(field_key.clone()).or_default();
             set.insert(transform_id.to_string());
-            info!("🔗 DEBUG: Registered field mapping '{}' -> transform '{}'", field_key, transform_id);
+            info!(
+                "🔗 DEBUG: Registered field mapping '{}' -> transform '{}'",
+                field_key, transform_id
+            );
         }
         transform_to_fields.insert(transform_id.to_string(), field_set);
-        
+
         // DEBUG: Log current field mappings state
         info!("🔍 DEBUG: Current field_to_transforms state after registration:");
         for (field_key, transforms) in field_to_transforms.iter() {

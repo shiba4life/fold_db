@@ -136,12 +136,12 @@ impl PerformanceMeasurement {
             "end_to_end" => targets.end_to_end_ms,
             _ => return true,
         };
-        
-        self.avg_operation_time_ms <= target_time_ms &&
-        self.operations_per_second >= targets.min_throughput_rps / 10.0 &&
-        self.memory_usage_bytes.unwrap_or(0) <= targets.max_memory_overhead_bytes &&
-        self.cpu_usage_percent.unwrap_or(0.0) <= targets.max_cpu_overhead_percent &&
-        self.success_rate_percent >= 99.0
+
+        self.avg_operation_time_ms <= target_time_ms
+            && self.operations_per_second >= targets.min_throughput_rps / 10.0
+            && self.memory_usage_bytes.unwrap_or(0) <= targets.max_memory_overhead_bytes
+            && self.cpu_usage_percent.unwrap_or(0.0) <= targets.max_cpu_overhead_percent
+            && self.success_rate_percent >= 99.0
     }
 }
 
@@ -306,7 +306,7 @@ impl PerformanceBenchmarkSuite {
             report_config: None,
         })
     }
-    
+
     pub fn with_analysis_and_reporting(
         mut self,
         analysis_config: PerformanceAnalysisConfig,
@@ -316,8 +316,10 @@ impl PerformanceBenchmarkSuite {
         self.report_config = Some(report_config);
         Ok(self)
     }
-    
-    pub async fn run_complete_benchmark_suite(&mut self) -> Result<PerformanceBenchmarkResult, Box<dyn std::error::Error>> {
+
+    pub async fn run_complete_benchmark_suite(
+        &mut self,
+    ) -> Result<PerformanceBenchmarkResult, Box<dyn std::error::Error>> {
         // Create mock benchmark result for now
         let measurements = vec![];
         let summary = PerformanceSummary {
@@ -329,7 +331,7 @@ impl PerformanceBenchmarkSuite {
             performance_score: 95.0,
             component_summaries: HashMap::new(),
         };
-        
+
         let metadata = BenchmarkMetadata {
             timestamp: chrono::Utc::now().to_rfc3339(),
             environment: EnvironmentInfo {
@@ -344,7 +346,7 @@ impl PerformanceBenchmarkSuite {
             execution_duration: Duration::from_secs(60),
             system_load: Some(0.5),
         };
-        
+
         Ok(PerformanceBenchmarkResult {
             config: self.config.clone(),
             targets: self.targets.clone(),
@@ -366,17 +368,22 @@ pub struct ServerPerformanceBenchmarks {
 }
 
 impl ServerPerformanceBenchmarks {
-    pub fn new(config: PerformanceBenchmarkConfig, targets: PerformanceTargets) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        config: PerformanceBenchmarkConfig,
+        targets: PerformanceTargets,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self { config, targets })
     }
-    
-    pub async fn run_all_benchmarks(&mut self) -> Result<Vec<PerformanceMeasurement>, Box<dyn std::error::Error>> {
+
+    pub async fn run_all_benchmarks(
+        &mut self,
+    ) -> Result<Vec<PerformanceMeasurement>, Box<dyn std::error::Error>> {
         // Implementation would go here
         Ok(vec![])
     }
 }
 
-// Client benchmarks  
+// Client benchmarks
 pub struct ClientPerformanceBenchmarks {
     #[allow(dead_code)]
     config: PerformanceBenchmarkConfig,
@@ -385,11 +392,16 @@ pub struct ClientPerformanceBenchmarks {
 }
 
 impl ClientPerformanceBenchmarks {
-    pub fn new(config: PerformanceBenchmarkConfig, targets: PerformanceTargets) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        config: PerformanceBenchmarkConfig,
+        targets: PerformanceTargets,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self { config, targets })
     }
-    
-    pub async fn run_all_benchmarks(&mut self) -> Result<Vec<PerformanceMeasurement>, Box<dyn std::error::Error>> {
+
+    pub async fn run_all_benchmarks(
+        &mut self,
+    ) -> Result<Vec<PerformanceMeasurement>, Box<dyn std::error::Error>> {
         Ok(vec![])
     }
 }
@@ -403,11 +415,16 @@ pub struct SdkPerformanceBenchmarks {
 }
 
 impl SdkPerformanceBenchmarks {
-    pub fn new(config: PerformanceBenchmarkConfig, targets: PerformanceTargets) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        config: PerformanceBenchmarkConfig,
+        targets: PerformanceTargets,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self { config, targets })
     }
-    
-    pub async fn run_all_benchmarks(&mut self) -> Result<Vec<PerformanceMeasurement>, Box<dyn std::error::Error>> {
+
+    pub async fn run_all_benchmarks(
+        &mut self,
+    ) -> Result<Vec<PerformanceMeasurement>, Box<dyn std::error::Error>> {
         Ok(vec![])
     }
 }
@@ -421,11 +438,16 @@ pub struct CliPerformanceBenchmarks {
 }
 
 impl CliPerformanceBenchmarks {
-    pub fn new(config: PerformanceBenchmarkConfig, targets: PerformanceTargets) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        config: PerformanceBenchmarkConfig,
+        targets: PerformanceTargets,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self { config, targets })
     }
-    
-    pub async fn run_all_benchmarks(&mut self) -> Result<Vec<PerformanceMeasurement>, Box<dyn std::error::Error>> {
+
+    pub async fn run_all_benchmarks(
+        &mut self,
+    ) -> Result<Vec<PerformanceMeasurement>, Box<dyn std::error::Error>> {
         Ok(vec![])
     }
 }
@@ -439,11 +461,16 @@ pub struct EndToEndPerformanceBenchmarks {
 }
 
 impl EndToEndPerformanceBenchmarks {
-    pub fn new(config: PerformanceBenchmarkConfig, targets: PerformanceTargets) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        config: PerformanceBenchmarkConfig,
+        targets: PerformanceTargets,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self { config, targets })
     }
-    
-    pub async fn run_all_benchmarks(&mut self) -> Result<Vec<PerformanceMeasurement>, Box<dyn std::error::Error>> {
+
+    pub async fn run_all_benchmarks(
+        &mut self,
+    ) -> Result<Vec<PerformanceMeasurement>, Box<dyn std::error::Error>> {
         Ok(vec![])
     }
 }
@@ -485,31 +512,31 @@ impl PerformanceMetricsCollector {
     pub fn new(config: MetricsCollectorConfig) -> Self {
         Self { config }
     }
-    
+
     pub async fn start_collection(&self) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
-    
+
     pub fn record_operation(&self, _latency_ms: f64, _success: bool) {
         // Implementation would record the operation
     }
-    
+
     pub fn record_network_traffic(&self, _bytes_sent: usize, _bytes_received: usize) {
         // Implementation would record network traffic
     }
-    
+
     pub async fn stop_collection(&self) {
         // Implementation would stop collection
     }
-    
+
     pub fn get_current_metrics(&self) -> CurrentMetrics {
         CurrentMetrics::default()
     }
-    
+
     pub fn get_aggregated_metrics(&self) -> Vec<PerformanceMeasurement> {
         vec![]
     }
-    
+
     pub fn get_active_alerts(&self) -> Vec<PerformanceAlert> {
         vec![]
     }

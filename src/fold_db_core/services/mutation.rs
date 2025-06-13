@@ -1,26 +1,26 @@
 //! Mutation Domain Service
-//! 
+//!
 //! This module handles ONLY mutation-specific domain logic:
 //! - Field value updates
 //! - Atom modifications  
 //! - Collection updates
-//! 
+//!
 //! It does NOT handle:
 //! - Schema orchestration (belongs to FoldDB)
-//! - Permission checking (belongs to FoldDB) 
+//! - Permission checking (belongs to FoldDB)
 //! - Event publishing (belongs to FoldDB)
 //! - Schema validation (belongs to FoldDB)
 
-use crate::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSetRequest};
 use crate::fold_db_core::infrastructure::factory::InfrastructureLogger;
+use crate::fold_db_core::infrastructure::message_bus::{FieldValueSetRequest, MessageBus};
 use crate::schema::types::field::FieldVariant;
 use crate::schema::types::schema::Schema;
 use crate::schema::types::Mutation;
 use crate::schema::SchemaError;
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use uuid::Uuid;
-use serde_json::Value;
 
 /// Mutation service responsible for field updates and atom modifications
 pub struct MutationService {
@@ -29,9 +29,7 @@ pub struct MutationService {
 
 impl MutationService {
     pub fn new(message_bus: Arc<MessageBus>) -> Self {
-        Self {
-            message_bus,
-        }
+        Self { message_bus }
     }
 
     /// Update a single field value (core mutation operation)
@@ -42,13 +40,19 @@ impl MutationService {
         value: &Value,
         mutation_hash: &str,
     ) -> Result<(), SchemaError> {
-        InfrastructureLogger::log_operation_start("MutationService", "Updating field", &format!("{}.{}", schema.name, field_name));
+        InfrastructureLogger::log_operation_start(
+            "MutationService",
+            "Updating field",
+            &format!("{}.{}", schema.name, field_name),
+        );
 
         // Get field definition from schema
-        let field_variant = schema.fields.get(field_name)
-            .ok_or_else(|| SchemaError::InvalidData(
-                format!("Field '{}' not found in schema '{}'", field_name, schema.name)
-            ))?;
+        let field_variant = schema.fields.get(field_name).ok_or_else(|| {
+            SchemaError::InvalidData(format!(
+                "Field '{}' not found in schema '{}'",
+                field_name, schema.name
+            ))
+        })?;
 
         // Apply field-specific mutation logic
         match field_variant {
@@ -57,8 +61,7 @@ impl MutationService {
             }
             FieldVariant::Range(range_field) => {
                 self.update_range_field(schema, field_name, range_field, value, mutation_hash)
-            }
-            // TODO: Collection fields are no longer supported - CollectionField has been removed
+            } // TODO: Collection fields are no longer supported - CollectionField has been removed
         }
     }
 
@@ -70,19 +73,32 @@ impl MutationService {
         range_key_value: &str,
         _mutation_hash: &str,
     ) -> Result<(), SchemaError> {
-        InfrastructureLogger::log_debug_info("MutationService", &format!("Processing range schema mutation for range_key_value: {}", range_key_value));
-        
+        InfrastructureLogger::log_debug_info(
+            "MutationService",
+            &format!(
+                "Processing range schema mutation for range_key_value: {}",
+                range_key_value
+            ),
+        );
+
         // DIRECT APPROACH: Since mutation service doesn't have direct DB access,
         // we need to use FieldValueSetRequest with range-specific handling
         for (field_name, value) in fields_and_values {
-            InfrastructureLogger::log_operation_start("MutationService", "Processing range field", &format!("{} with value: {} for range_key: {}", field_name, value, range_key_value));
-            
+            InfrastructureLogger::log_operation_start(
+                "MutationService",
+                "Processing range field",
+                &format!(
+                    "{} with value: {} for range_key: {}",
+                    field_name, value, range_key_value
+                ),
+            );
+
             // Create a special field value request that includes the range key
             let range_aware_value = serde_json::json!({
                 "range_key": range_key_value,
                 "value": value
             });
-            
+
             let correlation_id = Uuid::new_v4().to_string();
             let field_request = FieldValueSetRequest {
                 correlation_id: correlation_id.clone(),
@@ -94,16 +110,34 @@ impl MutationService {
 
             match self.message_bus.publish(field_request) {
                 Ok(_) => {
-                    InfrastructureLogger::log_operation_success("MutationService", "Range field update request sent", &format!("{}.{} with range_key: {}", schema.name, field_name, range_key_value));
+                    InfrastructureLogger::log_operation_success(
+                        "MutationService",
+                        "Range field update request sent",
+                        &format!(
+                            "{}.{} with range_key: {}",
+                            schema.name, field_name, range_key_value
+                        ),
+                    );
                 }
                 Err(e) => {
-                    InfrastructureLogger::log_operation_error("MutationService", "Failed to send range field update", &format!("{}.{}: {:?}", schema.name, field_name, e));
-                    return Err(SchemaError::InvalidData(format!("Failed to update range field {}: {}", field_name, e)));
+                    InfrastructureLogger::log_operation_error(
+                        "MutationService",
+                        "Failed to send range field update",
+                        &format!("{}.{}: {:?}", schema.name, field_name, e),
+                    );
+                    return Err(SchemaError::InvalidData(format!(
+                        "Failed to update range field {}: {}",
+                        field_name, e
+                    )));
                 }
             }
         }
-        
-        InfrastructureLogger::log_operation_success("MutationService", "All range field updates sent successfully", "");
+
+        InfrastructureLogger::log_operation_success(
+            "MutationService",
+            "All range field updates sent successfully",
+            "",
+        );
         Ok(())
     }
 
@@ -114,15 +148,23 @@ impl MutationService {
         _new_value: &Value,
         mutation_hash: &str,
     ) -> Result<(), SchemaError> {
-        InfrastructureLogger::log_operation_start("MutationService", "Modifying atom", &format!("{} with hash {}", atom_uuid, mutation_hash));
-        
+        InfrastructureLogger::log_operation_start(
+            "MutationService",
+            "Modifying atom",
+            &format!("{} with hash {}", atom_uuid, mutation_hash),
+        );
+
         // This would typically interact with atom storage
         // For now, we'll use event-driven communication
-        
+
         // TODO: Implement direct atom modification logic
         // This should update the atom's value and update its hash
-        
-        InfrastructureLogger::log_operation_success("MutationService", "Atom modified successfully", atom_uuid);
+
+        InfrastructureLogger::log_operation_success(
+            "MutationService",
+            "Atom modified successfully",
+            atom_uuid,
+        );
         Ok(())
     }
 
@@ -135,8 +177,12 @@ impl MutationService {
         value: &Value,
         _mutation_hash: &str,
     ) -> Result<(), SchemaError> {
-        InfrastructureLogger::log_operation_start("MutationService", "Updating single field", &format!("{}.{}", schema.name, field_name));
-        
+        InfrastructureLogger::log_operation_start(
+            "MutationService",
+            "Updating single field",
+            &format!("{}.{}", schema.name, field_name),
+        );
+
         // First, send FieldValueSetRequest to store the actual field value as an Atom
         let value_correlation_id = Uuid::new_v4().to_string();
         let field_value_request = FieldValueSetRequest::new(
@@ -148,14 +194,31 @@ impl MutationService {
         );
 
         if let Err(e) = self.message_bus.publish(field_value_request) {
-            InfrastructureLogger::log_operation_error("MutationService", "Failed to send field value set request", &format!("{}.{}: {:?}", schema.name, field_name, e));
-            return Err(SchemaError::InvalidData(format!("Failed to set field value: {}", e)));
+            InfrastructureLogger::log_operation_error(
+                "MutationService",
+                "Failed to send field value set request",
+                &format!("{}.{}: {:?}", schema.name, field_name, e),
+            );
+            return Err(SchemaError::InvalidData(format!(
+                "Failed to set field value: {}",
+                e
+            )));
         }
-        InfrastructureLogger::log_operation_success("MutationService", "Field value set request sent", &format!("{}.{}", schema.name, field_name));
-        
+        InfrastructureLogger::log_operation_success(
+            "MutationService",
+            "Field value set request sent",
+            &format!("{}.{}", schema.name, field_name),
+        );
+
         // DIAGNOSTIC LOG: Track if FieldValueSetRequest is being consumed
-        InfrastructureLogger::log_debug_info("MutationService", &format!("🔍 DIAGNOSTIC: FieldValueSetRequest published for {}.{} with correlation_id: {}", schema.name, field_name, value_correlation_id));
-        
+        InfrastructureLogger::log_debug_info(
+            "MutationService",
+            &format!(
+                "🔍 DIAGNOSTIC: FieldValueSetRequest published for {}.{} with correlation_id: {}",
+                schema.name, field_name, value_correlation_id
+            ),
+        );
+
         // Transform triggers are now handled automatically by TransformOrchestrator
         // via direct FieldValueSet event monitoring
         Ok(())
@@ -171,7 +234,11 @@ impl MutationService {
         _value: &Value,
         _mutation_hash: &str,
     ) -> Result<(), SchemaError> {
-        InfrastructureLogger::log_operation_error("MutationService", "Individual range field updates not supported", "Range fields must be updated via range schema mutation.");
+        InfrastructureLogger::log_operation_error(
+            "MutationService",
+            "Individual range field updates not supported",
+            "Range fields must be updated via range schema mutation.",
+        );
         Err(SchemaError::InvalidData(format!(
             "Range field '{}' in schema '{}' cannot be updated individually. Use range schema mutation instead.",
             field_name, schema.name
@@ -200,18 +267,21 @@ impl MutationService {
             FieldVariant::Single(_) => {
                 // Validate single field value format
                 if value.is_null() {
-                    return Err(SchemaError::InvalidData("Single field value cannot be null".to_string()));
+                    return Err(SchemaError::InvalidData(
+                        "Single field value cannot be null".to_string(),
+                    ));
                 }
                 Ok(())
             }
             FieldVariant::Range(_) => {
                 // Validate range field value format
                 if !value.is_object() {
-                    return Err(SchemaError::InvalidData("Range field value must be an object".to_string()));
+                    return Err(SchemaError::InvalidData(
+                        "Range field value must be an object".to_string(),
+                    ));
                 }
                 Ok(())
-            }
-            // TODO: Collection fields are no longer supported - CollectionField has been removed
+            } // TODO: Collection fields are no longer supported - CollectionField has been removed
         }
     }
 }
@@ -257,19 +327,26 @@ pub fn validate_range_schema_mutation_format(
         for (field_name, field_variant) in &schema.fields {
             match field_variant {
                 FieldVariant::Range(_) => {
-                    InfrastructureLogger::log_operation_success("MutationService", "Field validation", &format!("Field '{}' is correctly a RangeField", field_name));
+                    InfrastructureLogger::log_operation_success(
+                        "MutationService",
+                        "Field validation",
+                        &format!("Field '{}' is correctly a RangeField", field_name),
+                    );
                 }
                 FieldVariant::Single(_) => {
                     return Err(SchemaError::InvalidData(format!(
                         "Range schema '{}' contains Single field '{}', but all fields must be RangeFields",
                         schema.name, field_name
                     )));
-                }
-                // TODO: Collection fields are no longer supported - CollectionField has been removed
+                } // TODO: Collection fields are no longer supported - CollectionField has been removed
             }
         }
 
-        InfrastructureLogger::log_operation_success("MutationService", "Range schema mutation format validation passed", &format!("schema: {}", schema.name));
+        InfrastructureLogger::log_operation_success(
+            "MutationService",
+            "Range schema mutation format validation passed",
+            &format!("schema: {}", schema.name),
+        );
     }
 
     Ok(())

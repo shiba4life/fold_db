@@ -1,17 +1,16 @@
 //! Cryptographic initialization for DataFold database setup
 //!
 //! This module provides functions to initialize database encryption during
-//! database creation, including key generation, metadata storage, and 
+//! database creation, including key generation, metadata storage, and
 //! configuration validation.
 
-use crate::config::crypto::{CryptoConfig, MasterKeyConfig, KeyDerivationConfig, ConfigError};
+use crate::config::crypto::{ConfigError, CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
 use crate::crypto::{
-    generate_master_keypair, derive_master_keypair, generate_salt,
-    CryptoError, MasterKeyPair,
+    derive_master_keypair, generate_master_keypair, generate_salt, CryptoError, MasterKeyPair,
 };
-use crate::db_operations::{DbOperations, CryptoMetadata};
+use crate::db_operations::{CryptoMetadata, DbOperations};
 use crate::schema::SchemaError;
-use log::{info, warn, debug};
+use log::{debug, info, warn};
 use std::sync::Arc;
 
 /// Result type for crypto initialization operations
@@ -23,23 +22,23 @@ pub enum CryptoInitError {
     /// Crypto configuration validation error
     #[error("Crypto configuration error: {0}")]
     Config(#[from] ConfigError),
-    
+
     /// Cryptographic operation error
     #[error("Cryptographic operation failed: {0}")]
     Crypto(#[from] CryptoError),
-    
+
     /// Database operation error during crypto setup
     #[error("Database operation failed: {0}")]
     Database(#[from] SchemaError),
-    
+
     /// Sled database error
     #[error("Database error: {0}")]
     Sled(#[from] sled::Error),
-    
+
     /// Invalid configuration state
     #[error("Invalid configuration: {0}")]
     InvalidConfig(String),
-    
+
     /// Crypto initialization already completed
     #[error("Database already has crypto metadata initialized")]
     AlreadyInitialized,
@@ -61,12 +60,12 @@ impl CryptoInitContext {
     pub fn public_key(&self) -> &crate::crypto::PublicKey {
         self.master_keypair.public_key()
     }
-    
+
     /// Get the master key pair
     pub fn master_keypair(&self) -> &MasterKeyPair {
         &self.master_keypair
     }
-    
+
     /// Get the crypto metadata
     pub fn metadata(&self) -> &CryptoMetadata {
         &self.metadata
@@ -93,54 +92,61 @@ pub fn initialize_database_crypto(
     crypto_config: &CryptoConfig,
 ) -> CryptoInitResult<CryptoInitContext> {
     info!("Starting database crypto initialization");
-    
+
     // Check if crypto is already initialized
     if db_ops.has_crypto_metadata()? {
         warn!("Database already has crypto metadata - crypto initialization skipped");
         return Err(CryptoInitError::AlreadyInitialized);
     }
-    
+
     // Validate crypto configuration
     crypto_config.validate()?;
     debug!("Crypto configuration validated successfully");
-    
+
     if !crypto_config.enabled {
         info!("Crypto is disabled in configuration - skipping initialization");
         return Err(CryptoInitError::InvalidConfig(
-            "Crypto is disabled in configuration".to_string()
+            "Crypto is disabled in configuration".to_string(),
         ));
     }
-    
+
     // Generate or derive master key pair based on configuration
     let (master_keypair, derivation_method) = generate_master_keypair_from_config(crypto_config)?;
-    info!("Master key pair generated using method: {}", derivation_method);
-    
+    info!(
+        "Master key pair generated using method: {}",
+        derivation_method
+    );
+
     // Create crypto metadata
     let metadata = CryptoMetadata::new(
         master_keypair.public_key().clone(),
         derivation_method.clone(),
     )?;
-    debug!("Crypto metadata created with checksum: {}", metadata.checksum);
-    
+    debug!(
+        "Crypto metadata created with checksum: {}",
+        metadata.checksum
+    );
+
     // Store crypto metadata in database
     db_ops.store_crypto_metadata(&metadata)?;
     info!("Crypto metadata stored successfully in database");
-    
+
     // Verify storage by reading back
-    let stored_metadata = db_ops.get_crypto_metadata()?
-        .ok_or_else(|| CryptoInitError::Database(
-            SchemaError::InvalidData("Failed to retrieve stored crypto metadata".to_string())
-        ))?;
-    
+    let stored_metadata = db_ops.get_crypto_metadata()?.ok_or_else(|| {
+        CryptoInitError::Database(SchemaError::InvalidData(
+            "Failed to retrieve stored crypto metadata".to_string(),
+        ))
+    })?;
+
     // Verify integrity
     if !stored_metadata.verify_integrity()? {
-        return Err(CryptoInitError::Database(
-            SchemaError::InvalidData("Stored crypto metadata failed integrity check".to_string())
-        ));
+        return Err(CryptoInitError::Database(SchemaError::InvalidData(
+            "Stored crypto metadata failed integrity check".to_string(),
+        )));
     }
-    
+
     info!("Crypto initialization completed successfully");
-    
+
     Ok(CryptoInitContext {
         master_keypair,
         metadata,
@@ -158,19 +164,20 @@ fn generate_master_keypair_from_config(
             let keypair = generate_master_keypair()?;
             Ok((keypair, "Random".to_string()))
         }
-        
+
         MasterKeyConfig::Passphrase { passphrase } => {
             debug!("Deriving master key pair from passphrase");
             let salt = generate_salt();
             let params = crypto_config.key_derivation.to_argon2_params()?;
             let keypair = derive_master_keypair(passphrase, &salt, &params)?;
-            
+
             let method = if let Some(preset) = &crypto_config.key_derivation.preset {
                 // Check if parameters were customized from preset defaults
                 let preset_config = KeyDerivationConfig::for_security_level(*preset);
-                if crypto_config.key_derivation.memory_cost != preset_config.memory_cost ||
-                   crypto_config.key_derivation.time_cost != preset_config.time_cost ||
-                   crypto_config.key_derivation.parallelism != preset_config.parallelism {
+                if crypto_config.key_derivation.memory_cost != preset_config.memory_cost
+                    || crypto_config.key_derivation.time_cost != preset_config.time_cost
+                    || crypto_config.key_derivation.parallelism != preset_config.parallelism
+                {
                     "Argon2id-Custom".to_string()
                 } else {
                     format!("Argon2id-{}", preset.as_str())
@@ -180,11 +187,11 @@ fn generate_master_keypair_from_config(
             };
             Ok((keypair, method))
         }
-        
+
         MasterKeyConfig::External { .. } => {
             // For now, external key sources are not implemented
             Err(CryptoInitError::InvalidConfig(
-                "External key sources are not yet implemented".to_string()
+                "External key sources are not yet implemented".to_string(),
             ))
         }
     }
@@ -215,16 +222,16 @@ pub fn is_crypto_init_needed(
             return Ok(false);
         }
     };
-    
+
     // If crypto is disabled in config, no initialization needed
     if !crypto_config.enabled {
         debug!("Crypto disabled in configuration - initialization not needed");
         return Ok(false);
     }
-    
+
     // Check if crypto metadata already exists
     let has_crypto = db_ops.has_crypto_metadata()?;
-    
+
     if has_crypto {
         debug!("Database already has crypto metadata - initialization not needed");
         Ok(false)
@@ -247,62 +254,71 @@ pub fn is_crypto_init_needed(
 /// * `Err(CryptoInitError)` - Configuration validation failed
 pub fn validate_crypto_config_for_init(crypto_config: &CryptoConfig) -> CryptoInitResult<()> {
     debug!("Validating crypto configuration for database initialization");
-    
+
     // Basic configuration validation
     crypto_config.validate()?;
-    
+
     // Additional validation for initialization context
     match &crypto_config.master_key {
         MasterKeyConfig::Random => {
             debug!("Random key generation - no additional validation needed");
             Ok(())
         }
-        
+
         MasterKeyConfig::Passphrase { passphrase } => {
             debug!("Validating passphrase configuration");
-            
+
             if passphrase.is_empty() {
                 return Err(CryptoInitError::InvalidConfig(
-                    "Passphrase cannot be empty".to_string()
+                    "Passphrase cannot be empty".to_string(),
                 ));
             }
-            
+
             if passphrase.len() < 8 {
                 return Err(CryptoInitError::InvalidConfig(
-                    "Passphrase must be at least 8 characters long".to_string()
+                    "Passphrase must be at least 8 characters long".to_string(),
                 ));
             }
-            
+
             if passphrase.len() > 1024 {
                 return Err(CryptoInitError::InvalidConfig(
-                    "Passphrase is too long (max 1024 characters)".to_string()
+                    "Passphrase is too long (max 1024 characters)".to_string(),
                 ));
             }
-            
+
             // Check for common weak passphrases
             let weak_passphrases = [
-                "password", "123456", "12345678", "qwerty", "abc123",
-                "password123", "admin", "letmein", "welcome", "monkey"
+                "password",
+                "123456",
+                "12345678",
+                "qwerty",
+                "abc123",
+                "password123",
+                "admin",
+                "letmein",
+                "welcome",
+                "monkey",
             ];
-            
-            if weak_passphrases.iter().any(|&weak| passphrase.eq_ignore_ascii_case(weak)) {
+
+            if weak_passphrases
+                .iter()
+                .any(|&weak| passphrase.eq_ignore_ascii_case(weak))
+            {
                 return Err(CryptoInitError::InvalidConfig(
-                    "Passphrase is too weak - please choose a stronger passphrase".to_string()
+                    "Passphrase is too weak - please choose a stronger passphrase".to_string(),
                 ));
             }
-            
+
             // Validate key derivation parameters
             let _params = crypto_config.key_derivation.to_argon2_params()?;
-            
+
             debug!("Passphrase configuration validated successfully");
             Ok(())
         }
-        
-        MasterKeyConfig::External { .. } => {
-            Err(CryptoInitError::InvalidConfig(
-                "External key sources are not yet supported for database initialization".to_string()
-            ))
-        }
+
+        MasterKeyConfig::External { .. } => Err(CryptoInitError::InvalidConfig(
+            "External key sources are not yet supported for database initialization".to_string(),
+        )),
     }
 }
 
@@ -317,11 +333,9 @@ pub fn validate_crypto_config_for_init(crypto_config: &CryptoConfig) -> CryptoIn
 /// # Returns
 /// * `Ok(CryptoInitStatus)` - Crypto initialization status information
 /// * `Err(CryptoInitError)` - Error getting crypto status
-pub fn get_crypto_init_status(
-    db_ops: Arc<DbOperations>,
-) -> CryptoInitResult<CryptoInitStatus> {
+pub fn get_crypto_init_status(db_ops: Arc<DbOperations>) -> CryptoInitResult<CryptoInitStatus> {
     let has_crypto = db_ops.has_crypto_metadata()?;
-    
+
     if !has_crypto {
         return Ok(CryptoInitStatus {
             initialized: false,
@@ -332,14 +346,15 @@ pub fn get_crypto_init_status(
             integrity_verified: None,
         });
     }
-    
-    let metadata = db_ops.get_crypto_metadata()?
-        .ok_or_else(|| CryptoInitError::Database(
-            SchemaError::InvalidData("Crypto metadata exists but cannot be retrieved".to_string())
-        ))?;
-    
+
+    let metadata = db_ops.get_crypto_metadata()?.ok_or_else(|| {
+        CryptoInitError::Database(SchemaError::InvalidData(
+            "Crypto metadata exists but cannot be retrieved".to_string(),
+        ))
+    })?;
+
     let integrity_verified = metadata.verify_integrity().unwrap_or(false);
-    
+
     Ok(CryptoInitStatus {
         initialized: true,
         version: Some(metadata.version),
@@ -372,7 +387,7 @@ impl CryptoInitStatus {
     pub fn is_healthy(&self) -> bool {
         self.initialized && self.integrity_verified.unwrap_or(false)
     }
-    
+
     /// Get a human-readable status summary
     pub fn summary(&self) -> String {
         if !self.initialized {
@@ -422,12 +437,12 @@ mod tests {
     fn test_crypto_init_with_random_key() {
         let db_ops = create_test_db_ops();
         let config = create_random_crypto_config();
-        
+
         let context = initialize_database_crypto(db_ops.clone(), &config).unwrap();
-        
+
         assert_eq!(context.derivation_method, "Random");
         assert!(context.metadata.verify_integrity().unwrap());
-        
+
         // Verify stored in database
         assert!(db_ops.has_crypto_metadata().unwrap());
         let stored_key = db_ops.get_master_public_key().unwrap().unwrap();
@@ -438,12 +453,12 @@ mod tests {
     fn test_crypto_init_with_passphrase() {
         let db_ops = create_test_db_ops();
         let config = create_passphrase_crypto_config();
-        
+
         let context = initialize_database_crypto(db_ops.clone(), &config).unwrap();
-        
+
         assert!(context.derivation_method.starts_with("Argon2id-"));
         assert!(context.metadata.verify_integrity().unwrap());
-        
+
         // Verify stored in database
         assert!(db_ops.has_crypto_metadata().unwrap());
     }
@@ -453,7 +468,7 @@ mod tests {
         let db_ops = create_test_db_ops();
         let mut config = create_random_crypto_config();
         config.enabled = false;
-        
+
         let result = initialize_database_crypto(db_ops, &config);
         assert!(matches!(result, Err(CryptoInitError::InvalidConfig(_))));
     }
@@ -462,10 +477,10 @@ mod tests {
     fn test_crypto_init_already_initialized() {
         let db_ops = create_test_db_ops();
         let config = create_random_crypto_config();
-        
+
         // Initialize once
         initialize_database_crypto(db_ops.clone(), &config).unwrap();
-        
+
         // Try to initialize again
         let result = initialize_database_crypto(db_ops, &config);
         assert!(matches!(result, Err(CryptoInitError::AlreadyInitialized)));
@@ -475,10 +490,10 @@ mod tests {
     fn test_is_crypto_init_needed() {
         let db_ops = create_test_db_ops();
         let config = create_random_crypto_config();
-        
+
         // Initially needed
         assert!(is_crypto_init_needed(db_ops.clone(), Some(&config)).unwrap());
-        
+
         // After initialization, not needed
         initialize_database_crypto(db_ops.clone(), &config).unwrap();
         assert!(!is_crypto_init_needed(db_ops, Some(&config)).unwrap());
@@ -489,11 +504,11 @@ mod tests {
         // Valid random config
         let config = create_random_crypto_config();
         assert!(validate_crypto_config_for_init(&config).is_ok());
-        
+
         // Valid passphrase config
         let config = create_passphrase_crypto_config();
         assert!(validate_crypto_config_for_init(&config).is_ok());
-        
+
         // Invalid empty passphrase
         let config = CryptoConfig {
             enabled: true,
@@ -508,20 +523,20 @@ mod tests {
     #[test]
     fn test_crypto_init_status() {
         let db_ops = create_test_db_ops();
-        
+
         // No crypto initially
         let status = get_crypto_init_status(db_ops.clone()).unwrap();
         assert!(!status.initialized);
         assert!(!status.is_healthy());
         assert_eq!(status.summary(), "Not initialized");
-        
+
         // After initialization
         let config = create_random_crypto_config();
         initialize_database_crypto(db_ops.clone(), &config).unwrap();
-        
+
         let status = get_crypto_init_status(db_ops).unwrap();
         assert!(status.initialized);
         assert!(status.is_healthy());
         assert!(status.summary().contains("Random"));
     }
-} 
+}

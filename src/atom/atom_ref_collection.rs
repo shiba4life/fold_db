@@ -62,11 +62,20 @@ impl AtomRefCollection {
     }
 
     /// Inserts an atom UUID at the specified index.
-    pub fn insert_atom_uuid(&mut self, index: usize, atom_uuid: String, source_pub_key: String) -> Result<(), String> {
+    pub fn insert_atom_uuid(
+        &mut self,
+        index: usize,
+        atom_uuid: String,
+        source_pub_key: String,
+    ) -> Result<(), String> {
         if index > self.atom_uuids.len() {
-            return Err(format!("Index {} out of bounds for collection of length {}", index, self.atom_uuids.len()));
+            return Err(format!(
+                "Index {} out of bounds for collection of length {}",
+                index,
+                self.atom_uuids.len()
+            ));
         }
-        
+
         self.atom_uuids.insert(index, atom_uuid);
         self.updated_at = Utc::now();
         self.update_history.push(AtomRefUpdate {
@@ -78,11 +87,20 @@ impl AtomRefCollection {
     }
 
     /// Replaces the atom UUID at the specified index.
-    pub fn set_atom_uuid(&mut self, index: usize, atom_uuid: String, source_pub_key: String) -> Result<(), String> {
+    pub fn set_atom_uuid(
+        &mut self,
+        index: usize,
+        atom_uuid: String,
+        source_pub_key: String,
+    ) -> Result<(), String> {
         if index >= self.atom_uuids.len() {
-            return Err(format!("Index {} out of bounds for collection of length {}", index, self.atom_uuids.len()));
+            return Err(format!(
+                "Index {} out of bounds for collection of length {}",
+                index,
+                self.atom_uuids.len()
+            ));
         }
-        
+
         self.atom_uuids[index] = atom_uuid;
         self.updated_at = Utc::now();
         self.update_history.push(AtomRefUpdate {
@@ -184,7 +202,7 @@ mod tests {
         let mut collection = AtomRefCollection::new("test_key".to_string());
         collection.add_atom_uuid("atom1".to_string(), "test_key".to_string());
         collection.add_atom_uuid("atom2".to_string(), "test_key".to_string());
-        
+
         assert_eq!(collection.len(), 2);
         assert_eq!(collection.get_atom_uuid_at(0), Some(&"atom1".to_string()));
         assert_eq!(collection.get_atom_uuid_at(1), Some(&"atom2".to_string()));
@@ -197,13 +215,13 @@ mod tests {
         let mut collection = AtomRefCollection::new("test_key".to_string());
         collection.add_atom_uuid("atom1".to_string(), "test_key".to_string());
         collection.add_atom_uuid("atom2".to_string(), "test_key".to_string());
-        
+
         assert!(collection.remove_atom_uuid("atom1", "test_key".to_string()));
         assert_eq!(collection.len(), 1);
         assert_eq!(collection.get_atom_uuid_at(0), Some(&"atom2".to_string()));
         assert!(!collection.contains("atom1"));
         assert!(collection.contains("atom2"));
-        
+
         // Try to remove non-existent atom
         assert!(!collection.remove_atom_uuid("atom3", "test_key".to_string()));
     }
@@ -213,16 +231,20 @@ mod tests {
         let mut collection = AtomRefCollection::new("test_key".to_string());
         collection.add_atom_uuid("atom1".to_string(), "test_key".to_string());
         collection.add_atom_uuid("atom3".to_string(), "test_key".to_string());
-        
+
         // Insert at index 1
-        assert!(collection.insert_atom_uuid(1, "atom2".to_string(), "test_key".to_string()).is_ok());
+        assert!(collection
+            .insert_atom_uuid(1, "atom2".to_string(), "test_key".to_string())
+            .is_ok());
         assert_eq!(collection.len(), 3);
         assert_eq!(collection.get_atom_uuid_at(0), Some(&"atom1".to_string()));
         assert_eq!(collection.get_atom_uuid_at(1), Some(&"atom2".to_string()));
         assert_eq!(collection.get_atom_uuid_at(2), Some(&"atom3".to_string()));
-        
+
         // Try to insert at invalid index
-        assert!(collection.insert_atom_uuid(10, "atom4".to_string(), "test_key".to_string()).is_err());
+        assert!(collection
+            .insert_atom_uuid(10, "atom4".to_string(), "test_key".to_string())
+            .is_err());
     }
 
     #[test]
@@ -230,15 +252,22 @@ mod tests {
         let mut collection = AtomRefCollection::new("test_key".to_string());
         collection.add_atom_uuid("atom1".to_string(), "test_key".to_string());
         collection.add_atom_uuid("atom2".to_string(), "test_key".to_string());
-        
+
         // Replace at index 1
-        assert!(collection.set_atom_uuid(1, "atom_new".to_string(), "test_key".to_string()).is_ok());
+        assert!(collection
+            .set_atom_uuid(1, "atom_new".to_string(), "test_key".to_string())
+            .is_ok());
         assert_eq!(collection.len(), 2);
         assert_eq!(collection.get_atom_uuid_at(0), Some(&"atom1".to_string()));
-        assert_eq!(collection.get_atom_uuid_at(1), Some(&"atom_new".to_string()));
-        
+        assert_eq!(
+            collection.get_atom_uuid_at(1),
+            Some(&"atom_new".to_string())
+        );
+
         // Try to set at invalid index
-        assert!(collection.set_atom_uuid(10, "atom4".to_string(), "test_key".to_string()).is_err());
+        assert!(collection
+            .set_atom_uuid(10, "atom4".to_string(), "test_key".to_string())
+            .is_err());
     }
 
     #[test]
@@ -246,7 +275,7 @@ mod tests {
         let mut collection = AtomRefCollection::new("test_key".to_string());
         collection.add_atom_uuid("atom1".to_string(), "test_key".to_string());
         collection.add_atom_uuid("atom2".to_string(), "test_key".to_string());
-        
+
         collection.clear("test_key".to_string());
         assert!(collection.is_empty());
         assert_eq!(collection.len(), 0);
@@ -256,10 +285,10 @@ mod tests {
     fn test_update_history() {
         let mut collection = AtomRefCollection::new("test_key".to_string());
         let initial_history_len = collection.update_history().len();
-        
+
         collection.add_atom_uuid("atom1".to_string(), "test_key".to_string());
         assert_eq!(collection.update_history().len(), initial_history_len + 1);
-        
+
         collection.set_status(&AtomRefStatus::Active, "test_key".to_string());
         assert_eq!(collection.update_history().len(), initial_history_len + 2);
     }

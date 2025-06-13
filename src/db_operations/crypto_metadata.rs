@@ -5,11 +5,11 @@
 //! configuration data within the database metadata system.
 
 use super::core::DbOperations;
-use crate::crypto::{PublicKey, CryptoError, CryptoResult};
+use crate::crypto::{CryptoError, CryptoResult, PublicKey};
 use crate::schema::SchemaError;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 /// Version constant for crypto metadata schema
 const CRYPTO_METADATA_VERSION: u32 = 1;
@@ -44,14 +44,11 @@ pub struct CryptoMetadata {
 
 impl CryptoMetadata {
     /// Create new crypto metadata with the given public key
-    pub fn new(
-        master_public_key: PublicKey,
-        key_derivation_method: String,
-    ) -> CryptoResult<Self> {
+    pub fn new(master_public_key: PublicKey, key_derivation_method: String) -> CryptoResult<Self> {
         let created_at = Utc::now();
         let signature_algorithm = "Ed25519".to_string();
         let additional_metadata = HashMap::new();
-        
+
         let mut metadata = Self {
             version: CRYPTO_METADATA_VERSION,
             master_public_key,
@@ -61,22 +58,25 @@ impl CryptoMetadata {
             additional_metadata,
             checksum: String::new(), // Will be computed below
         };
-        
+
         // Compute checksum for integrity verification
         metadata.checksum = metadata.compute_checksum()?;
-        
+
         Ok(metadata)
     }
-    
+
     /// Compute integrity checksum for the metadata
     pub fn compute_checksum(&self) -> CryptoResult<String> {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         use std::collections::BTreeMap;
-        
+
         // Create a deterministic serialization with sorted additional_metadata
-        let sorted_additional_metadata: BTreeMap<String, String> =
-            self.additional_metadata.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-        
+        let sorted_additional_metadata: BTreeMap<String, String> = self
+            .additional_metadata
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+
         // Create a serializable structure with sorted metadata
         let serializable_data = serde_json::json!({
             "version": self.version,
@@ -86,23 +86,24 @@ impl CryptoMetadata {
             "created_at": self.created_at,
             "additional_metadata": sorted_additional_metadata
         });
-        
-        let serialized = serde_json::to_vec(&serializable_data)
-            .map_err(|e| CryptoError::InvalidInput(format!("Failed to serialize metadata for checksum: {}", e)))?;
-        
+
+        let serialized = serde_json::to_vec(&serializable_data).map_err(|e| {
+            CryptoError::InvalidInput(format!("Failed to serialize metadata for checksum: {}", e))
+        })?;
+
         let mut hasher = Sha256::new();
         hasher.update(&serialized);
         let result = hasher.finalize();
-        
+
         Ok(hex::encode(result))
     }
-    
+
     /// Verify the integrity of the metadata
     pub fn verify_integrity(&self) -> CryptoResult<bool> {
         let computed_checksum = self.compute_checksum()?;
         Ok(computed_checksum == self.checksum)
     }
-    
+
     /// Add additional metadata entry
     pub fn add_metadata(&mut self, key: String, value: String) -> CryptoResult<()> {
         self.additional_metadata.insert(key, value);
@@ -116,34 +117,39 @@ impl DbOperations {
     /// Store crypto metadata in the database
     pub fn store_crypto_metadata(&self, metadata: &CryptoMetadata) -> Result<(), SchemaError> {
         // Verify integrity before storing
-        metadata.verify_integrity()
-            .map_err(|e| SchemaError::InvalidData(format!("Crypto metadata integrity check failed: {}", e)))?;
-        
+        metadata.verify_integrity().map_err(|e| {
+            SchemaError::InvalidData(format!("Crypto metadata integrity check failed: {}", e))
+        })?;
+
         // Store the complete metadata
         self.store_in_tree(&self.metadata_tree, MASTER_PUBLIC_KEY_KEY, metadata)?;
-        
+
         // Store version separately for quick access
         self.store_in_tree(&self.metadata_tree, CRYPTO_VERSION_KEY, &metadata.version)?;
-        
+
         Ok(())
     }
-    
+
     /// Retrieve crypto metadata from the database
     pub fn get_crypto_metadata(&self) -> Result<Option<CryptoMetadata>, SchemaError> {
         match self.get_from_tree(&self.metadata_tree, MASTER_PUBLIC_KEY_KEY)? {
             Some(metadata) => {
                 let metadata: CryptoMetadata = metadata;
-                
+
                 // Verify integrity after retrieval
-                metadata.verify_integrity()
-                    .map_err(|e| SchemaError::InvalidData(format!("Retrieved crypto metadata failed integrity check: {}", e)))?;
-                
+                metadata.verify_integrity().map_err(|e| {
+                    SchemaError::InvalidData(format!(
+                        "Retrieved crypto metadata failed integrity check: {}",
+                        e
+                    ))
+                })?;
+
                 Ok(Some(metadata))
             }
             None => Ok(None),
         }
     }
-    
+
     /// Get just the master public key (commonly used operation)
     pub fn get_master_public_key(&self) -> Result<Option<PublicKey>, SchemaError> {
         match self.get_crypto_metadata()? {
@@ -151,17 +157,17 @@ impl DbOperations {
             None => Ok(None),
         }
     }
-    
+
     /// Check if crypto metadata exists
     pub fn has_crypto_metadata(&self) -> Result<bool, SchemaError> {
         self.exists_in_tree(&self.metadata_tree, MASTER_PUBLIC_KEY_KEY)
     }
-    
+
     /// Get crypto metadata version
     pub fn get_crypto_version(&self) -> Result<Option<u32>, SchemaError> {
         self.get_from_tree(&self.metadata_tree, CRYPTO_VERSION_KEY)
     }
-    
+
     /// Update additional metadata in existing crypto metadata
     pub fn update_crypto_additional_metadata(
         &self,
@@ -170,8 +176,9 @@ impl DbOperations {
     ) -> Result<(), SchemaError> {
         match self.get_crypto_metadata()? {
             Some(mut metadata) => {
-                metadata.add_metadata(key, value)
-                    .map_err(|e| SchemaError::InvalidData(format!("Failed to update additional metadata: {}", e)))?;
+                metadata.add_metadata(key, value).map_err(|e| {
+                    SchemaError::InvalidData(format!("Failed to update additional metadata: {}", e))
+                })?;
                 self.store_crypto_metadata(&metadata)
             }
             None => Err(SchemaError::InvalidData(
@@ -179,14 +186,14 @@ impl DbOperations {
             )),
         }
     }
-    
+
     /// Delete crypto metadata (for testing or migration purposes)
     pub fn delete_crypto_metadata(&self) -> Result<bool, SchemaError> {
         let key_deleted = self.delete_from_tree(&self.metadata_tree, MASTER_PUBLIC_KEY_KEY)?;
         let _version_deleted = self.delete_from_tree(&self.metadata_tree, CRYPTO_VERSION_KEY)?;
         Ok(key_deleted)
     }
-    
+
     /// List all crypto-related metadata keys
     pub fn list_crypto_metadata_keys(&self) -> Result<Vec<String>, SchemaError> {
         let all_keys = self.list_keys_in_tree(&self.metadata_tree)?;
@@ -196,30 +203,41 @@ impl DbOperations {
             .collect();
         Ok(crypto_keys)
     }
-    
+
     /// Get crypto metadata statistics
     pub fn get_crypto_metadata_stats(&self) -> Result<HashMap<String, String>, SchemaError> {
         let mut stats = HashMap::new();
-        
+
         match self.get_crypto_metadata()? {
             Some(metadata) => {
                 stats.insert("crypto_enabled".to_string(), "true".to_string());
                 stats.insert("version".to_string(), metadata.version.to_string());
-                stats.insert("signature_algorithm".to_string(), metadata.signature_algorithm.clone());
-                stats.insert("key_derivation_method".to_string(), metadata.key_derivation_method.clone());
+                stats.insert(
+                    "signature_algorithm".to_string(),
+                    metadata.signature_algorithm.clone(),
+                );
+                stats.insert(
+                    "key_derivation_method".to_string(),
+                    metadata.key_derivation_method.clone(),
+                );
                 stats.insert("created_at".to_string(), metadata.created_at.to_rfc3339());
-                stats.insert("additional_entries".to_string(), metadata.additional_metadata.len().to_string());
-                stats.insert("integrity_verified".to_string(), 
-                    metadata.verify_integrity().unwrap_or(false).to_string());
+                stats.insert(
+                    "additional_entries".to_string(),
+                    metadata.additional_metadata.len().to_string(),
+                );
+                stats.insert(
+                    "integrity_verified".to_string(),
+                    metadata.verify_integrity().unwrap_or(false).to_string(),
+                );
             }
             None => {
                 stats.insert("crypto_enabled".to_string(), "false".to_string());
             }
         }
-        
+
         Ok(stats)
     }
-    
+
     /// Migrate crypto metadata to a new version (for future schema updates)
     pub fn migrate_crypto_metadata(&self, _target_version: u32) -> Result<(), SchemaError> {
         // For now, just verify current metadata exists and is valid
@@ -256,10 +274,8 @@ mod tests {
     #[test]
     fn test_crypto_metadata_creation() {
         let keypair = generate_master_keypair().unwrap();
-        let metadata = CryptoMetadata::new(
-            keypair.public_key().clone(),
-            "Random".to_string(),
-        ).unwrap();
+        let metadata =
+            CryptoMetadata::new(keypair.public_key().clone(), "Random".to_string()).unwrap();
 
         assert_eq!(metadata.version, CRYPTO_METADATA_VERSION);
         assert_eq!(metadata.signature_algorithm, "Ed25519");
@@ -272,10 +288,8 @@ mod tests {
     fn test_store_and_retrieve_crypto_metadata() {
         let db_ops = create_test_db_ops();
         let keypair = generate_master_keypair().unwrap();
-        let metadata = CryptoMetadata::new(
-            keypair.public_key().clone(),
-            "Argon2id".to_string(),
-        ).unwrap();
+        let metadata =
+            CryptoMetadata::new(keypair.public_key().clone(), "Argon2id".to_string()).unwrap();
 
         // Store metadata
         assert!(db_ops.store_crypto_metadata(&metadata).is_ok());
@@ -283,8 +297,14 @@ mod tests {
         // Retrieve metadata
         let retrieved = db_ops.get_crypto_metadata().unwrap().unwrap();
         assert_eq!(retrieved.version, metadata.version);
-        assert_eq!(retrieved.master_public_key.to_bytes(), metadata.master_public_key.to_bytes());
-        assert_eq!(retrieved.key_derivation_method, metadata.key_derivation_method);
+        assert_eq!(
+            retrieved.master_public_key.to_bytes(),
+            metadata.master_public_key.to_bytes()
+        );
+        assert_eq!(
+            retrieved.key_derivation_method,
+            metadata.key_derivation_method
+        );
         assert!(retrieved.verify_integrity().unwrap());
     }
 
@@ -307,16 +327,14 @@ mod tests {
     #[test]
     fn test_has_crypto_metadata() {
         let db_ops = create_test_db_ops();
-        
+
         // Initially no metadata
         assert!(!db_ops.has_crypto_metadata().unwrap());
 
         // Store metadata
         let keypair = generate_master_keypair().unwrap();
-        let metadata = CryptoMetadata::new(
-            keypair.public_key().clone(),
-            "Random".to_string(),
-        ).unwrap();
+        let metadata =
+            CryptoMetadata::new(keypair.public_key().clone(), "Random".to_string()).unwrap();
         db_ops.store_crypto_metadata(&metadata).unwrap();
 
         // Now has metadata
@@ -326,10 +344,8 @@ mod tests {
     #[test]
     fn test_crypto_metadata_integrity() {
         let keypair = generate_master_keypair().unwrap();
-        let mut metadata = CryptoMetadata::new(
-            keypair.public_key().clone(),
-            "Random".to_string(),
-        ).unwrap();
+        let mut metadata =
+            CryptoMetadata::new(keypair.public_key().clone(), "Random".to_string()).unwrap();
 
         // Initially valid
         assert!(metadata.verify_integrity().unwrap());
@@ -343,19 +359,16 @@ mod tests {
     fn test_update_additional_metadata() {
         let db_ops = create_test_db_ops();
         let keypair = generate_master_keypair().unwrap();
-        let metadata = CryptoMetadata::new(
-            keypair.public_key().clone(),
-            "Random".to_string(),
-        ).unwrap();
+        let metadata =
+            CryptoMetadata::new(keypair.public_key().clone(), "Random".to_string()).unwrap();
 
         // Store initial metadata
         db_ops.store_crypto_metadata(&metadata).unwrap();
 
         // Update additional metadata
-        db_ops.update_crypto_additional_metadata(
-            "test_key".to_string(),
-            "test_value".to_string(),
-        ).unwrap();
+        db_ops
+            .update_crypto_additional_metadata("test_key".to_string(), "test_value".to_string())
+            .unwrap();
 
         // Verify update
         let updated_metadata = db_ops.get_crypto_metadata().unwrap().unwrap();
@@ -369,23 +382,27 @@ mod tests {
     #[test]
     fn test_crypto_metadata_stats() {
         let db_ops = create_test_db_ops();
-        
+
         // No crypto metadata
         let stats = db_ops.get_crypto_metadata_stats().unwrap();
         assert_eq!(stats.get("crypto_enabled"), Some(&"false".to_string()));
 
         // With crypto metadata
         let keypair = generate_master_keypair().unwrap();
-        let metadata = CryptoMetadata::new(
-            keypair.public_key().clone(),
-            "Argon2id".to_string(),
-        ).unwrap();
+        let metadata =
+            CryptoMetadata::new(keypair.public_key().clone(), "Argon2id".to_string()).unwrap();
         db_ops.store_crypto_metadata(&metadata).unwrap();
 
         let stats = db_ops.get_crypto_metadata_stats().unwrap();
         assert_eq!(stats.get("crypto_enabled"), Some(&"true".to_string()));
-        assert_eq!(stats.get("signature_algorithm"), Some(&"Ed25519".to_string()));
-        assert_eq!(stats.get("key_derivation_method"), Some(&"Argon2id".to_string()));
+        assert_eq!(
+            stats.get("signature_algorithm"),
+            Some(&"Ed25519".to_string())
+        );
+        assert_eq!(
+            stats.get("key_derivation_method"),
+            Some(&"Argon2id".to_string())
+        );
         assert_eq!(stats.get("integrity_verified"), Some(&"true".to_string()));
     }
 
@@ -393,10 +410,8 @@ mod tests {
     fn test_delete_crypto_metadata() {
         let db_ops = create_test_db_ops();
         let keypair = generate_master_keypair().unwrap();
-        let metadata = CryptoMetadata::new(
-            keypair.public_key().clone(),
-            "Random".to_string(),
-        ).unwrap();
+        let metadata =
+            CryptoMetadata::new(keypair.public_key().clone(), "Random".to_string()).unwrap();
 
         // Store and verify exists
         db_ops.store_crypto_metadata(&metadata).unwrap();
@@ -406,4 +421,4 @@ mod tests {
         assert!(db_ops.delete_crypto_metadata().unwrap());
         assert!(!db_ops.has_crypto_metadata().unwrap());
     }
-} 
+}

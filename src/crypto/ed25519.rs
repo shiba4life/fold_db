@@ -1,9 +1,9 @@
 //! Ed25519 cryptographic key generation and management for DataFold
 
 use crate::crypto::error::{CryptoError, CryptoResult};
-use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand::rngs::OsRng;
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zeroize::Zeroize;
 
 /// Ed25519 public key length in bytes
@@ -94,11 +94,13 @@ impl PublicKey {
             });
         }
 
-        let verifying_key = VerifyingKey::from_bytes(bytes)
-            .map_err(|_| CryptoError::Deserialization {
+        let verifying_key =
+            VerifyingKey::from_bytes(bytes).map_err(|_| CryptoError::Deserialization {
                 message: "Invalid public key bytes".to_string(),
             })?;
-        Ok(Self { inner: verifying_key })
+        Ok(Self {
+            inner: verifying_key,
+        })
     }
 
     /// Convert to bytes for storage
@@ -108,11 +110,11 @@ impl PublicKey {
 
     /// Verify a signature against this public key
     pub fn verify(&self, message: &[u8], signature: &[u8; SIGNATURE_LENGTH]) -> CryptoResult<()> {
-        let sig = Signature::try_from(&signature[..])
-            .map_err(|_| CryptoError::InvalidSignature {
+        let sig =
+            Signature::try_from(&signature[..]).map_err(|_| CryptoError::InvalidSignature {
                 message: "Invalid signature format".to_string(),
             })?;
-        
+
         self.inner.verify(message, &sig)?;
         Ok(())
     }
@@ -144,7 +146,8 @@ impl<'de> Deserialize<'de> for PublicKey {
         if bytes.len() != PUBLIC_KEY_LENGTH {
             return Err(D::Error::custom(format!(
                 "Invalid public key length: expected {}, got {}",
-                PUBLIC_KEY_LENGTH, bytes.len()
+                PUBLIC_KEY_LENGTH,
+                bytes.len()
             )));
         }
         let mut byte_array = [0u8; PUBLIC_KEY_LENGTH];
@@ -155,7 +158,7 @@ impl<'de> Deserialize<'de> for PublicKey {
 }
 
 /// Master key pair for DataFold database encryption
-/// 
+///
 /// This structure holds both the signing (private) key and verifying (public) key
 /// for a database instance. The private key material is automatically zeroized
 /// when the structure is dropped.
@@ -170,7 +173,7 @@ impl MasterKeyPair {
     pub fn from_signing_key(signing_key: SigningKey) -> Self {
         let verifying_key = signing_key.verifying_key();
         let public_key = PublicKey::from_verifying_key(verifying_key);
-        
+
         Self {
             signing_key,
             public_key,
@@ -256,10 +259,12 @@ pub fn generate_master_keypair() -> CryptoResult<MasterKeyPair> {
 /// or when recreating keys from stored seed material.
 ///
 /// # Security Note
-/// 
+///
 /// The seed bytes should be cryptographically secure and properly derived
 /// (e.g., through Argon2 key derivation from a passphrase).
-pub fn generate_master_keypair_from_seed(seed: &[u8; SECRET_KEY_LENGTH]) -> CryptoResult<MasterKeyPair> {
+pub fn generate_master_keypair_from_seed(
+    seed: &[u8; SECRET_KEY_LENGTH],
+) -> CryptoResult<MasterKeyPair> {
     MasterKeyPair::from_secret_bytes(seed)
 }
 
@@ -282,11 +287,11 @@ mod tests {
     #[test]
     fn test_master_keypair_generation() {
         let keypair = generate_master_keypair().expect("Failed to generate keypair");
-        
+
         // Test that we can get the public key
         let public_key_bytes = keypair.public_key_bytes();
         assert_eq!(public_key_bytes.len(), PUBLIC_KEY_LENGTH);
-        
+
         // Test that we can get the secret key
         let secret_key_bytes = keypair.secret_key_bytes();
         assert_eq!(secret_key_bytes.len(), SECRET_KEY_LENGTH);
@@ -296,56 +301,64 @@ mod tests {
     fn test_signing_and_verification() {
         let keypair = generate_master_keypair().expect("Failed to generate keypair");
         let message = b"test message for database operation";
-        
+
         // Sign the message
-        let signature = keypair.sign_data(message)
-            .expect("Failed to sign message");
+        let signature = keypair.sign_data(message).expect("Failed to sign message");
         assert_eq!(signature.len(), SIGNATURE_LENGTH);
-        
+
         // Verify the signature
-        keypair.verify_data(message, &signature)
+        keypair
+            .verify_data(message, &signature)
             .expect("Failed to verify signature");
     }
 
     #[test]
     fn test_serialization_round_trip() {
         let original_keypair = generate_master_keypair().expect("Failed to generate keypair");
-        
+
         // Get the secret key bytes
         let secret_bytes = original_keypair.secret_key_bytes();
-        
+
         // Recreate the keypair from secret bytes
-        let restored_keypair = MasterKeyPair::from_secret_bytes(&secret_bytes)
-            .expect("Failed to restore keypair");
-        
+        let restored_keypair =
+            MasterKeyPair::from_secret_bytes(&secret_bytes).expect("Failed to restore keypair");
+
         // Verify they produce the same public key
         assert_eq!(
             original_keypair.public_key_bytes(),
             restored_keypair.public_key_bytes()
         );
-        
+
         // Verify they can both sign and verify the same message
         let message = b"test message";
         let signature1 = original_keypair.sign_data(message).expect("Failed to sign");
         let signature2 = restored_keypair.sign_data(message).expect("Failed to sign");
-        
+
         // Verify each signature with both keypairs
-        original_keypair.verify_data(message, &signature1).expect("Failed to verify");
-        original_keypair.verify_data(message, &signature2).expect("Failed to verify");
-        restored_keypair.verify_data(message, &signature1).expect("Failed to verify");
-        restored_keypair.verify_data(message, &signature2).expect("Failed to verify");
+        original_keypair
+            .verify_data(message, &signature1)
+            .expect("Failed to verify");
+        original_keypair
+            .verify_data(message, &signature2)
+            .expect("Failed to verify");
+        restored_keypair
+            .verify_data(message, &signature1)
+            .expect("Failed to verify");
+        restored_keypair
+            .verify_data(message, &signature2)
+            .expect("Failed to verify");
     }
 
     #[test]
     fn test_public_key_serialization() {
         let keypair = generate_master_keypair().expect("Failed to generate keypair");
         let public_key = keypair.public_key();
-        
+
         // Convert to bytes and back
         let public_key_bytes = public_key.to_bytes();
-        let restored_public_key = PublicKey::from_bytes(&public_key_bytes)
-            .expect("Failed to restore public key");
-        
+        let restored_public_key =
+            PublicKey::from_bytes(&public_key_bytes).expect("Failed to restore public key");
+
         assert_eq!(public_key, &restored_public_key);
     }
 
@@ -356,7 +369,7 @@ mod tests {
         let mut invalid_bytes = [255u8; PUBLIC_KEY_LENGTH];
         // Make it an invalid point by setting the high bit and making it > curve order
         invalid_bytes[31] = 255; // This should be invalid in Ed25519
-        
+
         let result = PublicKey::from_bytes(&invalid_bytes);
         // If this specific pattern doesn't work, let's just verify round-trip instead
         if result.is_ok() {
@@ -376,9 +389,9 @@ mod tests {
         let keypair = generate_master_keypair().expect("Failed to generate keypair");
         let message = b"original message";
         let wrong_message = b"wrong message";
-        
+
         let signature = keypair.sign_data(message).expect("Failed to sign");
-        
+
         // Verification should fail with wrong message
         let result = keypair.verify_data(wrong_message, &signature);
         assert!(result.is_err());
@@ -387,14 +400,14 @@ mod tests {
     #[test]
     fn test_keypair_from_seed() {
         let seed = [42u8; SECRET_KEY_LENGTH]; // Fixed seed for reproducible keys
-        
-        let keypair1 = generate_master_keypair_from_seed(&seed)
-            .expect("Failed to generate from seed");
-        let keypair2 = generate_master_keypair_from_seed(&seed)
-            .expect("Failed to generate from seed");
-        
+
+        let keypair1 =
+            generate_master_keypair_from_seed(&seed).expect("Failed to generate from seed");
+        let keypair2 =
+            generate_master_keypair_from_seed(&seed).expect("Failed to generate from seed");
+
         // Should produce identical keypairs
         assert_eq!(keypair1.public_key_bytes(), keypair2.public_key_bytes());
         assert_eq!(keypair1.secret_key_bytes(), keypair2.secret_key_bytes());
     }
-} 
+}

@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use crate::config::crypto::CryptoConfig;
 use crate::datafold_node::config::NodeConfig;
 use crate::datafold_node::config::NodeInfo;
-use crate::datafold_node::crypto_init::{is_crypto_init_needed, initialize_database_crypto};
+use crate::datafold_node::crypto_init::{initialize_database_crypto, is_crypto_init_needed};
 use crate::datafold_node::crypto_validation::validate_for_database_creation;
 use crate::error::{FoldDbError, FoldDbResult, NetworkErrorKind};
 use crate::fold_db_core::FoldDB;
@@ -135,22 +135,26 @@ impl DataFoldNode {
         };
 
         // Check if crypto initialization is needed
-        let needs_init = is_crypto_init_needed(db_ops.clone(), Some(crypto_config))
-            .map_err(|e| FoldDbError::Config(format!("Failed to check crypto init status: {}", e)))?;
+        let needs_init =
+            is_crypto_init_needed(db_ops.clone(), Some(crypto_config)).map_err(|e| {
+                FoldDbError::Config(format!("Failed to check crypto init status: {}", e))
+            })?;
 
         if needs_init {
             info!("Crypto initialization needed - starting setup");
-            
+
             // Perform crypto initialization
             let context = initialize_database_crypto(db_ops, crypto_config)
                 .map_err(|e| FoldDbError::Config(format!("Crypto initialization failed: {}", e)))?;
-            
+
             info!(
                 "Crypto initialization completed successfully using method: {}",
                 context.derivation_method
             );
         } else {
-            info!("Crypto initialization not needed - database already configured or crypto disabled");
+            info!(
+                "Crypto initialization not needed - database already configured or crypto disabled"
+            );
         }
 
         Ok(())
@@ -168,9 +172,11 @@ impl DataFoldNode {
                 .lock()
                 .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
             // Initialize schema system via SchemaCore
-            db.schema_manager.discover_and_load_all_schemas().map_err(|e| {
-                FoldDbError::Config(format!("Failed to initialize schema system: {}", e))
-            })?;
+            db.schema_manager
+                .discover_and_load_all_schemas()
+                .map_err(|e| {
+                    FoldDbError::Config(format!("Failed to initialize schema system: {}", e))
+                })?;
         }
 
         info!("DataFoldNode loaded successfully with schema system initialized");
@@ -359,7 +365,9 @@ impl DataFoldNode {
 
     /// Get a reference to the underlying FoldDB instance
     pub fn get_fold_db(&self) -> FoldDbResult<std::sync::MutexGuard<'_, FoldDB>> {
-        self.db.lock().map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))
+        self.db
+            .lock()
+            .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))
     }
 
     /// Check which schemas are available on a remote peer
@@ -550,7 +558,8 @@ impl DataFoldNode {
             .lock()
             .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
         // Use schema_manager directly instead of deprecated FoldDB wrapper
-        db.schema_manager.add_schema_available(schema)
+        db.schema_manager
+            .add_schema_available(schema)
             .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to add schema: {}", e)))
     }
 
@@ -593,28 +602,29 @@ impl DataFoldNode {
     pub fn approve_schema(&mut self, schema_name: &str) -> crate::error::FoldDbResult<()> {
         // First approve the schema
         {
-            let db = self
-                .db
-                .lock()
-                .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
+            let db = self.db.lock().map_err(|_| {
+                crate::error::FoldDbError::Config("Cannot lock database mutex".into())
+            })?;
             db.schema_manager.approve_schema(schema_name).map_err(|e| {
                 crate::error::FoldDbError::Config(format!("Failed to approve schema: {}", e))
             })?;
         }
-        
+
         // Then grant permission for this schema to this node
         let db = self
             .db
             .lock()
             .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
-        
+
         let mut current_perms = db.get_schema_permissions(&self.node_id);
         if !current_perms.contains(&schema_name.to_string()) {
             current_perms.push(schema_name.to_string());
             db.set_schema_permissions(&self.node_id, &current_perms)
-                .map_err(|e| crate::error::FoldDbError::Config(format!("Failed to set permissions: {}", e)))?;
+                .map_err(|e| {
+                    crate::error::FoldDbError::Config(format!("Failed to set permissions: {}", e))
+                })?;
         }
-        
+
         Ok(())
     }
 
@@ -646,7 +656,7 @@ impl DataFoldNode {
             .db
             .lock()
             .map_err(|_| crate::error::FoldDbError::Config("Cannot lock database mutex".into()))?;
-        
+
         // Use schema_manager (which is Arc<SchemaCore>) to get available schemas
         db.schema_manager.list_available_schemas().map_err(|e| {
             crate::error::FoldDbError::Config(format!("Failed to list available schemas: {}", e))
@@ -776,7 +786,8 @@ impl DataFoldNode {
     /// Get crypto initialization status for this database
     pub fn get_crypto_status(&self) -> FoldDbResult<crate::datafold_node::CryptoInitStatus> {
         let db_ops = {
-            let db_guard = self.db
+            let db_guard = self
+                .db
                 .lock()
                 .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
             db_guard.db_ops()
@@ -789,7 +800,8 @@ impl DataFoldNode {
     /// Manually initialize crypto for an existing database (if not already initialized)
     pub fn initialize_crypto(&self, crypto_config: &CryptoConfig) -> FoldDbResult<()> {
         let db_ops = {
-            let db_guard = self.db
+            let db_guard = self
+                .db
                 .lock()
                 .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
             db_guard.db_ops()
@@ -797,14 +809,18 @@ impl DataFoldNode {
 
         crate::datafold_node::initialize_database_crypto(db_ops, crypto_config)
             .map_err(|e| FoldDbError::Config(format!("Crypto initialization failed: {}", e)))?;
-        
+
         Ok(())
     }
 
     /// Check if crypto initialization is needed for this database
-    pub fn is_crypto_init_needed(&self, crypto_config: Option<&CryptoConfig>) -> FoldDbResult<bool> {
+    pub fn is_crypto_init_needed(
+        &self,
+        crypto_config: Option<&CryptoConfig>,
+    ) -> FoldDbResult<bool> {
         let db_ops = {
-            let db_guard = self.db
+            let db_guard = self
+                .db
                 .lock()
                 .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
             db_guard.db_ops()

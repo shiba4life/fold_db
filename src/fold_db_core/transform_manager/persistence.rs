@@ -1,7 +1,6 @@
 use super::manager::{
-    AREF_TO_TRANSFORMS_KEY, TRANSFORM_TO_AREFS_KEY, TRANSFORM_INPUT_NAMES_KEY,
-    FIELD_TO_TRANSFORMS_KEY, TRANSFORM_TO_FIELDS_KEY, TRANSFORM_OUTPUTS_KEY,
-    TransformManager
+    TransformManager, AREF_TO_TRANSFORMS_KEY, FIELD_TO_TRANSFORMS_KEY, TRANSFORM_INPUT_NAMES_KEY,
+    TRANSFORM_OUTPUTS_KEY, TRANSFORM_TO_AREFS_KEY, TRANSFORM_TO_FIELDS_KEY,
 };
 use super::utils::*;
 use crate::db_operations::DbOperations;
@@ -18,7 +17,7 @@ impl TransformManager {
             &self.db_ops,
             &self.aref_to_transforms,
             AREF_TO_TRANSFORMS_KEY,
-            "aref_to_transforms"
+            "aref_to_transforms",
         )?;
 
         // Store transform_to_arefs mapping
@@ -26,7 +25,7 @@ impl TransformManager {
             &self.db_ops,
             &self.transform_to_arefs,
             TRANSFORM_TO_AREFS_KEY,
-            "transform_to_arefs"
+            "transform_to_arefs",
         )?;
 
         // Store transform_input_names mapping
@@ -34,7 +33,7 @@ impl TransformManager {
             &self.db_ops,
             &self.transform_input_names,
             TRANSFORM_INPUT_NAMES_KEY,
-            "transform_input_names"
+            "transform_input_names",
         )?;
 
         // Store field_to_transforms mapping (with debug logging)
@@ -42,7 +41,7 @@ impl TransformManager {
             &self.db_ops,
             &self.field_to_transforms,
             FIELD_TO_TRANSFORMS_KEY,
-            "field_to_transforms"
+            "field_to_transforms",
         )?;
 
         // Store transform_to_fields mapping
@@ -50,7 +49,7 @@ impl TransformManager {
             &self.db_ops,
             &self.transform_to_fields,
             TRANSFORM_TO_FIELDS_KEY,
-            "transform_to_fields"
+            "transform_to_fields",
         )?;
 
         // Store transform_outputs mapping
@@ -58,7 +57,7 @@ impl TransformManager {
             &self.db_ops,
             &self.transform_outputs,
             TRANSFORM_OUTPUTS_KEY,
-            "transform_outputs"
+            "transform_outputs",
         )?;
 
         Ok(())
@@ -87,16 +86,18 @@ impl TransformManager {
         // Load field_to_transforms with special debug logging
         let field_to_transforms = match db_ops.get_transform_mapping(FIELD_TO_TRANSFORMS_KEY)? {
             Some(data) => {
-                let loaded_map: HashMap<String, HashSet<String>> = SerializationHelper::deserialize_mapping(&data, "field_to_transforms")?;
-                info!("🔍 DEBUG: Loaded field_to_transforms mapping from database with {} entries:", loaded_map.len());
+                let loaded_map: HashMap<String, HashSet<String>> =
+                    SerializationHelper::deserialize_mapping(&data, "field_to_transforms")?;
+                info!(
+                    "🔍 DEBUG: Loaded field_to_transforms mapping from database with {} entries:",
+                    loaded_map.len()
+                );
                 for (field_key, transforms) in &loaded_map {
                     info!("  📋 Loaded '{}' -> {:?}", field_key, transforms);
                 }
                 loaded_map
             }
-            None => {
-                HashMap::new()
-            }
+            None => HashMap::new(),
         };
 
         // Simplified initialization - aggressive cleanup

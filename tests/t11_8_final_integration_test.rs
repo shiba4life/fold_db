@@ -3,10 +3,10 @@
 //! This test validates all mandatory signature authentication components work together
 //! properly as a completely standalone integration test suite.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use serde::{Deserialize, Serialize};
 
 // =============================================================================
 // STANDALONE TEST FRAMEWORK
@@ -33,10 +33,7 @@ impl Default for AuthConfig {
                 "/api/v1/submit".to_string(),
                 "/api/admin".to_string(),
             ],
-            exempted_endpoints: vec![
-                "/health".to_string(),
-                "/metrics".to_string(),
-            ],
+            exempted_endpoints: vec!["/health".to_string(), "/metrics".to_string()],
         }
     }
 }
@@ -133,20 +130,33 @@ impl MockSignatureAuthenticator {
     ) -> Result<AuthResult, AuthError> {
         let start_time = Instant::now();
         let mut metrics = self.metrics.lock().unwrap();
-        
+
         metrics.total_requests += 1;
 
         // Check if endpoint is exempted
-        if self.config.exempted_endpoints.iter().any(|exempt| endpoint.starts_with(exempt)) {
+        if self
+            .config
+            .exempted_endpoints
+            .iter()
+            .any(|exempt| endpoint.starts_with(exempt))
+        {
             let duration = start_time.elapsed().as_millis() as u64;
-            metrics.avg_processing_time_ms = self.update_avg_time(metrics.avg_processing_time_ms, metrics.total_requests, duration);
+            metrics.avg_processing_time_ms = self.update_avg_time(
+                metrics.avg_processing_time_ms,
+                metrics.total_requests,
+                duration,
+            );
             return Ok(AuthResult::Exempted);
         }
 
         // Mandatory authentication check
         if !self.config.mandatory_auth_enabled {
             let duration = start_time.elapsed().as_millis() as u64;
-            metrics.avg_processing_time_ms = self.update_avg_time(metrics.avg_processing_time_ms, metrics.total_requests, duration);
+            metrics.avg_processing_time_ms = self.update_avg_time(
+                metrics.avg_processing_time_ms,
+                metrics.total_requests,
+                duration,
+            );
             return Ok(AuthResult::Optional);
         }
 
@@ -155,7 +165,11 @@ impl MockSignatureAuthenticator {
             metrics.failed_authentications += 1;
             metrics.security_violations += 1;
             let duration = start_time.elapsed().as_millis() as u64;
-            metrics.avg_processing_time_ms = self.update_avg_time(metrics.avg_processing_time_ms, metrics.total_requests, duration);
+            metrics.avg_processing_time_ms = self.update_avg_time(
+                metrics.avg_processing_time_ms,
+                metrics.total_requests,
+                duration,
+            );
             return Err(AuthError::MissingSignature);
         }
 
@@ -165,7 +179,11 @@ impl MockSignatureAuthenticator {
             metrics.failed_authentications += 1;
             metrics.security_violations += 1;
             let duration = start_time.elapsed().as_millis() as u64;
-            metrics.avg_processing_time_ms = self.update_avg_time(metrics.avg_processing_time_ms, metrics.total_requests, duration);
+            metrics.avg_processing_time_ms = self.update_avg_time(
+                metrics.avg_processing_time_ms,
+                metrics.total_requests,
+                duration,
+            );
             return Err(AuthError::InvalidSignature);
         }
 
@@ -176,7 +194,11 @@ impl MockSignatureAuthenticator {
                 metrics.failed_authentications += 1;
                 metrics.security_violations += 1;
                 let duration = start_time.elapsed().as_millis() as u64;
-                metrics.avg_processing_time_ms = self.update_avg_time(metrics.avg_processing_time_ms, metrics.total_requests, duration);
+                metrics.avg_processing_time_ms = self.update_avg_time(
+                    metrics.avg_processing_time_ms,
+                    metrics.total_requests,
+                    duration,
+                );
                 return Err(AuthError::NonceReplay);
             }
             nonce_store.push(nonce_value.to_string());
@@ -189,7 +211,11 @@ impl MockSignatureAuthenticator {
         if duration > metrics.max_processing_time_ms {
             metrics.max_processing_time_ms = duration;
         }
-        metrics.avg_processing_time_ms = self.update_avg_time(metrics.avg_processing_time_ms, metrics.total_requests, duration);
+        metrics.avg_processing_time_ms = self.update_avg_time(
+            metrics.avg_processing_time_ms,
+            metrics.total_requests,
+            duration,
+        );
 
         // Check performance threshold
         if duration > self.config.max_signature_verification_time_ms {
@@ -203,7 +229,8 @@ impl MockSignatureAuthenticator {
         if total_requests == 1 {
             new_duration as f64
         } else {
-            (current_avg * (total_requests - 1) as f64 + new_duration as f64) / total_requests as f64
+            (current_avg * (total_requests - 1) as f64 + new_duration as f64)
+                / total_requests as f64
         }
     }
 
@@ -247,7 +274,8 @@ mod comprehensive_integration_tests {
 
         // Test Case 1: Valid authenticated request
         let start = Instant::now();
-        let result1 = authenticator.authenticate_request("/api/v1/data", true, true, Some("nonce123"));
+        let result1 =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("nonce123"));
         test_results.push(TestResult {
             category: "Authentication Enforcement".to_string(),
             test_name: "Valid authenticated request".to_string(),
@@ -271,7 +299,8 @@ mod comprehensive_integration_tests {
 
         // Test Case 3: Invalid signature rejection
         let start = Instant::now();
-        let result3 = authenticator.authenticate_request("/api/v1/submit", true, false, Some("nonce456"));
+        let result3 =
+            authenticator.authenticate_request("/api/v1/submit", true, false, Some("nonce456"));
         test_results.push(TestResult {
             category: "Authentication Enforcement".to_string(),
             test_name: "Invalid signature rejection".to_string(),
@@ -283,8 +312,10 @@ mod comprehensive_integration_tests {
 
         // Test Case 4: Nonce replay prevention
         let start = Instant::now();
-        let _first = authenticator.authenticate_request("/api/v1/data", true, true, Some("replay_nonce"));
-        let result4 = authenticator.authenticate_request("/api/v1/data", true, true, Some("replay_nonce"));
+        let _first =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("replay_nonce"));
+        let result4 =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("replay_nonce"));
         test_results.push(TestResult {
             category: "Authentication Enforcement".to_string(),
             test_name: "Nonce replay prevention".to_string(),
@@ -297,13 +328,22 @@ mod comprehensive_integration_tests {
         let metrics = authenticator.get_metrics();
         println!("✅ Authentication enforcement metrics:");
         println!("   Total requests: {}", metrics.total_requests);
-        println!("   Successful authentications: {}", metrics.successful_authentications);
-        println!("   Failed authentications: {}", metrics.failed_authentications);
+        println!(
+            "   Successful authentications: {}",
+            metrics.successful_authentications
+        );
+        println!(
+            "   Failed authentications: {}",
+            metrics.failed_authentications
+        );
         println!("   Security violations: {}", metrics.security_violations);
         println!("   Nonce validations: {}", metrics.nonce_validations);
 
         // Assertions
-        assert!(test_results.iter().all(|r| r.passed), "All authentication enforcement tests must pass");
+        assert!(
+            test_results.iter().all(|r| r.passed),
+            "All authentication enforcement tests must pass"
+        );
         assert_eq!(metrics.successful_authentications, 2);
         assert_eq!(metrics.failed_authentications, 3);
         assert_eq!(metrics.security_violations, 3);
@@ -318,18 +358,18 @@ mod comprehensive_integration_tests {
 
         let config = AuthConfig::default();
         let authenticator = MockSignatureAuthenticator::new(config);
-        
+
         // Performance benchmark test
         let iterations = 1000;
         let mut latencies = Vec::new();
-        
+
         for i in 0..iterations {
             let start = Instant::now();
             let _result = authenticator.authenticate_request(
-                "/api/v1/data", 
-                true, 
-                true, 
-                Some(&format!("nonce_{}", i))
+                "/api/v1/data",
+                true,
+                true,
+                Some(&format!("nonce_{}", i)),
             );
             latencies.push(start.elapsed().as_millis() as u64);
         }
@@ -337,12 +377,14 @@ mod comprehensive_integration_tests {
         let avg_latency = latencies.iter().sum::<u64>() / latencies.len() as u64;
         let max_latency = *latencies.iter().max().unwrap();
         let min_latency = *latencies.iter().min().unwrap();
-        
+
         // Calculate percentiles
         let mut sorted_latencies = latencies.clone();
         sorted_latencies.sort();
-        let p95_latency = sorted_latencies[(sorted_latencies.len() * 95 / 100).min(sorted_latencies.len() - 1)];
-        let p99_latency = sorted_latencies[(sorted_latencies.len() * 99 / 100).min(sorted_latencies.len() - 1)];
+        let p95_latency =
+            sorted_latencies[(sorted_latencies.len() * 95 / 100).min(sorted_latencies.len() - 1)];
+        let p99_latency =
+            sorted_latencies[(sorted_latencies.len() * 99 / 100).min(sorted_latencies.len() - 1)];
 
         println!("✅ Performance benchmark results:");
         println!("   Iterations: {}", iterations);
@@ -353,9 +395,21 @@ mod comprehensive_integration_tests {
         println!("   P99 latency: {}ms", p99_latency);
 
         // Performance assertions (PBI-11 requirements)
-        assert!(avg_latency < 10, "Average latency {} must be < 10ms", avg_latency);
-        assert!(p95_latency < 25, "P95 latency {} must be < 25ms", p95_latency);
-        assert!(p99_latency < 50, "P99 latency {} must be < 50ms", p99_latency);
+        assert!(
+            avg_latency < 10,
+            "Average latency {} must be < 10ms",
+            avg_latency
+        );
+        assert!(
+            p95_latency < 25,
+            "P95 latency {} must be < 25ms",
+            p95_latency
+        );
+        assert!(
+            p99_latency < 50,
+            "P99 latency {} must be < 50ms",
+            p99_latency
+        );
 
         let metrics = authenticator.get_metrics();
         assert_eq!(metrics.successful_authentications, iterations);
@@ -377,8 +431,11 @@ mod comprehensive_integration_tests {
         // Test protected endpoints
         for endpoint in &config.protected_endpoints {
             let result = authenticator.authenticate_request(endpoint, false, false, None);
-            assert!(matches!(result, Err(AuthError::MissingSignature)), 
-                   "Protected endpoint {} should reject unauthenticated requests", endpoint);
+            assert!(
+                matches!(result, Err(AuthError::MissingSignature)),
+                "Protected endpoint {} should reject unauthenticated requests",
+                endpoint
+            );
             protected_count += 1;
             println!("   🔒 Protected: {} - Requires authentication", endpoint);
         }
@@ -386,10 +443,16 @@ mod comprehensive_integration_tests {
         // Test exempted endpoints
         for endpoint in &config.exempted_endpoints {
             let result = authenticator.authenticate_request(endpoint, false, false, None);
-            assert!(matches!(result, Ok(AuthResult::Exempted)), 
-                   "Exempted endpoint {} should allow unauthenticated access", endpoint);
+            assert!(
+                matches!(result, Ok(AuthResult::Exempted)),
+                "Exempted endpoint {} should allow unauthenticated access",
+                endpoint
+            );
             exempted_count += 1;
-            println!("   🔓 Exempted: {} - Allows unauthenticated access", endpoint);
+            println!(
+                "   🔓 Exempted: {} - Allows unauthenticated access",
+                endpoint
+            );
         }
 
         println!("✅ Endpoint protection summary:");
@@ -423,23 +486,29 @@ mod comprehensive_integration_tests {
 
         for (client_name, has_sig, valid_sig, nonce) in test_clients {
             let result = authenticator.authenticate_request(
-                "/api/v1/data", 
-                has_sig, 
-                valid_sig, 
-                if has_sig { Some(nonce) } else { None }
+                "/api/v1/data",
+                has_sig,
+                valid_sig,
+                if has_sig { Some(nonce) } else { None },
             );
 
             match result {
                 Ok(AuthResult::Authenticated) => {
                     successful_clients += 1;
                     println!("   ✅ {}: Authentication successful", client_name);
-                    assert!(has_sig && valid_sig, "Should only succeed with valid signature");
-                },
+                    assert!(
+                        has_sig && valid_sig,
+                        "Should only succeed with valid signature"
+                    );
+                }
                 Err(error) => {
                     failed_clients += 1;
                     println!("   ❌ {}: Authentication failed ({:?})", client_name, error);
-                    assert!(!has_sig || !valid_sig, "Should only fail with invalid/missing signature");
-                },
+                    assert!(
+                        !has_sig || !valid_sig,
+                        "Should only fail with invalid/missing signature"
+                    );
+                }
                 _ => unreachable!("Unexpected auth result"),
             }
         }
@@ -448,8 +517,14 @@ mod comprehensive_integration_tests {
         println!("   Successful authentications: {}", successful_clients);
         println!("   Failed authentications: {}", failed_clients);
 
-        assert_eq!(successful_clients, 4, "Should have 4 successful client authentications");
-        assert_eq!(failed_clients, 2, "Should have 2 failed client authentications");
+        assert_eq!(
+            successful_clients, 4,
+            "Should have 4 successful client authentications"
+        );
+        assert_eq!(
+            failed_clients, 2,
+            "Should have 2 failed client authentications"
+        );
     }
 
     /// T11.8.5: Security Validation and Compliance Testing
@@ -462,12 +537,48 @@ mod comprehensive_integration_tests {
         let authenticator = MockSignatureAuthenticator::new(config);
 
         let security_test_cases = vec![
-            ("SQL Injection attempt", "/api/v1/data'; DROP TABLE users; --", false, false, None),
-            ("XSS attempt", "/api/v1/query?q=<script>alert('xss')</script>", false, false, None),
-            ("Path traversal attempt", "/api/v1/../../../etc/passwd", false, false, None),
-            ("Valid request with authentication", "/api/v1/data", true, true, Some("secure_nonce")),
-            ("Replay attack attempt", "/api/v1/data", true, true, Some("secure_nonce")), // Same nonce
-            ("Tampering detection", "/api/v1/data", true, false, Some("tampered_nonce")),
+            (
+                "SQL Injection attempt",
+                "/api/v1/data'; DROP TABLE users; --",
+                false,
+                false,
+                None,
+            ),
+            (
+                "XSS attempt",
+                "/api/v1/query?q=<script>alert('xss')</script>",
+                false,
+                false,
+                None,
+            ),
+            (
+                "Path traversal attempt",
+                "/api/v1/../../../etc/passwd",
+                false,
+                false,
+                None,
+            ),
+            (
+                "Valid request with authentication",
+                "/api/v1/data",
+                true,
+                true,
+                Some("secure_nonce"),
+            ),
+            (
+                "Replay attack attempt",
+                "/api/v1/data",
+                true,
+                true,
+                Some("secure_nonce"),
+            ), // Same nonce
+            (
+                "Tampering detection",
+                "/api/v1/data",
+                true,
+                false,
+                Some("tampered_nonce"),
+            ),
         ];
 
         let mut security_violations_detected = 0;
@@ -475,30 +586,48 @@ mod comprehensive_integration_tests {
 
         for (test_name, endpoint, has_sig, valid_sig, nonce) in security_test_cases {
             let result = authenticator.authenticate_request(endpoint, has_sig, valid_sig, nonce);
-            
+
             match result {
                 Ok(AuthResult::Authenticated) => {
                     valid_requests_processed += 1;
                     println!("   ✅ {}: Valid request processed", test_name);
-                },
+                }
                 Err(error) => {
                     security_violations_detected += 1;
-                    println!("   🛡️ {}: Security violation detected ({:?})", test_name, error);
-                },
+                    println!(
+                        "   🛡️ {}: Security violation detected ({:?})",
+                        test_name, error
+                    );
+                }
                 _ => unreachable!("Unexpected auth result"),
             }
         }
 
         let metrics = authenticator.get_metrics();
-        
-        println!("✅ Security validation summary:");
-        println!("   Security violations detected: {}", security_violations_detected);
-        println!("   Valid requests processed: {}", valid_requests_processed);
-        println!("   Total security violations in metrics: {}", metrics.security_violations);
 
-        assert!(security_violations_detected > 0, "Should detect security violations");
-        assert!(valid_requests_processed > 0, "Should process valid requests");
-        assert!(metrics.security_violations > 0, "Metrics should track security violations");
+        println!("✅ Security validation summary:");
+        println!(
+            "   Security violations detected: {}",
+            security_violations_detected
+        );
+        println!("   Valid requests processed: {}", valid_requests_processed);
+        println!(
+            "   Total security violations in metrics: {}",
+            metrics.security_violations
+        );
+
+        assert!(
+            security_violations_detected > 0,
+            "Should detect security violations"
+        );
+        assert!(
+            valid_requests_processed > 0,
+            "Should process valid requests"
+        );
+        assert!(
+            metrics.security_violations > 0,
+            "Metrics should track security violations"
+        );
     }
 
     /// T11.8.6: Migration and Backward Compatibility
@@ -512,24 +641,48 @@ mod comprehensive_integration_tests {
         optional_config.mandatory_auth_enabled = false;
         let optional_authenticator = MockSignatureAuthenticator::new(optional_config);
 
-        let result1 = optional_authenticator.authenticate_request("/api/v1/data", false, false, None);
-        assert!(matches!(result1, Ok(AuthResult::Optional)), "Optional mode should allow unauthenticated requests");
+        let result1 =
+            optional_authenticator.authenticate_request("/api/v1/data", false, false, None);
+        assert!(
+            matches!(result1, Ok(AuthResult::Optional)),
+            "Optional mode should allow unauthenticated requests"
+        );
         println!("   ✅ Phase 1 (Optional): Unauthenticated request allowed");
 
-        let result2 = optional_authenticator.authenticate_request("/api/v1/data", true, true, Some("migration_nonce"));
-        assert!(matches!(result2, Ok(AuthResult::Optional)), "Optional mode should allow authenticated requests");
+        let result2 = optional_authenticator.authenticate_request(
+            "/api/v1/data",
+            true,
+            true,
+            Some("migration_nonce"),
+        );
+        assert!(
+            matches!(result2, Ok(AuthResult::Optional)),
+            "Optional mode should allow authenticated requests"
+        );
         println!("   ✅ Phase 1 (Optional): Authenticated request allowed");
 
         // Phase 2: Mandatory authentication (post-migration state)
         let mandatory_config = AuthConfig::default(); // mandatory_auth_enabled = true by default
         let mandatory_authenticator = MockSignatureAuthenticator::new(mandatory_config);
 
-        let result3 = mandatory_authenticator.authenticate_request("/api/v1/data", false, false, None);
-        assert!(matches!(result3, Err(AuthError::MissingSignature)), "Mandatory mode should reject unauthenticated requests");
+        let result3 =
+            mandatory_authenticator.authenticate_request("/api/v1/data", false, false, None);
+        assert!(
+            matches!(result3, Err(AuthError::MissingSignature)),
+            "Mandatory mode should reject unauthenticated requests"
+        );
         println!("   ✅ Phase 2 (Mandatory): Unauthenticated request rejected");
 
-        let result4 = mandatory_authenticator.authenticate_request("/api/v1/data", true, true, Some("mandatory_nonce"));
-        assert!(matches!(result4, Ok(AuthResult::Authenticated)), "Mandatory mode should allow valid authenticated requests");
+        let result4 = mandatory_authenticator.authenticate_request(
+            "/api/v1/data",
+            true,
+            true,
+            Some("mandatory_nonce"),
+        );
+        assert!(
+            matches!(result4, Ok(AuthResult::Authenticated)),
+            "Mandatory mode should allow valid authenticated requests"
+        );
         println!("   ✅ Phase 2 (Mandatory): Authenticated request allowed");
 
         println!("✅ Migration compatibility validated:");
@@ -551,45 +704,66 @@ mod comprehensive_integration_tests {
         // AC1: All API endpoints require signature authentication (except exempted)
         let ac1_protected = authenticator.authenticate_request("/api/v1/data", false, false, None);
         let ac1_exempted = authenticator.authenticate_request("/health", false, false, None);
-        acceptance_criteria.insert("AC1_endpoint_protection".to_string(), 
-            matches!(ac1_protected, Err(AuthError::MissingSignature)) && matches!(ac1_exempted, Ok(AuthResult::Exempted)));
+        acceptance_criteria.insert(
+            "AC1_endpoint_protection".to_string(),
+            matches!(ac1_protected, Err(AuthError::MissingSignature))
+                && matches!(ac1_exempted, Ok(AuthResult::Exempted)),
+        );
 
         // AC2: Unauthenticated requests are rejected with proper error handling
         let ac2_result = authenticator.authenticate_request("/api/v1/query", false, false, None);
-        acceptance_criteria.insert("AC2_error_handling".to_string(), 
-            matches!(ac2_result, Err(AuthError::MissingSignature)));
+        acceptance_criteria.insert(
+            "AC2_error_handling".to_string(),
+            matches!(ac2_result, Err(AuthError::MissingSignature)),
+        );
 
         // AC3: Valid signatures are processed within performance thresholds
         let start = Instant::now();
-        let ac3_result = authenticator.authenticate_request("/api/v1/data", true, true, Some("perf_nonce"));
+        let ac3_result =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("perf_nonce"));
         let processing_time = start.elapsed().as_millis() as u64;
-        acceptance_criteria.insert("AC3_performance".to_string(), 
-            matches!(ac3_result, Ok(AuthResult::Authenticated)) && processing_time < 10);
+        acceptance_criteria.insert(
+            "AC3_performance".to_string(),
+            matches!(ac3_result, Ok(AuthResult::Authenticated)) && processing_time < 10,
+        );
 
         // AC4: Security events are logged and monitored
         let metrics_before = authenticator.get_metrics();
-        let _ac4_result = authenticator.authenticate_request("/api/v1/data", true, false, Some("invalid_nonce"));
+        let _ac4_result =
+            authenticator.authenticate_request("/api/v1/data", true, false, Some("invalid_nonce"));
         let metrics_after = authenticator.get_metrics();
-        acceptance_criteria.insert("AC4_monitoring".to_string(), 
-            metrics_after.security_violations > metrics_before.security_violations);
+        acceptance_criteria.insert(
+            "AC4_monitoring".to_string(),
+            metrics_after.security_violations > metrics_before.security_violations,
+        );
 
         // AC5: Cross-platform compatibility is maintained
-        let ac5_cli = authenticator.authenticate_request("/api/v1/data", true, true, Some("cli_nonce"));
-        let ac5_sdk = authenticator.authenticate_request("/api/v1/data", true, true, Some("sdk_nonce"));
-        acceptance_criteria.insert("AC5_compatibility".to_string(), 
-            matches!(ac5_cli, Ok(AuthResult::Authenticated)) && matches!(ac5_sdk, Ok(AuthResult::Authenticated)));
+        let ac5_cli =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("cli_nonce"));
+        let ac5_sdk =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("sdk_nonce"));
+        acceptance_criteria.insert(
+            "AC5_compatibility".to_string(),
+            matches!(ac5_cli, Ok(AuthResult::Authenticated))
+                && matches!(ac5_sdk, Ok(AuthResult::Authenticated)),
+        );
 
         // AC6: Replay protection through nonce validation
-        let _ac6_first = authenticator.authenticate_request("/api/v1/data", true, true, Some("replay_test"));
-        let ac6_replay = authenticator.authenticate_request("/api/v1/data", true, true, Some("replay_test"));
-        acceptance_criteria.insert("AC6_replay_protection".to_string(), 
-            matches!(ac6_replay, Err(AuthError::NonceReplay)));
+        let _ac6_first =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("replay_test"));
+        let ac6_replay =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("replay_test"));
+        acceptance_criteria.insert(
+            "AC6_replay_protection".to_string(),
+            matches!(ac6_replay, Err(AuthError::NonceReplay)),
+        );
 
         println!("📋 PBI-11 Acceptance Criteria Results:");
         for (criteria, passed) in &acceptance_criteria {
-            println!("   {} {}: {}", 
-                if *passed { "✅" } else { "❌" }, 
-                criteria, 
+            println!(
+                "   {} {}: {}",
+                if *passed { "✅" } else { "❌" },
+                criteria,
                 if *passed { "PASSED" } else { "FAILED" }
             );
         }
@@ -600,12 +774,25 @@ mod comprehensive_integration_tests {
         let overall_compliance = compliance_count == total_criteria;
 
         println!("\n🎯 PBI-11 COMPLIANCE REPORT:");
-        println!("   Criteria passed: {}/{}", compliance_count, total_criteria);
+        println!(
+            "   Criteria passed: {}/{}",
+            compliance_count, total_criteria
+        );
         println!("   Compliance percentage: {:.1}%", compliance_percentage);
-        println!("   Overall compliance: {}", if overall_compliance { "✅ COMPLIANT" } else { "❌ NON-COMPLIANT" });
+        println!(
+            "   Overall compliance: {}",
+            if overall_compliance {
+                "✅ COMPLIANT"
+            } else {
+                "❌ NON-COMPLIANT"
+            }
+        );
 
         // Final assertions
-        assert!(overall_compliance, "All PBI-11 acceptance criteria must be met");
+        assert!(
+            overall_compliance,
+            "All PBI-11 acceptance criteria must be met"
+        );
         assert_eq!(compliance_percentage, 100.0, "Must achieve 100% compliance");
     }
 
@@ -637,7 +824,7 @@ mod comprehensive_integration_tests {
         for category_name in test_categories {
             total_test_categories += 1;
             let category_start = Instant::now();
-            
+
             let test_result = match category_name {
                 "Mandatory Authentication Enforcement" => test_category_auth_enforcement(),
                 "Performance Benchmarking" => test_category_performance(),
@@ -648,13 +835,13 @@ mod comprehensive_integration_tests {
                 "PBI-11 Acceptance Criteria" => test_category_pbi11_criteria(),
                 _ => Ok(()),
             };
-            
+
             match test_result {
                 Ok(_) => {
                     passed_categories += 1;
                     let duration = category_start.elapsed().as_millis();
                     println!("   ✅ {} - PASSED ({}ms)", category_name, duration);
-                },
+                }
                 Err(_) => {
                     all_tests_passed = false;
                     let duration = category_start.elapsed().as_millis();
@@ -669,10 +856,22 @@ mod comprehensive_integration_tests {
         println!("======================================================================");
         println!("   Total test categories: {}", total_test_categories);
         println!("   Passed categories: {}", passed_categories);
-        println!("   Failed categories: {}", total_test_categories - passed_categories);
-        println!("   Success rate: {:.1}%", (passed_categories as f64 / total_test_categories as f64) * 100.0);
-        println!("   Total execution time: {:.2}s", total_duration.as_secs_f64());
-        println!("   Average time per category: {:.2}s", total_duration.as_secs_f64() / total_test_categories as f64);
+        println!(
+            "   Failed categories: {}",
+            total_test_categories - passed_categories
+        );
+        println!(
+            "   Success rate: {:.1}%",
+            (passed_categories as f64 / total_test_categories as f64) * 100.0
+        );
+        println!(
+            "   Total execution time: {:.2}s",
+            total_duration.as_secs_f64()
+        );
+        println!(
+            "   Average time per category: {:.2}s",
+            total_duration.as_secs_f64() / total_test_categories as f64
+        );
 
         if all_tests_passed {
             println!("\n🎉 T11.8 COMPREHENSIVE INTEGRATION TESTING: ✅ SUCCESS");
@@ -687,18 +886,25 @@ mod comprehensive_integration_tests {
             println!("   Some test categories failed - review individual results above");
         }
 
-        assert!(all_tests_passed, "All integration test categories must pass for PBI-11 compliance");
-        assert_eq!(passed_categories, total_test_categories, "Must achieve 100% test category success rate");
+        assert!(
+            all_tests_passed,
+            "All integration test categories must pass for PBI-11 compliance"
+        );
+        assert_eq!(
+            passed_categories, total_test_categories,
+            "Must achieve 100% test category success rate"
+        );
     }
 
     // Helper test functions for master integration test
     fn test_category_auth_enforcement() -> Result<(), &'static str> {
         let config = AuthConfig::default();
         let authenticator = MockSignatureAuthenticator::new(config);
-        
-        let valid_result = authenticator.authenticate_request("/api/v1/data", true, true, Some("test_nonce"));
+
+        let valid_result =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("test_nonce"));
         let invalid_result = authenticator.authenticate_request("/api/v1/data", false, false, None);
-        
+
         if !matches!(valid_result, Ok(AuthResult::Authenticated)) {
             return Err("Valid authentication failed");
         }
@@ -711,11 +917,12 @@ mod comprehensive_integration_tests {
     fn test_category_performance() -> Result<(), &'static str> {
         let config = AuthConfig::default();
         let authenticator = MockSignatureAuthenticator::new(config);
-        
+
         let start = Instant::now();
-        let _result = authenticator.authenticate_request("/api/v1/data", true, true, Some("perf_test"));
+        let _result =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("perf_test"));
         let duration = start.elapsed().as_millis() as u64;
-        
+
         if duration >= 10 {
             return Err("Performance test failed: duration >= 10ms");
         }
@@ -725,10 +932,11 @@ mod comprehensive_integration_tests {
     fn test_category_endpoint_protection() -> Result<(), &'static str> {
         let config = AuthConfig::default();
         let authenticator = MockSignatureAuthenticator::new(config);
-        
-        let protected_result = authenticator.authenticate_request("/api/v1/data", false, false, None);
+
+        let protected_result =
+            authenticator.authenticate_request("/api/v1/data", false, false, None);
         let exempted_result = authenticator.authenticate_request("/health", false, false, None);
-        
+
         if !matches!(protected_result, Err(AuthError::MissingSignature)) {
             return Err("Protected endpoint should require authentication");
         }
@@ -741,10 +949,12 @@ mod comprehensive_integration_tests {
     fn test_category_cross_platform() -> Result<(), &'static str> {
         let config = AuthConfig::default();
         let authenticator = MockSignatureAuthenticator::new(config);
-        
-        let cli_result = authenticator.authenticate_request("/api/v1/data", true, true, Some("cli_test"));
-        let sdk_result = authenticator.authenticate_request("/api/v1/data", true, true, Some("sdk_test"));
-        
+
+        let cli_result =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("cli_test"));
+        let sdk_result =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("sdk_test"));
+
         if !matches!(cli_result, Ok(AuthResult::Authenticated)) {
             return Err("CLI authentication failed");
         }
@@ -757,11 +967,14 @@ mod comprehensive_integration_tests {
     fn test_category_security() -> Result<(), &'static str> {
         let config = AuthConfig::default();
         let authenticator = MockSignatureAuthenticator::new(config);
-        
-        let _valid = authenticator.authenticate_request("/api/v1/data", true, true, Some("security_nonce"));
-        let replay = authenticator.authenticate_request("/api/v1/data", true, true, Some("security_nonce"));
-        let invalid = authenticator.authenticate_request("/api/v1/data", true, false, Some("invalid_sig"));
-        
+
+        let _valid =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("security_nonce"));
+        let replay =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("security_nonce"));
+        let invalid =
+            authenticator.authenticate_request("/api/v1/data", true, false, Some("invalid_sig"));
+
         if !matches!(replay, Err(AuthError::NonceReplay)) {
             return Err("Replay attack should be prevented");
         }
@@ -775,13 +988,15 @@ mod comprehensive_integration_tests {
         let mut optional_config = AuthConfig::default();
         optional_config.mandatory_auth_enabled = false;
         let optional_auth = MockSignatureAuthenticator::new(optional_config);
-        
+
         let mandatory_config = AuthConfig::default();
         let mandatory_auth = MockSignatureAuthenticator::new(mandatory_config);
-        
-        let optional_result = optional_auth.authenticate_request("/api/v1/data", false, false, None);
-        let mandatory_result = mandatory_auth.authenticate_request("/api/v1/data", false, false, None);
-        
+
+        let optional_result =
+            optional_auth.authenticate_request("/api/v1/data", false, false, None);
+        let mandatory_result =
+            mandatory_auth.authenticate_request("/api/v1/data", false, false, None);
+
         if !matches!(optional_result, Ok(AuthResult::Optional)) {
             return Err("Optional mode should allow unauthenticated access");
         }
@@ -794,12 +1009,13 @@ mod comprehensive_integration_tests {
     fn test_category_pbi11_criteria() -> Result<(), &'static str> {
         let config = AuthConfig::default();
         let authenticator = MockSignatureAuthenticator::new(config);
-        
+
         // Test core PBI-11 requirements
-        let auth_result = authenticator.authenticate_request("/api/v1/data", true, true, Some("pbi11_test"));
+        let auth_result =
+            authenticator.authenticate_request("/api/v1/data", true, true, Some("pbi11_test"));
         let unauth_result = authenticator.authenticate_request("/api/v1/data", false, false, None);
         let exempt_result = authenticator.authenticate_request("/health", false, false, None);
-        
+
         if !matches!(auth_result, Ok(AuthResult::Authenticated)) {
             return Err("Authenticated request should succeed");
         }
@@ -818,10 +1034,10 @@ mod comprehensive_integration_tests {
 fn test_t11_8_quick_validation_final() {
     println!("\n⚡ T11.8 Quick Validation (Final Standalone)");
     println!("==================================================");
-    
+
     let config = AuthConfig::default();
     let authenticator = MockSignatureAuthenticator::new(config);
-    
+
     // Core validation checks for PBI-11
     let validation_checks = vec![
         ("Mandatory authentication enforcement", {
@@ -829,11 +1045,17 @@ fn test_t11_8_quick_validation_final() {
             matches!(result, Err(AuthError::MissingSignature))
         }),
         ("Valid signature acceptance", {
-            let result = authenticator.authenticate_request("/api/v1/data", true, true, Some("valid_nonce"));
+            let result =
+                authenticator.authenticate_request("/api/v1/data", true, true, Some("valid_nonce"));
             matches!(result, Ok(AuthResult::Authenticated))
         }),
         ("Invalid signature rejection", {
-            let result = authenticator.authenticate_request("/api/v1/data", true, false, Some("invalid_nonce"));
+            let result = authenticator.authenticate_request(
+                "/api/v1/data",
+                true,
+                false,
+                Some("invalid_nonce"),
+            );
             matches!(result, Err(AuthError::InvalidSignature))
         }),
         ("Exempted endpoint access", {
@@ -841,15 +1063,25 @@ fn test_t11_8_quick_validation_final() {
             matches!(result, Ok(AuthResult::Exempted))
         }),
         ("Replay attack prevention", {
-            let _first = authenticator.authenticate_request("/api/v1/data", true, true, Some("replay_nonce"));
-            let second = authenticator.authenticate_request("/api/v1/data", true, true, Some("replay_nonce"));
+            let _first = authenticator.authenticate_request(
+                "/api/v1/data",
+                true,
+                true,
+                Some("replay_nonce"),
+            );
+            let second = authenticator.authenticate_request(
+                "/api/v1/data",
+                true,
+                true,
+                Some("replay_nonce"),
+            );
             matches!(second, Err(AuthError::NonceReplay))
         }),
     ];
-    
+
     let mut passed_checks = 0;
     let total_checks = validation_checks.len();
-    
+
     for (check_name, passed) in &validation_checks {
         if *passed {
             passed_checks += 1;
@@ -858,30 +1090,51 @@ fn test_t11_8_quick_validation_final() {
             println!("   ❌ {}: FAIL", check_name);
         }
     }
-    
+
     let success_rate = (passed_checks as f64 / total_checks as f64) * 100.0;
-    
+
     println!("\n📊 Quick Validation Summary:");
     println!("   Checks passed: {}/{}", passed_checks, total_checks);
     println!("   Success rate: {:.1}%", success_rate);
-    
+
     if passed_checks == total_checks {
         println!("   🎯 T11.8 Quick Validation: ✅ SUCCESS");
         println!("   🎉 PBI-11 mandatory signature authentication: VALIDATED");
     } else {
         println!("   ❌ T11.8 Quick Validation: FAILED");
     }
-    
-    assert_eq!(passed_checks, total_checks, "All quick validation checks must pass");
+
+    assert_eq!(
+        passed_checks, total_checks,
+        "All quick validation checks must pass"
+    );
     assert_eq!(success_rate, 100.0, "Must achieve 100% success rate");
-    
+
     let final_metrics = authenticator.get_metrics();
     println!("\n📈 Final Metrics Summary:");
-    println!("   Total requests processed: {}", final_metrics.total_requests);
-    println!("   Successful authentications: {}", final_metrics.successful_authentications);
-    println!("   Security violations detected: {}", final_metrics.security_violations);
-    println!("   Average processing time: {:.2}ms", final_metrics.avg_processing_time_ms);
-    
-    assert!(final_metrics.total_requests > 0, "Should have processed requests");
-    assert!(final_metrics.avg_processing_time_ms < 10.0, "Should meet performance requirements");
+    println!(
+        "   Total requests processed: {}",
+        final_metrics.total_requests
+    );
+    println!(
+        "   Successful authentications: {}",
+        final_metrics.successful_authentications
+    );
+    println!(
+        "   Security violations detected: {}",
+        final_metrics.security_violations
+    );
+    println!(
+        "   Average processing time: {:.2}ms",
+        final_metrics.avg_processing_time_ms
+    );
+
+    assert!(
+        final_metrics.total_requests > 0,
+        "Should have processed requests"
+    );
+    assert!(
+        final_metrics.avg_processing_time_ms < 10.0,
+        "Should meet performance requirements"
+    );
 }

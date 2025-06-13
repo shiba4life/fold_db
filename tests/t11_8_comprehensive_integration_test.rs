@@ -1,18 +1,18 @@
 //! T11.8: Comprehensive Integration Testing for PBI-11
 //!
-//! This module implements comprehensive integration testing to ensure all PBI-11 
-//! components work together properly and meet acceptance criteria for mandatory 
+//! This module implements comprehensive integration testing to ensure all PBI-11
+//! components work together properly and meet acceptance criteria for mandatory
 //! signature authentication.
 
 use actix_web::{test, web, App, HttpResponse};
 use datafold::crypto::ed25519::generate_master_keypair;
 use datafold::datafold_node::config::NodeConfig;
+use datafold::datafold_node::http_server::AppState;
 use datafold::datafold_node::signature_auth::{
-    SignatureAuthConfig, SignatureVerificationMiddleware, SignatureVerificationState, 
-    SecurityProfile, AuthenticationError
+    AuthenticationError, SecurityProfile, SignatureAuthConfig, SignatureVerificationMiddleware,
+    SignatureVerificationState,
 };
 use datafold::datafold_node::DataFoldNode;
-use datafold::datafold_node::http_server::AppState;
 use datafold::datafold_node::{crypto_routes, system_routes};
 use serde_json::json;
 use std::collections::HashMap;
@@ -70,14 +70,15 @@ impl T118TestResults {
     }
 
     pub fn add_endpoint_coverage(&mut self, endpoint: &str, requires_auth: bool) {
-        self.endpoint_coverage.insert(endpoint.to_string(), requires_auth);
+        self.endpoint_coverage
+            .insert(endpoint.to_string(), requires_auth);
     }
 
     pub fn success_rate(&self) -> f64 {
-        if self.total_tests == 0 { 
-            0.0 
-        } else { 
-            self.passed_tests as f64 / self.total_tests as f64 
+        if self.total_tests == 0 {
+            0.0
+        } else {
+            self.passed_tests as f64 / self.total_tests as f64
         }
     }
 }
@@ -97,28 +98,29 @@ impl T118ComprehensiveIntegrationTest {
     /// Run all T11.8 comprehensive integration tests
     pub async fn run_all_tests(&mut self) -> Result<T118TestResults, Box<dyn std::error::Error>> {
         println!("🚀 Starting T11.8: Comprehensive Integration Testing for PBI-11");
-        
+
         // Test 1: End-to-End Mandatory Authentication Tests
         self.test_mandatory_authentication_enforcement().await?;
-        
+
         // Test 2: Comprehensive Negative Scenarios
         self.test_comprehensive_negative_scenarios().await?;
-        
+
         // Test 3: Systematic API Endpoint Authentication Testing
         self.test_all_api_endpoints_require_signatures().await?;
-        
+
         // Test 4: Performance Benchmarking for Signature Verification
-        self.test_signature_verification_performance_benchmarks().await?;
-        
+        self.test_signature_verification_performance_benchmarks()
+            .await?;
+
         // Test 5: Migration Scenarios Testing
         self.test_migration_scenarios().await?;
-        
+
         // Test 6: Cross-Platform Integration Testing
         self.test_cross_platform_integration().await?;
-        
+
         // Test 7: Production Simulation Testing
         self.test_production_simulation().await?;
-        
+
         // Test 8: Compliance and Security Validation
         self.test_compliance_and_security_validation().await?;
 
@@ -129,20 +131,27 @@ impl T118ComprehensiveIntegrationTest {
     }
 
     /// Test 1: End-to-End Mandatory Authentication Tests
-    async fn test_mandatory_authentication_enforcement(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_mandatory_authentication_enforcement(
+        &mut self,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         println!("🔒 Testing mandatory authentication enforcement...");
 
         let temp_dir = tempdir()?;
         let config = NodeConfig::production(temp_dir.path().to_path_buf());
         let node = DataFoldNode::new(config.clone())?;
-        
+
         // Test that signature auth is configured in the node config
-        assert!(config.is_signature_auth_enabled(), 
-               "Mandatory signature authentication must be enabled");
-        
+        assert!(
+            config.is_signature_auth_enabled(),
+            "Mandatory signature authentication must be enabled"
+        );
+
         let sig_config = config.signature_auth_config();
-        assert_eq!(sig_config.security_profile, SecurityProfile::Strict,
-                  "Production should use strict security profile");
+        assert_eq!(
+            sig_config.security_profile,
+            SecurityProfile::Strict,
+            "Production should use strict security profile"
+        );
 
         let signature_auth = SignatureVerificationState::new(sig_config.clone())?;
         let app_state = web::Data::new(AppState {
@@ -152,51 +161,65 @@ impl T118ComprehensiveIntegrationTest {
 
         // Test middleware enforcement
         let app = test::init_service(
-            App::new()
-                .app_data(app_state.clone())
-                .service(
-                    web::scope("/api")
-                        .wrap(SignatureVerificationMiddleware::new(signature_auth))
-                        .route("/test/mandatory", web::get().to(|| async {
+            App::new().app_data(app_state.clone()).service(
+                web::scope("/api")
+                    .wrap(SignatureVerificationMiddleware::new(signature_auth))
+                    .route(
+                        "/test/mandatory",
+                        web::get().to(|| async {
                             HttpResponse::Ok().json(json!({"message": "authenticated"}))
-                        }))
-                )
-        ).await;
+                        }),
+                    ),
+            ),
+        )
+        .await;
 
         // Unauthenticated request should be rejected
-        let req = test::TestRequest::get().uri("/api/test/mandatory").to_request();
+        let req = test::TestRequest::get()
+            .uri("/api/test/mandatory")
+            .to_request();
         let resp_result = test::try_call_service(&app, req).await;
-        
+
         // The middleware should return an authentication error
         match resp_result {
             Err(_) => {
                 // This is expected - authentication failure should cause an error
                 println!("  ✓ Unauthenticated request properly rejected with error");
-            },
+            }
             Ok(resp) => {
                 // If we get a response, it should be a client error
-                assert!(resp.status().is_client_error(),
-                       "Unauthenticated requests must be rejected with client error");
-                println!("  ✓ Unauthenticated request properly rejected with status: {}", resp.status());
+                assert!(
+                    resp.status().is_client_error(),
+                    "Unauthenticated requests must be rejected with client error"
+                );
+                println!(
+                    "  ✓ Unauthenticated request properly rejected with status: {}",
+                    resp.status()
+                );
             }
         }
 
-        self.results.add_test_result("mandatory_authentication_enforcement", true, None);
-        self.results.add_security_validation("Mandatory authentication cannot be bypassed");
-        self.results.add_security_validation("Production uses strict security profile");
-        
+        self.results
+            .add_test_result("mandatory_authentication_enforcement", true, None);
+        self.results
+            .add_security_validation("Mandatory authentication cannot be bypassed");
+        self.results
+            .add_security_validation("Production uses strict security profile");
+
         println!("✅ Mandatory authentication enforcement test passed");
         Ok(())
     }
 
     /// Test 2: Comprehensive Negative Scenarios
-    async fn test_comprehensive_negative_scenarios(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_comprehensive_negative_scenarios(
+        &mut self,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         println!("🧪 Testing comprehensive negative scenarios...");
 
         let temp_dir = tempdir()?;
         let config = NodeConfig::development(temp_dir.path().to_path_buf());
         let node = DataFoldNode::new(config)?;
-        
+
         let sig_config = SignatureAuthConfig::strict();
         let signature_auth = SignatureVerificationState::new(sig_config)?;
         let app_state = web::Data::new(AppState {
@@ -205,24 +228,38 @@ impl T118ComprehensiveIntegrationTest {
         });
 
         let app = test::init_service(
-            App::new()
-                .app_data(app_state.clone())
-                .service(
-                    web::scope("/api")
-                        .wrap(SignatureVerificationMiddleware::new(signature_auth.clone()))
-                        .route("/test/negative", web::post().to(|| async {
+            App::new().app_data(app_state.clone()).service(
+                web::scope("/api")
+                    .wrap(SignatureVerificationMiddleware::new(signature_auth.clone()))
+                    .route(
+                        "/test/negative",
+                        web::post().to(|| async {
                             HttpResponse::Ok().json(json!({"message": "authenticated"}))
-                        }))
-                )
-        ).await;
+                        }),
+                    ),
+            ),
+        )
+        .await;
 
         // Test scenarios for negative cases
         let negative_scenarios = vec![
-            ("missing_signature_header", "Request with no signature header"),
-            ("missing_signature_input_header", "Request with no signature-input header"),
+            (
+                "missing_signature_header",
+                "Request with no signature header",
+            ),
+            (
+                "missing_signature_input_header",
+                "Request with no signature-input header",
+            ),
             ("malformed_signature", "Request with malformed signature"),
-            ("invalid_signature_algorithm", "Request with unsupported algorithm"),
-            ("corrupted_signature_data", "Request with corrupted signature data"),
+            (
+                "invalid_signature_algorithm",
+                "Request with unsupported algorithm",
+            ),
+            (
+                "corrupted_signature_data",
+                "Request with corrupted signature data",
+            ),
             ("expired_timestamp", "Request with expired timestamp"),
             ("future_timestamp", "Request with future timestamp"),
             ("replay_nonce", "Request with reused nonce"),
@@ -250,42 +287,66 @@ impl T118ComprehensiveIntegrationTest {
                 Err(_) => {
                     // Authentication errors are expected for negative scenarios
                     negative_tests_passed += 1;
-                    println!("  ✓ {} correctly rejected with authentication error", scenario_name);
-                },
+                    println!(
+                        "  ✓ {} correctly rejected with authentication error",
+                        scenario_name
+                    );
+                }
                 Ok(resp) => {
                     if resp.status().is_client_error() {
                         negative_tests_passed += 1;
-                        println!("  ✓ {} correctly rejected with status: {}", scenario_name, resp.status());
+                        println!(
+                            "  ✓ {} correctly rejected with status: {}",
+                            scenario_name,
+                            resp.status()
+                        );
                     } else {
-                        self.results.errors.push(format!("Negative scenario {} should have been rejected but wasn't", scenario_name));
+                        self.results.errors.push(format!(
+                            "Negative scenario {} should have been rejected but wasn't",
+                            scenario_name
+                        ));
                     }
                 }
             }
         }
 
-        self.results.add_test_result("comprehensive_negative_scenarios",
-                                   negative_tests_passed >= 8, // At least 8/10 should pass
-                                   if negative_tests_passed < 8 {
-                                       Some(format!("Only {}/10 negative scenarios handled correctly", negative_tests_passed))
-                                   } else { None });
-        
-        self.results.add_metric("negative_scenarios_tested", scenario_count as f64);
-        self.results.add_metric("negative_scenarios_passed", negative_tests_passed as f64);
-        self.results.add_security_validation("Comprehensive negative scenario testing completed");
-        
-        println!("✅ Comprehensive negative scenarios test completed: {}/{} passed",
-                negative_tests_passed, scenario_count);
+        self.results.add_test_result(
+            "comprehensive_negative_scenarios",
+            negative_tests_passed >= 8, // At least 8/10 should pass
+            if negative_tests_passed < 8 {
+                Some(format!(
+                    "Only {}/10 negative scenarios handled correctly",
+                    negative_tests_passed
+                ))
+            } else {
+                None
+            },
+        );
+
+        self.results
+            .add_metric("negative_scenarios_tested", scenario_count as f64);
+        self.results
+            .add_metric("negative_scenarios_passed", negative_tests_passed as f64);
+        self.results
+            .add_security_validation("Comprehensive negative scenario testing completed");
+
+        println!(
+            "✅ Comprehensive negative scenarios test completed: {}/{} passed",
+            negative_tests_passed, scenario_count
+        );
         Ok(())
     }
 
     /// Test 3: Systematic API Endpoint Authentication Testing
-    async fn test_all_api_endpoints_require_signatures(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_all_api_endpoints_require_signatures(
+        &mut self,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         println!("🔍 Testing that all API endpoints require signatures...");
 
         let temp_dir = tempdir()?;
         let config = NodeConfig::production(temp_dir.path().to_path_buf());
         let node = DataFoldNode::new(config)?;
-        
+
         let sig_config = SignatureAuthConfig::strict();
         let signature_auth = SignatureVerificationState::new(sig_config)?;
         let app_state = web::Data::new(AppState {
@@ -295,49 +356,51 @@ impl T118ComprehensiveIntegrationTest {
 
         // Create comprehensive app with all route types
         let app = test::init_service(
-            App::new()
-                .app_data(app_state.clone())
-                .service(
-                    web::scope("/api")
-                        .wrap(SignatureVerificationMiddleware::new(signature_auth))
-                        // Schema endpoints
-                        .route("/schemas", web::get().to(test_handler))
-                        .route("/schema/test", web::get().to(test_handler))
-                        .route("/schema", web::post().to(test_handler))
-                        // Query/mutation endpoints
-                        .route("/execute", web::post().to(test_handler))
-                        .route("/query", web::post().to(test_handler))
-                        .route("/mutation", web::post().to(test_handler))
-                        // Transform endpoints
-                        .route("/transforms", web::get().to(test_handler))
-                        .route("/transform/test/run", web::post().to(test_handler))
-                        // Log endpoints
-                        .route("/logs", web::get().to(test_handler))
-                        .route("/logs/config", web::get().to(test_handler))
-                        // System endpoints
-                        .service(
-                            web::scope("/system")
-                                .route("/status", web::get().to(system_routes::get_system_status))
-                                .route("/reset-database", web::post().to(test_handler))
-                                .route("/health", web::get().to(test_handler))
-                        )
-                        // Crypto endpoints
-                        .service(
-                            web::scope("/crypto")
-                                .route("/init/random", web::post().to(test_handler))
-                                .route("/status", web::get().to(test_handler))
-                                .route("/keys/register", web::post().to(crypto_routes::register_public_key))
-                                .route("/keys/status/test", web::get().to(test_handler))
-                        )
-                        // Network endpoints
-                        .service(
-                            web::scope("/network")
-                                .route("/init", web::post().to(test_handler))
-                                .route("/status", web::get().to(test_handler))
-                                .route("/connect", web::post().to(test_handler))
-                        )
-                )
-        ).await;
+            App::new().app_data(app_state.clone()).service(
+                web::scope("/api")
+                    .wrap(SignatureVerificationMiddleware::new(signature_auth))
+                    // Schema endpoints
+                    .route("/schemas", web::get().to(test_handler))
+                    .route("/schema/test", web::get().to(test_handler))
+                    .route("/schema", web::post().to(test_handler))
+                    // Query/mutation endpoints
+                    .route("/execute", web::post().to(test_handler))
+                    .route("/query", web::post().to(test_handler))
+                    .route("/mutation", web::post().to(test_handler))
+                    // Transform endpoints
+                    .route("/transforms", web::get().to(test_handler))
+                    .route("/transform/test/run", web::post().to(test_handler))
+                    // Log endpoints
+                    .route("/logs", web::get().to(test_handler))
+                    .route("/logs/config", web::get().to(test_handler))
+                    // System endpoints
+                    .service(
+                        web::scope("/system")
+                            .route("/status", web::get().to(system_routes::get_system_status))
+                            .route("/reset-database", web::post().to(test_handler))
+                            .route("/health", web::get().to(test_handler)),
+                    )
+                    // Crypto endpoints
+                    .service(
+                        web::scope("/crypto")
+                            .route("/init/random", web::post().to(test_handler))
+                            .route("/status", web::get().to(test_handler))
+                            .route(
+                                "/keys/register",
+                                web::post().to(crypto_routes::register_public_key),
+                            )
+                            .route("/keys/status/test", web::get().to(test_handler)),
+                    )
+                    // Network endpoints
+                    .service(
+                        web::scope("/network")
+                            .route("/init", web::post().to(test_handler))
+                            .route("/status", web::get().to(test_handler))
+                            .route("/connect", web::post().to(test_handler)),
+                    ),
+            ),
+        )
+        .await;
 
         // Define all endpoints to test
         let protected_endpoints = vec![
@@ -379,21 +442,32 @@ impl T118ComprehensiveIntegrationTest {
             };
 
             let resp_result = test::try_call_service(&app, req).await;
-            
+
             match resp_result {
                 Err(_) => {
                     // Authentication errors are expected for protected endpoints
                     protected_requiring_auth += 1;
                     self.results.add_endpoint_coverage(path, true);
-                    println!("  ✓ {} {} requires authentication (error response)", method, path);
-                },
+                    println!(
+                        "  ✓ {} {} requires authentication (error response)",
+                        method, path
+                    );
+                }
                 Ok(resp) => {
                     if resp.status().is_client_error() {
                         protected_requiring_auth += 1;
                         self.results.add_endpoint_coverage(path, true);
-                        println!("  ✓ {} {} requires authentication (status: {})", method, path, resp.status());
+                        println!(
+                            "  ✓ {} {} requires authentication (status: {})",
+                            method,
+                            path,
+                            resp.status()
+                        );
                     } else {
-                        self.results.errors.push(format!("Protected endpoint {} {} should require authentication", method, path));
+                        self.results.errors.push(format!(
+                            "Protected endpoint {} {} should require authentication",
+                            method, path
+                        ));
                         self.results.add_endpoint_coverage(path, false);
                     }
                 }
@@ -415,17 +489,26 @@ impl T118ComprehensiveIntegrationTest {
             };
 
             let resp_result = test::try_call_service(&app, req).await;
-            
+
             match resp_result {
                 Ok(resp) => {
-                    if resp.status().is_success() ||
-                       (resp.status().is_client_error() && resp.status().as_u16() != 401) {
+                    if resp.status().is_success()
+                        || (resp.status().is_client_error() && resp.status().as_u16() != 401)
+                    {
                         exempted_working += 1;
-                        println!("  ✓ {} {} correctly exempted (status: {})", method, path, resp.status());
+                        println!(
+                            "  ✓ {} {} correctly exempted (status: {})",
+                            method,
+                            path,
+                            resp.status()
+                        );
                     } else if resp.status().as_u16() == 401 {
-                        self.results.errors.push(format!("Exempted endpoint {} {} should not require authentication", method, path));
+                        self.results.errors.push(format!(
+                            "Exempted endpoint {} {} should not require authentication",
+                            method, path
+                        ));
                     }
-                },
+                }
                 Err(_) => {
                     // Exempted endpoints should not cause authentication errors
                     self.results.errors.push(format!("Exempted endpoint {} {} should not require authentication but caused error", method, path));
@@ -433,36 +516,59 @@ impl T118ComprehensiveIntegrationTest {
             }
         }
 
-        let endpoint_test_success = protected_requiring_auth == protected_endpoints.len() && 
-                                   exempted_working == exempted_endpoints.len();
+        let endpoint_test_success = protected_requiring_auth == protected_endpoints.len()
+            && exempted_working == exempted_endpoints.len();
 
-        self.results.add_test_result("all_api_endpoints_require_signatures", 
-                                   endpoint_test_success,
-                                   if !endpoint_test_success {
-                                       Some(format!("Protected: {}/{}, Exempted: {}/{}", 
-                                                  protected_requiring_auth, protected_endpoints.len(),
-                                                  exempted_working, exempted_endpoints.len()))
-                                   } else { None });
+        self.results.add_test_result(
+            "all_api_endpoints_require_signatures",
+            endpoint_test_success,
+            if !endpoint_test_success {
+                Some(format!(
+                    "Protected: {}/{}, Exempted: {}/{}",
+                    protected_requiring_auth,
+                    protected_endpoints.len(),
+                    exempted_working,
+                    exempted_endpoints.len()
+                ))
+            } else {
+                None
+            },
+        );
 
-        self.results.add_metric("total_endpoints_tested", (protected_endpoints.len() + exempted_endpoints.len()) as f64);
-        self.results.add_metric("protected_endpoints_requiring_auth", protected_requiring_auth as f64);
-        self.results.add_metric("exempted_endpoints_working", exempted_working as f64);
-        self.results.add_security_validation("All API endpoints systematically tested for authentication requirements");
+        self.results.add_metric(
+            "total_endpoints_tested",
+            (protected_endpoints.len() + exempted_endpoints.len()) as f64,
+        );
+        self.results.add_metric(
+            "protected_endpoints_requiring_auth",
+            protected_requiring_auth as f64,
+        );
+        self.results
+            .add_metric("exempted_endpoints_working", exempted_working as f64);
+        self.results.add_security_validation(
+            "All API endpoints systematically tested for authentication requirements",
+        );
 
-        println!("✅ API endpoint authentication test completed: {}/{} protected, {}/{} exempted", 
-                protected_requiring_auth, protected_endpoints.len(),
-                exempted_working, exempted_endpoints.len());
+        println!(
+            "✅ API endpoint authentication test completed: {}/{} protected, {}/{} exempted",
+            protected_requiring_auth,
+            protected_endpoints.len(),
+            exempted_working,
+            exempted_endpoints.len()
+        );
         Ok(())
     }
 
     /// Test 4: Performance Benchmarking for Signature Verification
-    async fn test_signature_verification_performance_benchmarks(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_signature_verification_performance_benchmarks(
+        &mut self,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         println!("⚡ Testing signature verification performance benchmarks...");
 
         let temp_dir = tempdir()?;
         let config = NodeConfig::development(temp_dir.path().to_path_buf());
         let _node = DataFoldNode::new(config)?;
-        
+
         let sig_config = SignatureAuthConfig::default();
         let signature_auth = SignatureVerificationState::new(sig_config)?;
 
@@ -478,13 +584,13 @@ impl T118ComprehensiveIntegrationTest {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_secs();
-            
+
             let start = Instant::now();
-            
+
             // Test core verification operations
             let _timestamp_validation = signature_auth.validate_timestamp(timestamp);
             let _nonce_validation = signature_auth.check_and_store_nonce(&nonce, timestamp);
-            
+
             let verification_time = start.elapsed();
             total_verification_time += verification_time;
             verification_latencies.push(verification_time);
@@ -502,7 +608,7 @@ impl T118ComprehensiveIntegrationTest {
         // Load testing: concurrent signature verifications
         let concurrent_clients = 50;
         let requests_per_client = 20;
-        
+
         let load_test_start = Instant::now();
         let mut handles = Vec::new();
 
@@ -510,7 +616,7 @@ impl T118ComprehensiveIntegrationTest {
             let auth_state = signature_auth.clone();
             let handle = tokio::spawn(async move {
                 let mut client_latencies = Vec::new();
-                
+
                 for req_id in 0..requests_per_client {
                     // Use UUID4 format required by strict configuration
                     let nonce = format!("{}", uuid::Uuid::new_v4());
@@ -518,12 +624,12 @@ impl T118ComprehensiveIntegrationTest {
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
                         .as_secs();
-                    
+
                     let start = Instant::now();
                     let _result = auth_state.check_and_store_nonce(&nonce, timestamp);
                     client_latencies.push(start.elapsed());
                 }
-                
+
                 client_latencies
             });
             handles.push(handle);
@@ -548,17 +654,29 @@ impl T118ComprehensiveIntegrationTest {
         self.results.add_test_result("signature_verification_performance", 
                                    latency_target_met && p95_target_met && high_load_met,
                                    if !(latency_target_met && p95_target_met && high_load_met) {
-                                       Some(format!("Performance targets not met: avg={}ms, p95={}ms, load_p95={}ms, throughput={:.1}/s", 
-                                                  avg_latency.as_millis(), p95_latency.as_millis(), 
+                                       Some(format!("Performance targets not met: avg={}ms, p95={}ms, load_p95={}ms, throughput={:.1}/s",
+                                                  avg_latency.as_millis(), p95_latency.as_millis(),
                                                   load_p95.as_millis(), throughput))
                                    } else { None });
 
-        self.results.add_metric("avg_verification_latency_ms", avg_latency.as_millis() as f64);
-        self.results.add_metric("p95_verification_latency_ms", p95_latency.as_millis() as f64);
-        self.results.add_metric("p99_verification_latency_ms", p99_latency.as_millis() as f64);
-        self.results.add_metric("load_test_throughput_rps", throughput);
-        self.results.add_metric("load_test_p95_latency_ms", load_p95.as_millis() as f64);
-        self.results.add_security_validation("Signature verification meets <10ms latency target");
+        self.results.add_metric(
+            "avg_verification_latency_ms",
+            avg_latency.as_millis() as f64,
+        );
+        self.results.add_metric(
+            "p95_verification_latency_ms",
+            p95_latency.as_millis() as f64,
+        );
+        self.results.add_metric(
+            "p99_verification_latency_ms",
+            p99_latency.as_millis() as f64,
+        );
+        self.results
+            .add_metric("load_test_throughput_rps", throughput);
+        self.results
+            .add_metric("load_test_p95_latency_ms", load_p95.as_millis() as f64);
+        self.results
+            .add_security_validation("Signature verification meets <10ms latency target");
 
         println!("✅ Performance benchmarks completed:");
         println!("  Average latency: {:?} (target: <10ms)", avg_latency);
@@ -575,32 +693,51 @@ impl T118ComprehensiveIntegrationTest {
 
         // Test migration from optional to mandatory authentication
         let temp_dir = tempdir()?;
-        
+
         // Simulate "old" configuration (still mandatory in our implementation)
         let old_config = NodeConfig::development(temp_dir.path().to_path_buf());
-        assert!(old_config.is_signature_auth_enabled(), 
-               "Even development config should have mandatory auth");
+        assert!(
+            old_config.is_signature_auth_enabled(),
+            "Even development config should have mandatory auth"
+        );
 
         // Test "upgrade" to production configuration
         let new_config = NodeConfig::production(temp_dir.path().to_path_buf());
-        assert!(new_config.is_signature_auth_enabled(), 
-               "Production config must have mandatory auth");
-        assert_eq!(new_config.signature_auth_config().security_profile, SecurityProfile::Strict,
-                  "Production should use strict security profile");
+        assert!(
+            new_config.is_signature_auth_enabled(),
+            "Production config must have mandatory auth"
+        );
+        assert_eq!(
+            new_config.signature_auth_config().security_profile,
+            SecurityProfile::Strict,
+            "Production should use strict security profile"
+        );
 
         // Test configuration compatibility
         let old_sig_config = old_config.signature_auth_config();
         let new_sig_config = new_config.signature_auth_config();
-        
+
         // Both should be valid
-        assert!(old_sig_config.validate().is_ok(), "Old config should be valid");
-        assert!(new_sig_config.validate().is_ok(), "New config should be valid");
+        assert!(
+            old_sig_config.validate().is_ok(),
+            "Old config should be valid"
+        );
+        assert!(
+            new_sig_config.validate().is_ok(),
+            "New config should be valid"
+        );
 
         // Test fallback and rollback procedures
         let fallback_config = SignatureAuthConfig::lenient(); // More permissive fallback
-        assert!(fallback_config.validate().is_ok(), "Fallback config should be valid");
-        assert_eq!(fallback_config.security_profile, SecurityProfile::Lenient,
-                  "Fallback should use lenient profile");
+        assert!(
+            fallback_config.validate().is_ok(),
+            "Fallback config should be valid"
+        );
+        assert_eq!(
+            fallback_config.security_profile,
+            SecurityProfile::Lenient,
+            "Fallback should use lenient profile"
+        );
 
         // Test client version compatibility
         let client_compatibility_scenarios = vec![
@@ -611,13 +748,19 @@ impl T118ComprehensiveIntegrationTest {
 
         for (_version, description) in client_compatibility_scenarios {
             // All versions should work with mandatory auth
-            println!("  ✓ {} compatible with mandatory authentication", description);
+            println!(
+                "  ✓ {} compatible with mandatory authentication",
+                description
+            );
         }
 
-        self.results.add_test_result("migration_scenarios", true, None);
-        self.results.add_security_validation("Configuration migration procedures validated");
-        self.results.add_security_validation("Client version compatibility confirmed");
-        
+        self.results
+            .add_test_result("migration_scenarios", true, None);
+        self.results
+            .add_security_validation("Configuration migration procedures validated");
+        self.results
+            .add_security_validation("Client version compatibility confirmed");
+
         println!("✅ Migration scenarios test completed");
         Ok(())
     }
@@ -628,21 +771,27 @@ impl T118ComprehensiveIntegrationTest {
 
         let temp_dir = tempdir()?;
         let config = NodeConfig::development(temp_dir.path().to_path_buf());
-        
+
         // Test signature compatibility across platforms
         let master_keys = generate_master_keypair()?;
         let test_message = b"cross-platform test message";
-        
+
         // All platforms should be able to verify the same signature
         let signature = master_keys.sign_data(test_message)?;
         let public_key = master_keys.public_key();
         let verification_result = public_key.verify(test_message, &signature);
-        assert!(verification_result.is_ok(), "Cross-platform signature verification should work");
+        assert!(
+            verification_result.is_ok(),
+            "Cross-platform signature verification should work"
+        );
 
-        self.results.add_test_result("cross_platform_integration", true, None);
-        self.results.add_security_validation("Cross-platform signature compatibility verified");
-        self.results.add_security_validation("Unified configuration works across all platforms");
-        
+        self.results
+            .add_test_result("cross_platform_integration", true, None);
+        self.results
+            .add_security_validation("Cross-platform signature compatibility verified");
+        self.results
+            .add_security_validation("Unified configuration works across all platforms");
+
         println!("✅ Cross-platform integration test completed");
         Ok(())
     }
@@ -654,7 +803,7 @@ impl T118ComprehensiveIntegrationTest {
         let temp_dir = tempdir()?;
         let config = NodeConfig::production(temp_dir.path().to_path_buf());
         let _node = DataFoldNode::new(config)?;
-        
+
         let sig_config = SignatureAuthConfig::strict();
         let signature_auth = SignatureVerificationState::new(sig_config)?;
 
@@ -664,13 +813,13 @@ impl T118ComprehensiveIntegrationTest {
         let production_start = Instant::now();
 
         let mut production_handles = Vec::new();
-        
+
         for client_id in 0..production_load_clients {
             let auth_state = signature_auth.clone();
             let handle = tokio::spawn(async move {
                 let mut successes = 0;
                 let mut failures = 0;
-                
+
                 for req_id in 0..requests_per_client {
                     // Use UUID4 format required by strict configuration
                     let nonce = format!("{}", uuid::Uuid::new_v4());
@@ -678,16 +827,16 @@ impl T118ComprehensiveIntegrationTest {
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
                         .as_secs();
-                    
+
                     match auth_state.check_and_store_nonce(&nonce, timestamp) {
                         Ok(_) => successes += 1,
                         Err(_) => failures += 1,
                     }
-                    
+
                     // Simulate realistic request spacing
                     tokio::time::sleep(Duration::from_millis(10)).await;
                 }
-                
+
                 (successes, failures)
             });
             production_handles.push(handle);
@@ -695,7 +844,7 @@ impl T118ComprehensiveIntegrationTest {
 
         let mut total_successes = 0;
         let mut total_failures = 0;
-        
+
         for handle in production_handles {
             let (successes, failures) = handle.await?;
             total_successes += successes;
@@ -703,37 +852,55 @@ impl T118ComprehensiveIntegrationTest {
         }
 
         let production_duration = production_start.elapsed();
-        let production_throughput = (total_successes + total_failures) as f64 / production_duration.as_secs_f64();
-        let production_success_rate = total_successes as f64 / (total_successes + total_failures) as f64;
+        let production_throughput =
+            (total_successes + total_failures) as f64 / production_duration.as_secs_f64();
+        let production_success_rate =
+            total_successes as f64 / (total_successes + total_failures) as f64;
 
         // Test monitoring and alerting systems
         let metrics = signature_auth.get_metrics_collector();
         let security_metrics = metrics.get_enhanced_security_metrics(1000);
-        
+
         // Verify monitoring data is available
-        assert!(security_metrics.nonce_store_size >= 0, "Monitoring should provide nonce store size");
-        assert!(security_metrics.processing_time_ms >= 0, "Monitoring should provide processing time");
+        // Verify monitoring data is available - unsigned types are always valid
+        // security_metrics.nonce_store_size and processing_time_ms are unsigned, no need to check >= 0
 
         // Test system health monitoring
         let nonce_stats = signature_auth.get_nonce_store_stats()?;
-        assert!(nonce_stats.total_nonces >= 0, "Health monitoring should provide nonce statistics");
-        assert!(nonce_stats.max_capacity > 0, "Health monitoring should provide capacity information");
+        // nonce_stats.total_nonces is unsigned, no need to check >= 0
+        assert!(
+            nonce_stats.max_capacity > 0,
+            "Health monitoring should provide capacity information"
+        );
 
-        let production_simulation_success = production_success_rate > 0.95 && 
-                                          production_throughput > 50.0;
+        let production_simulation_success =
+            production_success_rate > 0.95 && production_throughput > 50.0;
 
-        self.results.add_test_result("production_simulation", 
-                                   production_simulation_success,
-                                   if !production_simulation_success {
-                                       Some(format!("Production simulation failed: success_rate={:.2}, throughput={:.1}", 
-                                                  production_success_rate, production_throughput))
-                                   } else { None });
+        self.results.add_test_result(
+            "production_simulation",
+            production_simulation_success,
+            if !production_simulation_success {
+                Some(format!(
+                    "Production simulation failed: success_rate={:.2}, throughput={:.1}",
+                    production_success_rate, production_throughput
+                ))
+            } else {
+                None
+            },
+        );
 
-        self.results.add_metric("production_throughput_rps", production_throughput);
-        self.results.add_metric("production_success_rate", production_success_rate);
-        self.results.add_metric("production_total_requests", (total_successes + total_failures) as f64);
-        self.results.add_security_validation("Production monitoring and alerting verified");
-        self.results.add_security_validation("System health monitoring operational");
+        self.results
+            .add_metric("production_throughput_rps", production_throughput);
+        self.results
+            .add_metric("production_success_rate", production_success_rate);
+        self.results.add_metric(
+            "production_total_requests",
+            (total_successes + total_failures) as f64,
+        );
+        self.results
+            .add_security_validation("Production monitoring and alerting verified");
+        self.results
+            .add_security_validation("System health monitoring operational");
 
         println!("✅ Production simulation completed:");
         println!("  Throughput: {:.1} req/s", production_throughput);
@@ -744,28 +911,45 @@ impl T118ComprehensiveIntegrationTest {
     }
 
     /// Test 8: Compliance and Security Validation
-    async fn test_compliance_and_security_validation(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_compliance_and_security_validation(
+        &mut self,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         println!("🛡️ Testing compliance and security validation...");
 
         let temp_dir = tempdir()?;
         let config = NodeConfig::production(temp_dir.path().to_path_buf());
         let _node = DataFoldNode::new(config.clone())?;
-        
+
         let sig_config = SignatureAuthConfig::strict();
         let signature_auth = SignatureVerificationState::new(sig_config.clone())?;
 
         // Validate all PBI-11 acceptance criteria
         let pbi11_criteria = vec![
-            ("mandatory_signature_auth", "Signature authentication is mandatory"),
-            ("all_endpoints_protected", "All API endpoints require signatures"),
-            ("exempted_endpoints_defined", "Specific endpoints are properly exempted"),
+            (
+                "mandatory_signature_auth",
+                "Signature authentication is mandatory",
+            ),
+            (
+                "all_endpoints_protected",
+                "All API endpoints require signatures",
+            ),
+            (
+                "exempted_endpoints_defined",
+                "Specific endpoints are properly exempted",
+            ),
             ("replay_attack_prevention", "Replay attacks are prevented"),
             ("timestamp_validation", "Timestamp validation is enforced"),
             ("nonce_uniqueness", "Nonce uniqueness is enforced"),
             ("performance_targets", "Performance targets are met"),
-            ("error_handling", "Appropriate error handling is implemented"),
+            (
+                "error_handling",
+                "Appropriate error handling is implemented",
+            ),
             ("security_logging", "Security events are logged"),
-            ("monitoring_integration", "Monitoring systems are integrated"),
+            (
+                "monitoring_integration",
+                "Monitoring systems are integrated",
+            ),
         ];
 
         let mut criteria_met = 0;
@@ -793,10 +977,10 @@ impl T118ComprehensiveIntegrationTest {
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
                         .as_secs();
-                    
+
                     println!("Testing nonce validation with UUID4 nonce: {}", nonce1);
                     println!("Testing timestamp: {} (current time)", timestamp);
-                    
+
                     // First nonce should succeed
                     match signature_auth.check_and_store_nonce(&nonce1, timestamp) {
                         Ok(_) => println!("✓ First nonce validation succeeded"),
@@ -805,13 +989,13 @@ impl T118ComprehensiveIntegrationTest {
                             panic!("First nonce should succeed but failed: {:?}", e);
                         }
                     }
-                    
+
                     // Second use of same nonce should fail (replay)
                     match signature_auth.check_and_store_nonce(&nonce2, timestamp) {
                         Ok(_) => {
                             println!("✗ Replay nonce validation should have failed but succeeded");
                             panic!("Replay nonce should fail but succeeded");
-                        },
+                        }
                         Err(_) => println!("✓ Replay nonce correctly rejected"),
                     }
                     criteria_met += 1;
@@ -821,9 +1005,11 @@ impl T118ComprehensiveIntegrationTest {
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
                         .as_secs();
-                    
+
                     assert!(signature_auth.validate_timestamp(current_time).is_ok());
-                    assert!(signature_auth.validate_timestamp(current_time - 3600).is_err());
+                    assert!(signature_auth
+                        .validate_timestamp(current_time - 3600)
+                        .is_err());
                     criteria_met += 1;
                 }
                 "nonce_uniqueness" => {
@@ -856,24 +1042,39 @@ impl T118ComprehensiveIntegrationTest {
                 }
                 _ => {}
             }
-            
+
             println!("  ✓ {} - {}", criterion, description);
         }
 
         let compliance_success = criteria_met == pbi11_criteria.len();
 
-        self.results.add_test_result("compliance_and_security_validation", 
-                                   compliance_success,
-                                   if !compliance_success {
-                                       Some(format!("Only {}/{} PBI-11 criteria met", criteria_met, pbi11_criteria.len()))
-                                   } else { None });
+        self.results.add_test_result(
+            "compliance_and_security_validation",
+            compliance_success,
+            if !compliance_success {
+                Some(format!(
+                    "Only {}/{} PBI-11 criteria met",
+                    criteria_met,
+                    pbi11_criteria.len()
+                ))
+            } else {
+                None
+            },
+        );
 
-        self.results.add_metric("pbi11_criteria_met", criteria_met as f64);
-        self.results.add_metric("pbi11_criteria_total", pbi11_criteria.len() as f64);
-        self.results.add_security_validation("All PBI-11 acceptance criteria validated");
+        self.results
+            .add_metric("pbi11_criteria_met", criteria_met as f64);
+        self.results
+            .add_metric("pbi11_criteria_total", pbi11_criteria.len() as f64);
+        self.results
+            .add_security_validation("All PBI-11 acceptance criteria validated");
 
         println!("✅ Compliance and security validation completed:");
-        println!("  PBI-11 criteria met: {}/{}", criteria_met, pbi11_criteria.len());
+        println!(
+            "  PBI-11 criteria met: {}/{}",
+            criteria_met,
+            pbi11_criteria.len()
+        );
 
         Ok(())
     }
@@ -882,21 +1083,25 @@ impl T118ComprehensiveIntegrationTest {
     async fn generate_comprehensive_report(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("\n📊 T11.8 Comprehensive Integration Test Report");
         println!("================================================");
-        
+
         let success_rate = self.results.success_rate();
-        println!("Overall Success Rate: {:.1}% ({}/{} tests passed)", 
-                success_rate * 100.0, self.results.passed_tests, self.results.total_tests);
-        
+        println!(
+            "Overall Success Rate: {:.1}% ({}/{} tests passed)",
+            success_rate * 100.0,
+            self.results.passed_tests,
+            self.results.total_tests
+        );
+
         println!("\n🔒 Security Validations:");
         for validation in &self.results.security_validations {
             println!("  ✓ {}", validation);
         }
-        
+
         println!("\n⚡ Performance Metrics:");
         for (metric, value) in &self.results.performance_metrics {
             println!("  {} : {:.2}", metric, value);
         }
-        
+
         println!("\n🌐 Endpoint Coverage:");
         let mut total_endpoints = 0;
         let mut protected_endpoints = 0;
@@ -905,24 +1110,35 @@ impl T118ComprehensiveIntegrationTest {
             if *requires_auth {
                 protected_endpoints += 1;
             }
-            println!("  {} : {}", endpoint, if *requires_auth { "Protected" } else { "Exempted" });
+            println!(
+                "  {} : {}",
+                endpoint,
+                if *requires_auth {
+                    "Protected"
+                } else {
+                    "Exempted"
+                }
+            );
         }
-        println!("  Summary: {}/{} endpoints require authentication", protected_endpoints, total_endpoints);
-        
+        println!(
+            "  Summary: {}/{} endpoints require authentication",
+            protected_endpoints, total_endpoints
+        );
+
         if !self.results.errors.is_empty() {
             println!("\n❌ Errors:");
             for error in &self.results.errors {
                 println!("  • {}", error);
             }
         }
-        
+
         if !self.results.warnings.is_empty() {
             println!("\n⚠️  Warnings:");
             for warning in &self.results.warnings {
                 println!("  • {}", warning);
             }
         }
-        
+
         println!("\n🎯 T11.8 Implementation Status:");
         if success_rate >= 0.95 {
             println!("  ✅ PASSED - All comprehensive integration tests successful");
@@ -932,7 +1148,7 @@ impl T118ComprehensiveIntegrationTest {
             println!("  ❌ FAILED - Some integration tests failed");
             println!("  ⚠️  System requires attention before production deployment");
         }
-        
+
         Ok(())
     }
 }
@@ -946,19 +1162,37 @@ async fn test_handler() -> HttpResponse {
 #[tokio::test]
 async fn test_t11_8_comprehensive_integration() {
     let _ = env_logger::builder().is_test(true).try_init();
-    
+
     println!("🚀 Starting T11.8: Comprehensive Integration Testing for PBI-11");
-    
+
     let mut test_suite = T118ComprehensiveIntegrationTest::new();
-    let results = test_suite.run_all_tests().await.expect("T11.8 tests should complete");
-    
+    let results = test_suite
+        .run_all_tests()
+        .await
+        .expect("T11.8 tests should complete");
+
     // Validate that tests are comprehensive and successful
-    assert!(results.total_tests >= 8, "Should run at least 8 comprehensive test categories");
-    assert!(results.success_rate() >= 0.95, "Success rate should be at least 95%");
-    assert!(!results.security_validations.is_empty(), "Should have security validations");
-    assert!(!results.performance_metrics.is_empty(), "Should have performance metrics");
-    assert!(!results.endpoint_coverage.is_empty(), "Should have endpoint coverage data");
-    
+    assert!(
+        results.total_tests >= 8,
+        "Should run at least 8 comprehensive test categories"
+    );
+    assert!(
+        results.success_rate() >= 0.95,
+        "Success rate should be at least 95%"
+    );
+    assert!(
+        !results.security_validations.is_empty(),
+        "Should have security validations"
+    );
+    assert!(
+        !results.performance_metrics.is_empty(),
+        "Should have performance metrics"
+    );
+    assert!(
+        !results.endpoint_coverage.is_empty(),
+        "Should have endpoint coverage data"
+    );
+
     println!("✅ T11.8 Comprehensive Integration Testing completed successfully");
 }
 
@@ -966,16 +1200,28 @@ async fn test_t11_8_comprehensive_integration() {
 #[tokio::test]
 async fn test_t11_8_quick_validation() {
     let _ = env_logger::builder().is_test(true).try_init();
-    
+
     let mut test_suite = T118ComprehensiveIntegrationTest::new();
-    
+
     // Run just the essential validations quickly
-    test_suite.test_mandatory_authentication_enforcement().await.expect("Mandatory auth test should pass");
-    test_suite.test_all_api_endpoints_require_signatures().await.expect("Endpoint test should pass");
-    test_suite.test_compliance_and_security_validation().await.expect("Compliance test should pass");
-    
+    test_suite
+        .test_mandatory_authentication_enforcement()
+        .await
+        .expect("Mandatory auth test should pass");
+    test_suite
+        .test_all_api_endpoints_require_signatures()
+        .await
+        .expect("Endpoint test should pass");
+    test_suite
+        .test_compliance_and_security_validation()
+        .await
+        .expect("Compliance test should pass");
+
     let results = test_suite.results;
-    assert!(results.success_rate() >= 0.95, "Quick validation should pass");
-    
+    assert!(
+        results.success_rate() >= 0.95,
+        "Quick validation should pass"
+    );
+
     println!("✅ T11.8 Quick validation completed");
 }

@@ -3,8 +3,8 @@
 //! This module provides real-time security monitoring, anomaly detection,
 //! and alerting for encryption-related security events.
 
-use super::audit_logger::{SecurityEventDetails, OperationResult, CryptoAuditLogger};
-use super::enhanced_error::{EnhancedCryptoError};
+use super::audit_logger::{CryptoAuditLogger, OperationResult, SecurityEventDetails};
+use super::enhanced_error::EnhancedCryptoError;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -161,7 +161,7 @@ impl PatternTracker {
         // Clean up old events
         let cutoff = Instant::now() - window_duration;
         self.events.retain(|e| e.timestamp > cutoff);
-        
+
         // Add new event
         self.events.push(event);
         self.last_cleanup = Instant::now();
@@ -169,7 +169,10 @@ impl PatternTracker {
 
     fn get_events_in_window(&self, window_duration: Duration) -> Vec<&SecurityEvent> {
         let cutoff = Instant::now() - window_duration;
-        self.events.iter().filter(|e| e.timestamp > cutoff).collect()
+        self.events
+            .iter()
+            .filter(|e| e.timestamp > cutoff)
+            .collect()
     }
 }
 
@@ -330,15 +333,21 @@ impl CryptoSecurityMonitor {
     }
 
     /// Process an enhanced crypto error for security monitoring
-    pub async fn monitor_crypto_error(&self, error: &EnhancedCryptoError) -> Vec<SecurityDetection> {
+    pub async fn monitor_crypto_error(
+        &self,
+        error: &EnhancedCryptoError,
+    ) -> Vec<SecurityDetection> {
         if !self.config.enabled {
             return Vec::new();
         }
 
         let mut metadata = HashMap::new();
-        metadata.insert("error_type".to_string(), error.error_type_name().to_string());
+        metadata.insert(
+            "error_type".to_string(),
+            error.error_type_name().to_string(),
+        );
         metadata.insert("severity".to_string(), format!("{:?}", error.severity()));
-        
+
         // Add error context metadata
         for (key, value) in &error.context().metadata {
             metadata.insert(format!("ctx_{}", key), value.clone());
@@ -363,17 +372,21 @@ impl CryptoSecurityMonitor {
                     threat_level: format!("{:?}", detection.threat_level),
                     source: Some(detection.source.clone()),
                     target: None,
-                    security_metadata: detection.evidence.iter()
+                    security_metadata: detection
+                        .evidence
+                        .iter()
                         .map(|(k, v)| (k.clone(), v.to_string()))
                         .collect(),
                 };
 
-                audit_logger.log_security_event(
-                    &format!("threat_detected_{:?}", detection.pattern),
-                    security_details,
-                    OperationResult::Success,
-                    Some(detection.detection_id),
-                ).await;
+                audit_logger
+                    .log_security_event(
+                        &format!("threat_detected_{:?}", detection.pattern),
+                        security_details,
+                        OperationResult::Success,
+                        Some(detection.detection_id),
+                    )
+                    .await;
             }
         }
 
@@ -393,9 +406,13 @@ impl CryptoSecurityMonitor {
     }
 
     /// Get detections by threat level
-    pub async fn get_detections_by_threat_level(&self, threat_level: ThreatLevel) -> Vec<SecurityDetection> {
+    pub async fn get_detections_by_threat_level(
+        &self,
+        threat_level: ThreatLevel,
+    ) -> Vec<SecurityDetection> {
         let detections = self.detections.read().await;
-        detections.iter()
+        detections
+            .iter()
             .filter(|d| d.threat_level == threat_level)
             .cloned()
             .collect()
@@ -405,7 +422,7 @@ impl CryptoSecurityMonitor {
     pub async fn clear_detections(&self) {
         let mut detections = self.detections.write().await;
         detections.clear();
-        
+
         let mut stats = self.statistics.write().await;
         stats.threats_detected = 0;
         stats.threats_by_level.clear();
@@ -428,8 +445,13 @@ impl CryptoSecurityMonitor {
         // Add event to pattern trackers
         {
             let mut trackers = self.pattern_trackers.write().await;
-            let tracker = trackers.entry(event.event_type.clone()).or_insert_with(PatternTracker::new);
-            tracker.add_event(event.clone(), Duration::from_secs(self.config.detection_window_minutes * 60));
+            let tracker = trackers
+                .entry(event.event_type.clone())
+                .or_insert_with(PatternTracker::new);
+            tracker.add_event(
+                event.clone(),
+                Duration::from_secs(self.config.detection_window_minutes * 60),
+            );
         }
 
         // Run pattern detection algorithms
@@ -446,8 +468,14 @@ impl CryptoSecurityMonitor {
             stats.last_detection = Some(Utc::now());
 
             for detection in &detections {
-                *stats.threats_by_level.entry(detection.threat_level.clone()).or_insert(0) += 1;
-                *stats.patterns_detected.entry(detection.pattern).or_insert(0) += 1;
+                *stats
+                    .threats_by_level
+                    .entry(detection.threat_level.clone())
+                    .or_insert(0) += 1;
+                *stats
+                    .patterns_detected
+                    .entry(detection.pattern)
+                    .or_insert(0) += 1;
             }
 
             // Store detections
@@ -473,7 +501,11 @@ impl CryptoSecurityMonitor {
     }
 
     /// Detect specific security patterns
-    async fn detect_pattern(&self, pattern: &SecurityPattern, event: &SecurityEvent) -> Option<SecurityDetection> {
+    async fn detect_pattern(
+        &self,
+        pattern: &SecurityPattern,
+        event: &SecurityEvent,
+    ) -> Option<SecurityDetection> {
         match pattern {
             SecurityPattern::RepeatedDecryptionFailures => {
                 self.detect_repeated_failures("decryption", event).await
@@ -481,24 +513,24 @@ impl CryptoSecurityMonitor {
             SecurityPattern::UnusualEncryptionPattern => {
                 self.detect_unusual_encryption_pattern(event).await
             }
-            SecurityPattern::KeyUsageAnomaly => {
-                self.detect_key_usage_anomaly(event).await
-            }
+            SecurityPattern::KeyUsageAnomaly => self.detect_key_usage_anomaly(event).await,
             SecurityPattern::PerformanceDegradation => {
                 self.detect_performance_degradation(event).await
             }
             SecurityPattern::UnauthorizedKeyAccess => {
                 self.detect_unauthorized_key_access(event).await
             }
-            SecurityPattern::DataCorruption => {
-                self.detect_data_corruption(event).await
-            }
+            SecurityPattern::DataCorruption => self.detect_data_corruption(event).await,
             _ => None, // Other patterns not implemented yet
         }
     }
 
     /// Detect repeated failure patterns
-    async fn detect_repeated_failures(&self, operation_type: &str, event: &SecurityEvent) -> Option<SecurityDetection> {
+    async fn detect_repeated_failures(
+        &self,
+        operation_type: &str,
+        event: &SecurityEvent,
+    ) -> Option<SecurityDetection> {
         if event.event_type != operation_type || event.success {
             return None;
         }
@@ -507,16 +539,26 @@ impl CryptoSecurityMonitor {
         if let Some(tracker) = trackers.get(operation_type) {
             let window_duration = Duration::from_secs(self.config.detection_window_minutes * 60);
             let recent_events = tracker.get_events_in_window(window_duration);
-            
-            let failure_count = recent_events.iter()
+
+            let failure_count = recent_events
+                .iter()
                 .filter(|e| !e.success && e.operation == event.operation)
                 .count();
 
             if failure_count >= self.config.failure_threshold as usize {
                 let mut evidence = HashMap::new();
-                evidence.insert("failure_count".to_string(), serde_json::Value::Number(failure_count.into()));
-                evidence.insert("threshold".to_string(), serde_json::Value::Number(self.config.failure_threshold.into()));
-                evidence.insert("window_minutes".to_string(), serde_json::Value::Number(self.config.detection_window_minutes.into()));
+                evidence.insert(
+                    "failure_count".to_string(),
+                    serde_json::Value::Number(failure_count.into()),
+                );
+                evidence.insert(
+                    "threshold".to_string(),
+                    serde_json::Value::Number(self.config.failure_threshold.into()),
+                );
+                evidence.insert(
+                    "window_minutes".to_string(),
+                    serde_json::Value::Number(self.config.detection_window_minutes.into()),
+                );
 
                 return Some(SecurityDetection {
                     detection_id: Uuid::new_v4(),
@@ -528,7 +570,11 @@ impl CryptoSecurityMonitor {
                         ThreatLevel::Medium
                     },
                     confidence: 0.8,
-                    source: event.metadata.get("source").cloned().unwrap_or("unknown".to_string()),
+                    source: event
+                        .metadata
+                        .get("source")
+                        .cloned()
+                        .unwrap_or("unknown".to_string()),
                     description: format!(
                         "Detected {} repeated {} failures in {} minutes",
                         failure_count, operation_type, self.config.detection_window_minutes
@@ -547,7 +593,10 @@ impl CryptoSecurityMonitor {
     }
 
     /// Detect unusual encryption patterns
-    async fn detect_unusual_encryption_pattern(&self, event: &SecurityEvent) -> Option<SecurityDetection> {
+    async fn detect_unusual_encryption_pattern(
+        &self,
+        event: &SecurityEvent,
+    ) -> Option<SecurityDetection> {
         if event.event_type != "encryption" {
             return None;
         }
@@ -558,8 +607,14 @@ impl CryptoSecurityMonitor {
                 // Flag very large or very small data sizes as potentially suspicious
                 if data_size > 100_000_000 || (data_size < 10 && data_size > 0) {
                     let mut evidence = HashMap::new();
-                    evidence.insert("data_size".to_string(), serde_json::Value::Number(data_size.into()));
-                    evidence.insert("threshold_exceeded".to_string(), serde_json::Value::Bool(true));
+                    evidence.insert(
+                        "data_size".to_string(),
+                        serde_json::Value::Number(data_size.into()),
+                    );
+                    evidence.insert(
+                        "threshold_exceeded".to_string(),
+                        serde_json::Value::Bool(true),
+                    );
 
                     return Some(SecurityDetection {
                         detection_id: Uuid::new_v4(),
@@ -567,7 +622,11 @@ impl CryptoSecurityMonitor {
                         pattern: SecurityPattern::UnusualEncryptionPattern,
                         threat_level: ThreatLevel::Low,
                         confidence: 0.6,
-                        source: event.metadata.get("source").cloned().unwrap_or("unknown".to_string()),
+                        source: event
+                            .metadata
+                            .get("source")
+                            .cloned()
+                            .unwrap_or("unknown".to_string()),
                         description: format!("Unusual encryption data size: {} bytes", data_size),
                         evidence,
                         recommended_actions: vec![
@@ -593,15 +652,22 @@ impl CryptoSecurityMonitor {
         if let Some(tracker) = trackers.get("key_operation") {
             let window_duration = Duration::from_secs(300); // 5 minute window
             let recent_events = tracker.get_events_in_window(window_duration);
-            
-            let key_gen_count = recent_events.iter()
+
+            let key_gen_count = recent_events
+                .iter()
                 .filter(|e| e.operation.contains("generate") || e.operation.contains("derive"))
                 .count();
 
             if key_gen_count > 10 {
                 let mut evidence = HashMap::new();
-                evidence.insert("key_generation_count".to_string(), serde_json::Value::Number(key_gen_count.into()));
-                evidence.insert("time_window_minutes".to_string(), serde_json::Value::Number(5.into()));
+                evidence.insert(
+                    "key_generation_count".to_string(),
+                    serde_json::Value::Number(key_gen_count.into()),
+                );
+                evidence.insert(
+                    "time_window_minutes".to_string(),
+                    serde_json::Value::Number(5.into()),
+                );
 
                 return Some(SecurityDetection {
                     detection_id: Uuid::new_v4(),
@@ -609,8 +675,15 @@ impl CryptoSecurityMonitor {
                     pattern: SecurityPattern::KeyUsageAnomaly,
                     threat_level: ThreatLevel::Medium,
                     confidence: 0.7,
-                    source: event.metadata.get("source").cloned().unwrap_or("unknown".to_string()),
-                    description: format!("Excessive key generation: {} operations in 5 minutes", key_gen_count),
+                    source: event
+                        .metadata
+                        .get("source")
+                        .cloned()
+                        .unwrap_or("unknown".to_string()),
+                    description: format!(
+                        "Excessive key generation: {} operations in 5 minutes",
+                        key_gen_count
+                    ),
                     evidence,
                     recommended_actions: vec![
                         "Investigate key usage patterns".to_string(),
@@ -625,14 +698,23 @@ impl CryptoSecurityMonitor {
     }
 
     /// Detect performance degradation attacks
-    async fn detect_performance_degradation(&self, event: &SecurityEvent) -> Option<SecurityDetection> {
+    async fn detect_performance_degradation(
+        &self,
+        event: &SecurityEvent,
+    ) -> Option<SecurityDetection> {
         if let Some(duration_str) = event.metadata.get("duration_ms") {
             if let Ok(duration_ms) = duration_str.parse::<u64>() {
                 // Flag operations that take longer than 5 seconds
                 if duration_ms > 5000 {
                     let mut evidence = HashMap::new();
-                    evidence.insert("duration_ms".to_string(), serde_json::Value::Number(duration_ms.into()));
-                    evidence.insert("threshold_ms".to_string(), serde_json::Value::Number(5000.into()));
+                    evidence.insert(
+                        "duration_ms".to_string(),
+                        serde_json::Value::Number(duration_ms.into()),
+                    );
+                    evidence.insert(
+                        "threshold_ms".to_string(),
+                        serde_json::Value::Number(5000.into()),
+                    );
 
                     return Some(SecurityDetection {
                         detection_id: Uuid::new_v4(),
@@ -640,7 +722,11 @@ impl CryptoSecurityMonitor {
                         pattern: SecurityPattern::PerformanceDegradation,
                         threat_level: ThreatLevel::Medium,
                         confidence: 0.5,
-                        source: event.metadata.get("source").cloned().unwrap_or("unknown".to_string()),
+                        source: event
+                            .metadata
+                            .get("source")
+                            .cloned()
+                            .unwrap_or("unknown".to_string()),
                         description: format!("Slow cryptographic operation: {} ms", duration_ms),
                         evidence,
                         recommended_actions: vec![
@@ -657,11 +743,20 @@ impl CryptoSecurityMonitor {
     }
 
     /// Detect unauthorized key access attempts
-    async fn detect_unauthorized_key_access(&self, event: &SecurityEvent) -> Option<SecurityDetection> {
+    async fn detect_unauthorized_key_access(
+        &self,
+        event: &SecurityEvent,
+    ) -> Option<SecurityDetection> {
         if event.event_type == "key_operation" && !event.success {
             let mut evidence = HashMap::new();
-            evidence.insert("operation".to_string(), serde_json::Value::String(event.operation.clone()));
-            evidence.insert("component".to_string(), serde_json::Value::String(event.component.clone()));
+            evidence.insert(
+                "operation".to_string(),
+                serde_json::Value::String(event.operation.clone()),
+            );
+            evidence.insert(
+                "component".to_string(),
+                serde_json::Value::String(event.component.clone()),
+            );
 
             return Some(SecurityDetection {
                 detection_id: Uuid::new_v4(),
@@ -669,7 +764,11 @@ impl CryptoSecurityMonitor {
                 pattern: SecurityPattern::UnauthorizedKeyAccess,
                 threat_level: ThreatLevel::High,
                 confidence: 0.9,
-                source: event.metadata.get("source").cloned().unwrap_or("unknown".to_string()),
+                source: event
+                    .metadata
+                    .get("source")
+                    .cloned()
+                    .unwrap_or("unknown".to_string()),
                 description: format!("Failed key operation: {}", event.operation),
                 evidence,
                 recommended_actions: vec![
@@ -687,13 +786,16 @@ impl CryptoSecurityMonitor {
     async fn detect_data_corruption(&self, event: &SecurityEvent) -> Option<SecurityDetection> {
         if event.event_type == "decryption" && !event.success {
             // Additional checks for corruption vs. authentication failure would go here
-            let operation_contains_corruption = event.operation.to_lowercase().contains("corrupt") ||
-                event.operation.to_lowercase().contains("invalid") ||
-                event.operation.to_lowercase().contains("tamper");
+            let operation_contains_corruption = event.operation.to_lowercase().contains("corrupt")
+                || event.operation.to_lowercase().contains("invalid")
+                || event.operation.to_lowercase().contains("tamper");
 
             if operation_contains_corruption {
                 let mut evidence = HashMap::new();
-                evidence.insert("operation".to_string(), serde_json::Value::String(event.operation.clone()));
+                evidence.insert(
+                    "operation".to_string(),
+                    serde_json::Value::String(event.operation.clone()),
+                );
 
                 return Some(SecurityDetection {
                     detection_id: Uuid::new_v4(),
@@ -701,7 +803,11 @@ impl CryptoSecurityMonitor {
                     pattern: SecurityPattern::DataCorruption,
                     threat_level: ThreatLevel::High,
                     confidence: 0.8,
-                    source: event.metadata.get("source").cloned().unwrap_or("unknown".to_string()),
+                    source: event
+                        .metadata
+                        .get("source")
+                        .cloned()
+                        .unwrap_or("unknown".to_string()),
                     description: "Potential data corruption detected during decryption".to_string(),
                     evidence,
                     recommended_actions: vec![
@@ -721,7 +827,10 @@ impl CryptoSecurityMonitor {
         #[allow(clippy::match_like_matches_macro)]
         match (&self.config.alert_threshold, threat_level) {
             (ThreatLevel::Low, _) => true,
-            (ThreatLevel::Medium, ThreatLevel::Medium | ThreatLevel::High | ThreatLevel::Critical) => true,
+            (
+                ThreatLevel::Medium,
+                ThreatLevel::Medium | ThreatLevel::High | ThreatLevel::Critical,
+            ) => true,
             (ThreatLevel::High, ThreatLevel::High | ThreatLevel::Critical) => true,
             (ThreatLevel::Critical, ThreatLevel::Critical) => true,
             _ => false,
@@ -759,7 +868,9 @@ pub fn init_global_security_monitor(config: SecurityMonitorConfig) {
 /// Get the global security monitor instance
 pub fn get_global_security_monitor() -> Option<Arc<CryptoSecurityMonitor>> {
     #[allow(static_mut_refs)]
-    unsafe { GLOBAL_SECURITY_MONITOR.as_ref().map(Arc::clone) }
+    unsafe {
+        GLOBAL_SECURITY_MONITOR.as_ref().map(Arc::clone)
+    }
 }
 
 #[cfg(test)]
@@ -771,7 +882,7 @@ mod tests {
     async fn test_security_monitor_creation() {
         let config = SecurityMonitorConfig::default();
         let monitor = CryptoSecurityMonitor::new(config);
-        
+
         let stats = monitor.get_statistics().await;
         assert_eq!(stats.total_events_processed, 0);
     }
@@ -783,21 +894,26 @@ mod tests {
             ..Default::default()
         };
         let monitor = CryptoSecurityMonitor::new(config);
-        
+
         // Simulate repeated failures
         for _ in 0..4 {
-            let detections = monitor.monitor_decryption_operation(
-                "decrypt_data",
-                "test_context",
-                100,
-                Duration::from_millis(10),
-                false, // failure
-                Some("test_source"),
-            ).await;
-            
+            let detections = monitor
+                .monitor_decryption_operation(
+                    "decrypt_data",
+                    "test_context",
+                    100,
+                    Duration::from_millis(10),
+                    false, // failure
+                    Some("test_source"),
+                )
+                .await;
+
             // Should detect threat on the 4th failure (exceeding threshold of 3)
             if !detections.is_empty() {
-                assert_eq!(detections[0].pattern, SecurityPattern::RepeatedDecryptionFailures);
+                assert_eq!(
+                    detections[0].pattern,
+                    SecurityPattern::RepeatedDecryptionFailures
+                );
                 break;
             }
         }
@@ -806,68 +922,97 @@ mod tests {
     #[tokio::test]
     async fn test_unusual_encryption_pattern_detection() {
         let monitor = CryptoSecurityMonitor::with_default_config();
-        
+
         // Test with unusually large data size
-        let detections = monitor.monitor_encryption_operation(
-            "encrypt_data",
-            "test_context",
-            200_000_000, // Very large size
-            Duration::from_millis(100),
-            true,
-            Some("test_source"),
-        ).await;
-        
+        let detections = monitor
+            .monitor_encryption_operation(
+                "encrypt_data",
+                "test_context",
+                200_000_000, // Very large size
+                Duration::from_millis(100),
+                true,
+                Some("test_source"),
+            )
+            .await;
+
         assert!(!detections.is_empty());
-        assert_eq!(detections[0].pattern, SecurityPattern::UnusualEncryptionPattern);
+        assert_eq!(
+            detections[0].pattern,
+            SecurityPattern::UnusualEncryptionPattern
+        );
     }
 
     #[tokio::test]
     async fn test_performance_degradation_detection() {
         let monitor = CryptoSecurityMonitor::with_default_config();
-        
-        let detections = monitor.monitor_encryption_operation(
-            "encrypt_data",
-            "test_context",
-            1000,
-            Duration::from_millis(10000), // Very slow operation
-            true,
-            Some("test_source"),
-        ).await;
-        
+
+        let detections = monitor
+            .monitor_encryption_operation(
+                "encrypt_data",
+                "test_context",
+                1000,
+                Duration::from_millis(10000), // Very slow operation
+                true,
+                Some("test_source"),
+            )
+            .await;
+
         assert!(!detections.is_empty());
-        assert_eq!(detections[0].pattern, SecurityPattern::PerformanceDegradation);
+        assert_eq!(
+            detections[0].pattern,
+            SecurityPattern::PerformanceDegradation
+        );
     }
 
     #[tokio::test]
     async fn test_unauthorized_key_access_detection() {
         let monitor = CryptoSecurityMonitor::with_default_config();
-        
-        let detections = monitor.monitor_key_operation(
-            "access_private_key",
-            "ed25519",
-            Duration::from_millis(50),
-            false, // Failed access
-            Some("unauthorized_source"),
-        ).await;
-        
+
+        let detections = monitor
+            .monitor_key_operation(
+                "access_private_key",
+                "ed25519",
+                Duration::from_millis(50),
+                false, // Failed access
+                Some("unauthorized_source"),
+            )
+            .await;
+
         assert!(!detections.is_empty());
-        assert_eq!(detections[0].pattern, SecurityPattern::UnauthorizedKeyAccess);
+        assert_eq!(
+            detections[0].pattern,
+            SecurityPattern::UnauthorizedKeyAccess
+        );
         assert_eq!(detections[0].threat_level, ThreatLevel::High);
     }
 
     #[tokio::test]
     async fn test_statistics_tracking() {
         let monitor = CryptoSecurityMonitor::with_default_config();
-        
+
         // Generate some events
-        monitor.monitor_encryption_operation(
-            "encrypt1", "context1", 100, Duration::from_millis(10), true, None
-        ).await;
-        
-        monitor.monitor_decryption_operation(
-            "decrypt1", "context1", 100, Duration::from_millis(15), false, None
-        ).await;
-        
+        monitor
+            .monitor_encryption_operation(
+                "encrypt1",
+                "context1",
+                100,
+                Duration::from_millis(10),
+                true,
+                None,
+            )
+            .await;
+
+        monitor
+            .monitor_decryption_operation(
+                "decrypt1",
+                "context1",
+                100,
+                Duration::from_millis(15),
+                false,
+                None,
+            )
+            .await;
+
         let stats = monitor.get_statistics().await;
         assert_eq!(stats.total_events_processed, 2);
     }

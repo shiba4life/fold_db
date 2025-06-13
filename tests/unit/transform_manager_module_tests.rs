@@ -5,17 +5,14 @@
 
 use crate::test_utils::CommonTestFixture;
 use datafold::fold_db_core::infrastructure::message_bus::{
-    TransformTriggered,
-    SchemaChanged,
-    TransformExecuted,
+    SchemaChanged, TransformExecuted, TransformTriggered,
 };
 
 // ========== Manager Module Tests ==========
 
 #[tokio::test]
 async fn test_manager_module_initialization() {
-    let fixture = CommonTestFixture::new()
-        .expect("Failed to create test fixture");
+    let fixture = CommonTestFixture::new().expect("Failed to create test fixture");
 
     let transform_manager = &fixture.common.transform_manager;
 
@@ -27,8 +24,7 @@ async fn test_manager_module_initialization() {
 
 #[tokio::test]
 async fn test_manager_module_state_consistency() {
-    let fixture = CommonTestFixture::new()
-        .expect("Failed to create test fixture");
+    let fixture = CommonTestFixture::new().expect("Failed to create test fixture");
 
     let transform_manager = &fixture.common.transform_manager;
 
@@ -53,8 +49,7 @@ async fn test_manager_module_state_consistency() {
 
 #[tokio::test]
 async fn test_event_handlers_module_exists() {
-    let fixture = CommonTestFixture::new()
-        .expect("Failed to create test fixture");
+    let fixture = CommonTestFixture::new().expect("Failed to create test fixture");
 
     // Test basic event publishing works
     let trigger_event = TransformTriggered {
@@ -79,7 +74,7 @@ async fn test_event_handlers_trigger_request_processing() {
 
 #[tokio::test]
 async fn test_event_handlers_execution_request_processing() {
-    // This test needs to be updated for the new event-driven architecture 
+    // This test needs to be updated for the new event-driven architecture
     println!("⚠️ Test temporarily disabled - needs update for new architecture");
 }
 
@@ -101,7 +96,7 @@ async fn test_loading_module_functionality() {
     println!("⚠️ Test temporarily disabled - needs update for new architecture");
 }
 
-#[tokio::test] 
+#[tokio::test]
 async fn test_persistence_module_functionality() {
     // This test needs to be updated for the new event-driven architecture
     println!("⚠️ Test temporarily disabled - needs update for new architecture");
@@ -130,8 +125,7 @@ async fn test_monitoring_module_functionality() {
 
 #[tokio::test]
 async fn test_basic_schema_change_event() {
-    let fixture = CommonTestFixture::new()
-        .expect("Failed to create test fixture");
+    let fixture = CommonTestFixture::new().expect("Failed to create test fixture");
 
     // Test basic schema change event publishing
     let schema_change = SchemaChanged {
@@ -146,8 +140,7 @@ async fn test_basic_schema_change_event() {
 
 #[tokio::test]
 async fn test_basic_transform_execution_event() {
-    let fixture = CommonTestFixture::new()
-        .expect("Failed to create test fixture");
+    let fixture = CommonTestFixture::new().expect("Failed to create test fixture");
 
     // Test basic transform execution event publishing
     let executed_event = TransformExecuted {

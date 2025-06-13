@@ -550,7 +550,7 @@ pub enum Event {
     QueryExecuted(QueryExecuted),
     /// Mutation executed event
     MutationExecuted(MutationExecuted),
-    
+
     // Request/Response Events
     /// Atom create request
     AtomCreateRequest(AtomCreateRequest),

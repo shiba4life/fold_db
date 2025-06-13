@@ -61,4 +61,4 @@ impl From<argon2::Error> for CryptoError {
             message: err.to_string(),
         }
     }
-} 
+}

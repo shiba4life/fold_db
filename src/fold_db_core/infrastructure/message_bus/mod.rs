@@ -48,7 +48,7 @@
 //! ## Main Components
 //!
 //! ### Synchronous Message Bus
-//! 
+//!
 //! The [`MessageBus`] provides synchronous pub/sub messaging:
 //!
 //! ```rust
@@ -57,10 +57,10 @@
 //!
 //! let bus = MessageBus::new();
 //! let mut consumer = bus.subscribe::<FieldValueSet>();
-//! 
+//!
 //! let event = FieldValueSet::new("user.email", json!("alice@example.com"), "user_service");
 //! bus.publish(event).unwrap();
-//! 
+//!
 //! let received_event = consumer.try_recv().unwrap();
 //! ```
 //!
@@ -75,10 +75,10 @@
 //! # async fn example() {
 //! let bus = AsyncMessageBus::new();
 //! let mut consumer = bus.subscribe("AtomCreated").await;
-//! 
+//!
 //! let event = AtomCreated::new("atom-123", json!({"name": "Alice"}));
 //! bus.publish_atom_created(event).await.unwrap();
-//! 
+//!
 //! let received_event = consumer.recv().await;
 //! # }
 //! ```
@@ -107,22 +107,22 @@
 //! ```
 
 // Re-export all public types and traits
-pub use events::*;
+pub use async_bus::{AsyncConsumer, AsyncEventHandler, AsyncMessageBus};
 pub use error_handling::{
     AsyncRecvError, AsyncTryRecvError, DeadLetterEvent, EventHistoryEntry, MessageBusError,
     MessageBusResult, RetryableEvent,
 };
+pub use events::*;
 pub use sync_bus::{Consumer, MessageBus};
-pub use async_bus::{AsyncConsumer, AsyncEventHandler, AsyncMessageBus};
 
 // Import constructor implementations (these add methods to the event types)
 
 // Internal modules
-mod events;
-mod error_handling;
-mod sync_bus;
 mod async_bus;
 mod constructors;
+mod error_handling;
+mod events;
+mod sync_bus;
 
 #[cfg(test)]
 mod integration_tests {
@@ -176,7 +176,6 @@ mod integration_tests {
         assert!(received.is_some());
     }
 
-
     #[test]
     fn test_event_constructors() {
         // Test that all constructor methods work correctly
@@ -229,8 +228,14 @@ mod integration_tests {
         assert_eq!(AtomCreateResponse::type_id(), "AtomCreateResponse");
         assert_eq!(FieldValueSetRequest::type_id(), "FieldValueSetRequest");
         assert_eq!(FieldValueSetResponse::type_id(), "FieldValueSetResponse");
-        assert_eq!(SystemInitializationRequest::type_id(), "SystemInitializationRequest");
-        assert_eq!(SystemInitializationResponse::type_id(), "SystemInitializationResponse");
+        assert_eq!(
+            SystemInitializationRequest::type_id(),
+            "SystemInitializationRequest"
+        );
+        assert_eq!(
+            SystemInitializationResponse::type_id(),
+            "SystemInitializationResponse"
+        );
     }
 
     #[test]
@@ -243,11 +248,15 @@ mod integration_tests {
         let reg_error = MessageBusError::RegistrationFailed {
             event_type: "TestEvent".to_string(),
         };
-        assert!(reg_error.to_string().contains("Failed to register consumer"));
+        assert!(reg_error
+            .to_string()
+            .contains("Failed to register consumer"));
 
         let disconnected_error = MessageBusError::ChannelDisconnected {
             event_type: "TestEvent".to_string(),
         };
-        assert!(disconnected_error.to_string().contains("Channel disconnected"));
+        assert!(disconnected_error
+            .to_string()
+            .contains("Channel disconnected"));
     }
 }

@@ -12,13 +12,15 @@ pub fn create_atom(
     source_pub_key: String,
     content: Value,
 ) -> Result<Atom, Box<dyn std::error::Error>> {
-    db_ops.create_atom(
-        schema_name,
-        source_pub_key,
-        None,
-        content,
-        Some(AtomStatus::Active),
-    ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+    db_ops
+        .create_atom(
+            schema_name,
+            source_pub_key,
+            None,
+            content,
+            Some(AtomStatus::Active),
+        )
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
 }
 
 /// Create a new atom in the database with encryption
@@ -29,14 +31,16 @@ pub fn create_atom_encrypted(
     source_pub_key: String,
     content: Value,
 ) -> Result<Atom, Box<dyn std::error::Error>> {
-    db_ops.create_atom_encrypted(
-        encryption_wrapper,
-        schema_name,
-        source_pub_key,
-        None,
-        content,
-        Some(AtomStatus::Active),
-    ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+    db_ops
+        .create_atom_encrypted(
+            encryption_wrapper,
+            schema_name,
+            source_pub_key,
+            None,
+            content,
+            Some(AtomStatus::Active),
+        )
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
 }
 
 /// Update an atom reference
@@ -46,7 +50,8 @@ pub fn update_atom_ref(
     atom_uuid: String,
     source_pub_key: String,
 ) -> Result<AtomRef, Box<dyn std::error::Error>> {
-    db_ops.update_atom_ref(aref_uuid, atom_uuid, source_pub_key)
+    db_ops
+        .update_atom_ref(aref_uuid, atom_uuid, source_pub_key)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
 }
 
@@ -58,7 +63,8 @@ pub fn update_atom_ref_encrypted(
     atom_uuid: String,
     source_pub_key: String,
 ) -> Result<AtomRef, Box<dyn std::error::Error>> {
-    db_ops.update_atom_ref_encrypted(encryption_wrapper, aref_uuid, atom_uuid, source_pub_key)
+    db_ops
+        .update_atom_ref_encrypted(encryption_wrapper, aref_uuid, atom_uuid, source_pub_key)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
 }
 
@@ -70,7 +76,8 @@ pub fn update_atom_ref_range(
     key: String,
     source_pub_key: String,
 ) -> Result<AtomRefRange, Box<dyn std::error::Error>> {
-    db_ops.update_atom_ref_range(aref_uuid, atom_uuid, key, source_pub_key)
+    db_ops
+        .update_atom_ref_range(aref_uuid, atom_uuid, key, source_pub_key)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
 }
 
@@ -83,7 +90,14 @@ pub fn update_atom_ref_range_encrypted(
     key: String,
     source_pub_key: String,
 ) -> Result<AtomRefRange, Box<dyn std::error::Error>> {
-    db_ops.update_atom_ref_range_encrypted(encryption_wrapper, aref_uuid, atom_uuid, key, source_pub_key)
+    db_ops
+        .update_atom_ref_range_encrypted(
+            encryption_wrapper,
+            aref_uuid,
+            atom_uuid,
+            key,
+            source_pub_key,
+        )
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
 }
 
@@ -94,13 +108,13 @@ pub fn get_atom_history(
 ) -> Result<Vec<Atom>, Box<dyn std::error::Error>> {
     // Load the atom ref from database
     let key = format!("ref:{}", aref_uuid);
-    
+
     match db_ops.db().get(&key)? {
         Some(bytes) => {
             // Try to deserialize as AtomRef first
             if let Ok(atom_ref) = serde_json::from_slice::<AtomRef>(&bytes) {
                 let atom_uuid = atom_ref.get_atom_uuid();
-                
+
                 // Get the current atom
                 let atom_key = format!("atom:{}", atom_uuid);
                 match db_ops.db().get(&atom_key)? {
@@ -108,7 +122,7 @@ pub fn get_atom_history(
                         let atom: Atom = serde_json::from_slice(&atom_bytes)?;
                         Ok(vec![atom])
                     }
-                    None => Ok(vec![])
+                    None => Ok(vec![]),
                 }
             } else {
                 // Try as AtomRefRange
@@ -121,6 +135,6 @@ pub fn get_atom_history(
                 }
             }
         }
-        None => Ok(vec![])
+        None => Ok(vec![]),
     }
 }

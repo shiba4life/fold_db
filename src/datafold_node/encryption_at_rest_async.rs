@@ -39,19 +39,17 @@
 //! ```
 
 use crate::crypto::error::{CryptoError, CryptoResult};
-use crate::datafold_node::encryption_at_rest::{
-    EncryptionAtRest, EncryptedData, AES_KEY_SIZE
-};
+use crate::datafold_node::encryption_at_rest::{EncryptedData, EncryptionAtRest, AES_KEY_SIZE};
+use bytes::BytesMut;
+use futures::future::join_all;
 use lru::LruCache;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{RwLock, Semaphore};
 use tokio::task;
-use serde::{Deserialize, Serialize};
-use futures::future::join_all;
-use bytes::BytesMut;
 
 /// Configuration for performance optimizations
 #[derive(Debug, Clone)]
@@ -101,7 +99,7 @@ impl PerformanceConfig {
             ..Default::default()
         }
     }
-    
+
     /// Create a configuration optimized for low latency
     pub fn low_latency() -> Self {
         Self {
@@ -114,7 +112,7 @@ impl PerformanceConfig {
             ..Default::default()
         }
     }
-    
+
     /// Create a configuration optimized for memory efficiency
     pub fn memory_efficient() -> Self {
         Self {
@@ -170,27 +168,30 @@ impl PerformanceMetrics {
             (self.key_cache_hits as f64 / total_requests as f64) * 100.0
         }
     }
-    
+
     /// Calculate average throughput in bytes per second
     pub fn avg_throughput_bps(&self) -> u64 {
         let total_bytes = self.total_bytes_encrypted + self.total_bytes_decrypted;
         let total_ops = self.total_encryptions + self.total_decryptions;
-        let total_time_seconds = (self.avg_encryption_time_micros + self.avg_decryption_time_micros) * total_ops / 2_000_000;
-        
+        let total_time_seconds =
+            (self.avg_encryption_time_micros + self.avg_decryption_time_micros) * total_ops
+                / 2_000_000;
+
         if total_time_seconds == 0 {
             0
         } else {
             total_bytes / total_time_seconds
         }
     }
-    
+
     /// Calculate performance overhead percentage compared to baseline
     pub fn overhead_percentage(&self, baseline_throughput_bps: u64) -> f64 {
         let current_throughput = self.avg_throughput_bps();
         if baseline_throughput_bps == 0 {
             0.0
         } else {
-            let overhead = (baseline_throughput_bps as f64 - current_throughput as f64) / baseline_throughput_bps as f64;
+            let overhead = (baseline_throughput_bps as f64 - current_throughput as f64)
+                / baseline_throughput_bps as f64;
             overhead * 100.0
         }
     }
@@ -215,11 +216,11 @@ impl CachedKey {
             last_used: now,
         }
     }
-    
+
     fn is_expired(&self, ttl: Duration) -> bool {
         self.created_at.elapsed() > ttl
     }
-    
+
     fn touch(&mut self) {
         self.last_used = Instant::now();
     }
@@ -240,7 +241,7 @@ impl MemoryPool {
             max_size,
         }
     }
-    
+
     async fn get_buffer(&self) -> BytesMut {
         let mut buffers = self.buffers.write().await;
         if let Some(mut buffer) = buffers.pop() {
@@ -251,7 +252,7 @@ impl MemoryPool {
             BytesMut::with_capacity(self.buffer_size)
         }
     }
-    
+
     async fn return_buffer(&self, buffer: BytesMut) {
         let mut buffers = self.buffers.write().await;
         if buffers.len() < self.max_size {
@@ -271,18 +272,19 @@ impl EncryptionContextPool {
     fn new(key: [u8; AES_KEY_SIZE], pool_size: usize) -> CryptoResult<Self> {
         let semaphore = Arc::new(Semaphore::new(pool_size));
         let contexts = Arc::new(RwLock::new(Vec::with_capacity(pool_size)));
-        
+
         Ok(Self {
             contexts,
             semaphore,
             key,
         })
     }
-    
+
     async fn acquire_context(&self) -> CryptoResult<EncryptionAtRest> {
-        let _permit = self.semaphore.acquire().await
-            .map_err(|_| CryptoError::InvalidInput("Failed to acquire context from pool".to_string()))?;
-        
+        let _permit = self.semaphore.acquire().await.map_err(|_| {
+            CryptoError::InvalidInput("Failed to acquire context from pool".to_string())
+        })?;
+
         let mut contexts = self.contexts.write().await;
         if let Some(context) = contexts.pop() {
             Ok(context)
@@ -291,7 +293,7 @@ impl EncryptionContextPool {
             EncryptionAtRest::new(self.key)
         }
     }
-    
+
     #[allow(dead_code)]
     async fn return_context(&self, context: EncryptionAtRest) {
         let mut contexts = self.contexts.write().await;
@@ -321,15 +323,15 @@ impl AsyncEncryptionAtRest {
     /// Create a new async encryption manager with performance optimizations
     pub async fn new(key: [u8; AES_KEY_SIZE], config: PerformanceConfig) -> CryptoResult<Self> {
         let context_pool = EncryptionContextPool::new(key, config.context_pool_size)?;
-        
-        let key_cache = Arc::new(RwLock::new(
-            LruCache::new(NonZeroUsize::new(config.key_cache_size).unwrap())
-        ));
-        
+
+        let key_cache = Arc::new(RwLock::new(LruCache::new(
+            NonZeroUsize::new(config.key_cache_size).unwrap(),
+        )));
+
         let memory_pool = MemoryPool::new(config.streaming_buffer_size, config.memory_pool_size);
-        
+
         let operation_semaphore = Arc::new(Semaphore::new(config.max_concurrent_operations));
-        
+
         Ok(Self {
             context_pool,
             key_cache,
@@ -339,221 +341,240 @@ impl AsyncEncryptionAtRest {
             operation_semaphore,
         })
     }
-    
+
     /// Encrypt data asynchronously
     pub async fn encrypt_async(&self, plaintext: &[u8]) -> CryptoResult<EncryptedData> {
-        let _permit = self.operation_semaphore.acquire().await
-            .map_err(|_| CryptoError::InvalidInput("Failed to acquire operation permit".to_string()))?;
-        
+        let _permit = self.operation_semaphore.acquire().await.map_err(|_| {
+            CryptoError::InvalidInput("Failed to acquire operation permit".to_string())
+        })?;
+
         let start_time = Instant::now();
-        
+
         // Use a task to perform CPU-intensive encryption
         let plaintext_bytes = plaintext.to_vec();
         let context = self.context_pool.acquire_context().await?;
-        
-        let result = task::spawn_blocking(move || {
-            context.encrypt(&plaintext_bytes)
-        }).await
-        .map_err(|e| CryptoError::InvalidInput(format!("Encryption task failed: {}", e)))??;
-        
+
+        let result = task::spawn_blocking(move || context.encrypt(&plaintext_bytes))
+            .await
+            .map_err(|e| CryptoError::InvalidInput(format!("Encryption task failed: {}", e)))??;
+
         let elapsed = start_time.elapsed();
-        
+
         // Update metrics
         if self.config.enable_metrics {
             let mut metrics = self.metrics.write().await;
             metrics.total_encryptions += 1;
             metrics.total_bytes_encrypted += plaintext.len() as u64;
-            let new_avg = (metrics.avg_encryption_time_micros * (metrics.total_encryptions - 1) + elapsed.as_micros() as u64) / metrics.total_encryptions;
+            let new_avg = (metrics.avg_encryption_time_micros * (metrics.total_encryptions - 1)
+                + elapsed.as_micros() as u64)
+                / metrics.total_encryptions;
             metrics.avg_encryption_time_micros = new_avg;
         }
-        
+
         Ok(result)
     }
-    
+
     /// Decrypt data asynchronously
     pub async fn decrypt_async(&self, encrypted_data: &EncryptedData) -> CryptoResult<Vec<u8>> {
-        let _permit = self.operation_semaphore.acquire().await
-            .map_err(|_| CryptoError::InvalidInput("Failed to acquire operation permit".to_string()))?;
-        
+        let _permit = self.operation_semaphore.acquire().await.map_err(|_| {
+            CryptoError::InvalidInput("Failed to acquire operation permit".to_string())
+        })?;
+
         let start_time = Instant::now();
-        
+
         // Use a task to perform CPU-intensive decryption
         let encrypted_data_clone = encrypted_data.clone();
         let context = self.context_pool.acquire_context().await?;
-        
-        let result = task::spawn_blocking(move || {
-            context.decrypt(&encrypted_data_clone)
-        }).await
-        .map_err(|e| CryptoError::InvalidInput(format!("Decryption task failed: {}", e)))??;
-        
+
+        let result = task::spawn_blocking(move || context.decrypt(&encrypted_data_clone))
+            .await
+            .map_err(|e| CryptoError::InvalidInput(format!("Decryption task failed: {}", e)))??;
+
         let elapsed = start_time.elapsed();
-        
+
         // Update metrics
         if self.config.enable_metrics {
             let mut metrics = self.metrics.write().await;
             metrics.total_decryptions += 1;
             metrics.total_bytes_decrypted += result.len() as u64;
-            let new_avg = (metrics.avg_decryption_time_micros * (metrics.total_decryptions - 1) + elapsed.as_micros() as u64) / metrics.total_decryptions;
+            let new_avg = (metrics.avg_decryption_time_micros * (metrics.total_decryptions - 1)
+                + elapsed.as_micros() as u64)
+                / metrics.total_decryptions;
             metrics.avg_decryption_time_micros = new_avg;
         }
-        
+
         Ok(result)
     }
-    
+
     /// Perform batch encryption operations
     pub async fn encrypt_batch(&self, plaintexts: Vec<&[u8]>) -> CryptoResult<Vec<EncryptedData>> {
         let start_time = Instant::now();
-        
+
         // Split into batches for better resource management
         let mut results = Vec::new();
-        
+
         for chunk in plaintexts.chunks(self.config.batch_size) {
-            let futures: Vec<_> = chunk.iter().map(|plaintext| {
-                self.encrypt_async(plaintext)
-            }).collect();
-            
+            let futures: Vec<_> = chunk
+                .iter()
+                .map(|plaintext| self.encrypt_async(plaintext))
+                .collect();
+
             let chunk_results = join_all(futures).await;
             for result in chunk_results {
                 results.push(result?);
             }
         }
-        
+
         let elapsed = start_time.elapsed();
-        
+
         // Update batch metrics
         if self.config.enable_metrics {
             let mut metrics = self.metrics.write().await;
             metrics.batch_operations += 1;
             metrics.batch_operation_time_micros += elapsed.as_micros() as u64;
         }
-        
+
         Ok(results)
     }
-    
+
     /// Perform batch decryption operations
-    pub async fn decrypt_batch(&self, encrypted_data_list: Vec<&EncryptedData>) -> CryptoResult<Vec<Vec<u8>>> {
+    pub async fn decrypt_batch(
+        &self,
+        encrypted_data_list: Vec<&EncryptedData>,
+    ) -> CryptoResult<Vec<Vec<u8>>> {
         let start_time = Instant::now();
-        
+
         // Split into batches for better resource management
         let mut results = Vec::new();
-        
+
         for chunk in encrypted_data_list.chunks(self.config.batch_size) {
-            let futures: Vec<_> = chunk.iter().map(|encrypted_data| {
-                self.decrypt_async(encrypted_data)
-            }).collect();
-            
+            let futures: Vec<_> = chunk
+                .iter()
+                .map(|encrypted_data| self.decrypt_async(encrypted_data))
+                .collect();
+
             let chunk_results = join_all(futures).await;
             for result in chunk_results {
                 results.push(result?);
             }
         }
-        
+
         let elapsed = start_time.elapsed();
-        
+
         // Update batch metrics
         if self.config.enable_metrics {
             let mut metrics = self.metrics.write().await;
             metrics.batch_operations += 1;
             metrics.batch_operation_time_micros += elapsed.as_micros() as u64;
         }
-        
+
         Ok(results)
     }
-    
+
     /// Stream encryption for large data to optimize memory usage
     pub async fn encrypt_stream<R>(&self, reader: R) -> CryptoResult<Vec<u8>>
     where
         R: tokio::io::AsyncRead + Unpin,
     {
         use tokio::io::AsyncReadExt;
-        
+
         let start_time = Instant::now();
         let mut reader = reader;
         let mut buffer = self.memory_pool.get_buffer().await;
         let mut all_data = Vec::new();
-        
+
         // Read data in chunks to optimize memory usage
         loop {
             buffer.resize(self.config.streaming_buffer_size, 0);
-            let bytes_read = reader.read(&mut buffer).await
-                .map_err(|e| CryptoError::InvalidInput(format!("Failed to read from stream: {}", e)))?;
-            
+            let bytes_read = reader.read(&mut buffer).await.map_err(|e| {
+                CryptoError::InvalidInput(format!("Failed to read from stream: {}", e))
+            })?;
+
             if bytes_read == 0 {
                 break; // End of stream
             }
-            
+
             all_data.extend_from_slice(&buffer[..bytes_read]);
             buffer.clear();
         }
-        
+
         // Return buffer to pool
         self.memory_pool.return_buffer(buffer).await;
-        
+
         // Encrypt the accumulated data
         let encrypted_data = self.encrypt_async(&all_data).await?;
         let result = encrypted_data.to_bytes();
-        
+
         let elapsed = start_time.elapsed();
-        
+
         // Update streaming metrics
         if self.config.enable_metrics {
             let mut metrics = self.metrics.write().await;
             metrics.streaming_operations += 1;
             if elapsed.as_secs() > 0 {
                 let throughput = all_data.len() as u64 / elapsed.as_secs();
-                metrics.streaming_throughput_bps = (metrics.streaming_throughput_bps + throughput) / 2;
+                metrics.streaming_throughput_bps =
+                    (metrics.streaming_throughput_bps + throughput) / 2;
             }
         }
-        
+
         Ok(result)
     }
-    
+
     /// Get current performance metrics
     pub async fn get_metrics(&self) -> PerformanceMetrics {
         self.metrics.read().await.clone()
     }
-    
+
     /// Reset performance metrics
     pub async fn reset_metrics(&self) {
         let mut metrics = self.metrics.write().await;
         *metrics = PerformanceMetrics::default();
     }
-    
+
     /// Get cache statistics
     pub async fn get_cache_stats(&self) -> (usize, usize) {
         let cache = self.key_cache.read().await;
         (cache.len(), cache.cap().get())
     }
-    
+
     /// Clear the key cache
     pub async fn clear_cache(&self) {
         let mut cache = self.key_cache.write().await;
         cache.clear();
     }
-    
+
     /// Benchmark encryption performance against a baseline
-    pub async fn benchmark_performance(&self, data_sizes: Vec<usize>, iterations: usize) -> CryptoResult<HashMap<usize, Duration>> {
+    pub async fn benchmark_performance(
+        &self,
+        data_sizes: Vec<usize>,
+        iterations: usize,
+    ) -> CryptoResult<HashMap<usize, Duration>> {
         let mut results = HashMap::new();
-        
+
         for &size in &data_sizes {
             let test_data = vec![0u8; size];
             let mut total_time = Duration::default();
-            
+
             for _ in 0..iterations {
                 let start = Instant::now();
                 let encrypted = self.encrypt_async(&test_data).await?;
                 let _decrypted = self.decrypt_async(&encrypted).await?;
                 total_time += start.elapsed();
             }
-            
+
             results.insert(size, total_time / iterations as u32);
         }
-        
+
         Ok(results)
     }
-    
+
     /// Validate that performance overhead is within acceptable limits
-    pub async fn validate_performance_overhead(&self, baseline_throughput_bps: u64, max_overhead_percent: f64) -> CryptoResult<bool> {
+    pub async fn validate_performance_overhead(
+        &self,
+        baseline_throughput_bps: u64,
+        max_overhead_percent: f64,
+    ) -> CryptoResult<bool> {
         let metrics = self.get_metrics().await;
         let overhead = metrics.overhead_percentage(baseline_throughput_bps);
         Ok(overhead <= max_overhead_percent)
@@ -564,87 +585,87 @@ impl AsyncEncryptionAtRest {
 mod tests {
     use super::*;
     use std::io::Cursor;
-    
+
     fn create_test_key() -> [u8; AES_KEY_SIZE] {
         [0x42; AES_KEY_SIZE]
     }
-    
+
     #[tokio::test]
     async fn test_async_encryption_roundtrip() {
         let key = create_test_key();
         let config = PerformanceConfig::default();
         let encryptor = AsyncEncryptionAtRest::new(key, config).await.unwrap();
-        
+
         let test_data = b"Hello, async encryption!";
         let encrypted = encryptor.encrypt_async(test_data).await.unwrap();
         let decrypted = encryptor.decrypt_async(&encrypted).await.unwrap();
-        
+
         assert_eq!(test_data, &decrypted[..]);
     }
-    
+
     #[tokio::test]
     async fn test_batch_operations() {
         let key = create_test_key();
         let config = PerformanceConfig::default();
         let encryptor = AsyncEncryptionAtRest::new(key, config).await.unwrap();
-        
+
         let test_data = vec![
             b"Data 1".as_slice(),
             b"Data 2".as_slice(),
             b"Data 3".as_slice(),
         ];
-        
+
         let encrypted_batch = encryptor.encrypt_batch(test_data.clone()).await.unwrap();
         assert_eq!(encrypted_batch.len(), 3);
-        
+
         let encrypted_refs: Vec<&EncryptedData> = encrypted_batch.iter().collect();
         let decrypted_batch = encryptor.decrypt_batch(encrypted_refs).await.unwrap();
-        
+
         for (i, decrypted) in decrypted_batch.iter().enumerate() {
             assert_eq!(test_data[i], &decrypted[..]);
         }
     }
-    
+
     #[tokio::test]
     async fn test_streaming_encryption() {
         let key = create_test_key();
         let config = PerformanceConfig::default();
         let encryptor = AsyncEncryptionAtRest::new(key, config).await.unwrap();
-        
+
         let test_data = b"This is a test of streaming encryption with larger data";
         let cursor = Cursor::new(test_data);
-        
+
         let encrypted_bytes = encryptor.encrypt_stream(cursor).await.unwrap();
         assert!(!encrypted_bytes.is_empty());
-        
+
         // Verify we can decrypt the result
         let encrypted_data = EncryptedData::from_bytes(&encrypted_bytes).unwrap();
         let decrypted = encryptor.decrypt_async(&encrypted_data).await.unwrap();
         assert_eq!(test_data, &decrypted[..]);
     }
-    
+
     #[tokio::test]
     async fn test_performance_metrics() {
         let key = create_test_key();
         let config = PerformanceConfig::default();
         let encryptor = AsyncEncryptionAtRest::new(key, config).await.unwrap();
-        
+
         let test_data = b"Test data for metrics";
-        
+
         // Perform some operations
         let encrypted = encryptor.encrypt_async(test_data).await.unwrap();
         let _decrypted = encryptor.decrypt_async(&encrypted).await.unwrap();
-        
+
         let metrics = encryptor.get_metrics().await;
         assert_eq!(metrics.total_encryptions, 1);
         assert_eq!(metrics.total_decryptions, 1);
         assert_eq!(metrics.total_bytes_encrypted, test_data.len() as u64);
     }
-    
+
     #[tokio::test]
     async fn test_performance_config_variants() {
         let key = create_test_key();
-        
+
         // Test different configuration profiles
         let configs = vec![
             PerformanceConfig::default(),
@@ -652,7 +673,7 @@ mod tests {
             PerformanceConfig::low_latency(),
             PerformanceConfig::memory_efficient(),
         ];
-        
+
         for config in configs {
             let encryptor = AsyncEncryptionAtRest::new(key, config).await.unwrap();
             let test_data = b"Test data";
@@ -661,33 +682,36 @@ mod tests {
             assert_eq!(test_data, &decrypted[..]);
         }
     }
-    
+
     #[tokio::test]
     async fn test_benchmark_performance() {
         let key = create_test_key();
         let config = PerformanceConfig::memory_efficient(); // Use smaller config for tests
         let encryptor = AsyncEncryptionAtRest::new(key, config).await.unwrap();
-        
+
         let data_sizes = vec![100, 1000, 10000];
-        let results = encryptor.benchmark_performance(data_sizes.clone(), 3).await.unwrap();
-        
+        let results = encryptor
+            .benchmark_performance(data_sizes.clone(), 3)
+            .await
+            .unwrap();
+
         assert_eq!(results.len(), data_sizes.len());
         for size in data_sizes {
             assert!(results.contains_key(&size));
             assert!(results[&size] > Duration::default());
         }
     }
-    
+
     #[tokio::test]
     async fn test_cache_operations() {
         let key = create_test_key();
         let config = PerformanceConfig::default();
         let encryptor = AsyncEncryptionAtRest::new(key, config).await.unwrap();
-        
+
         let (initial_size, capacity) = encryptor.get_cache_stats().await;
         assert_eq!(initial_size, 0);
         assert!(capacity > 0);
-        
+
         // Clear cache (should be no-op initially)
         encryptor.clear_cache().await;
         let (size_after_clear, _) = encryptor.get_cache_stats().await;

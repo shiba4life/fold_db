@@ -26,6 +26,8 @@ pub enum SecurityEventCategory {
     Verification,
     /// System lifecycle events (startup, shutdown, initialization)
     System,
+    /// Key rotation and cryptographic lifecycle events
+    KeyRotation,
 }
 
 impl std::fmt::Display for SecurityEventCategory {
@@ -38,6 +40,7 @@ impl std::fmt::Display for SecurityEventCategory {
             SecurityEventCategory::Security => write!(f, "Security"),
             SecurityEventCategory::Verification => write!(f, "Verification"),
             SecurityEventCategory::System => write!(f, "System"),
+            SecurityEventCategory::KeyRotation => write!(f, "KeyRotation"),
         }
     }
 }
@@ -162,8 +165,6 @@ pub struct AuthenticationEvent {
     pub source_ip: Option<String>,
     /// User agent if available
     pub user_agent: Option<String>,
-    /// Whether MFA was used
-    pub mfa_used: bool,
 }
 
 /// Authorization event details
@@ -304,6 +305,75 @@ pub struct SystemEvent {
     pub state: HashMap<String, serde_json::Value>,
 }
 
+/// Key rotation event details
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyRotationEvent {
+    /// Base verification event
+    pub base: VerificationEvent,
+    /// Type of key rotation event
+    pub rotation_type: KeyRotationEventType,
+    /// User/client identifier
+    pub user_id: Option<String>,
+    /// Old key identifier (hex encoded)
+    pub old_key_id: Option<String>,
+    /// New key identifier (hex encoded)
+    pub new_key_id: Option<String>,
+    /// Rotation reason
+    pub rotation_reason: String,
+    /// Key rotation operation ID for correlation
+    pub operation_id: Option<String>,
+    /// Network nodes that need to be updated
+    pub target_nodes: Vec<String>,
+    /// Current propagation status
+    pub propagation_status: KeyPropagationStatus,
+    /// Affected associations count
+    pub affected_associations: Option<u64>,
+    /// Rotation metadata
+    pub rotation_metadata: HashMap<String, serde_json::Value>,
+}
+
+/// Types of key rotation events
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KeyRotationEventType {
+    /// Key rotation process has started
+    RotationStarted,
+    /// Key rotation completed successfully
+    RotationCompleted,
+    /// Key rotation failed
+    RotationFailed,
+    /// Key rotation propagation started
+    PropagationStarted,
+    /// Key rotation propagated to a specific node
+    NodeUpdated,
+    /// Key rotation propagation completed
+    PropagationCompleted,
+    /// Key rotation propagation failed
+    PropagationFailed,
+    /// Cache invalidation triggered
+    CacheInvalidated,
+    /// Rollback initiated
+    RollbackStarted,
+    /// Rollback completed
+    RollbackCompleted,
+}
+
+/// Status of key rotation propagation across the network
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KeyPropagationStatus {
+    /// Propagation not started
+    Pending,
+    /// Currently propagating to network nodes
+    InProgress,
+    /// Successfully propagated to all nodes
+    Completed,
+    /// Propagation failed on some nodes
+    PartialFailure,
+    /// Propagation completely failed
+    Failed,
+    /// Propagation was rolled back
+    RolledBack,
+}
+
 /// Unified event wrapper for all event types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SecurityEvent {
@@ -321,6 +391,8 @@ pub enum SecurityEvent {
     Verification(VerificationOperationEvent),
     /// System lifecycle event
     System(SystemEvent),
+    /// Key rotation event
+    KeyRotation(KeyRotationEvent),
     /// Generic verification event
     Generic(VerificationEvent),
 }
@@ -336,6 +408,7 @@ impl SecurityEvent {
             SecurityEvent::Security(e) => &e.base,
             SecurityEvent::Verification(e) => &e.base,
             SecurityEvent::System(e) => &e.base,
+            SecurityEvent::KeyRotation(e) => &e.base,
             SecurityEvent::Generic(e) => e,
         }
     }

@@ -55,7 +55,6 @@ pub async fn create_schema(
     }
 }
 
-
 /// Unload a schema so it is no longer active.
 pub async fn unload_schema_route(
     path: web::Path<String>,
@@ -105,7 +104,7 @@ pub async fn list_available_schemas(state: web::Data<AppState>) -> impl Responde
         Ok(schemas) => {
             info!("Successfully retrieved {} available schemas", schemas.len());
             HttpResponse::Ok().json(json!({"data": schemas}))
-        },
+        }
         Err(e) => {
             error!("Failed to list available schemas: {}", e);
             HttpResponse::InternalServerError()

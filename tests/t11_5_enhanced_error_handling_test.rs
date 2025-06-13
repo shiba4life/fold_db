@@ -1,8 +1,7 @@
 //! Tests for T11.5: Enhanced Error Handling & User Experience for PBI-11
 
 use datafold::datafold_node::signature_auth::{
-    AuthenticationError, SignatureAuthConfig,
-    SignatureVerificationState, SecurityEventSeverity
+    AuthenticationError, SecurityEventSeverity, SignatureAuthConfig, SignatureVerificationState,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -69,7 +68,7 @@ async fn test_error_response_format() {
 
     // Test error response creation
     let response = state.create_error_response(&error);
-    
+
     assert!(response.error);
     assert_eq!(response.error_code, "TIMESTAMP_VALIDATION_FAILED");
     assert!(response.message.contains("timestamp"));
@@ -92,10 +91,10 @@ async fn test_error_response_with_details() {
     };
 
     let response = state.create_error_response(&error);
-    
+
     assert!(response.error);
     assert_eq!(response.error_code, "INVALID_SIGNATURE_FORMAT");
-    
+
     // In development mode, details should be present
     assert!(response.details.is_some());
     let details = response.details.unwrap();
@@ -108,7 +107,7 @@ async fn test_error_response_with_details() {
 #[tokio::test]
 async fn test_all_error_types_have_guidance() {
     let correlation_id = "test-all".to_string();
-    
+
     let errors = vec![
         AuthenticationError::MissingHeaders {
             missing: vec!["test".to_string()],
@@ -154,31 +153,50 @@ async fn test_all_error_types_have_guidance() {
     for error in errors {
         // Every error should have guidance
         let guidance = error.get_troubleshooting_guidance();
-        assert!(!guidance.is_empty(), "Error {:?} should have troubleshooting guidance", error);
+        assert!(
+            !guidance.is_empty(),
+            "Error {:?} should have troubleshooting guidance",
+            error
+        );
 
         // Every error should have suggested actions
         let actions = error.get_suggested_actions();
-        assert!(!actions.is_empty(), "Error {:?} should have suggested actions", error);
+        assert!(
+            !actions.is_empty(),
+            "Error {:?} should have suggested actions",
+            error
+        );
 
         // Every error should have a documentation link
         let doc_link = error.get_documentation_link();
-        assert!(doc_link.contains("docs.datafold.dev"), "Error {:?} should have valid doc link", error);
+        assert!(
+            doc_link.contains("docs.datafold.dev"),
+            "Error {:?} should have valid doc link",
+            error
+        );
 
         // Every error should have an error code
         let error_code = error.error_code();
-        assert!(!error_code.is_empty(), "Error {:?} should have error code", error);
+        assert!(
+            !error_code.is_empty(),
+            "Error {:?} should have error code",
+            error
+        );
 
         // Every error should have proper HTTP status codes
         let status = error.http_status_code();
-        assert!(status.is_client_error() || status.is_server_error(), 
-                "Error {:?} should have appropriate HTTP status", error);
+        assert!(
+            status.is_client_error() || status.is_server_error(),
+            "Error {:?} should have appropriate HTTP status",
+            error
+        );
     }
 }
 
 #[tokio::test]
 async fn test_error_severity_mapping() {
     let correlation_id = "test-severity".to_string();
-    
+
     // Test critical severity errors
     let critical_error = AuthenticationError::NonceValidationFailed {
         nonce: "replay-nonce".to_string(),
@@ -205,7 +223,7 @@ async fn test_error_severity_mapping() {
 #[tokio::test]
 async fn test_correlation_id_consistency() {
     let correlation_id = "test-correlation-123".to_string();
-    
+
     let error = AuthenticationError::ConfigurationError {
         reason: "Database connection failed".to_string(),
         correlation_id: correlation_id.clone(),
@@ -213,11 +231,11 @@ async fn test_correlation_id_consistency() {
 
     // Correlation ID should be consistent across different methods
     assert_eq!(error.correlation_id(), &correlation_id);
-    
+
     let config = SignatureAuthConfig::default();
     let state = SignatureVerificationState::new(config).expect("Valid config");
     let response = state.create_error_response(&error);
-    
+
     assert_eq!(response.correlation_id, Some(correlation_id));
 }
 
@@ -244,13 +262,16 @@ async fn test_timestamp_error_details() {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    
+
     let old_timestamp = now - 1000; // 1000 seconds ago
-    
+
     let error = AuthenticationError::TimestampValidationFailed {
         timestamp: old_timestamp,
         current_time: now,
-        reason: format!("Timestamp outside allowed window: {} seconds (max: 300)", 1000),
+        reason: format!(
+            "Timestamp outside allowed window: {} seconds (max: 300)",
+            1000
+        ),
         correlation_id: "test-timestamp".to_string(),
     };
 
@@ -261,14 +282,18 @@ async fn test_timestamp_error_details() {
     assert!(guidance.contains(&now.to_string()));
 
     let actions = error.get_suggested_actions();
-    assert!(actions.iter().any(|action| action.contains("Synchronize system clock")));
-    assert!(actions.iter().any(|action| action.contains("current Unix timestamp")));
+    assert!(actions
+        .iter()
+        .any(|action| action.contains("Synchronize system clock")));
+    assert!(actions
+        .iter()
+        .any(|action| action.contains("current Unix timestamp")));
 }
 
 #[tokio::test]
 async fn test_nonce_error_details() {
     let invalid_nonce = "invalid-nonce-with-special-chars!@#";
-    
+
     let error = AuthenticationError::NonceValidationFailed {
         nonce: invalid_nonce.to_string(),
         reason: "Nonce contains invalid characters".to_string(),
@@ -282,8 +307,12 @@ async fn test_nonce_error_details() {
     assert!(guidance.contains(&invalid_nonce));
 
     let actions = error.get_suggested_actions();
-    assert!(actions.iter().any(|action| action.contains("Generate a new unique nonce")));
-    assert!(actions.iter().any(|action| action.contains("format requirements")));
+    assert!(actions
+        .iter()
+        .any(|action| action.contains("Generate a new unique nonce")));
+    assert!(actions
+        .iter()
+        .any(|action| action.contains("format requirements")));
 }
 
 #[cfg(test)]
@@ -301,25 +330,26 @@ mod integration_tests {
         let mut config = SignatureAuthConfig::default();
         config.response_security.detailed_error_messages = true; // Development mode
         config.response_security.include_correlation_id = true;
-        
+
         let state = SignatureVerificationState::new(config).expect("Valid config");
-        
+
         let app = test::init_service(
             App::new()
                 .wrap(SignatureVerificationMiddleware::new(state))
-                .route("/test", web::get().to(test_handler))
-        ).await;
+                .route("/test", web::get().to(test_handler)),
+        )
+        .await;
 
         // Request without signature headers should return enhanced error response
         let req = test::TestRequest::get().uri("/test").to_request();
-        
+
         // The middleware returns an actix-web error for authentication failures
         // We need to handle this properly in the test
         let result = test::try_call_service(&app, req).await;
-        
+
         // Should be an error due to missing signature
         assert!(result.is_err());
-        
+
         // Verify the error contains helpful information
         let error = result.unwrap_err();
         let error_message = format!("{}", error);

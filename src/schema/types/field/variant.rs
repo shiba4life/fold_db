@@ -3,9 +3,7 @@ use std::collections::HashMap;
 
 use crate::fees::types::config::FieldPaymentConfig;
 use crate::permissions::types::policy::PermissionsPolicy;
-use crate::schema::types::field::{
-    Field, FieldCommon, FieldType, RangeField, SingleField,
-};
+use crate::schema::types::field::{Field, FieldCommon, FieldType, RangeField, SingleField};
 use crate::schema::types::Transform;
 
 /// Enumeration over all field variants.

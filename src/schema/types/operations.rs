@@ -71,9 +71,10 @@ impl<'de> Deserialize<'de> for MutationType {
             "update" => Ok(MutationType::Update),
             "delete" => Ok(MutationType::Delete),
             // TODO: Collection operations are no longer supported - removed add_to_collection
-            s if s.starts_with("add_to_collection:") => {
-                Err(serde::de::Error::custom(format!("Collection operations are no longer supported: {}", s)))
-            }
+            s if s.starts_with("add_to_collection:") => Err(serde::de::Error::custom(format!(
+                "Collection operations are no longer supported: {}",
+                s
+            ))),
             s if s.starts_with("update_to_collection:") => {
                 let id = s.split(':').nth(1).unwrap_or_default().to_string();
                 Ok(MutationType::UpdateToCollection(id))
@@ -201,7 +202,7 @@ impl Mutation {
             // This transformation ensures that ALL range fields will have consistent
             // AtomRefRange keys that are the range_key VALUE, not field names.
             let mut new_fields_and_values = self.fields_and_values.clone();
-            
+
             // Convert the range_key value to a string that will be used as the AtomRefRange key
             // This handles all JSON value types (string, number, boolean, etc.)
             let range_key_str = match range_key_value {
@@ -239,13 +240,13 @@ impl Mutation {
                     // Extract: Remove "test_id" (range_key), keep the rest
                     // Output: "test_data": {"abc": "123"}
                     // Result: field_manager will store just "123" under key "abc"
-                    
+
                     let field_content = if let Some(obj) = original_value.as_object() {
                         if obj.contains_key(range_key) {
                             // Object contains range_key - extract non-range-key content
                             let mut extracted_content = obj.clone();
                             extracted_content.remove(range_key); // Remove the range_key field
-                            
+
                             // If only one field remains, use its value directly
                             if extracted_content.len() == 1 {
                                 extracted_content.values().next().unwrap().clone()
@@ -264,7 +265,7 @@ impl Mutation {
                         // Not an object - use as-is
                         original_value
                     };
-                    
+
                     let mut obj = serde_json::Map::new();
                     obj.insert(range_key_str.clone(), field_content);
                     *value = serde_json::Value::Object(obj);
@@ -290,12 +291,12 @@ impl Mutation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fees::types::config::FieldPaymentConfig;
+    use crate::permissions::types::policy::PermissionsPolicy;
     use crate::schema::types::field::{FieldVariant, RangeField};
     use crate::schema::types::operations::MutationType;
     use crate::schema::types::Schema;
     use crate::schema::types::SchemaError;
-    use crate::permissions::types::policy::PermissionsPolicy;
-    use crate::fees::types::config::FieldPaymentConfig;
     use serde_json::json;
     use std::collections::HashMap;
 

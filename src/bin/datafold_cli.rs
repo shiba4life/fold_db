@@ -1,30 +1,31 @@
 use clap::{Parser, Subcommand, ValueEnum};
-use datafold::schema::SchemaHasher;
-use datafold::{load_node_config, DataFoldNode, MutationType, Operation, SchemaState};
-use datafold::config::crypto::{CryptoConfig, MasterKeyConfig, KeyDerivationConfig, SecurityLevel};
-use datafold::crypto::ed25519::{generate_master_keypair, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH};
-use datafold::crypto::MasterKeyPair;
-use datafold::datafold_node::crypto_init::{
-    initialize_database_crypto, get_crypto_init_status, validate_crypto_config_for_init
-};
 use datafold::cli::auth::{CliAuthProfile, CliSigningConfig};
 use datafold::cli::config::{CliConfigManager, ServerConfig};
 use datafold::cli::environment_utils::commands as env_commands;
 use datafold::cli::http_client::{AuthenticatedHttpClient, HttpClientBuilder, RetryConfig};
+use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel};
+use datafold::crypto::ed25519::{generate_master_keypair, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH};
+use datafold::crypto::MasterKeyPair;
+use datafold::datafold_node::crypto_init::{
+    get_crypto_init_status, initialize_database_crypto, validate_crypto_config_for_init,
+};
+use datafold::schema::SchemaHasher;
+use datafold::{load_node_config, DataFoldNode, MutationType, Operation, SchemaState};
+// Removed: Admin key rotation commands have been removed for security
+use base64::{engine::general_purpose, Engine as _};
 use datafold::cli::signing_config::SigningMode;
-use log::{info, warn, error};
+use datafold::crypto::{derive_key, generate_salt, Argon2Params};
+use log::{error, info, warn};
+use rand::{rngs::OsRng, RngCore};
+use reqwest::Client;
 use rpassword::read_password;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
 use std::io::{self, Write};
 use std::os::unix::fs::PermissionsExt;
-use datafold::crypto::{derive_key, Argon2Params, generate_salt};
-use rand::{RngCore, rngs::OsRng};
-use reqwest::Client;
+use std::path::PathBuf;
 use std::time::Duration;
-use base64::{Engine as _, engine::general_purpose};
-use std::collections::HashMap;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -828,6 +829,7 @@ enum Commands {
         #[command(subcommand)]
         action: EnvironmentAction,
     },
+    // Removed: Administrative key rotation commands have been removed for security
 }
 
 /// Environment management actions
@@ -1077,8 +1079,7 @@ impl From<&Argon2Params> for StoredArgon2Params {
 
 impl From<StoredArgon2Params> for Argon2Params {
     fn from(val: StoredArgon2Params) -> Self {
-        Argon2Params::new(val.memory_cost, val.time_cost, val.parallelism)
-            .unwrap_or_default()
+        Argon2Params::new(val.memory_cost, val.time_cost, val.parallelism).unwrap_or_default()
     }
 }
 
@@ -1258,26 +1259,26 @@ fn hkdf_derive_key(
 ) -> Vec<u8> {
     // Simplified key derivation using BLAKE3
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"HKDF-DATAFOLD");  // Domain separator
+    hasher.update(b"HKDF-DATAFOLD"); // Domain separator
     hasher.update(salt);
     hasher.update(master_key);
     hasher.update(info);
-    
+
     let base_hash = hasher.finalize();
-    
+
     // For simplicity, just use the first output_length bytes
     // In a production system, you'd want proper HKDF expansion
     let mut output = vec![0u8; output_length];
     let available_bytes = std::cmp::min(32, output_length);
     output[..available_bytes].copy_from_slice(&base_hash.as_bytes()[..available_bytes]);
-    
+
     // If we need more than 32 bytes, use a simple expansion
     if output_length > 32 {
         for (i, item) in output.iter_mut().enumerate().skip(32) {
             *item = base_hash.as_bytes()[i % 32];
         }
     }
-    
+
     output
 }
 
@@ -1300,49 +1301,53 @@ where
     T: serde::de::DeserializeOwned,
 {
     let mut last_error = None;
-    
+
     for attempt in 0..=retries {
         if attempt > 0 {
             println!("Retrying request (attempt {}/{})", attempt + 1, retries + 1);
             tokio::time::sleep(Duration::from_millis(1000 * attempt as u64)).await;
         }
-        
+
         // Clone the request builder for each attempt
         let request = match request_builder.try_clone() {
             Some(req) => req,
             None => return Err("Failed to clone request for retry".into()),
         };
-        
+
         match request.send().await {
             Ok(response) => {
                 let status = response.status();
                 let response_text = response.text().await?;
-                
+
                 if status.is_success() {
                     // Parse the API response wrapper
                     let api_response: ApiResponse<T> = serde_json::from_str(&response_text)
                         .map_err(|e| format!("Failed to parse response: {}", e))?;
-                    
+
                     if api_response.success {
                         if let Some(data) = api_response.data {
                             return Ok(data);
                         } else {
-                            return Err("API response marked as successful but contained no data".into());
+                            return Err(
+                                "API response marked as successful but contained no data".into()
+                            );
                         }
                     } else if let Some(error) = api_response.error {
                         return Err(format!("API error: {} - {}", error.code, error.message).into());
                     } else {
-                        return Err("API response marked as failed but contained no error details".into());
+                        return Err(
+                            "API response marked as failed but contained no error details".into(),
+                        );
                     }
                 } else {
                     let error_msg = format!("HTTP error {}: {}", status, response_text);
                     last_error = Some(error_msg.clone().into());
-                    
+
                     // Don't retry on client errors (4xx), only server errors (5xx) and network issues
                     if status.is_client_error() {
                         return Err(error_msg.into());
                     }
-                    
+
                     println!("Server error, will retry: {}", error_msg);
                 }
             }
@@ -1353,7 +1358,7 @@ where
             }
         }
     }
-    
+
     Err(last_error.unwrap_or_else(|| "All retry attempts failed".into()))
 }
 
@@ -1366,18 +1371,21 @@ async fn build_authenticated_client(
     config_manager: &CliConfigManager,
 ) -> Result<AuthenticatedHttpClient, Box<dyn std::error::Error>> {
     let signing_context = config_manager.signing_config().for_command(command_name);
-    
+
     // With mandatory authentication, all requests must be signed
     let should_sign = true;
-    
+
     if cli.verbose {
-        println!("🔐 Signing status for '{}': {}", command_name,
-                if should_sign { "enabled" } else { "disabled" });
+        println!(
+            "🔐 Signing status for '{}': {}",
+            command_name,
+            if should_sign { "enabled" } else { "disabled" }
+        );
         if signing_context.debug_enabled {
             println!("🐛 Debug mode enabled for signature operations");
         }
     }
-    
+
     // Get timeout from CLI config
     let timeout = config_manager.config().settings.default_timeout_secs;
     let retry_config = RetryConfig {
@@ -1387,7 +1395,7 @@ async fn build_authenticated_client(
         retry_server_errors: true,
         retry_network_errors: true,
     };
-    
+
     if !should_sign {
         // Return unauthenticated client
         return Ok(HttpClientBuilder::new()
@@ -1395,34 +1403,37 @@ async fn build_authenticated_client(
             .retry_config(retry_config)
             .build()?);
     }
-    
+
     // Get profile to use
-    let profile_name = cli.profile.as_ref()
+    let profile_name = cli
+        .profile
+        .as_ref()
         .or(signing_context.profile.as_ref())
         .or(config_manager.config().default_profile.as_ref())
         .ok_or("No authentication profile specified and no default profile set")?;
-    
-    let profile = config_manager.get_profile(profile_name)
+
+    let profile = config_manager
+        .get_profile(profile_name)
         .ok_or_else(|| format!("Authentication profile '{}' not found", profile_name))?;
-    
+
     if cli.verbose {
         println!("🔑 Using authentication profile: {}", profile_name);
         println!("🌐 Server URL: {}", profile.server_url);
         println!("🆔 Client ID: {}", profile.client_id);
     }
-    
+
     // Load key from storage
     let storage_dir = CliConfigManager::default_keys_dir()?;
     let key_content = handle_retrieve_key_internal(&profile.key_id, &storage_dir, false)?;
-    
+
     // Parse the key
     let private_key_bytes = parse_key_input(&key_content, true)?;
     let keypair = MasterKeyPair::from_secret_bytes(&private_key_bytes)
         .map_err(|e| format!("Failed to load keypair: {}", e))?;
-    
+
     // Create signing configuration
     let signing_config = signing_context.get_signing_config().clone();
-    
+
     // Apply CLI debug override
     if cli.sign_debug {
         // Enable debug logging for this request
@@ -1430,17 +1441,17 @@ async fn build_authenticated_client(
             println!("🐛 Enabling debug mode for signature generation");
         }
     }
-    
+
     // Build authenticated client
     let client = HttpClientBuilder::new()
         .timeout_secs(timeout)
         .retry_config(retry_config)
         .build_authenticated(keypair, profile.clone(), Some(signing_config))?;
-    
+
     if cli.verbose {
         println!("✅ Authenticated HTTP client ready");
     }
-    
+
     Ok(client)
 }
 
@@ -1453,22 +1464,22 @@ fn handle_retrieve_key_internal(
     public_only: bool,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let key_file = storage_dir.join(format!("{}.json", key_id));
-    
+
     if !key_file.exists() {
         return Err(format!("Key '{}' not found in storage", key_id).into());
     }
-    
+
     let content = fs::read_to_string(&key_file)?;
     let key_config: KeyStorageConfig = serde_json::from_str(&content)?;
-    
+
     // Prompt for passphrase
     print!("Enter passphrase for key '{}': ", key_id);
     io::stdout().flush()?;
     let passphrase = read_password()?;
-    
+
     // Decrypt the key
     let decrypted_bytes = decrypt_key(&key_config, &passphrase)?;
-    
+
     if public_only {
         // Extract public key from private key
         let keypair = MasterKeyPair::from_secret_bytes(&decrypted_bytes)
@@ -1491,13 +1502,13 @@ fn ensure_storage_dir(dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         fs::create_dir_all(dir)
             .map_err(|e| format!("Failed to create storage directory: {}", e))?;
     }
-    
+
     // Set directory permissions to 700 (owner read/write/execute only)
     let mut perms = fs::metadata(dir)?.permissions();
     perms.set_mode(0o700);
     fs::set_permissions(dir, perms)
         .map_err(|e| format!("Failed to set directory permissions: {}", e))?;
-    
+
     Ok(())
 }
 
@@ -1511,23 +1522,23 @@ fn encrypt_key(
     let salt = generate_salt();
     let mut nonce = [0u8; 12];
     OsRng.fill_bytes(&mut nonce);
-    
+
     // Derive encryption key from passphrase
     let derived_key = derive_key(passphrase, &salt, argon2_params)
         .map_err(|e| format!("Key derivation failed: {}", e))?;
-    
+
     // Use BLAKE3 to generate a keystream for encryption
     let mut hasher = blake3::Hasher::new();
     hasher.update(derived_key.as_bytes());
     hasher.update(&nonce);
     let keystream = hasher.finalize();
-    
+
     // XOR encrypt the private key
     let mut encrypted_key = [0u8; 32];
     for i in 0..32 {
         encrypted_key[i] = private_key[i] ^ keystream.as_bytes()[i];
     }
-    
+
     Ok(KeyStorageConfig {
         encrypted_key: encrypted_key.to_vec(),
         nonce,
@@ -1545,30 +1556,30 @@ fn decrypt_key(
 ) -> Result<[u8; 32], Box<dyn std::error::Error>> {
     // Reconstruct Argon2 params
     let argon2_params: Argon2Params = config.argon2_params.clone().into();
-    
+
     // Create Salt from stored bytes
     let salt = datafold::crypto::argon2::Salt::from_bytes(config.salt);
-    
+
     // Derive decryption key from passphrase
     let derived_key = derive_key(passphrase, &salt, &argon2_params)
         .map_err(|e| format!("Key derivation failed: {}", e))?;
-    
+
     // Use BLAKE3 to generate the same keystream
     let mut hasher = blake3::Hasher::new();
     hasher.update(derived_key.as_bytes());
     hasher.update(&config.nonce);
     let keystream = hasher.finalize();
-    
+
     // XOR decrypt the private key
     if config.encrypted_key.len() != 32 {
         return Err("Invalid encrypted key length".into());
     }
-    
+
     let mut decrypted_key = [0u8; 32];
     for (i, item) in decrypted_key.iter_mut().enumerate() {
         *item = config.encrypted_key[i] ^ keystream.as_bytes()[i];
     }
-    
+
     Ok(decrypted_key)
 }
 
@@ -1584,7 +1595,7 @@ fn handle_store_key(
     // Get storage directory
     let storage_path = storage_dir.unwrap_or(get_default_storage_dir()?);
     ensure_storage_dir(&storage_path)?;
-    
+
     // Get private key bytes
     let private_key_bytes = match (private_key, private_key_file) {
         (Some(key_str), None) => parse_key_input(&key_str, true)?,
@@ -1600,43 +1611,47 @@ fn handle_store_key(
             return Err("Must specify either --private-key or --private-key-file".into());
         }
     };
-    
+
     // Check if key already exists
     let key_file_path = storage_path.join(format!("{}.key", key_id));
     if key_file_path.exists() && !force {
         return Err(format!("Key '{}' already exists. Use --force to overwrite", key_id).into());
     }
-    
+
     // Get passphrase for encryption
     let passphrase = match passphrase {
         Some(p) => p,
         None => get_secure_passphrase()?,
     };
-    
+
     // Convert security level to Argon2 parameters
     let argon2_params = match security_level {
         CliSecurityLevel::Interactive => Argon2Params::interactive(),
         CliSecurityLevel::Balanced => Argon2Params::default(),
         CliSecurityLevel::Sensitive => Argon2Params::sensitive(),
     };
-    
+
     // Encrypt the key
     let storage_config = encrypt_key(&private_key_bytes, &passphrase, &argon2_params)?;
-    
+
     // Write encrypted key to file
     let config_json = serde_json::to_string_pretty(&storage_config)?;
     fs::write(&key_file_path, config_json)
         .map_err(|e| format!("Failed to write key file: {}", e))?;
-    
+
     // Set file permissions to 600 (owner read/write only)
     let mut perms = fs::metadata(&key_file_path)?.permissions();
     perms.set_mode(0o600);
     fs::set_permissions(&key_file_path, perms)
         .map_err(|e| format!("Failed to set file permissions: {}", e))?;
-    
-    info!("✅ Key '{}' stored securely at: {}", key_id, key_file_path.display());
+
+    info!(
+        "✅ Key '{}' stored securely at: {}",
+        key_id,
+        key_file_path.display()
+    );
     info!("Security level: {:?}", security_level);
-    
+
     Ok(())
 }
 
@@ -1650,40 +1665,55 @@ fn handle_retrieve_key(
     // Get storage directory
     let storage_path = storage_dir.unwrap_or(get_default_storage_dir()?);
     let key_file_path = storage_path.join(format!("{}.key", key_id));
-    
+
     if !key_file_path.exists() {
         return Err(format!("Key '{}' not found", key_id).into());
     }
-    
+
     // Read storage config
     let config_content = fs::read_to_string(&key_file_path)
         .map_err(|e| format!("Failed to read key file: {}", e))?;
     let storage_config: KeyStorageConfig = serde_json::from_str(&config_content)
         .map_err(|e| format!("Failed to parse key file: {}", e))?;
-    
+
     // Get passphrase for decryption
     print!("Enter passphrase to decrypt key: ");
     io::stdout().flush()?;
     let passphrase = read_password()?;
-    
+
     // Decrypt the private key
     let private_key_bytes = decrypt_key(&storage_config, &passphrase)?;
-    
+
     if public_only {
         // Extract and output public key only
-        let keypair = datafold::crypto::ed25519::generate_master_keypair_from_seed(&private_key_bytes)
-            .map_err(|e| format!("Failed to generate keypair from stored key: {}", e))?;
+        let keypair =
+            datafold::crypto::ed25519::generate_master_keypair_from_seed(&private_key_bytes)
+                .map_err(|e| format!("Failed to generate keypair from stored key: {}", e))?;
         let public_key_bytes = keypair.public_key_bytes();
         let formatted_public = format_key(&public_key_bytes, &format, false)?;
-        output_key(&formatted_public, output_file.as_ref(), "public", 0, 1, true)?;
+        output_key(
+            &formatted_public,
+            output_file.as_ref(),
+            "public",
+            0,
+            1,
+            true,
+        )?;
     } else {
         // Output private key
         let formatted_private = format_key(&private_key_bytes, &format, true)?;
-        output_key(&formatted_private, output_file.as_ref(), "private", 0, 1, true)?;
+        output_key(
+            &formatted_private,
+            output_file.as_ref(),
+            "private",
+            0,
+            1,
+            true,
+        )?;
     }
-    
+
     info!("✅ Key '{}' retrieved successfully", key_id);
-    
+
     Ok(())
 }
 
@@ -1695,11 +1725,11 @@ fn handle_delete_key(
     // Get storage directory
     let storage_path = storage_dir.unwrap_or(get_default_storage_dir()?);
     let key_file_path = storage_path.join(format!("{}.key", key_id));
-    
+
     if !key_file_path.exists() {
         return Err(format!("Key '{}' not found", key_id).into());
     }
-    
+
     // Confirm deletion unless force is specified
     if !force {
         print!("Are you sure you want to delete key '{}'? (y/N): ", key_id);
@@ -1711,13 +1741,12 @@ fn handle_delete_key(
             return Ok(());
         }
     }
-    
+
     // Delete the key file
-    fs::remove_file(&key_file_path)
-        .map_err(|e| format!("Failed to delete key file: {}", e))?;
-    
+    fs::remove_file(&key_file_path).map_err(|e| format!("Failed to delete key file: {}", e))?;
+
     info!("✅ Key '{}' deleted successfully", key_id);
-    
+
     Ok(())
 }
 
@@ -1727,16 +1756,16 @@ fn handle_list_keys(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Get storage directory
     let storage_path = storage_dir.unwrap_or(get_default_storage_dir()?);
-    
+
     if !storage_path.exists() {
         info!("No keys found (storage directory doesn't exist)");
         return Ok(());
     }
-    
+
     // Read directory entries
     let entries = fs::read_dir(&storage_path)
         .map_err(|e| format!("Failed to read storage directory: {}", e))?;
-    
+
     let mut keys = Vec::new();
     for entry in entries {
         let entry = entry?;
@@ -1747,35 +1776,35 @@ fn handle_list_keys(
             }
         }
     }
-    
+
     if keys.is_empty() {
         info!("No keys found in storage directory");
         return Ok(());
     }
-    
+
     keys.sort_by(|a, b| a.0.cmp(&b.0));
-    
+
     info!("Stored keys in {}:", storage_path.display());
-    
+
     for (key_id, path) in keys {
         if verbose {
             // Read and parse key config for detailed info
             match fs::read_to_string(&path) {
-                Ok(content) => {
-                    match serde_json::from_str::<KeyStorageConfig>(&content) {
-                        Ok(config) => {
-                            info!("  {} (created: {}, security: {}KB/{}/{})",
-                                key_id, config.created_at,
-                                config.argon2_params.memory_cost,
-                                config.argon2_params.time_cost,
-                                config.argon2_params.parallelism
-                            );
-                        }
-                        Err(_) => {
-                            info!("  {} (invalid format)", key_id);
-                        }
+                Ok(content) => match serde_json::from_str::<KeyStorageConfig>(&content) {
+                    Ok(config) => {
+                        info!(
+                            "  {} (created: {}, security: {}KB/{}/{})",
+                            key_id,
+                            config.created_at,
+                            config.argon2_params.memory_cost,
+                            config.argon2_params.time_cost,
+                            config.argon2_params.parallelism
+                        );
                     }
-                }
+                    Err(_) => {
+                        info!("  {} (invalid format)", key_id);
+                    }
+                },
                 Err(_) => {
                     info!("  {} (read error)", key_id);
                 }
@@ -1784,7 +1813,7 @@ fn handle_list_keys(
             info!("  {}", key_id);
         }
     }
-    
+
     Ok(())
 }
 
@@ -1802,82 +1831,97 @@ fn handle_derive_from_master(
     // Get storage directory
     let storage_path = storage_dir.unwrap_or(get_default_storage_dir()?);
     let master_key_file_path = storage_path.join(format!("{}.key", master_key_id));
-    
+
     if !master_key_file_path.exists() {
         return Err(format!("Master key '{}' not found", master_key_id).into());
     }
-    
+
     // Read and decrypt master key
     let config_content = fs::read_to_string(&master_key_file_path)
         .map_err(|e| format!("Failed to read master key file: {}", e))?;
     let storage_config: KeyStorageConfig = serde_json::from_str(&config_content)
         .map_err(|e| format!("Failed to parse master key file: {}", e))?;
-    
-    print!("Enter passphrase to decrypt master key '{}': ", master_key_id);
+
+    print!(
+        "Enter passphrase to decrypt master key '{}': ",
+        master_key_id
+    );
     io::stdout().flush()?;
     let passphrase = read_password()?;
-    
+
     let master_key_bytes = decrypt_key(&storage_config, &passphrase)?;
-    
+
     // Derive child key using HKDF (BLAKE3)
     let context_bytes = context.as_bytes();
     let salt = generate_salt();
-    let derived_key_material = hkdf_derive_key(&master_key_bytes, salt.as_bytes(), context_bytes, 32);
-    
+    let derived_key_material =
+        hkdf_derive_key(&master_key_bytes, salt.as_bytes(), context_bytes, 32);
+
     if derived_key_material.len() != 32 {
         return Err("Failed to derive 32-byte key".into());
     }
-    
+
     let mut child_key_bytes = [0u8; 32];
     child_key_bytes.copy_from_slice(&derived_key_material);
-    
+
     if output_only {
         // Just output the derived key
         let formatted_key = format_key(&child_key_bytes, &format, true)?;
         println!("{}", formatted_key);
-        info!("✅ Child key derived from master '{}' with context '{}'", master_key_id, context);
+        info!(
+            "✅ Child key derived from master '{}' with context '{}'",
+            master_key_id, context
+        );
     } else {
         // Store the derived child key
         let child_key_file_path = storage_path.join(format!("{}.key", child_key_id));
         if child_key_file_path.exists() && !force {
-            return Err(format!("Child key '{}' already exists. Use --force to overwrite", child_key_id).into());
+            return Err(format!(
+                "Child key '{}' already exists. Use --force to overwrite",
+                child_key_id
+            )
+            .into());
         }
-        
+
         // Get passphrase for child key encryption
         print!("Enter passphrase to encrypt child key '{}': ", child_key_id);
         io::stdout().flush()?;
         let child_passphrase = read_password()?;
-        
+
         // Convert security level to Argon2 parameters
         let argon2_params = match security_level {
             CliSecurityLevel::Interactive => Argon2Params::interactive(),
             CliSecurityLevel::Balanced => Argon2Params::default(),
             CliSecurityLevel::Sensitive => Argon2Params::sensitive(),
         };
-        
+
         // Encrypt the child key
-        let child_storage_config = encrypt_key(&child_key_bytes, &child_passphrase, &argon2_params)?;
-        
+        let child_storage_config =
+            encrypt_key(&child_key_bytes, &child_passphrase, &argon2_params)?;
+
         // Write encrypted child key to file
         let config_json = serde_json::to_string_pretty(&child_storage_config)?;
         fs::write(&child_key_file_path, config_json)
             .map_err(|e| format!("Failed to write child key file: {}", e))?;
-        
+
         // Set file permissions to 600 (owner read/write only)
         let mut perms = fs::metadata(&child_key_file_path)?.permissions();
         perms.set_mode(0o600);
         fs::set_permissions(&child_key_file_path, perms)
             .map_err(|e| format!("Failed to set file permissions: {}", e))?;
-        
-        info!("✅ Child key '{}' derived from master '{}' and stored securely", child_key_id, master_key_id);
+
+        info!(
+            "✅ Child key '{}' derived from master '{}' and stored securely",
+            child_key_id, master_key_id
+        );
         info!("Derivation context: '{}'", context);
         info!("Security level: {:?}", security_level);
     }
-    
+
     // Clear sensitive data
     let _ = master_key_bytes;
     let _ = child_key_bytes;
-    
+
     Ok(())
 }
 
@@ -1892,14 +1936,17 @@ fn handle_rotate_key(
     // Get storage directory
     let storage_path = storage_dir.unwrap_or(get_default_storage_dir()?);
     let key_file_path = storage_path.join(format!("{}.key", key_id));
-    
+
     if !key_file_path.exists() {
         return Err(format!("Key '{}' not found", key_id).into());
     }
-    
+
     // Confirm rotation unless force is specified
     if !force {
-        print!("Are you sure you want to rotate key '{}'? This will create a new version. (y/N): ", key_id);
+        print!(
+            "Are you sure you want to rotate key '{}'? This will create a new version. (y/N): ",
+            key_id
+        );
         io::stdout().flush()?;
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
@@ -1908,20 +1955,20 @@ fn handle_rotate_key(
             return Ok(());
         }
     }
-    
+
     // Read current key
     let config_content = fs::read_to_string(&key_file_path)
         .map_err(|e| format!("Failed to read key file: {}", e))?;
     let current_config: KeyStorageConfig = serde_json::from_str(&config_content)
         .map_err(|e| format!("Failed to parse key file: {}", e))?;
-    
+
     // Get passphrase for current key
     print!("Enter passphrase for current key '{}': ", key_id);
     io::stdout().flush()?;
     let current_passphrase = read_password()?;
-    
+
     let current_key_bytes = decrypt_key(&current_config, &current_passphrase)?;
-    
+
     // Generate new key based on rotation method
     let new_key_bytes = match method {
         RotationMethod::Regenerate => {
@@ -1934,7 +1981,8 @@ fn handle_rotate_key(
             // Derive new key from current key using incremental counter
             let context = format!("rotation-{}", chrono::Utc::now().timestamp());
             let salt = generate_salt();
-            let derived_material = hkdf_derive_key(&current_key_bytes, salt.as_bytes(), context.as_bytes(), 32);
+            let derived_material =
+                hkdf_derive_key(&current_key_bytes, salt.as_bytes(), context.as_bytes(), 32);
             let mut new_key = [0u8; 32];
             new_key.copy_from_slice(&derived_material);
             new_key
@@ -1944,71 +1992,78 @@ fn handle_rotate_key(
             print!("Enter passphrase for key re-derivation: ");
             io::stdout().flush()?;
             let derive_passphrase = read_password()?;
-            
+
             let argon2_params = match security_level {
                 CliSecurityLevel::Interactive => Argon2Params::interactive(),
                 CliSecurityLevel::Balanced => Argon2Params::default(),
                 CliSecurityLevel::Sensitive => Argon2Params::sensitive(),
             };
-            
+
             let derived_key = derive_key(&derive_passphrase, &generate_salt(), &argon2_params)
                 .map_err(|e| format!("Key re-derivation failed: {}", e))?;
-            
+
             let mut new_key = [0u8; 32];
             new_key.copy_from_slice(derived_key.as_bytes());
             new_key
         }
     };
-    
+
     // Create backup if requested
     if keep_backup {
-        let backup_path = storage_path.join(format!("{}.backup.{}.key", key_id, chrono::Utc::now().timestamp()));
+        let backup_path = storage_path.join(format!(
+            "{}.backup.{}.key",
+            key_id,
+            chrono::Utc::now().timestamp()
+        ));
         fs::copy(&key_file_path, &backup_path)
             .map_err(|e| format!("Failed to create backup: {}", e))?;
-        
+
         // Set backup file permissions to 600
         let mut perms = fs::metadata(&backup_path)?.permissions();
         perms.set_mode(0o600);
         fs::set_permissions(&backup_path, perms)?;
-        
+
         info!("✅ Backup created: {}", backup_path.display());
     }
-    
+
     // Get passphrase for new key encryption
     print!("Enter passphrase for rotated key '{}': ", key_id);
     io::stdout().flush()?;
     let new_passphrase = read_password()?;
-    
+
     // Convert security level to Argon2 parameters
     let argon2_params = match security_level {
         CliSecurityLevel::Interactive => Argon2Params::interactive(),
         CliSecurityLevel::Balanced => Argon2Params::default(),
         CliSecurityLevel::Sensitive => Argon2Params::sensitive(),
     };
-    
+
     // Encrypt the new key
     let new_storage_config = encrypt_key(&new_key_bytes, &new_passphrase, &argon2_params)?;
-    
+
     // Write new encrypted key to file
     let config_json = serde_json::to_string_pretty(&new_storage_config)?;
     fs::write(&key_file_path, config_json)
         .map_err(|e| format!("Failed to write rotated key file: {}", e))?;
-    
+
     // Set file permissions to 600
     let mut perms = fs::metadata(&key_file_path)?.permissions();
     perms.set_mode(0o600);
     fs::set_permissions(&key_file_path, perms)?;
-    
-    info!("✅ Key '{}' rotated successfully using method: {:?}", key_id, method);
+
+    info!(
+        "✅ Key '{}' rotated successfully using method: {:?}",
+        key_id, method
+    );
     info!("Security level: {:?}", security_level);
     if keep_backup {
         info!("Previous version backed up");
     }
-    
+
     // Clear sensitive data
     let _ = current_key_bytes;
     let _ = new_key_bytes;
-    
+
     Ok(())
 }
 
@@ -2019,67 +2074,76 @@ fn handle_list_key_versions(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Get storage directory
     let storage_path = storage_dir.unwrap_or(get_default_storage_dir()?);
-    
+
     if !storage_path.exists() {
         info!("No keys found (storage directory doesn't exist)");
         return Ok(());
     }
-    
+
     // Find all versions of the key
     let entries = fs::read_dir(&storage_path)
         .map_err(|e| format!("Failed to read storage directory: {}", e))?;
-    
+
     let mut versions = Vec::new();
-    
+
     // Look for main key and backup files
     for entry in entries {
         let entry = entry?;
         let path = entry.path();
         if path.is_file() {
             let filename = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
-            
+
             // Check for main key file
             if filename == format!("{}.key", key_id) {
                 versions.push(("current".to_string(), path));
             }
             // Check for backup files
-            else if filename.starts_with(&format!("{}.backup.", key_id)) && filename.ends_with(".key") {
-                if let Some(timestamp_part) = filename.strip_prefix(&format!("{}.backup.", key_id)).and_then(|s| s.strip_suffix(".key")) {
+            else if filename.starts_with(&format!("{}.backup.", key_id))
+                && filename.ends_with(".key")
+            {
+                if let Some(timestamp_part) = filename
+                    .strip_prefix(&format!("{}.backup.", key_id))
+                    .and_then(|s| s.strip_suffix(".key"))
+                {
                     versions.push((format!("backup-{}", timestamp_part), path));
                 }
             }
         }
     }
-    
+
     if versions.is_empty() {
         info!("No versions found for key '{}'", key_id);
         return Ok(());
     }
-    
+
     // Sort versions
     versions.sort_by(|a, b| a.0.cmp(&b.0));
-    
-    info!("Versions for key '{}' in {}:", key_id, storage_path.display());
-    
+
+    info!(
+        "Versions for key '{}' in {}:",
+        key_id,
+        storage_path.display()
+    );
+
     for (version_name, path) in versions {
         if verbose {
             // Read and parse key config for detailed info
             match fs::read_to_string(&path) {
-                Ok(content) => {
-                    match serde_json::from_str::<KeyStorageConfig>(&content) {
-                        Ok(config) => {
-                            info!("  {} (created: {}, security: {}KB/{}/{})",
-                                version_name, config.created_at,
-                                config.argon2_params.memory_cost,
-                                config.argon2_params.time_cost,
-                                config.argon2_params.parallelism
-                            );
-                        }
-                        Err(_) => {
-                            info!("  {} (invalid format)", version_name);
-                        }
+                Ok(content) => match serde_json::from_str::<KeyStorageConfig>(&content) {
+                    Ok(config) => {
+                        info!(
+                            "  {} (created: {}, security: {}KB/{}/{})",
+                            version_name,
+                            config.created_at,
+                            config.argon2_params.memory_cost,
+                            config.argon2_params.time_cost,
+                            config.argon2_params.parallelism
+                        );
                     }
-                }
+                    Err(_) => {
+                        info!("  {} (invalid format)", version_name);
+                    }
+                },
                 Err(_) => {
                     info!("  {} (read error)", version_name);
                 }
@@ -2088,7 +2152,7 @@ fn handle_list_key_versions(
             info!("  {}", version_name);
         }
     }
-    
+
     Ok(())
 }
 
@@ -2101,17 +2165,17 @@ fn handle_backup_key(
     // Get storage directory
     let storage_path = storage_dir.unwrap_or(get_default_storage_dir()?);
     let key_file_path = storage_path.join(format!("{}.key", key_id));
-    
+
     if !key_file_path.exists() {
         return Err(format!("Key '{}' not found", key_id).into());
     }
-    
+
     // Read the key config
     let config_content = fs::read_to_string(&key_file_path)
         .map_err(|e| format!("Failed to read key file: {}", e))?;
     let key_config: KeyStorageConfig = serde_json::from_str(&config_content)
         .map_err(|e| format!("Failed to parse key file: {}", e))?;
-    
+
     // Create backup metadata
     let backup_metadata = KeyVersionMetadata {
         version: 1,
@@ -2121,43 +2185,43 @@ fn handle_backup_key(
         salt: key_config.salt,
         argon2_params: key_config.argon2_params.clone(),
     };
-    
+
     let mut backup_data = config_content.into_bytes();
     let mut backup_nonce = [0u8; 12];
     OsRng.fill_bytes(&mut backup_nonce);
-    
+
     let mut backup_salt = None;
     let mut backup_params = None;
-    
+
     // Apply additional encryption if backup passphrase is requested
     if backup_passphrase {
         print!("Enter backup passphrase for additional encryption: ");
         io::stdout().flush()?;
         let backup_pass = read_password()?;
-        
+
         let salt = generate_salt();
         let argon2_params = Argon2Params::default();
-        
+
         let derived_key = derive_key(&backup_pass, &salt, &argon2_params)
             .map_err(|e| format!("Backup key derivation failed: {}", e))?;
-        
+
         // Use BLAKE3 to generate keystream for encryption
         let mut hasher = blake3::Hasher::new();
         hasher.update(derived_key.as_bytes());
         hasher.update(&backup_nonce);
         let keystream = hasher.finalize();
-        
+
         // XOR encrypt the backup data
         for (i, byte) in backup_data.iter_mut().enumerate() {
             if i < keystream.as_bytes().len() {
                 *byte ^= keystream.as_bytes()[i % keystream.as_bytes().len()];
             }
         }
-        
+
         backup_salt = Some(*salt.as_bytes());
         backup_params = Some((&argon2_params).into());
     }
-    
+
     // Create backup format
     let backup_format = KeyBackupFormat {
         format_version: 1,
@@ -2169,25 +2233,29 @@ fn handle_backup_key(
         backup_params,
         original_metadata: backup_metadata,
     };
-    
+
     // Write backup file
     let backup_json = serde_json::to_string_pretty(&backup_format)
         .map_err(|e| format!("Failed to serialize backup: {}", e))?;
-    
+
     fs::write(&backup_file, backup_json)
         .map_err(|e| format!("Failed to write backup file: {}", e))?;
-    
+
     // Set backup file permissions to 600
     let mut perms = fs::metadata(&backup_file)?.permissions();
     perms.set_mode(0o600);
     fs::set_permissions(&backup_file, perms)
         .map_err(|e| format!("Failed to set backup file permissions: {}", e))?;
-    
-    info!("✅ Key '{}' backed up to: {}", key_id, backup_file.display());
+
+    info!(
+        "✅ Key '{}' backed up to: {}",
+        key_id,
+        backup_file.display()
+    );
     if backup_passphrase {
         info!("Backup is double-encrypted with backup passphrase");
     }
-    
+
     Ok(())
 }
 
@@ -2200,40 +2268,40 @@ fn handle_restore_key(
     // Get storage directory
     let storage_path = storage_dir.unwrap_or(get_default_storage_dir()?);
     ensure_storage_dir(&storage_path)?;
-    
+
     let key_file_path = storage_path.join(format!("{}.key", key_id));
-    
+
     if key_file_path.exists() && !force {
         return Err(format!("Key '{}' already exists. Use --force to overwrite", key_id).into());
     }
-    
+
     // Read backup file
     let backup_content = fs::read_to_string(&backup_file)
         .map_err(|e| format!("Failed to read backup file: {}", e))?;
-    
+
     let backup_format: KeyBackupFormat = serde_json::from_str(&backup_content)
         .map_err(|e| format!("Failed to parse backup file: {}", e))?;
-    
+
     let mut restored_data = backup_format.backup_data;
-    
+
     // Decrypt backup if it has additional encryption
     if backup_format.backup_salt.is_some() && backup_format.backup_params.is_some() {
         print!("Enter backup passphrase for decryption: ");
         io::stdout().flush()?;
         let backup_pass = read_password()?;
-        
+
         let salt = datafold::crypto::argon2::Salt::from_bytes(backup_format.backup_salt.unwrap());
         let argon2_params: Argon2Params = backup_format.backup_params.unwrap().into();
-        
+
         let derived_key = derive_key(&backup_pass, &salt, &argon2_params)
             .map_err(|e| format!("Backup key derivation failed: {}", e))?;
-        
+
         // Use BLAKE3 to generate the same keystream
         let mut hasher = blake3::Hasher::new();
         hasher.update(derived_key.as_bytes());
         hasher.update(&backup_format.backup_nonce);
         let keystream = hasher.finalize();
-        
+
         // XOR decrypt the backup data
         for (i, byte) in restored_data.iter_mut().enumerate() {
             if i < keystream.as_bytes().len() {
@@ -2241,21 +2309,25 @@ fn handle_restore_key(
             }
         }
     }
-    
+
     // Write restored key to file
     fs::write(&key_file_path, &restored_data)
         .map_err(|e| format!("Failed to write restored key file: {}", e))?;
-    
+
     // Set file permissions to 600
     let mut perms = fs::metadata(&key_file_path)?.permissions();
     perms.set_mode(0o600);
     fs::set_permissions(&key_file_path, perms)
         .map_err(|e| format!("Failed to set file permissions: {}", e))?;
-    
-    info!("✅ Key '{}' restored from backup: {}", key_id, backup_file.display());
+
+    info!(
+        "✅ Key '{}' restored from backup: {}",
+        key_id,
+        backup_file.display()
+    );
     info!("Original key ID: {}", backup_format.key_id);
     info!("Backup created: {}", backup_format.exported_at);
-    
+
     Ok(())
 }
 
@@ -2270,25 +2342,25 @@ fn handle_export_key(
     // Get storage directory
     let storage_path = storage_dir.unwrap_or(get_default_storage_dir()?);
     let key_file_path = storage_path.join(format!("{}.key", key_id));
-    
+
     if !key_file_path.exists() {
         return Err(format!("Key '{}' not found", key_id).into());
     }
-    
+
     // Read the key config
     let config_content = fs::read_to_string(&key_file_path)
         .map_err(|e| format!("Failed to read key file: {}", e))?;
     let key_config: KeyStorageConfig = serde_json::from_str(&config_content)
         .map_err(|e| format!("Failed to parse key file: {}", e))?;
-    
+
     // Get the original key passphrase to decrypt the stored key
     print!("Enter passphrase to decrypt stored key '{}': ", key_id);
     io::stdout().flush()?;
     let key_passphrase = read_password()?;
-    
+
     // Decrypt the stored key
     let decrypted_key = decrypt_key(&key_config, &key_passphrase)?;
-    
+
     // Get export passphrase
     let export_pass = if export_passphrase {
         print!("Enter export passphrase for additional protection: ");
@@ -2298,29 +2370,29 @@ fn handle_export_key(
         // Use the same passphrase as the stored key
         Some(key_passphrase)
     };
-    
+
     if let Some(pass) = export_pass {
         // Generate salt and nonce for export encryption
         let mut salt = [0u8; 32];
         OsRng.fill_bytes(&mut salt);
-        
+
         let mut nonce = [0u8; 12]; // AES-GCM nonce
         OsRng.fill_bytes(&mut nonce);
-        
+
         // Use stronger parameters for export
         let argon2_params = Argon2Params::sensitive();
-        
+
         // Derive export encryption key
         let salt_obj = datafold::crypto::argon2::Salt::from_bytes(salt);
         let derived_key = derive_key(&pass, &salt_obj, &argon2_params)
             .map_err(|e| format!("Export key derivation failed: {}", e))?;
-        
+
         // Encrypt the key using AES-GCM-like encryption (simplified)
         let mut hasher = blake3::Hasher::new();
         hasher.update(derived_key.as_bytes());
         hasher.update(&nonce);
         let keystream = hasher.finalize();
-        
+
         // XOR encrypt the key data
         let mut encrypted_data = decrypted_key.to_vec();
         for (i, byte) in encrypted_data.iter_mut().enumerate() {
@@ -2328,7 +2400,7 @@ fn handle_export_key(
                 *byte ^= keystream.as_bytes()[i % keystream.as_bytes().len()];
             }
         }
-        
+
         // Create export metadata if requested
         let metadata = if include_metadata {
             Some(ExportKeyMetadata {
@@ -2340,7 +2412,7 @@ fn handle_export_key(
         } else {
             None
         };
-        
+
         // Create the enhanced export format
         let export_data = EnhancedKeyExportFormat {
             version: 1,
@@ -2357,13 +2429,13 @@ fn handle_export_key(
             created: chrono::Utc::now().to_rfc3339(),
             metadata,
         };
-        
+
         match format {
             ExportFormat::Json => {
                 // Export as JSON
                 let export_json = serde_json::to_string_pretty(&export_data)
                     .map_err(|e| format!("Failed to serialize export data: {}", e))?;
-                
+
                 fs::write(&export_file, export_json)
                     .map_err(|e| format!("Failed to write export file: {}", e))?;
             }
@@ -2371,18 +2443,18 @@ fn handle_export_key(
                 // Export as compact binary (using bincode or similar)
                 let export_binary = serde_json::to_vec(&export_data)
                     .map_err(|e| format!("Failed to serialize export data: {}", e))?;
-                
+
                 fs::write(&export_file, export_binary)
                     .map_err(|e| format!("Failed to write export file: {}", e))?;
             }
         }
-        
+
         // Set export file permissions to 600
         let mut perms = fs::metadata(&export_file)?.permissions();
         perms.set_mode(0o600);
         fs::set_permissions(&export_file, perms)
             .map_err(|e| format!("Failed to set export file permissions: {}", e))?;
-        
+
         info!("✅ Key '{}' exported to: {}", key_id, export_file.display());
         info!("Export format: {:?}", format);
         if export_passphrase {
@@ -2394,10 +2466,10 @@ fn handle_export_key(
     } else {
         return Err("Export passphrase is required".into());
     }
-    
+
     // Clear sensitive data
     let _ = decrypted_key;
-    
+
     Ok(())
 }
 
@@ -2411,48 +2483,58 @@ fn handle_import_key(
     // Get storage directory
     let storage_path = storage_dir.unwrap_or(get_default_storage_dir()?);
     ensure_storage_dir(&storage_path)?;
-    
+
     let key_file_path = storage_path.join(format!("{}.key", key_id));
-    
+
     if key_file_path.exists() && !force {
         return Err(format!("Key '{}' already exists. Use --force to overwrite", key_id).into());
     }
-    
+
     // Read export file
     let export_content = fs::read_to_string(&export_file)
         .map_err(|e| format!("Failed to read export file: {}", e))?;
-    
+
     // Try to parse as enhanced export format
-    let export_data: EnhancedKeyExportFormat = serde_json::from_str(&export_content)
-        .map_err(|e| format!("Failed to parse export file (not valid enhanced format): {}", e))?;
-    
+    let export_data: EnhancedKeyExportFormat =
+        serde_json::from_str(&export_content).map_err(|e| {
+            format!(
+                "Failed to parse export file (not valid enhanced format): {}",
+                e
+            )
+        })?;
+
     // Validate export format version
     if export_data.version != 1 {
         return Err(format!("Unsupported export format version: {}", export_data.version).into());
     }
-    
+
     // Validate encryption algorithm
     if export_data.encryption != "aes-gcm-like" {
-        return Err(format!("Unsupported encryption algorithm: {}", export_data.encryption).into());
+        return Err(format!(
+            "Unsupported encryption algorithm: {}",
+            export_data.encryption
+        )
+        .into());
     }
-    
+
     // Validate KDF
     if export_data.kdf != "argon2id" {
         return Err(format!("Unsupported KDF: {}", export_data.kdf).into());
     }
-    
+
     // Get import passphrase
     print!("Enter import passphrase to decrypt exported key: ");
     io::stdout().flush()?;
     let import_passphrase = read_password()?;
-    
+
     // Reconstruct Argon2 parameters
     let argon2_params = Argon2Params::new(
         export_data.kdf_params.memory,
         export_data.kdf_params.iterations,
         export_data.kdf_params.parallelism,
-    ).map_err(|e| format!("Invalid KDF parameters: {}", e))?;
-    
+    )
+    .map_err(|e| format!("Invalid KDF parameters: {}", e))?;
+
     // Recreate salt from export data
     if export_data.kdf_params.salt.len() != 32 {
         return Err("Invalid salt length in export data".into());
@@ -2460,23 +2542,23 @@ fn handle_import_key(
     let mut salt_bytes = [0u8; 32];
     salt_bytes.copy_from_slice(&export_data.kdf_params.salt);
     let salt = datafold::crypto::argon2::Salt::from_bytes(salt_bytes);
-    
+
     // Derive decryption key
     let derived_key = derive_key(&import_passphrase, &salt, &argon2_params)
         .map_err(|e| format!("Import key derivation failed: {}", e))?;
-    
+
     // Decrypt the key data
     if export_data.nonce.len() != 12 {
         return Err("Invalid nonce length in export data".into());
     }
     let mut nonce = [0u8; 12];
     nonce.copy_from_slice(&export_data.nonce);
-    
+
     let mut hasher = blake3::Hasher::new();
     hasher.update(derived_key.as_bytes());
     hasher.update(&nonce);
     let keystream = hasher.finalize();
-    
+
     // XOR decrypt the key data
     let mut decrypted_data = export_data.ciphertext.clone();
     for (i, byte) in decrypted_data.iter_mut().enumerate() {
@@ -2484,54 +2566,59 @@ fn handle_import_key(
             *byte ^= keystream.as_bytes()[i % keystream.as_bytes().len()];
         }
     }
-    
+
     // Validate decrypted key length
     if decrypted_data.len() != 32 {
         return Err("Invalid decrypted key length (corruption or wrong passphrase)".into());
     }
-    
+
     let mut imported_key = [0u8; 32];
     imported_key.copy_from_slice(&decrypted_data);
-    
+
     // Verify key integrity if requested
     if verify_integrity {
         // Generate keypair from imported key to verify it's valid
         let keypair = datafold::crypto::ed25519::generate_master_keypair_from_seed(&imported_key)
             .map_err(|e| format!("Key integrity verification failed: {}", e))?;
-        
+
         // Test signing and verification
         let test_message = b"DataFold import verification test";
-        let signature = keypair.sign_data(test_message)
+        let signature = keypair
+            .sign_data(test_message)
             .map_err(|e| format!("Key functionality test failed: {}", e))?;
-        
-        keypair.verify_data(test_message, &signature)
+
+        keypair
+            .verify_data(test_message, &signature)
             .map_err(|e| format!("Key verification test failed: {}", e))?;
-        
+
         info!("✅ Key integrity verification passed");
     }
-    
+
     // Get passphrase for storing the imported key
-    print!("Enter passphrase to encrypt imported key '{}' for storage: ", key_id);
+    print!(
+        "Enter passphrase to encrypt imported key '{}' for storage: ",
+        key_id
+    );
     io::stdout().flush()?;
     let storage_passphrase = read_password()?;
-    
+
     // Use balanced security for storage (can be upgraded later if needed)
     let storage_argon2_params = Argon2Params::default();
-    
+
     // Encrypt the imported key for storage
     let storage_config = encrypt_key(&imported_key, &storage_passphrase, &storage_argon2_params)?;
-    
+
     // Write encrypted key to file
     let config_json = serde_json::to_string_pretty(&storage_config)?;
     fs::write(&key_file_path, config_json)
         .map_err(|e| format!("Failed to write imported key file: {}", e))?;
-    
+
     // Set file permissions to 600
     let mut perms = fs::metadata(&key_file_path)?.permissions();
     perms.set_mode(0o600);
     fs::set_permissions(&key_file_path, perms)
         .map_err(|e| format!("Failed to set file permissions: {}", e))?;
-    
+
     info!("✅ Key imported successfully as '{}'", key_id);
     info!("Source export created: {}", export_data.created);
     if let Some(metadata) = &export_data.metadata {
@@ -2541,11 +2628,11 @@ fn handle_import_key(
             info!("Notes: {}", notes);
         }
     }
-    
+
     // Clear sensitive data
     let _ = imported_key;
     drop(decrypted_data);
-    
+
     Ok(())
 }
 
@@ -2562,38 +2649,42 @@ async fn handle_register_key(
     retries: u32,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Registering public key with DataFold server...");
-    
+
     // Get storage directory
     let storage_dir = storage_dir.unwrap_or_else(|| get_default_storage_dir().unwrap());
     ensure_storage_dir(&storage_dir)?;
-    
+
     // Load the key from storage
     let key_file = storage_dir.join(format!("{}.json", key_id));
     if !key_file.exists() {
-        return Err(format!("Key '{}' not found in storage. Use store-key to create it first.", key_id).into());
+        return Err(format!(
+            "Key '{}' not found in storage. Use store-key to create it first.",
+            key_id
+        )
+        .into());
     }
-    
+
     // Read and decrypt the stored key
     let key_content = fs::read_to_string(&key_file)?;
     let key_config: KeyStorageConfig = serde_json::from_str(&key_content)?;
-    
+
     print!("Enter passphrase to unlock key: ");
     io::stdout().flush()?;
     let passphrase = get_secure_passphrase()?;
-    
+
     let private_key_bytes = decrypt_key(&key_config, &passphrase)?;
-    
+
     // Extract public key from private key
     let master_keypair = MasterKeyPair::from_secret_bytes(&private_key_bytes)?;
     let public_key = master_keypair.public_key();
     let public_key_hex = hex::encode(public_key.to_bytes());
-    
+
     // Generate client ID if not provided
     let client_id = client_id.unwrap_or_else(|| format!("cli_{}", uuid::Uuid::new_v4()));
-    
+
     // Create HTTP client
     let client = create_http_client(timeout)?;
-    
+
     // Prepare registration request
     let registration_request = PublicKeyRegistrationRequest {
         client_id: Some(client_id.clone()),
@@ -2607,23 +2698,27 @@ async fn handle_register_key(
             meta
         }),
     };
-    
+
     // Send registration request
-    let register_url = format!("{}/api/crypto/keys/register", server_url.trim_end_matches('/'));
+    let register_url = format!(
+        "{}/api/crypto/keys/register",
+        server_url.trim_end_matches('/')
+    );
     let request = client
         .post(&register_url)
         .header("Content-Type", "application/json")
         .json(&registration_request);
-    
+
     println!("Sending registration request to: {}", register_url);
-    let response: PublicKeyRegistrationResponse = http_request_with_retry(&client, request, retries).await?;
-    
+    let response: PublicKeyRegistrationResponse =
+        http_request_with_retry(&client, request, retries).await?;
+
     println!("✅ Public key registered successfully!");
     println!("Registration ID: {}", response.registration_id);
     println!("Client ID: {}", response.client_id);
     println!("Status: {}", response.status);
     println!("Registered at: {}", response.registered_at);
-    
+
     // Save client ID for future use
     let client_file = storage_dir.join(format!("{}_client.json", key_id));
     let client_info = json!({
@@ -2633,9 +2728,9 @@ async fn handle_register_key(
         "registered_at": response.registered_at
     });
     fs::write(client_file, serde_json::to_string_pretty(&client_info)?)?;
-    
+
     println!("Client information saved for future use");
-    
+
     Ok(())
 }
 
@@ -2647,17 +2742,22 @@ async fn handle_check_registration(
     retries: u32,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Checking public key registration status...");
-    
+
     // Create HTTP client
     let client = create_http_client(timeout)?;
-    
+
     // Send status request
-    let status_url = format!("{}/api/crypto/keys/status/{}", server_url.trim_end_matches('/'), client_id);
+    let status_url = format!(
+        "{}/api/crypto/keys/status/{}",
+        server_url.trim_end_matches('/'),
+        client_id
+    );
     let request = client.get(&status_url);
-    
+
     println!("Requesting status from: {}", status_url);
-    let response: PublicKeyStatusResponse = http_request_with_retry(&client, request, retries).await?;
-    
+    let response: PublicKeyStatusResponse =
+        http_request_with_retry(&client, request, retries).await?;
+
     println!("✅ Registration status retrieved successfully!");
     println!("Registration ID: {}", response.registration_id);
     println!("Client ID: {}", response.client_id);
@@ -2672,7 +2772,7 @@ async fn handle_check_registration(
     if let Some(key_name) = response.key_name {
         println!("Key name: {}", key_name);
     }
-    
+
     Ok(())
 }
 
@@ -2690,34 +2790,36 @@ async fn handle_sign_and_verify(
     retries: u32,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Signing message and verifying with server...");
-    
+
     // Get storage directory
     let storage_dir = storage_dir.unwrap_or_else(|| get_default_storage_dir().unwrap());
     ensure_storage_dir(&storage_dir)?;
-    
+
     // Load the key from storage
     let key_file = storage_dir.join(format!("{}.json", key_id));
     if !key_file.exists() {
-        return Err(format!("Key '{}' not found in storage. Use store-key to create it first.", key_id).into());
+        return Err(format!(
+            "Key '{}' not found in storage. Use store-key to create it first.",
+            key_id
+        )
+        .into());
     }
-    
+
     // Read and decrypt the stored key
     let key_content = fs::read_to_string(&key_file)?;
     let key_config: KeyStorageConfig = serde_json::from_str(&key_content)?;
-    
+
     print!("Enter passphrase to unlock key: ");
     io::stdout().flush()?;
     let passphrase = get_secure_passphrase()?;
-    
+
     let private_key_bytes = decrypt_key(&key_config, &passphrase)?;
     let master_keypair = MasterKeyPair::from_secret_bytes(&private_key_bytes)?;
-    
+
     // Get message to sign
     let message_to_sign = match (message, message_file) {
         (Some(msg), None) => msg,
-        (None, Some(file)) => {
-            fs::read_to_string(file)?
-        }
+        (None, Some(file)) => fs::read_to_string(file)?,
         (Some(_), Some(_)) => {
             return Err("Cannot specify both --message and --message-file".into());
         }
@@ -2725,24 +2827,24 @@ async fn handle_sign_and_verify(
             return Err("Must specify either --message or --message-file".into());
         }
     };
-    
+
     // Sign the message
     let signature = master_keypair.sign_data(message_to_sign.as_bytes())?;
     let signature_hex = hex::encode(signature);
-    
+
     println!("Message signed successfully");
     println!("Signature: {}", signature_hex);
-    
+
     // Create HTTP client
     let client = create_http_client(timeout)?;
-    
+
     // Prepare verification request
     let encoding_str = match message_encoding {
         MessageEncoding::Utf8 => "utf8",
         MessageEncoding::Hex => "hex",
         MessageEncoding::Base64 => "base64",
     };
-    
+
     let verification_request = SignatureVerificationRequest {
         client_id: client_id.clone(),
         message: message_to_sign,
@@ -2755,28 +2857,39 @@ async fn handle_sign_and_verify(
             meta
         }),
     };
-    
+
     // Send verification request
-    let verify_url = format!("{}/api/crypto/signatures/verify", server_url.trim_end_matches('/'));
+    let verify_url = format!(
+        "{}/api/crypto/signatures/verify",
+        server_url.trim_end_matches('/')
+    );
     let request = client
         .post(&verify_url)
         .header("Content-Type", "application/json")
         .json(&verification_request);
-    
+
     println!("Sending verification request to: {}", verify_url);
-    let response: SignatureVerificationResponse = http_request_with_retry(&client, request, retries).await?;
-    
+    let response: SignatureVerificationResponse =
+        http_request_with_retry(&client, request, retries).await?;
+
     println!("✅ Signature verification completed!");
-    println!("Verified: {}", if response.verified { "✅ SUCCESS" } else { "❌ FAILED" });
+    println!(
+        "Verified: {}",
+        if response.verified {
+            "✅ SUCCESS"
+        } else {
+            "❌ FAILED"
+        }
+    );
     println!("Client ID: {}", response.client_id);
     println!("Public Key: {}", response.public_key);
     println!("Verified at: {}", response.verified_at);
     println!("Message hash: {}", response.message_hash);
-    
+
     if !response.verified {
         return Err("Signature verification failed".into());
     }
-    
+
     Ok(())
 }
 
@@ -2791,18 +2904,19 @@ async fn handle_auth_init(
     force: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔐 Initializing CLI authentication...");
-    
+
     // Load or create CLI configuration
     let mut config_manager = CliConfigManager::new()?;
-    
+
     // Check if profile already exists
     if config_manager.get_profile(&profile).is_some() && !force {
         return Err(format!(
             "Profile '{}' already exists. Use --force to overwrite.",
             profile
-        ).into());
+        )
+        .into());
     }
-    
+
     // Verify the key exists in storage
     let storage_dir = storage_dir.unwrap_or_else(|| get_default_storage_dir().unwrap());
     let key_file = storage_dir.join(format!("{}.json", key_id));
@@ -2810,17 +2924,18 @@ async fn handle_auth_init(
         return Err(format!(
             "Key '{}' not found in storage. Use 'auth-keygen' or 'store-key' to create it first.",
             key_id
-        ).into());
+        )
+        .into());
     }
-    
+
     // Generate client ID
     let client_id = format!("cli_{}", uuid::Uuid::new_v4());
-    
+
     // Create authentication profile
     let mut metadata = HashMap::new();
     metadata.insert("source".to_string(), "datafold-cli".to_string());
     metadata.insert("created_by".to_string(), "auth-init".to_string());
-    
+
     let auth_profile = CliAuthProfile {
         client_id: client_id.clone(),
         key_id: key_id.clone(),
@@ -2828,24 +2943,30 @@ async fn handle_auth_init(
         server_url: server_url.clone(),
         metadata,
     };
-    
+
     // Add profile to configuration
     config_manager.add_profile(profile.clone(), auth_profile)?;
     config_manager.save()?;
-    
-    println!("✅ Authentication profile '{}' created successfully!", profile);
+
+    println!(
+        "✅ Authentication profile '{}' created successfully!",
+        profile
+    );
     println!("Client ID: {}", client_id);
     println!("Key ID: {}", key_id);
     println!("Server URL: {}", server_url);
-    
+
     if config_manager.config().default_profile.as_ref() == Some(&profile) {
         println!("✨ Set as default profile");
     }
-    
+
     println!("\n💡 Next steps:");
-    println!("1. Register your public key: datafold register-key --key-id {} --client-id {}", key_id, client_id);
+    println!(
+        "1. Register your public key: datafold register-key --key-id {} --client-id {}",
+        key_id, client_id
+    );
     println!("2. Test authentication: datafold auth-test");
-    
+
     Ok(())
 }
 
@@ -2857,10 +2978,10 @@ async fn handle_auth_status(
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔐 CLI Authentication Status");
     println!("============================");
-    
+
     let config_manager = CliConfigManager::new()?;
     let status = config_manager.auth_status();
-    
+
     if !status.configured {
         println!("❌ Authentication not configured");
         println!("\n💡 To get started:");
@@ -2868,9 +2989,9 @@ async fn handle_auth_status(
         println!("2. Initialize auth: datafold auth-init --key-id my-key --server-url https://your-server.com");
         return Ok(());
     }
-    
+
     println!("✅ Authentication configured");
-    
+
     if let Some(profile_name) = &profile {
         // Show specific profile
         if let Some(prof) = config_manager.get_profile(profile_name) {
@@ -2878,11 +2999,11 @@ async fn handle_auth_status(
             println!("   Client ID: {}", prof.client_id);
             println!("   Key ID: {}", prof.key_id);
             println!("   Server URL: {}", prof.server_url);
-            
+
             if let Some(user_id) = &prof.user_id {
                 println!("   User ID: {}", user_id);
             }
-            
+
             if verbose {
                 println!("   Metadata:");
                 for (key, value) in &prof.metadata {
@@ -2903,7 +3024,7 @@ async fn handle_auth_status(
         if let Some(server_url) = &status.server_url {
             println!("   Server URL: {}", server_url);
         }
-        
+
         if verbose {
             println!("\n📋 All Profiles:");
             let profiles = config_manager.list_profiles();
@@ -2911,10 +3032,11 @@ async fn handle_auth_status(
                 println!("   No profiles configured");
             } else {
                 for profile_name in profiles {
-                    let is_default = config_manager.config().default_profile.as_ref() == Some(profile_name);
+                    let is_default =
+                        config_manager.config().default_profile.as_ref() == Some(profile_name);
                     let marker = if is_default { " (default)" } else { "" };
                     println!("   • {}{}", profile_name, marker);
-                    
+
                     if let Some(prof) = config_manager.get_profile(profile_name) {
                         println!("     Client ID: {}", prof.client_id);
                         println!("     Key ID: {}", prof.key_id);
@@ -2924,31 +3046,40 @@ async fn handle_auth_status(
             }
         }
     }
-    
-    println!("\n🔧 Configuration file: {}", config_manager.config_path().display());
-    
+
+    println!(
+        "\n🔧 Configuration file: {}",
+        config_manager.config_path().display()
+    );
+
     Ok(())
 }
 
 /// Handle authentication profile management
 async fn handle_auth_profile(action: ProfileAction) -> Result<(), Box<dyn std::error::Error>> {
     let mut config_manager = CliConfigManager::new()?;
-    
+
     match action {
-        ProfileAction::Create { name, server_url, key_id, user_id, set_default } => {
+        ProfileAction::Create {
+            name,
+            server_url,
+            key_id,
+            user_id,
+            set_default,
+        } => {
             // Check if profile already exists
             if config_manager.get_profile(&name).is_some() {
                 return Err(format!("Profile '{}' already exists", name).into());
             }
-            
+
             // Generate client ID
             let client_id = format!("cli_{}", uuid::Uuid::new_v4());
-            
+
             // Create profile
             let mut metadata = HashMap::new();
             metadata.insert("source".to_string(), "datafold-cli".to_string());
             metadata.insert("created_by".to_string(), "profile-create".to_string());
-            
+
             let profile = CliAuthProfile {
                 client_id: client_id.clone(),
                 key_id: key_id.clone(),
@@ -2956,51 +3087,52 @@ async fn handle_auth_profile(action: ProfileAction) -> Result<(), Box<dyn std::e
                 server_url: server_url.clone(),
                 metadata,
             };
-            
+
             config_manager.add_profile(name.clone(), profile)?;
-            
+
             if set_default {
                 config_manager.set_default_profile(name.clone())?;
             }
-            
+
             config_manager.save()?;
-            
+
             println!("✅ Profile '{}' created successfully!", name);
             println!("   Client ID: {}", client_id);
             println!("   Key ID: {}", key_id);
             println!("   Server URL: {}", server_url);
-            
+
             if set_default {
                 println!("   ✨ Set as default profile");
             }
         }
-        
+
         ProfileAction::List { verbose } => {
             let profiles = config_manager.list_profiles();
-            
+
             if profiles.is_empty() {
                 println!("No authentication profiles configured");
                 return Ok(());
             }
-            
+
             println!("📋 Authentication Profiles:");
             println!("===========================");
-            
+
             for profile_name in profiles {
-                let is_default = config_manager.config().default_profile.as_ref() == Some(profile_name);
+                let is_default =
+                    config_manager.config().default_profile.as_ref() == Some(profile_name);
                 let marker = if is_default { " (default)" } else { "" };
-                
+
                 println!("\n• {}{}", profile_name, marker);
-                
+
                 if let Some(prof) = config_manager.get_profile(profile_name) {
                     println!("  Client ID: {}", prof.client_id);
                     println!("  Key ID: {}", prof.key_id);
                     println!("  Server: {}", prof.server_url);
-                    
+
                     if let Some(user_id) = &prof.user_id {
                         println!("  User ID: {}", user_id);
                     }
-                    
+
                     if verbose {
                         println!("  Metadata:");
                         for (key, value) in &prof.metadata {
@@ -3010,11 +3142,11 @@ async fn handle_auth_profile(action: ProfileAction) -> Result<(), Box<dyn std::e
                 }
             }
         }
-        
+
         ProfileAction::Show { name } => {
             if let Some(prof) = config_manager.get_profile(&name) {
                 let is_default = config_manager.config().default_profile.as_ref() == Some(&name);
-                
+
                 println!("📋 Profile: {}", name);
                 if is_default {
                     println!("   Status: Default profile");
@@ -3022,11 +3154,11 @@ async fn handle_auth_profile(action: ProfileAction) -> Result<(), Box<dyn std::e
                 println!("   Client ID: {}", prof.client_id);
                 println!("   Key ID: {}", prof.key_id);
                 println!("   Server URL: {}", prof.server_url);
-                
+
                 if let Some(user_id) = &prof.user_id {
                     println!("   User ID: {}", user_id);
                 }
-                
+
                 println!("   Metadata:");
                 for (key, value) in &prof.metadata {
                     println!("     {}: {}", key, value);
@@ -3035,26 +3167,31 @@ async fn handle_auth_profile(action: ProfileAction) -> Result<(), Box<dyn std::e
                 return Err(format!("Profile '{}' not found", name).into());
             }
         }
-        
-        ProfileAction::Update { name, server_url, key_id, user_id } => {
+
+        ProfileAction::Update {
+            name,
+            server_url,
+            key_id,
+            user_id,
+        } => {
             if let Some(mut prof) = config_manager.get_profile(&name).cloned() {
                 let mut updated = false;
-                
+
                 if let Some(new_url) = server_url {
                     prof.server_url = new_url;
                     updated = true;
                 }
-                
+
                 if let Some(new_key_id) = key_id {
                     prof.key_id = new_key_id;
                     updated = true;
                 }
-                
+
                 if let Some(new_user_id) = user_id {
                     prof.user_id = Some(new_user_id);
                     updated = true;
                 }
-                
+
                 if updated {
                     config_manager.add_profile(name.clone(), prof)?;
                     config_manager.save()?;
@@ -3066,42 +3203,45 @@ async fn handle_auth_profile(action: ProfileAction) -> Result<(), Box<dyn std::e
                 return Err(format!("Profile '{}' not found", name).into());
             }
         }
-        
+
         ProfileAction::Delete { name, force } => {
             if config_manager.get_profile(&name).is_none() {
                 return Err(format!("Profile '{}' not found", name).into());
             }
-            
+
             if !force {
-                print!("Are you sure you want to delete profile '{}'? (y/N): ", name);
+                print!(
+                    "Are you sure you want to delete profile '{}'? (y/N): ",
+                    name
+                );
                 io::stdout().flush()?;
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
-                
+
                 if !input.trim().to_lowercase().starts_with('y') {
                     println!("❌ Cancelled");
                     return Ok(());
                 }
             }
-            
+
             config_manager.remove_profile(&name)?;
             config_manager.save()?;
-            
+
             println!("✅ Profile '{}' deleted successfully!", name);
         }
-        
+
         ProfileAction::SetDefault { name } => {
             if config_manager.get_profile(&name).is_none() {
                 return Err(format!("Profile '{}' not found", name).into());
             }
-            
+
             config_manager.set_default_profile(name.clone())?;
             config_manager.save()?;
-            
+
             println!("✅ Profile '{}' set as default!", name);
         }
     }
-    
+
     Ok(())
 }
 
@@ -3116,23 +3256,20 @@ async fn handle_auth_keygen(
     passphrase: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔑 Generating authentication key pair...");
-    
+
     // Get storage directory
     let storage_dir = storage_dir.unwrap_or_else(|| get_default_storage_dir().unwrap());
     ensure_storage_dir(&storage_dir)?;
-    
+
     // Check if key already exists
     let key_file = storage_dir.join(format!("{}.json", key_id));
     if key_file.exists() && !force {
-        return Err(format!(
-            "Key '{}' already exists. Use --force to overwrite.",
-            key_id
-        ).into());
+        return Err(format!("Key '{}' already exists. Use --force to overwrite.", key_id).into());
     }
-    
+
     // Generate key pair
     let master_keypair = generate_master_keypair()?;
-    
+
     // Get passphrase for key encryption
     let _passphrase = match passphrase {
         Some(p) => p,
@@ -3142,7 +3279,7 @@ async fn handle_auth_keygen(
             get_secure_passphrase()?
         }
     };
-    
+
     // Store the key
     handle_store_key(
         key_id.clone(),
@@ -3153,19 +3290,22 @@ async fn handle_auth_keygen(
         security_level,
         Some(_passphrase),
     )?;
-    
+
     println!("✅ Key pair generated and stored!");
     println!("   Key ID: {}", key_id);
-    println!("   Public Key: {}", hex::encode(master_keypair.public_key_bytes()));
+    println!(
+        "   Public Key: {}",
+        hex::encode(master_keypair.public_key_bytes())
+    );
     println!("   Storage: {}", key_file.display());
-    
+
     // Auto-register if requested
     if auto_register {
         if let Some(server) = server_url {
             println!("\n🔄 Auto-registering key with server...");
-            
+
             let client_id = format!("cli_{}", uuid::Uuid::new_v4());
-            
+
             match handle_register_key(
                 server,
                 key_id.clone(),
@@ -3175,29 +3315,40 @@ async fn handle_auth_keygen(
                 Some(format!("CLI Key: {}", key_id)),
                 30, // timeout
                 3,  // retries
-            ).await {
+            )
+            .await
+            {
                 Ok(()) => {
                     println!("✅ Key registered successfully!");
                     println!("   Client ID: {}", client_id);
                     println!("\n💡 To use this key for authentication:");
-                    println!("   datafold auth-init --key-id {} --server-url <server-url>", key_id);
+                    println!(
+                        "   datafold auth-init --key-id {} --server-url <server-url>",
+                        key_id
+                    );
                 }
                 Err(e) => {
-                    println!("⚠️  Key generation successful but registration failed: {}", e);
+                    println!(
+                        "⚠️  Key generation successful but registration failed: {}",
+                        e
+                    );
                     println!("   You can register manually later with:");
                     println!("   datafold register-key --key-id {}", key_id);
                 }
             }
         } else {
             println!("\n💡 To register this key:");
-            println!("   datafold register-key --key-id {} --server-url <server-url>", key_id);
+            println!(
+                "   datafold register-key --key-id {} --server-url <server-url>",
+                key_id
+            );
         }
     } else {
         println!("\n💡 Next steps:");
         println!("1. Register key: datafold register-key --key-id {}", key_id);
         println!("2. Initialize auth: datafold auth-init --key-id {}", key_id);
     }
-    
+
     Ok(())
 }
 
@@ -3210,51 +3361,46 @@ async fn handle_auth_test(
     timeout: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing authenticated request...");
-    
+
     // Load CLI configuration
     let config_manager = CliConfigManager::new()?;
-    
+
     // Get profile to use
     let auth_profile = if let Some(profile_name) = &profile {
-        config_manager.get_profile(profile_name)
+        config_manager
+            .get_profile(profile_name)
             .ok_or_else(|| format!("Profile '{}' not found", profile_name))?
     } else {
-        config_manager.get_default_profile()
+        config_manager
+            .get_default_profile()
             .ok_or("No default profile configured. Use 'auth-init' to set up authentication.")?
     };
-    
+
     // Get storage directory and load key
     let storage_dir = CliConfigManager::default_keys_dir()?;
     let key_file = storage_dir.join(format!("{}.json", auth_profile.key_id));
-    
+
     if !key_file.exists() {
-        return Err(format!(
-            "Key '{}' not found in storage",
-            auth_profile.key_id
-        ).into());
+        return Err(format!("Key '{}' not found in storage", auth_profile.key_id).into());
     }
-    
+
     // Load and decrypt the key
     let key_content = fs::read_to_string(&key_file)?;
     let key_config: KeyStorageConfig = serde_json::from_str(&key_content)?;
-    
+
     print!("Enter passphrase to unlock key: ");
     io::stdout().flush()?;
     let passphrase = get_secure_passphrase()?;
-    
+
     let private_key_bytes = decrypt_key(&key_config, &passphrase)?;
     let master_keypair = MasterKeyPair::from_secret_bytes(&private_key_bytes)?;
-    
+
     // Create authenticated HTTP client
     let signing_config = CliSigningConfig::default();
     let client = HttpClientBuilder::new()
         .timeout_secs(timeout)
-        .build_authenticated(
-            master_keypair,
-            auth_profile.clone(),
-            Some(signing_config),
-        )?;
-    
+        .build_authenticated(master_keypair, auth_profile.clone(), Some(signing_config))?;
+
     // Build request URL
     let full_url = if endpoint.starts_with("http") {
         endpoint.to_string()
@@ -3266,48 +3412,67 @@ async fn handle_auth_test(
         };
         format!("{}{}", auth_profile.server_url.trim_end_matches('/'), path)
     };
-    
-    println!("Making {} request to: {}", method_to_string(&method), full_url);
-    
+
+    println!(
+        "Making {} request to: {}",
+        method_to_string(&method),
+        full_url
+    );
+
     // Execute request based on method
     let response = match method {
         HttpMethod::Get => client.get(&full_url).await?,
         HttpMethod::Post => {
             let body = payload.unwrap_or_else(|| "{}".to_string());
-            client.post_json(&full_url, &serde_json::from_str::<serde_json::Value>(&body)?).await?
+            client
+                .post_json(
+                    &full_url,
+                    &serde_json::from_str::<serde_json::Value>(&body)?,
+                )
+                .await?
         }
         HttpMethod::Put => {
             let body = payload.unwrap_or_else(|| "{}".to_string());
-            client.put_json(&full_url, &serde_json::from_str::<serde_json::Value>(&body)?).await?
+            client
+                .put_json(
+                    &full_url,
+                    &serde_json::from_str::<serde_json::Value>(&body)?,
+                )
+                .await?
         }
         HttpMethod::Patch => {
             let body = payload.unwrap_or_else(|| "{}".to_string());
-            client.patch_json(&full_url, &serde_json::from_str::<serde_json::Value>(&body)?).await?
+            client
+                .patch_json(
+                    &full_url,
+                    &serde_json::from_str::<serde_json::Value>(&body)?,
+                )
+                .await?
         }
         HttpMethod::Delete => client.delete(&full_url).await?,
     };
-    
+
     // Display response
     let status = response.status();
     let headers = response.headers().clone();
     let body = response.text().await?;
-    
+
     println!("\n📄 Response:");
     println!("   Status: {}", status);
-    
+
     if status.is_success() {
         println!("   ✅ Request successful!");
     } else {
         println!("   ❌ Request failed!");
     }
-    
+
     println!("   Headers:");
     for (name, value) in headers.iter() {
         if let Ok(value_str) = value.to_str() {
             println!("     {}: {}", name, value_str);
         }
     }
-    
+
     println!("   Body:");
     if body.is_empty() {
         println!("     (empty)");
@@ -3322,7 +3487,7 @@ async fn handle_auth_test(
             }
         }
     }
-    
+
     Ok(())
 }
 
@@ -3350,7 +3515,7 @@ async fn handle_auth_configure(
     show: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut config_manager = CliConfigManager::load_with_migration()?;
-    
+
     if show {
         // Show current configuration
         let signing_config = config_manager.signing_config();
@@ -3358,10 +3523,16 @@ async fn handle_auth_configure(
         println!("=====================================");
         println!();
         println!("🔐 Global Settings:");
-        println!("  Auto-signing enabled: {}", signing_config.auto_signing.enabled);
-        println!("  Default mode: {}", signing_config.auto_signing.default_mode.as_str());
+        println!(
+            "  Auto-signing enabled: {}",
+            signing_config.auto_signing.enabled
+        );
+        println!(
+            "  Default mode: {}",
+            signing_config.auto_signing.default_mode.as_str()
+        );
         println!("  Debug logging: {}", signing_config.debug.enabled);
-        
+
         if let Some(env) = &signing_config.auto_signing.env_override {
             println!("  Environment override: {}", env);
             if let Ok(value) = std::env::var(env) {
@@ -3370,7 +3541,7 @@ async fn handle_auth_configure(
                 println!("    Current value: (not set)");
             }
         }
-        
+
         println!();
         println!("📝 Command Overrides:");
         if signing_config.auto_signing.command_overrides.is_empty() {
@@ -3380,32 +3551,41 @@ async fn handle_auth_configure(
                 println!("  {}: {}", cmd, mode.as_str());
             }
         }
-        
+
         println!();
         println!("🎛️  Performance Settings:");
-        println!("  Max signing time: {}ms", signing_config.performance.max_signing_time_ms);
+        println!(
+            "  Max signing time: {}ms",
+            signing_config.performance.max_signing_time_ms
+        );
         println!("  Cache keys: {}", signing_config.performance.cache_keys);
-        println!("  Max concurrent signs: {}", signing_config.performance.max_concurrent_signs);
-        
+        println!(
+            "  Max concurrent signs: {}",
+            signing_config.performance.max_concurrent_signs
+        );
+
         return Ok(());
     }
-    
+
     let mut modified = false;
-    
+
     // Apply configuration changes
     if let Some(enabled) = enable_auto_sign {
         config_manager.set_auto_signing_enabled(enabled);
-        println!("✅ Auto-signing {}", if enabled { "enabled" } else { "disabled" });
+        println!(
+            "✅ Auto-signing {}",
+            if enabled { "enabled" } else { "disabled" }
+        );
         modified = true;
     }
-    
+
     if let Some(mode) = default_mode {
         let mode_str = SigningMode::from(mode.clone()).as_str();
         config_manager.set_default_signing_mode(mode.into());
         println!("✅ Default signing mode set to: {}", mode_str);
         modified = true;
     }
-    
+
     if let Some(cmd) = command {
         if let Some(mode) = command_mode {
             let mode_str = SigningMode::from(mode.clone()).as_str();
@@ -3414,32 +3594,41 @@ async fn handle_auth_configure(
             modified = true;
         }
     }
-    
+
     if let Some(cmd) = remove_command_override {
-        config_manager.signing_config_mut().auto_signing.remove_command_override(&cmd);
+        config_manager
+            .signing_config_mut()
+            .auto_signing
+            .remove_command_override(&cmd);
         println!("✅ Removed signing override for command: {}", cmd);
         modified = true;
     }
-    
+
     if let Some(debug_enabled) = debug {
         config_manager.set_signing_debug(debug_enabled);
-        println!("✅ Debug logging {}", if debug_enabled { "enabled" } else { "disabled" });
+        println!(
+            "✅ Debug logging {}",
+            if debug_enabled { "enabled" } else { "disabled" }
+        );
         modified = true;
     }
-    
+
     if let Some(env) = env_var {
-        config_manager.signing_config_mut().auto_signing.env_override = Some(env.clone());
+        config_manager
+            .signing_config_mut()
+            .auto_signing
+            .env_override = Some(env.clone());
         println!("✅ Environment variable override set to: {}", env);
         modified = true;
     }
-    
+
     if modified {
         config_manager.save()?;
         println!("💾 Configuration saved");
     } else {
         println!("ℹ️  No changes specified. Use --show to view current configuration.");
     }
-    
+
     Ok(())
 }
 
@@ -3452,25 +3641,28 @@ async fn handle_auth_init_enhanced(
     if interactive {
         return handle_interactive_auth_setup(server_url).await;
     }
-    
+
     if create_config {
         let config_path = CliConfigManager::default_config_path()?;
-        
+
         if config_path.exists() {
-            println!("⚠️  Configuration file already exists at: {}", config_path.display());
+            println!(
+                "⚠️  Configuration file already exists at: {}",
+                config_path.display()
+            );
             print!("Do you want to overwrite it? (y/N): ");
             io::stdout().flush()?;
             let mut input = String::new();
             io::stdin().read_line(&mut input)?;
-            
+
             if !input.trim().to_lowercase().starts_with('y') {
                 println!("❌ Aborted");
                 return Ok(());
             }
         }
-        
+
         let mut config_manager = CliConfigManager::new()?;
-        
+
         // Set default server URL if provided
         if let Some(url) = server_url {
             let server_config = ServerConfig {
@@ -3485,10 +3677,10 @@ async fn handle_auth_init_enhanced(
             config_manager.add_server("default".to_string(), server_config);
             println!("✅ Added default server: {}", url);
         }
-        
+
         config_manager.save()?;
         println!("✅ Created configuration file: {}", config_path.display());
-        
+
         println!();
         println!("🎯 Next steps:");
         println!("1. Generate a key pair: datafold auth-keygen --key-id my-key");
@@ -3498,16 +3690,18 @@ async fn handle_auth_init_enhanced(
         println!("ℹ️  Use --create-config to create default configuration");
         println!("ℹ️  Use --interactive for guided setup");
     }
-    
+
     Ok(())
 }
 
 /// Handle interactive authentication setup
-async fn handle_interactive_auth_setup(default_server_url: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_interactive_auth_setup(
+    default_server_url: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
     println!("🚀 DataFold CLI Authentication Setup");
     println!("====================================");
     println!();
-    
+
     // Check if configuration exists
     let config_path = CliConfigManager::default_config_path()?;
     let mut config_manager = if config_path.exists() {
@@ -3517,7 +3711,7 @@ async fn handle_interactive_auth_setup(default_server_url: Option<String>) -> Re
         println!("📝 Creating new configuration");
         CliConfigManager::new()?
     };
-    
+
     // Get server URL
     let server_url = if let Some(url) = default_server_url {
         println!("🌐 Using provided server URL: {}", url);
@@ -3529,35 +3723,43 @@ async fn handle_interactive_auth_setup(default_server_url: Option<String>) -> Re
         io::stdin().read_line(&mut input)?;
         input.trim().to_string()
     };
-    
+
     if server_url.is_empty() {
         return Err("Server URL is required".into());
     }
-    
+
     // Get profile name
     print!("📛 Enter profile name (default: default): ");
     io::stdout().flush()?;
     let mut profile_name = String::new();
     io::stdin().read_line(&mut profile_name)?;
     let profile_name = profile_name.trim();
-    let profile_name = if profile_name.is_empty() { "default" } else { profile_name };
-    
+    let profile_name = if profile_name.is_empty() {
+        "default"
+    } else {
+        profile_name
+    };
+
     // Get key ID
     print!("🔑 Enter key ID (default: {}): ", profile_name);
     io::stdout().flush()?;
     let mut key_id = String::new();
     io::stdin().read_line(&mut key_id)?;
     let key_id = key_id.trim();
-    let key_id = if key_id.is_empty() { profile_name } else { key_id };
-    
+    let key_id = if key_id.is_empty() {
+        profile_name
+    } else {
+        key_id
+    };
+
     // Check if key exists
     let storage_dir = CliConfigManager::default_keys_dir()?;
     let storage_dir_display = storage_dir.clone();
     let key_file = storage_dir.join(format!("{}.json", key_id));
-    
+
     if !key_file.exists() {
         println!("🔧 Key '{}' not found. Generating new key pair...", key_id);
-        
+
         // Generate new key
         handle_store_key(
             key_id.to_string(),
@@ -3568,17 +3770,17 @@ async fn handle_interactive_auth_setup(default_server_url: Option<String>) -> Re
             CliSecurityLevel::Balanced,
             None,
         )?;
-        
+
         println!("✅ Generated and stored key: {}", key_id);
     } else {
         println!("✅ Using existing key: {}", key_id);
     }
-    
+
     // Create profile
     let mut metadata = HashMap::new();
     metadata.insert("created_by".to_string(), "interactive_setup".to_string());
     metadata.insert("created_at".to_string(), chrono::Utc::now().to_rfc3339());
-    
+
     let profile = CliAuthProfile {
         client_id: format!("datafold-cli-{}", profile_name),
         key_id: key_id.to_string(),
@@ -3586,9 +3788,9 @@ async fn handle_interactive_auth_setup(default_server_url: Option<String>) -> Re
         server_url: server_url.clone(),
         metadata,
     };
-    
+
     config_manager.add_profile(profile_name.to_string(), profile)?;
-    
+
     // Configure signing
     println!();
     println!("🔐 Configure automatic signing:");
@@ -3596,10 +3798,10 @@ async fn handle_interactive_auth_setup(default_server_url: Option<String>) -> Re
     io::stdout().flush()?;
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
-    
+
     let enable_auto = !input.trim().to_lowercase().starts_with('n');
     config_manager.set_auto_signing_enabled(enable_auto);
-    
+
     if enable_auto {
         config_manager.set_default_signing_mode(SigningMode::Auto);
         println!("✅ Automatic signing enabled");
@@ -3607,10 +3809,10 @@ async fn handle_interactive_auth_setup(default_server_url: Option<String>) -> Re
         config_manager.set_default_signing_mode(SigningMode::Manual);
         println!("✅ Manual signing mode (use --sign flag to sign requests)");
     }
-    
+
     // Save configuration
     config_manager.save()?;
-    
+
     println!();
     println!("🎉 Setup complete!");
     println!("📁 Configuration saved to: {}", config_path.display());
@@ -3619,7 +3821,7 @@ async fn handle_interactive_auth_setup(default_server_url: Option<String>) -> Re
     println!("🧪 Test your setup:");
     println!("  datafold auth-status");
     println!("  datafold auth-test");
-    
+
     Ok(())
 }
 
@@ -3636,23 +3838,23 @@ async fn handle_test_server_integration(
     cleanup: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Starting end-to-end server integration test...");
-    
+
     // Get storage directory
     let storage_dir = storage_dir.unwrap_or_else(|| get_default_storage_dir().unwrap());
     ensure_storage_dir(&storage_dir)?;
-    
+
     let test_key_id = format!("{}_test", key_id);
     let client_id = format!("test_{}", uuid::Uuid::new_v4());
-    
+
     println!("Step 1: Generating test keypair...");
     // Generate a test key
     let master_keypair = generate_master_keypair()?;
-    
+
     // Store the test key
     print!("Enter passphrase for test key: ");
     io::stdout().flush()?;
     let _passphrase = get_secure_passphrase()?;
-    
+
     handle_store_key(
         test_key_id.clone(),
         Some(hex::encode(master_keypair.secret_key_bytes())),
@@ -3662,9 +3864,9 @@ async fn handle_test_server_integration(
         security_level.clone(),
         Some(_passphrase),
     )?;
-    
+
     println!("✅ Test key generated and stored");
-    
+
     println!("Step 2: Registering public key with server...");
     // Register the key
     match handle_register_key(
@@ -3676,7 +3878,9 @@ async fn handle_test_server_integration(
         Some("Integration Test Key".to_string()),
         timeout,
         retries,
-    ).await {
+    )
+    .await
+    {
         Ok(()) => println!("✅ Key registration successful"),
         Err(e) => {
             eprintln!("❌ Key registration failed: {}", e);
@@ -3686,15 +3890,10 @@ async fn handle_test_server_integration(
             return Err(e);
         }
     }
-    
+
     println!("Step 3: Checking registration status...");
     // Check registration status
-    match handle_check_registration(
-        server_url.clone(),
-        client_id.clone(),
-        timeout,
-        retries,
-    ).await {
+    match handle_check_registration(server_url.clone(), client_id.clone(), timeout, retries).await {
         Ok(()) => println!("✅ Registration status check successful"),
         Err(e) => {
             eprintln!("❌ Registration status check failed: {}", e);
@@ -3704,7 +3903,7 @@ async fn handle_test_server_integration(
             return Err(e);
         }
     }
-    
+
     println!("Step 4: Signing and verifying message...");
     // Sign and verify
     match handle_sign_and_verify(
@@ -3717,7 +3916,9 @@ async fn handle_test_server_integration(
         MessageEncoding::Utf8,
         timeout,
         retries,
-    ).await {
+    )
+    .await
+    {
         Ok(()) => println!("✅ Message signing and verification successful"),
         Err(e) => {
             eprintln!("❌ Message signing and verification failed: {}", e);
@@ -3727,7 +3928,7 @@ async fn handle_test_server_integration(
             return Err(e);
         }
     }
-    
+
     if cleanup {
         println!("Step 5: Cleaning up test key...");
         match handle_delete_key(test_key_id, Some(storage_dir), true) {
@@ -3738,10 +3939,10 @@ async fn handle_test_server_integration(
             }
         }
     }
-    
+
     println!("🎉 End-to-end server integration test completed successfully!");
     println!("All server integration functionality is working correctly.");
-    
+
     Ok(())
 }
 
@@ -3752,17 +3953,21 @@ fn handle_crypto_init(
     node: &mut DataFoldNode,
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting database crypto initialization");
-    
+
     // Get the actual SecurityLevel from the CLI wrapper
     let security_level: SecurityLevel = security_level.into();
-    
+
     // Check if crypto is already initialized
     let fold_db = node.get_fold_db()?;
     let db_ops = fold_db.db_ops();
-    let status = get_crypto_init_status(db_ops.clone()).map_err(|e| format!("Failed to check crypto status: {}", e))?;
-    
+    let status = get_crypto_init_status(db_ops.clone())
+        .map_err(|e| format!("Failed to check crypto status: {}", e))?;
+
     if status.initialized && !force {
-        info!("Database crypto is already initialized: {}", status.summary());
+        info!(
+            "Database crypto is already initialized: {}",
+            status.summary()
+        );
         if status.is_healthy() {
             info!("Crypto initialization is healthy and verified");
             return Ok(());
@@ -3774,13 +3979,13 @@ fn handle_crypto_init(
     } else if status.initialized && force {
         warn!("Forcing crypto re-initialization on already initialized database");
     }
-    
+
     // Get passphrase if needed
     let passphrase = match method {
         CryptoMethod::Random => None,
         CryptoMethod::Passphrase => Some(get_secure_passphrase()?),
     };
-    
+
     // Create crypto configuration
     let crypto_config = match method {
         CryptoMethod::Random => {
@@ -3793,7 +3998,10 @@ fn handle_crypto_init(
         }
         CryptoMethod::Passphrase => {
             let passphrase = passphrase.unwrap(); // Safe since we just set it
-            info!("Using passphrase-based key derivation with {} security level", security_level.as_str());
+            info!(
+                "Using passphrase-based key derivation with {} security level",
+                security_level.as_str()
+            );
             CryptoConfig {
                 enabled: true,
                 master_key: MasterKeyConfig::Passphrase { passphrase },
@@ -3801,24 +4009,24 @@ fn handle_crypto_init(
             }
         }
     };
-    
+
     // Validate configuration
     validate_crypto_config_for_init(&crypto_config)
         .map_err(|e| format!("Crypto configuration validation failed: {}", e))?;
     info!("Crypto configuration validated successfully");
-    
+
     // Perform initialization
     match initialize_database_crypto(db_ops, &crypto_config) {
         Ok(context) => {
             info!("✅ Database crypto initialization completed successfully!");
             info!("Derivation method: {}", context.derivation_method);
             info!("Master public key stored in database metadata");
-            
+
             // Verify the initialization was successful
             let fold_db = node.get_fold_db()?;
             let final_status = get_crypto_init_status(fold_db.db_ops())
                 .map_err(|e| format!("Failed to verify crypto initialization: {}", e))?;
-            
+
             if final_status.is_healthy() {
                 info!("✅ Crypto initialization verified successfully");
             } else {
@@ -3831,36 +4039,42 @@ fn handle_crypto_init(
             return Err(format!("Crypto initialization failed: {}", e).into());
         }
     }
-    
+
     Ok(())
 }
 
 fn handle_crypto_status(node: &mut DataFoldNode) -> Result<(), Box<dyn std::error::Error>> {
     info!("Checking database crypto initialization status");
-    
+
     let fold_db = node.get_fold_db()?;
     let db_ops = fold_db.db_ops();
     let status = get_crypto_init_status(db_ops)
         .map_err(|e| format!("Failed to get crypto status: {}", e))?;
-    
+
     info!("Crypto Status: {}", status.summary());
-    
+
     if status.initialized {
         info!("  Initialized: ✅ Yes");
-        info!("  Algorithm: {}", status.algorithm.as_deref().unwrap_or("Unknown"));
-        info!("  Derivation Method: {}", status.derivation_method.as_deref().unwrap_or("Unknown"));
+        info!(
+            "  Algorithm: {}",
+            status.algorithm.as_deref().unwrap_or("Unknown")
+        );
+        info!(
+            "  Derivation Method: {}",
+            status.derivation_method.as_deref().unwrap_or("Unknown")
+        );
         info!("  Version: {}", status.version.unwrap_or(0));
-        
+
         if let Some(created_at) = status.created_at {
             info!("  Created: {}", created_at.format("%Y-%m-%d %H:%M:%S UTC"));
         }
-        
+
         match status.integrity_verified {
             Some(true) => info!("  Integrity: ✅ Verified"),
             Some(false) => warn!("  Integrity: ❌ Failed verification"),
             None => info!("  Integrity: ⚠️  Not checked"),
         }
-        
+
         if status.is_healthy() {
             info!("🟢 Overall Status: Healthy");
         } else {
@@ -3870,7 +4084,7 @@ fn handle_crypto_status(node: &mut DataFoldNode) -> Result<(), Box<dyn std::erro
         info!("  Initialized: ❌ No");
         info!("🔴 Overall Status: Not initialized");
     }
-    
+
     Ok(())
 }
 
@@ -3882,25 +4096,25 @@ fn handle_crypto_validate(
         .as_deref()
         .map(|p| p.to_str().unwrap_or(default_config_path))
         .unwrap_or(default_config_path);
-    
+
     info!("Validating crypto configuration in: {}", config_path);
-    
+
     // Load the node configuration
     let node_config = load_node_config(Some(config_path), None)?;
-    
+
     // Check if crypto configuration exists
     if let Some(crypto_config) = &node_config.crypto {
         info!("Found crypto configuration");
-        
+
         // Validate the configuration
         match validate_crypto_config_for_init(crypto_config) {
             Ok(()) => {
                 info!("✅ Crypto configuration is valid");
-                
+
                 // Show configuration details
                 info!("Configuration details:");
                 info!("  Enabled: {}", crypto_config.enabled);
-                
+
                 if crypto_config.enabled {
                     match &crypto_config.master_key {
                         MasterKeyConfig::Random => {
@@ -3908,14 +4122,23 @@ fn handle_crypto_validate(
                         }
                         MasterKeyConfig::Passphrase { .. } => {
                             info!("  Master Key: Passphrase-based derivation");
-                            
+
                             if let Some(preset) = &crypto_config.key_derivation.preset {
                                 info!("  Security Level: {}", preset.as_str());
                             } else {
                                 info!("  Key Derivation: Custom parameters");
-                                info!("    Memory Cost: {} KB", crypto_config.key_derivation.memory_cost);
-                                info!("    Time Cost: {} iterations", crypto_config.key_derivation.time_cost);
-                                info!("    Parallelism: {} threads", crypto_config.key_derivation.parallelism);
+                                info!(
+                                    "    Memory Cost: {} KB",
+                                    crypto_config.key_derivation.memory_cost
+                                );
+                                info!(
+                                    "    Time Cost: {} iterations",
+                                    crypto_config.key_derivation.time_cost
+                                );
+                                info!(
+                                    "    Parallelism: {} threads",
+                                    crypto_config.key_derivation.parallelism
+                                );
                             }
                         }
                         MasterKeyConfig::External { key_source } => {
@@ -3933,7 +4156,7 @@ fn handle_crypto_validate(
         info!("No crypto configuration found in node config");
         info!("ℹ️  Crypto will be disabled by default");
     }
-    
+
     Ok(())
 }
 
@@ -3941,33 +4164,33 @@ fn get_secure_passphrase() -> Result<String, Box<dyn std::error::Error>> {
     loop {
         print!("Enter passphrase for master key derivation: ");
         io::stdout().flush()?;
-        
+
         let passphrase = read_password()?;
-        
+
         if passphrase.len() < 6 {
             error!("Passphrase must be at least 6 characters long");
             continue;
         }
-        
+
         if passphrase.len() > 1024 {
             error!("Passphrase is too long (maximum 1024 characters)");
             continue;
         }
-        
+
         // Confirm passphrase
         print!("Confirm passphrase: ");
         io::stdout().flush()?;
-        
+
         let confirmation = read_password()?;
-        
+
         if passphrase != confirmation {
             error!("Passphrases do not match. Please try again.");
             continue;
         }
-        
+
         // Clear confirmation from memory
         drop(confirmation);
-        
+
         info!("✅ Passphrase accepted");
         return Ok(passphrase);
     }
@@ -4254,8 +4477,8 @@ fn handle_generate_key(
     }
 
     for i in 0..count {
-        let keypair = generate_master_keypair()
-            .map_err(|e| format!("Failed to generate keypair: {}", e))?;
+        let keypair =
+            generate_master_keypair().map_err(|e| format!("Failed to generate keypair: {}", e))?;
 
         let public_key_bytes = keypair.public_key_bytes();
         let private_key_bytes = keypair.secret_key_bytes();
@@ -4267,13 +4490,27 @@ fn handle_generate_key(
         // Output private key if requested
         if !public_only {
             let formatted_private = format_key(&private_key_bytes, &format, true)?;
-            output_key(&formatted_private, private_key_file.as_ref(), "private", i, count, true)?;
+            output_key(
+                &formatted_private,
+                private_key_file.as_ref(),
+                "private",
+                i,
+                count,
+                true,
+            )?;
         }
 
         // Output public key if requested
         if !private_only {
             let formatted_public = format_key(&public_key_bytes, &format, false)?;
-            output_key(&formatted_public, public_key_file.as_ref(), "public", i, count, true)?;
+            output_key(
+                &formatted_public,
+                public_key_file.as_ref(),
+                "public",
+                i,
+                count,
+                true,
+            )?;
         }
 
         // Clear sensitive data
@@ -4303,14 +4540,14 @@ fn handle_derive_key(
         Some(p) => p,
         None => get_secure_passphrase()?,
     };
-    
+
     // Convert security level to Argon2 parameters
     let argon2_params = match security_level {
         CliSecurityLevel::Interactive => Argon2Params::interactive(),
         CliSecurityLevel::Balanced => Argon2Params::default(),
         CliSecurityLevel::Sensitive => Argon2Params::sensitive(),
     };
-    
+
     // Generate salt and derive keypair
     let (_salt, keypair) = generate_salt_and_derive_keypair(&passphrase, &argon2_params)
         .map_err(|e| format!("Failed to derive keypair from passphrase: {}", e))?;
@@ -4321,13 +4558,27 @@ fn handle_derive_key(
     // Output private key if requested
     if !public_only {
         let formatted_private = format_key(&private_key_bytes, &format, true)?;
-        output_key(&formatted_private, private_key_file.as_ref(), "private", 0, 1, true)?;
+        output_key(
+            &formatted_private,
+            private_key_file.as_ref(),
+            "private",
+            0,
+            1,
+            true,
+        )?;
     }
 
     // Output public key if requested
     if !private_only {
         let formatted_public = format_key(&public_key_bytes, &format, false)?;
-        output_key(&formatted_public, public_key_file.as_ref(), "public", 0, 1, true)?;
+        output_key(
+            &formatted_public,
+            public_key_file.as_ref(),
+            "public",
+            0,
+            1,
+            true,
+        )?;
     }
 
     // Clear sensitive data
@@ -4365,8 +4616,15 @@ fn handle_extract_public_key(
 
     let public_key_bytes = keypair.public_key_bytes();
     let formatted_public = format_key(&public_key_bytes, &format, false)?;
-    
-    output_key(&formatted_public, output_file.as_ref(), "public", 0, 1, false)?;
+
+    output_key(
+        &formatted_public,
+        output_file.as_ref(),
+        "public",
+        0,
+        1,
+        false,
+    )?;
 
     Ok(())
 }
@@ -4416,23 +4674,28 @@ fn handle_verify_key(
 
     // Check if the public keys match
     let derived_public_key_bytes = keypair.public_key_bytes();
-    
+
     if derived_public_key_bytes == public_key_bytes {
         info!("✅ Keypair verification successful: private and public keys match");
         info!("Public key: {}", hex::encode(public_key_bytes));
     } else {
         error!("❌ Keypair verification failed: private and public keys do not match");
-        error!("Expected public key: {}", hex::encode(derived_public_key_bytes));
+        error!(
+            "Expected public key: {}",
+            hex::encode(derived_public_key_bytes)
+        );
         error!("Provided public key: {}", hex::encode(public_key_bytes));
         return Err("Keypair verification failed".into());
     }
 
     // Test signing and verification to ensure the keypair is fully functional
     let test_message = b"DataFold Ed25519 keypair verification test";
-    let signature = keypair.sign_data(test_message)
+    let signature = keypair
+        .sign_data(test_message)
         .map_err(|e| format!("Failed to sign test message: {}", e))?;
-    
-    keypair.verify_data(test_message, &signature)
+
+    keypair
+        .verify_data(test_message, &signature)
         .map_err(|e| format!("Failed to verify test signature: {}", e))?;
 
     info!("✅ Functional verification successful: keypair can sign and verify");
@@ -4441,7 +4704,11 @@ fn handle_verify_key(
 }
 
 /// Format key bytes according to the specified format
-fn format_key(key_bytes: &[u8], format: &KeyFormat, is_private: bool) -> Result<String, Box<dyn std::error::Error>> {
+fn format_key(
+    key_bytes: &[u8],
+    format: &KeyFormat,
+    is_private: bool,
+) -> Result<String, Box<dyn std::error::Error>> {
     match format {
         KeyFormat::Hex => Ok(hex::encode(key_bytes)),
         KeyFormat::Base64 => Ok(general_purpose::STANDARD.encode(key_bytes)),
@@ -4481,14 +4748,13 @@ fn output_key(
         Some(file_path) => {
             let actual_path = if total > 1 {
                 // Add index to filename for batch generation
-                let stem = file_path.file_stem()
+                let stem = file_path
+                    .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("key");
-                let extension = file_path.extension()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("");
+                let extension = file_path.extension().and_then(|s| s.to_str()).unwrap_or("");
                 let parent = file_path.parent().unwrap_or(std::path::Path::new("."));
-                
+
                 if extension.is_empty() {
                     parent.join(format!("{}_{}", stem, index + 1))
                 } else {
@@ -4519,15 +4785,16 @@ fn output_key(
 /// Parse key input from string (supports hex, base64, and PEM formats)
 fn parse_key_input(input: &str, is_private: bool) -> Result<[u8; 32], Box<dyn std::error::Error>> {
     let trimmed = input.trim();
-    
+
     // Try to parse as PEM first
     if trimmed.starts_with("-----BEGIN") && trimmed.ends_with("-----") {
         let lines: Vec<&str> = trimmed.lines().collect();
         if lines.len() >= 3 {
-            let base64_content = lines[1..lines.len()-1].join("");
-            let decoded = general_purpose::STANDARD.decode(&base64_content)
+            let base64_content = lines[1..lines.len() - 1].join("");
+            let decoded = general_purpose::STANDARD
+                .decode(&base64_content)
                 .map_err(|e| format!("Invalid base64 in PEM: {}", e))?;
-            
+
             if decoded.len() == 32 {
                 let mut key_bytes = [0u8; 32];
                 key_bytes.copy_from_slice(&decoded);
@@ -4536,18 +4803,17 @@ fn parse_key_input(input: &str, is_private: bool) -> Result<[u8; 32], Box<dyn st
         }
         return Err("Invalid PEM format or wrong key size".into());
     }
-    
+
     // Try hex format
     if trimmed.len() == 64 && trimmed.chars().all(|c| c.is_ascii_hexdigit()) {
-        let decoded = hex::decode(trimmed)
-            .map_err(|e| format!("Invalid hex: {}", e))?;
+        let decoded = hex::decode(trimmed).map_err(|e| format!("Invalid hex: {}", e))?;
         if decoded.len() == 32 {
             let mut key_bytes = [0u8; 32];
             key_bytes.copy_from_slice(&decoded);
             return Ok(key_bytes);
         }
     }
-    
+
     // Try base64 format
     if let Ok(decoded) = general_purpose::STANDARD.decode(trimmed) {
         if decoded.len() == 32 {
@@ -4556,12 +4822,17 @@ fn parse_key_input(input: &str, is_private: bool) -> Result<[u8; 32], Box<dyn st
             return Ok(key_bytes);
         }
     }
-    
-    let expected_size = if is_private { SECRET_KEY_LENGTH } else { PUBLIC_KEY_LENGTH };
+
+    let expected_size = if is_private {
+        SECRET_KEY_LENGTH
+    } else {
+        PUBLIC_KEY_LENGTH
+    };
     Err(format!(
         "Unable to parse key: expected {} bytes in hex, base64, or PEM format",
         expected_size
-    ).into())
+    )
+    .into())
 }
 
 /// Main entry point for the DataFold CLI.
@@ -4607,7 +4878,7 @@ async fn handle_verify_signature(
     debug: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use datafold::cli::verification::{CliSignatureVerifier, CliVerificationConfig};
-    
+
     // Get message bytes
     let message_bytes = match (message, message_file) {
         (Some(msg), None) => msg.into_bytes(),
@@ -4618,7 +4889,7 @@ async fn handle_verify_signature(
 
     // Create verifier
     let config = CliVerificationConfig::default();
-    
+
     // Add public key
     let public_key_bytes = match (public_key, public_key_file) {
         (Some(key), None) => parse_key_input(&key, false)?.to_vec(),
@@ -4626,7 +4897,9 @@ async fn handle_verify_signature(
             let key_str = fs::read_to_string(file)?;
             parse_key_input(key_str.trim(), false)?.to_vec()
         }
-        (Some(_), Some(_)) => return Err("Cannot specify both public-key and public-key-file".into()),
+        (Some(_), Some(_)) => {
+            return Err("Cannot specify both public-key and public-key-file".into())
+        }
         (None, None) => return Err("Must specify either public-key or public-key-file".into()),
     };
 
@@ -4634,7 +4907,9 @@ async fn handle_verify_signature(
     verifier.add_public_key(key_id.clone(), public_key_bytes)?;
 
     // Perform verification
-    let result = verifier.verify_message_signature(&message_bytes, &signature, &key_id, policy.as_deref()).await?;
+    let result = verifier
+        .verify_message_signature(&message_bytes, &signature, &key_id, policy.as_deref())
+        .await?;
 
     // Output result
     match output_format {
@@ -4646,7 +4921,7 @@ async fn handle_verify_signature(
             println!("Status: {}", result.status);
             println!("Signature Valid: {}", result.signature_valid);
             println!("Total Time: {}ms", result.performance.total_time_ms);
-            
+
             if debug {
                 let inspector = datafold::cli::verification::SignatureInspector::new(true);
                 let report = inspector.generate_diagnostic_report(&result);
@@ -4654,7 +4929,11 @@ async fn handle_verify_signature(
             }
         }
         VerificationOutputFormat::Compact => {
-            println!("{}: {}", result.status, if result.signature_valid { "✓" } else { "✗" });
+            println!(
+                "{}: {}",
+                result.status,
+                if result.signature_valid { "✓" } else { "✗" }
+            );
         }
     }
 
@@ -4694,7 +4973,9 @@ async fn handle_inspect_signature(
     }
 
     if headers.is_empty() {
-        return Err("Must provide signature headers via signature-input, signature, or headers-file".into());
+        return Err(
+            "Must provide signature headers via signature-input, signature, or headers-file".into(),
+        );
     }
 
     // Inspect signature format
@@ -4708,9 +4989,12 @@ async fn handle_inspect_signature(
         VerificationOutputFormat::Table => {
             println!("=== Signature Format Analysis ===");
             println!("RFC 9421 Compliant: {}", analysis.is_valid_rfc9421);
-            println!("Signature Headers: {}", analysis.signature_headers.join(", "));
+            println!(
+                "Signature Headers: {}",
+                analysis.signature_headers.join(", ")
+            );
             println!("Signature IDs: {}", analysis.signature_ids.join(", "));
-            
+
             if !analysis.issues.is_empty() {
                 println!("\n=== Issues Found ===");
                 for issue in &analysis.issues {
@@ -4722,8 +5006,13 @@ async fn handle_inspect_signature(
             }
         }
         VerificationOutputFormat::Compact => {
-            println!("RFC9421: {} | Issues: {}",
-                if analysis.is_valid_rfc9421 { "✓" } else { "✗" },
+            println!(
+                "RFC9421: {} | Issues: {}",
+                if analysis.is_valid_rfc9421 {
+                    "✓"
+                } else {
+                    "✗"
+                },
                 analysis.issues.len()
             );
         }
@@ -4769,7 +5058,8 @@ async fn handle_verify_response(
 
     // Add headers if provided
     if let Some(headers_json) = headers {
-        let headers_map: std::collections::HashMap<String, String> = serde_json::from_str(&headers_json)?;
+        let headers_map: std::collections::HashMap<String, String> =
+            serde_json::from_str(&headers_json)?;
         for (key, value) in headers_map {
             request_builder = request_builder.header(key, value);
         }
@@ -4789,10 +5079,10 @@ async fn handle_verify_response(
 
     // Send request
     let response = request_builder.send().await?;
-    
+
     // Setup verifier
     let config = CliVerificationConfig::default();
-    
+
     // Add public key
     let public_key_bytes = match (public_key, public_key_file) {
         (Some(key), None) => parse_key_input(&key, false)?.to_vec(),
@@ -4800,7 +5090,9 @@ async fn handle_verify_response(
             let key_str = fs::read_to_string(file)?;
             parse_key_input(key_str.trim(), false)?.to_vec()
         }
-        (Some(_), Some(_)) => return Err("Cannot specify both public-key and public-key-file".into()),
+        (Some(_), Some(_)) => {
+            return Err("Cannot specify both public-key and public-key-file".into())
+        }
         (None, None) => return Err("Must specify either public-key or public-key-file".into()),
     };
 
@@ -4808,7 +5100,9 @@ async fn handle_verify_response(
     verifier.add_public_key(key_id.clone(), public_key_bytes)?;
 
     // Verify response
-    let result = verifier.verify_response_with_context(&response, method_str, &url, policy.as_deref()).await?;
+    let result = verifier
+        .verify_response_with_context(&response, method_str, &url, policy.as_deref())
+        .await?;
 
     // Output result
     match output_format {
@@ -4820,7 +5114,7 @@ async fn handle_verify_response(
             println!("Status: {}", result.status);
             println!("Signature Valid: {}", result.signature_valid);
             println!("Total Time: {}ms", result.performance.total_time_ms);
-            
+
             if debug {
                 let inspector = datafold::cli::verification::SignatureInspector::new(true);
                 let report = inspector.generate_diagnostic_report(&result);
@@ -4828,7 +5122,11 @@ async fn handle_verify_response(
             }
         }
         VerificationOutputFormat::Compact => {
-            println!("{}: {}", result.status, if result.signature_valid { "✓" } else { "✗" });
+            println!(
+                "{}: {}",
+                result.status,
+                if result.signature_valid { "✓" } else { "✗" }
+            );
         }
     }
 
@@ -4840,13 +5138,15 @@ async fn handle_verify_response(
 }
 
 /// Handle verification configuration command
-async fn handle_verification_config(action: VerificationConfigAction) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_verification_config(
+    action: VerificationConfigAction,
+) -> Result<(), Box<dyn std::error::Error>> {
     use datafold::cli::verification::{CliVerificationConfig, VerificationPolicy};
 
     match action {
         VerificationConfigAction::Show { policies, keys } => {
             let config = CliVerificationConfig::default();
-            
+
             if policies {
                 println!("=== Verification Policies ===");
                 for (name, policy) in &config.policies {
@@ -4863,7 +5163,7 @@ async fn handle_verification_config(action: VerificationConfigAction) -> Result<
                     println!();
                 }
             }
-            
+
             if keys {
                 println!("=== Public Keys ===");
                 if config.public_keys.is_empty() {
@@ -4877,41 +5177,67 @@ async fn handle_verification_config(action: VerificationConfigAction) -> Result<
                     }
                 }
             }
-            
+
             if !policies && !keys {
                 println!("=== Verification Configuration ===");
                 println!("Default Policy: {}", config.default_policy);
                 println!("Available Policies: {}", config.policies.len());
                 println!("Configured Keys: {}", config.public_keys.len());
-                println!("Performance Monitoring: {}", config.performance_monitoring.enabled);
+                println!(
+                    "Performance Monitoring: {}",
+                    config.performance_monitoring.enabled
+                );
                 println!("Debug Enabled: {}", config.debug.enabled);
             }
         }
         VerificationConfigAction::AddPolicy { name, config_file } => {
             let policy_json = fs::read_to_string(config_file)?;
             let _policy: VerificationPolicy = serde_json::from_str(&policy_json)?;
-            println!("Policy '{}' would be added (not implemented in this demo)", name);
+            println!(
+                "Policy '{}' would be added (not implemented in this demo)",
+                name
+            );
         }
         VerificationConfigAction::RemovePolicy { name } => {
-            println!("Policy '{}' would be removed (not implemented in this demo)", name);
+            println!(
+                "Policy '{}' would be removed (not implemented in this demo)",
+                name
+            );
         }
         VerificationConfigAction::SetDefaultPolicy { name } => {
-            println!("Default policy would be set to '{}' (not implemented in this demo)", name);
+            println!(
+                "Default policy would be set to '{}' (not implemented in this demo)",
+                name
+            );
         }
-        VerificationConfigAction::AddPublicKey { key_id, public_key, public_key_file } => {
+        VerificationConfigAction::AddPublicKey {
+            key_id,
+            public_key,
+            public_key_file,
+        } => {
             let _key_bytes = match (public_key, public_key_file) {
                 (Some(key), None) => parse_key_input(&key, false)?.to_vec(),
                 (None, Some(file)) => {
                     let key_str = fs::read_to_string(file)?;
                     parse_key_input(key_str.trim(), false)?.to_vec()
                 }
-                (Some(_), Some(_)) => return Err("Cannot specify both public-key and public-key-file".into()),
-                (None, None) => return Err("Must specify either public-key or public-key-file".into()),
+                (Some(_), Some(_)) => {
+                    return Err("Cannot specify both public-key and public-key-file".into())
+                }
+                (None, None) => {
+                    return Err("Must specify either public-key or public-key-file".into())
+                }
             };
-            println!("Public key '{}' would be added (not implemented in this demo)", key_id);
+            println!(
+                "Public key '{}' would be added (not implemented in this demo)",
+                key_id
+            );
         }
         VerificationConfigAction::RemovePublicKey { key_id } => {
-            println!("Public key '{}' would be removed (not implemented in this demo)", key_id);
+            println!(
+                "Public key '{}' would be removed (not implemented in this demo)",
+                key_id
+            );
         }
         VerificationConfigAction::ListPublicKeys { verbose } => {
             let config = CliVerificationConfig::default();
@@ -4985,7 +5311,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             public_key_file,
             count,
             public_only,
-            private_only
+            private_only,
         } => {
             return handle_generate_key(
                 format.clone(),
@@ -4993,7 +5319,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 public_key_file.clone(),
                 *count,
                 *public_only,
-                *private_only
+                *private_only,
             );
         }
         Commands::DeriveKey {
@@ -5003,7 +5329,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             security_level,
             public_only,
             private_only,
-            passphrase
+            passphrase,
         } => {
             return handle_derive_key(
                 format.clone(),
@@ -5012,33 +5338,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 security_level.clone(),
                 *public_only,
                 *private_only,
-                passphrase.clone()
+                passphrase.clone(),
             );
         }
         Commands::ExtractPublicKey {
             private_key,
             private_key_file,
             format,
-            output_file
+            output_file,
         } => {
             return handle_extract_public_key(
                 private_key.clone(),
                 private_key_file.clone(),
                 format.clone(),
-                output_file.clone()
+                output_file.clone(),
             );
         }
         Commands::VerifyKey {
             private_key,
             private_key_file,
             public_key,
-            public_key_file
+            public_key_file,
         } => {
             return handle_verify_key(
                 private_key.clone(),
                 private_key_file.clone(),
                 public_key.clone(),
-                public_key_file.clone()
+                public_key_file.clone(),
             );
         }
         Commands::StoreKey {
@@ -5048,7 +5374,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             storage_dir,
             force,
             security_level,
-            passphrase
+            passphrase,
         } => {
             return handle_store_key(
                 key_id.clone(),
@@ -5057,7 +5383,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 storage_dir.clone(),
                 *force,
                 security_level.clone(),
-                passphrase.clone()
+                passphrase.clone(),
             );
         }
         Commands::RetrieveKey {
@@ -5065,35 +5391,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             storage_dir,
             format,
             output_file,
-            public_only
+            public_only,
         } => {
             return handle_retrieve_key(
                 key_id.clone(),
                 storage_dir.clone(),
                 format.clone(),
                 output_file.clone(),
-                *public_only
+                *public_only,
             );
         }
         Commands::DeleteKey {
             key_id,
             storage_dir,
-            force
+            force,
         } => {
-            return handle_delete_key(
-                key_id.clone(),
-                storage_dir.clone(),
-                *force
-            );
+            return handle_delete_key(key_id.clone(), storage_dir.clone(), *force);
         }
         Commands::ListKeys {
             storage_dir,
-            verbose
+            verbose,
         } => {
-            return handle_list_keys(
-                storage_dir.clone(),
-                *verbose
-            );
+            return handle_list_keys(storage_dir.clone(), *verbose);
         }
         Commands::DeriveFromMaster {
             master_key_id,
@@ -5103,7 +5422,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             security_level,
             format,
             output_only,
-            force
+            force,
         } => {
             return handle_derive_from_master(
                 master_key_id.clone(),
@@ -5113,7 +5432,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 security_level.clone(),
                 format.clone(),
                 *output_only,
-                *force
+                *force,
             );
         }
         Commands::RotateKey {
@@ -5122,7 +5441,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             security_level,
             method,
             keep_backup,
-            force
+            force,
         } => {
             return handle_rotate_key(
                 key_id.clone(),
@@ -5130,44 +5449,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 security_level.clone(),
                 method.clone(),
                 *keep_backup,
-                *force
+                *force,
             );
         }
         Commands::ListKeyVersions {
             key_id,
             storage_dir,
-            verbose
+            verbose,
         } => {
-            return handle_list_key_versions(
-                key_id.clone(),
-                storage_dir.clone(),
-                *verbose
-            );
+            return handle_list_key_versions(key_id.clone(), storage_dir.clone(), *verbose);
         }
         Commands::BackupKey {
             key_id,
             storage_dir,
             backup_file,
-            backup_passphrase
+            backup_passphrase,
         } => {
             return handle_backup_key(
                 key_id.clone(),
                 storage_dir.clone(),
                 backup_file.clone(),
-                *backup_passphrase
+                *backup_passphrase,
             );
         }
         Commands::RestoreKey {
             backup_file,
             key_id,
             storage_dir,
-            force
+            force,
         } => {
             return handle_restore_key(
                 backup_file.clone(),
                 key_id.clone(),
                 storage_dir.clone(),
-                *force
+                *force,
             );
         }
         Commands::ExportKey {
@@ -5176,7 +5491,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             export_file,
             format,
             export_passphrase,
-            include_metadata
+            include_metadata,
         } => {
             return handle_export_key(
                 key_id.clone(),
@@ -5184,7 +5499,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 export_file.clone(),
                 format.clone(),
                 *export_passphrase,
-                *include_metadata
+                *include_metadata,
             );
         }
         Commands::ImportKey {
@@ -5192,14 +5507,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             key_id,
             storage_dir,
             force,
-            verify_integrity
+            verify_integrity,
         } => {
             return handle_import_key(
                 export_file.clone(),
                 key_id.clone(),
                 storage_dir.clone(),
                 *force,
-                *verify_integrity
+                *verify_integrity,
             );
         }
         Commands::RegisterKey {
@@ -5210,7 +5525,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             user_id,
             key_name,
             timeout,
-            retries
+            retries,
         } => {
             return handle_register_key(
                 server_url.clone(),
@@ -5220,21 +5535,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 user_id.clone(),
                 key_name.clone(),
                 *timeout,
-                *retries
-            ).await;
+                *retries,
+            )
+            .await;
         }
         Commands::CheckRegistration {
             server_url,
             client_id,
             timeout,
-            retries
+            retries,
         } => {
             return handle_check_registration(
                 server_url.clone(),
                 client_id.clone(),
                 *timeout,
-                *retries
-            ).await;
+                *retries,
+            )
+            .await;
         }
         Commands::SignAndVerify {
             server_url,
@@ -5245,7 +5562,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             message_file,
             message_encoding,
             timeout,
-            retries
+            retries,
         } => {
             return handle_sign_and_verify(
                 server_url.clone(),
@@ -5256,8 +5573,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 message_file.clone(),
                 message_encoding.clone(),
                 *timeout,
-                *retries
-            ).await;
+                *retries,
+            )
+            .await;
         }
         Commands::TestServerIntegration {
             server_url,
@@ -5267,7 +5585,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             timeout,
             retries,
             security_level,
-            cleanup
+            cleanup,
         } => {
             return handle_test_server_integration(
                 server_url.clone(),
@@ -5277,8 +5595,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 *timeout,
                 *retries,
                 security_level.clone(),
-                *cleanup
-            ).await;
+                *cleanup,
+            )
+            .await;
         }
         Commands::AuthInit {
             server_url,
@@ -5287,7 +5606,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             storage_dir,
             user_id,
             environment,
-            force
+            force,
         } => {
             return handle_auth_init(
                 server_url.clone(),
@@ -5296,19 +5615,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 storage_dir.clone(),
                 user_id.clone(),
                 environment.clone(),
-                *force
-            ).await;
+                *force,
+            )
+            .await;
         }
         Commands::AuthStatus {
             verbose,
             profile,
-            environment
+            environment,
         } => {
-            return handle_auth_status(
-                *verbose,
-                profile.clone(),
-                environment.clone()
-            ).await;
+            return handle_auth_status(*verbose, profile.clone(), environment.clone()).await;
         }
         Commands::AuthProfile { action } => {
             return handle_auth_profile((*action).clone()).await;
@@ -5320,7 +5636,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             force,
             auto_register,
             server_url,
-            passphrase
+            passphrase,
         } => {
             return handle_auth_keygen(
                 key_id.clone(),
@@ -5329,23 +5645,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 *force,
                 *auto_register,
                 server_url.clone(),
-                passphrase.clone()
-            ).await;
+                passphrase.clone(),
+            )
+            .await;
         }
         Commands::AuthTest {
             endpoint,
             profile,
             method,
             payload,
-            timeout
+            timeout,
         } => {
             return handle_auth_test(
                 endpoint.clone(),
                 profile.clone(),
                 method.clone(),
                 payload.clone(),
-                *timeout
-            ).await;
+                *timeout,
+            )
+            .await;
         }
         Commands::AuthConfigure {
             enable_auto_sign,
@@ -5355,7 +5673,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             remove_command_override,
             debug,
             env_var,
-            show
+            show,
         } => {
             return handle_auth_configure(
                 *enable_auto_sign,
@@ -5365,28 +5683,89 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 remove_command_override.clone(),
                 *debug,
                 env_var.clone(),
-                *show
-            ).await;
+                *show,
+            )
+            .await;
         }
         Commands::AuthSetup {
             create_config,
             server_url,
-            interactive
+            interactive,
         } => {
-            return handle_auth_init_enhanced(
-                *create_config,
-                server_url.clone(),
-                *interactive
-            ).await;
+            return handle_auth_init_enhanced(*create_config, server_url.clone(), *interactive)
+                .await;
         }
-        Commands::VerifySignature { message, message_file, signature, key_id, public_key, public_key_file, policy, output_format, debug } => {
-            return handle_verify_signature(message.clone(), message_file.clone(), signature.clone(), key_id.clone(), public_key.clone(), public_key_file.clone(), policy.clone(), output_format.clone(), *debug).await;
+        Commands::VerifySignature {
+            message,
+            message_file,
+            signature,
+            key_id,
+            public_key,
+            public_key_file,
+            policy,
+            output_format,
+            debug,
+        } => {
+            return handle_verify_signature(
+                message.clone(),
+                message_file.clone(),
+                signature.clone(),
+                key_id.clone(),
+                public_key.clone(),
+                public_key_file.clone(),
+                policy.clone(),
+                output_format.clone(),
+                *debug,
+            )
+            .await;
         }
-        Commands::InspectSignature { signature_input, signature, headers_file, output_format, detailed, debug } => {
-            return handle_inspect_signature(signature_input.clone(), signature.clone(), headers_file.clone(), output_format.clone(), *detailed, *debug).await;
+        Commands::InspectSignature {
+            signature_input,
+            signature,
+            headers_file,
+            output_format,
+            detailed,
+            debug,
+        } => {
+            return handle_inspect_signature(
+                signature_input.clone(),
+                signature.clone(),
+                headers_file.clone(),
+                output_format.clone(),
+                *detailed,
+                *debug,
+            )
+            .await;
         }
-        Commands::VerifyResponse { url, method, headers, body, body_file, key_id, public_key, public_key_file, policy, output_format, debug, timeout } => {
-            return handle_verify_response(url.clone(), method.clone(), headers.clone(), body.clone(), body_file.clone(), key_id.clone(), public_key.clone(), public_key_file.clone(), policy.clone(), output_format.clone(), *debug, *timeout).await;
+        Commands::VerifyResponse {
+            url,
+            method,
+            headers,
+            body,
+            body_file,
+            key_id,
+            public_key,
+            public_key_file,
+            policy,
+            output_format,
+            debug,
+            timeout,
+        } => {
+            return handle_verify_response(
+                url.clone(),
+                method.clone(),
+                headers.clone(),
+                body.clone(),
+                body_file.clone(),
+                key_id.clone(),
+                public_key.clone(),
+                public_key_file.clone(),
+                policy.clone(),
+                output_format.clone(),
+                *debug,
+                *timeout,
+            )
+            .await;
         }
         Commands::Environment { action } => {
             return handle_environment_command(action.clone());
@@ -5394,6 +5773,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::VerificationConfig { action } => {
             return handle_verification_config(action.clone()).await;
         }
+        // Removed: Admin key rotation commands have been removed for security
         _ => {}
     }
 
@@ -5430,46 +5810,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::BlockSchema { name } => handle_block_schema(name, &mut node)?,
         Commands::GetSchemaState { name } => handle_get_schema_state(name, &mut node)?,
         Commands::ListSchemasByState { state } => handle_list_schemas_by_state(state, &mut node)?,
-        Commands::CryptoInit { method, security_level, force } => {
-            handle_crypto_init(method, security_level, force, &mut node)?
-        }
+        Commands::CryptoInit {
+            method,
+            security_level,
+            force,
+        } => handle_crypto_init(method, security_level, force, &mut node)?,
         Commands::CryptoStatus {} => handle_crypto_status(&mut node)?,
         Commands::CryptoValidate { .. } => unreachable!(), // Already handled above
-        Commands::GenerateKey { .. } => unreachable!(), // Already handled above
-        Commands::DeriveKey { .. } => unreachable!(), // Already handled above
+        Commands::GenerateKey { .. } => unreachable!(),    // Already handled above
+        Commands::DeriveKey { .. } => unreachable!(),      // Already handled above
         Commands::ExtractPublicKey { .. } => unreachable!(), // Already handled above
-        Commands::VerifyKey { .. } => unreachable!(), // Already handled above
-        Commands::StoreKey { .. } => unreachable!(), // Already handled above
-        Commands::RetrieveKey { .. } => unreachable!(), // Already handled above
-        Commands::DeleteKey { .. } => unreachable!(), // Already handled above
-        Commands::ListKeys { .. } => unreachable!(), // Already handled above
+        Commands::VerifyKey { .. } => unreachable!(),      // Already handled above
+        Commands::StoreKey { .. } => unreachable!(),       // Already handled above
+        Commands::RetrieveKey { .. } => unreachable!(),    // Already handled above
+        Commands::DeleteKey { .. } => unreachable!(),      // Already handled above
+        Commands::ListKeys { .. } => unreachable!(),       // Already handled above
         Commands::DeriveFromMaster { .. } => unreachable!(), // Already handled above
-        Commands::RotateKey { .. } => unreachable!(), // Already handled above
+        Commands::RotateKey { .. } => unreachable!(),      // Already handled above
         Commands::ListKeyVersions { .. } => unreachable!(), // Already handled above
-        Commands::BackupKey { .. } => unreachable!(), // Already handled above
-        Commands::RestoreKey { .. } => unreachable!(), // Already handled above
-        Commands::ExportKey { .. } => unreachable!(), // Already handled above
-        Commands::ImportKey { .. } => unreachable!(), // Already handled above
+        Commands::BackupKey { .. } => unreachable!(),      // Already handled above
+        Commands::RestoreKey { .. } => unreachable!(),     // Already handled above
+        Commands::ExportKey { .. } => unreachable!(),      // Already handled above
+        Commands::ImportKey { .. } => unreachable!(),      // Already handled above
         Commands::Execute { path } => handle_execute(path, &mut node)?,
         Commands::RegisterKey { .. } => unreachable!(), // Already handled above
         Commands::CheckRegistration { .. } => unreachable!(), // Already handled above
         Commands::SignAndVerify { .. } => unreachable!(), // Already handled above
         Commands::TestServerIntegration { .. } => unreachable!(), // Already handled above
-        Commands::AuthInit { .. } => unreachable!(), // Already handled above
-        Commands::AuthStatus { .. } => unreachable!(), // Already handled above
+        Commands::AuthInit { .. } => unreachable!(),    // Already handled above
+        Commands::AuthStatus { .. } => unreachable!(),  // Already handled above
         Commands::AuthProfile { .. } => unreachable!(), // Already handled above
-        Commands::AuthKeygen { .. } => unreachable!(), // Already handled above
-        Commands::AuthTest { .. } => unreachable!(), // Already handled above
+        Commands::AuthKeygen { .. } => unreachable!(),  // Already handled above
+        Commands::AuthTest { .. } => unreachable!(),    // Already handled above
         Commands::AuthConfigure { .. } => unreachable!(), // Already handled above
-        Commands::AuthSetup { .. } => unreachable!(), // Already handled above
+        Commands::AuthSetup { .. } => unreachable!(),   // Already handled above
         Commands::VerifySignature { .. } => unreachable!(), // Already handled above
         Commands::InspectSignature { .. } => unreachable!(), // Already handled above
         Commands::VerifyResponse { .. } => unreachable!(), // Already handled above
         Commands::VerificationConfig { .. } => unreachable!(), // Already handled above
         Commands::Environment { .. } => unreachable!(), // Already handled above
-        
+                                                         // Removed: Admin key rotation commands have been removed for security
     }
 
     Ok(())
 }
-

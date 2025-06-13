@@ -3,12 +3,12 @@
 //! This module provides comprehensive monitoring, metrics collection, and reporting
 //! capabilities for the E2E test suite, with CI/CD pipeline integration support.
 
+use serde::{Deserialize, Serialize};
+use serde_json::{self, Value};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use serde::{Serialize, Deserialize};
-use serde_json::{self, Value};
 
 /// Test monitoring and metrics collection system
 pub struct E2ETestMonitor {
@@ -262,10 +262,10 @@ impl Default for MonitorConfig {
 impl Default for AlertThresholds {
     fn default() -> Self {
         Self {
-            max_test_failure_rate: 5.0, // 5% failure rate threshold
-            max_test_duration_seconds: 300, // 5 minutes max test duration
-            min_coverage_percentage: 80.0, // Minimum 80% coverage
-            max_memory_usage_mb: 1024, // 1GB memory limit
+            max_test_failure_rate: 5.0,               // 5% failure rate threshold
+            max_test_duration_seconds: 300,           // 5 minutes max test duration
+            min_coverage_percentage: 80.0,            // Minimum 80% coverage
+            max_memory_usage_mb: 1024,                // 1GB memory limit
             max_performance_regression_percent: 20.0, // 20% performance regression
         }
     }
@@ -296,15 +296,15 @@ impl E2ETestMonitor {
     /// Start monitoring test execution
     pub async fn start_monitoring(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("📊 Starting E2E test monitoring");
-        
+
         if self.config.enable_real_time_monitoring {
             self.setup_real_time_monitoring().await?;
         }
-        
+
         if self.config.dashboard_config.enable_web_dashboard {
             self.start_web_dashboard().await?;
         }
-        
+
         Ok(())
     }
 
@@ -324,20 +324,26 @@ impl E2ETestMonitor {
         } else {
             self.metrics.execution_metrics.tests_failed += 1;
         }
-        
+
         // Track slow tests
         let duration_ms = duration.as_millis() as u64;
-        if duration_ms > 5000 { // Tests taking more than 5 seconds
-            self.metrics.execution_metrics.slowest_tests.push(SlowTestInfo {
-                test_name: test_name.to_string(),
-                duration_ms,
-                platform: platform.to_string(),
-                category: "E2E".to_string(),
-            });
+        if duration_ms > 5000 {
+            // Tests taking more than 5 seconds
+            self.metrics
+                .execution_metrics
+                .slowest_tests
+                .push(SlowTestInfo {
+                    test_name: test_name.to_string(),
+                    duration_ms,
+                    platform: platform.to_string(),
+                    category: "E2E".to_string(),
+                });
         }
-        
+
         // Update platform metrics
-        let platform_metrics = self.metrics.platform_metrics
+        let platform_metrics = self
+            .metrics
+            .platform_metrics
             .entry(platform.to_string())
             .or_insert_with(|| PlatformMetrics {
                 platform_name: platform.to_string(),
@@ -348,14 +354,16 @@ impl E2ETestMonitor {
                 compatibility_score: 100.0,
                 platform_specific_issues: Vec::new(),
             });
-        
+
         platform_metrics.tests_run += 1;
         platform_metrics.success_rate = if platform_metrics.tests_run > 0 {
-            ((platform_metrics.tests_run - if success { 0 } else { 1 }) as f64 / platform_metrics.tests_run as f64) * 100.0
+            ((platform_metrics.tests_run - if success { 0 } else { 1 }) as f64
+                / platform_metrics.tests_run as f64)
+                * 100.0
         } else {
             0.0
         };
-        
+
         // Check alert thresholds
         self.check_alert_thresholds();
     }
@@ -370,25 +378,35 @@ impl E2ETestMonitor {
     ) {
         match operation {
             "key_generation" => {
-                self.metrics.performance_metrics.key_generation_time_ms
+                self.metrics
+                    .performance_metrics
+                    .key_generation_time_ms
                     .insert(platform.to_string(), duration_ms);
             }
             "storage_operation" => {
-                self.metrics.performance_metrics.storage_operation_time_ms
+                self.metrics
+                    .performance_metrics
+                    .storage_operation_time_ms
                     .insert(platform.to_string(), duration_ms);
             }
             "key_derivation" => {
-                self.metrics.performance_metrics.derivation_time_ms
+                self.metrics
+                    .performance_metrics
+                    .derivation_time_ms
                     .insert(platform.to_string(), duration_ms);
             }
             "backup_restore" => {
-                self.metrics.performance_metrics.backup_restore_time_ms
+                self.metrics
+                    .performance_metrics
+                    .backup_restore_time_ms
                     .insert(platform.to_string(), duration_ms);
             }
             _ => {}
         }
-        
-        self.metrics.performance_metrics.memory_usage_mb
+
+        self.metrics
+            .performance_metrics
+            .memory_usage_mb
             .insert(format!("{}_{}", platform, operation), memory_usage_mb);
     }
 
@@ -401,13 +419,17 @@ impl E2ETestMonitor {
     ) {
         match validation_type {
             "cryptographic_strength" => {
-                self.metrics.security_metrics.cryptographic_strength_validations += 1;
+                self.metrics
+                    .security_metrics
+                    .cryptographic_strength_validations += 1;
             }
             "key_storage_security" => {
                 self.metrics.security_metrics.key_storage_security_checks += 1;
             }
             "encryption_algorithm" => {
-                self.metrics.security_metrics.encryption_algorithm_validations += 1;
+                self.metrics
+                    .security_metrics
+                    .encryption_algorithm_validations += 1;
             }
             "random_number_quality" => {
                 self.metrics.security_metrics.random_number_quality_tests += 1;
@@ -417,24 +439,32 @@ impl E2ETestMonitor {
             }
             _ => {}
         }
-        
+
         // Add any vulnerabilities found
         for vulnerability in vulnerabilities {
-            self.metrics.security_metrics.security_vulnerabilities_found.push(vulnerability);
+            self.metrics
+                .security_metrics
+                .security_vulnerabilities_found
+                .push(vulnerability);
         }
-        
+
         // Update compliance checks
-        self.metrics.security_metrics.compliance_checks
+        self.metrics
+            .security_metrics
+            .compliance_checks
             .insert(validation_type.to_string(), passed);
     }
 
     /// Generate comprehensive test report
-    pub async fn generate_comprehensive_report(&self, output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn generate_comprehensive_report(
+        &self,
+        output_dir: &PathBuf,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         println!("📋 Generating comprehensive test report");
-        
+
         // Create output directory
         fs::create_dir_all(output_dir)?;
-        
+
         // Generate reports in all configured formats
         for format in &self.config.export_formats {
             match format {
@@ -446,30 +476,46 @@ impl E2ETestMonitor {
                 ExportFormat::Grafana => self.generate_grafana_dashboard(output_dir).await?,
             }
         }
-        
+
         // Generate summary report
         self.generate_executive_summary(output_dir).await?;
-        
+
         Ok(())
     }
 
     /// Check if any alert thresholds have been exceeded
     fn check_alert_thresholds(&mut self) {
         let current_failure_rate = if self.metrics.execution_metrics.total_tests > 0 {
-            (self.metrics.execution_metrics.tests_failed as f64 / self.metrics.execution_metrics.total_tests as f64) * 100.0
+            (self.metrics.execution_metrics.tests_failed as f64
+                / self.metrics.execution_metrics.total_tests as f64)
+                * 100.0
         } else {
             0.0
         };
-        
+
         if current_failure_rate > self.config.alert_thresholds.max_test_failure_rate {
             self.alerts.push(Alert {
-                alert_id: format!("failure_rate_{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()),
+                alert_id: format!(
+                    "failure_rate_{}",
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs()
+                ),
                 alert_type: AlertType::TestFailure,
                 severity: AlertSeverity::Critical,
-                message: format!("Test failure rate ({:.1}%) exceeded threshold ({:.1}%)", 
-                                current_failure_rate, self.config.alert_thresholds.max_test_failure_rate),
-                timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                metadata: [("failure_rate".to_string(), current_failure_rate.to_string())].iter().cloned().collect(),
+                message: format!(
+                    "Test failure rate ({:.1}%) exceeded threshold ({:.1}%)",
+                    current_failure_rate, self.config.alert_thresholds.max_test_failure_rate
+                ),
+                timestamp: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+                metadata: [("failure_rate".to_string(), current_failure_rate.to_string())]
+                    .iter()
+                    .cloned()
+                    .collect(),
             });
         }
     }
@@ -483,7 +529,10 @@ impl E2ETestMonitor {
 
     /// Start web dashboard for test visualization
     async fn start_web_dashboard(&self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("  🌐 Starting web dashboard on port {}", self.config.dashboard_config.dashboard_port);
+        println!(
+            "  🌐 Starting web dashboard on port {}",
+            self.config.dashboard_config.dashboard_port
+        );
         // Web dashboard startup logic would go here
         Ok(())
     }
@@ -515,22 +564,23 @@ impl E2ETestMonitor {
             Dashboard {
                 dashboard_id: "security_dashboard".to_string(),
                 title: "Security Validation Dashboard".to_string(),
-                widgets: vec![
-                    Widget {
-                        widget_id: "security_validations".to_string(),
-                        widget_type: WidgetType::Counter,
-                        title: "Security Validations Passed".to_string(),
-                        data_source: "security_metrics".to_string(),
-                        configuration: HashMap::new(),
-                    },
-                ],
+                widgets: vec![Widget {
+                    widget_id: "security_validations".to_string(),
+                    widget_type: WidgetType::Counter,
+                    title: "Security Validations Passed".to_string(),
+                    data_source: "security_metrics".to_string(),
+                    configuration: HashMap::new(),
+                }],
                 refresh_interval_seconds: 60,
             },
         ]
     }
 
     /// Generate JSON format report
-    async fn generate_json_report(&self, output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    async fn generate_json_report(
+        &self,
+        output_dir: &PathBuf,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let report = serde_json::to_string_pretty(&self.metrics)?;
         let file_path = output_dir.join("comprehensive_e2e_report.json");
         fs::write(file_path, report)?;
@@ -538,7 +588,10 @@ impl E2ETestMonitor {
     }
 
     /// Generate HTML format report
-    async fn generate_html_report(&self, output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    async fn generate_html_report(
+        &self,
+        output_dir: &PathBuf,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let html_content = format!(
             r#"<!DOCTYPE html>
 <html>
@@ -594,18 +647,26 @@ impl E2ETestMonitor {
             self.metrics.execution_metrics.tests_passed,
             self.metrics.execution_metrics.tests_failed,
             self.metrics.execution_metrics.success_rate,
-            self.metrics.security_metrics.cryptographic_strength_validations,
+            self.metrics
+                .security_metrics
+                .cryptographic_strength_validations,
             self.metrics.security_metrics.key_storage_security_checks,
-            self.metrics.security_metrics.security_vulnerabilities_found.len()
+            self.metrics
+                .security_metrics
+                .security_vulnerabilities_found
+                .len()
         );
-        
+
         let file_path = output_dir.join("comprehensive_e2e_report.html");
         fs::write(file_path, html_content)?;
         Ok(())
     }
 
     /// Generate JUnit XML format report
-    async fn generate_junit_report(&self, output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    async fn generate_junit_report(
+        &self,
+        output_dir: &PathBuf,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let junit_xml = format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
 <testsuites name="E2E Client-Side Key Management" tests="{}" failures="{}" time="{:.3}">
@@ -620,14 +681,17 @@ impl E2ETestMonitor {
             self.metrics.execution_metrics.tests_failed,
             self.metrics.execution_metrics.total_duration_ms as f64 / 1000.0
         );
-        
+
         let file_path = output_dir.join("junit_e2e_results.xml");
         fs::write(file_path, junit_xml)?;
         Ok(())
     }
 
     /// Generate CSV format report
-    async fn generate_csv_report(&self, output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    async fn generate_csv_report(
+        &self,
+        output_dir: &PathBuf,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let csv_content = format!(
             "Metric,Value\nTotal Tests,{}\nTests Passed,{}\nTests Failed,{}\nSuccess Rate,{:.1}%\n",
             self.metrics.execution_metrics.total_tests,
@@ -635,14 +699,17 @@ impl E2ETestMonitor {
             self.metrics.execution_metrics.tests_failed,
             self.metrics.execution_metrics.success_rate
         );
-        
+
         let file_path = output_dir.join("e2e_metrics.csv");
         fs::write(file_path, csv_content)?;
         Ok(())
     }
 
     /// Generate Prometheus metrics format
-    async fn generate_prometheus_metrics(&self, output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    async fn generate_prometheus_metrics(
+        &self,
+        output_dir: &PathBuf,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let prometheus_metrics = format!(
             "# HELP e2e_tests_total Total number of E2E tests executed\n\
 # TYPE e2e_tests_total counter\n\
@@ -664,14 +731,17 @@ e2e_test_success_rate {:.3}\n",
             self.metrics.execution_metrics.tests_failed,
             self.metrics.execution_metrics.success_rate / 100.0
         );
-        
+
         let file_path = output_dir.join("e2e_metrics.prom");
         fs::write(file_path, prometheus_metrics)?;
         Ok(())
     }
 
     /// Generate Grafana dashboard configuration
-    async fn generate_grafana_dashboard(&self, output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    async fn generate_grafana_dashboard(
+        &self,
+        output_dir: &PathBuf,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let grafana_dashboard = serde_json::json!({
             "dashboard": {
                 "title": "E2E Client-Side Key Management Dashboard",
@@ -697,14 +767,17 @@ e2e_test_success_rate {:.3}\n",
                 ]
             }
         });
-        
+
         let file_path = output_dir.join("grafana_dashboard.json");
         fs::write(file_path, serde_json::to_string_pretty(&grafana_dashboard)?)?;
         Ok(())
     }
 
     /// Generate executive summary report
-    async fn generate_executive_summary(&self, output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    async fn generate_executive_summary(
+        &self,
+        output_dir: &PathBuf,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let summary = format!(
             r#"# E2E Client-Side Key Management Test Summary
 
@@ -734,13 +807,22 @@ Generated on: {}
             self.metrics.execution_metrics.success_rate,
             self.metrics.execution_metrics.total_duration_ms as f64 / 1000.0,
             self.metrics.platform_metrics.len(),
-            self.metrics.security_metrics.cryptographic_strength_validations,
-            self.metrics.performance_metrics.key_generation_time_ms.len(),
+            self.metrics
+                .security_metrics
+                .cryptographic_strength_validations,
+            self.metrics
+                .performance_metrics
+                .key_generation_time_ms
+                .len(),
             self.metrics.execution_metrics.tests_passed,
-            if self.alerts.is_empty() { "No alerts generated".to_string() } else { format!("{} alerts generated", self.alerts.len()) },
+            if self.alerts.is_empty() {
+                "No alerts generated".to_string()
+            } else {
+                format!("{} alerts generated", self.alerts.len())
+            },
             chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
         );
-        
+
         let file_path = output_dir.join("executive_summary.md");
         fs::write(file_path, summary)?;
         Ok(())
@@ -751,7 +833,10 @@ impl TestMetrics {
     /// Create new test metrics instance
     fn new() -> Self {
         Self {
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
             execution_metrics: ExecutionMetrics {
                 total_tests: 0,
                 tests_passed: 0,
@@ -806,25 +891,49 @@ impl TestMetrics {
 async fn test_e2e_monitoring_system() {
     let config = MonitorConfig::default();
     let mut monitor = E2ETestMonitor::new(config);
-    
+
     // Simulate test execution and metric collection
-    monitor.collect_test_metrics("js_key_generation", "javascript", Duration::from_millis(150), true, HashMap::new());
-    monitor.collect_test_metrics("python_storage", "python", Duration::from_millis(200), true, HashMap::new());
-    monitor.collect_test_metrics("cli_backup", "cli", Duration::from_millis(300), false, HashMap::new());
-    
+    monitor.collect_test_metrics(
+        "js_key_generation",
+        "javascript",
+        Duration::from_millis(150),
+        true,
+        HashMap::new(),
+    );
+    monitor.collect_test_metrics(
+        "python_storage",
+        "python",
+        Duration::from_millis(200),
+        true,
+        HashMap::new(),
+    );
+    monitor.collect_test_metrics(
+        "cli_backup",
+        "cli",
+        Duration::from_millis(300),
+        false,
+        HashMap::new(),
+    );
+
     // Collect performance metrics
     monitor.collect_performance_metrics("key_generation", "javascript", 150, 50);
     monitor.collect_performance_metrics("storage_operation", "python", 200, 75);
-    
+
     // Collect security metrics
     monitor.collect_security_metrics("cryptographic_strength", true, Vec::new());
     monitor.collect_security_metrics("key_storage_security", true, Vec::new());
-    
+
     // Generate reports
     let output_dir = PathBuf::from("test_reports");
-    monitor.generate_comprehensive_report(&output_dir).await.expect("Failed to generate reports");
-    
+    monitor
+        .generate_comprehensive_report(&output_dir)
+        .await
+        .expect("Failed to generate reports");
+
     println!("✅ E2E monitoring and reporting system test completed");
-    println!("   📊 Metrics collected for {} tests", monitor.metrics.execution_metrics.total_tests);
+    println!(
+        "   📊 Metrics collected for {} tests",
+        monitor.metrics.execution_metrics.total_tests
+    );
     println!("   📋 Reports generated in: {}", output_dir.display());
 }

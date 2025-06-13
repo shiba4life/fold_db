@@ -80,22 +80,22 @@ impl TcpServer {
     ///
     /// ```rust,no_run
     /// use datafold::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
-///     use datafold::datafold_node::signature_auth::SignatureAuthConfig;
+    ///     use datafold::datafold_node::signature_auth::SignatureAuthConfig;
     /// use datafold::error::FoldDbResult;
     /// use std::path::PathBuf;
     ///
     /// #[tokio::main]
     /// async fn main() -> FoldDbResult<()> {
-///     let config = NodeConfig {
-///         storage_path: PathBuf::from("data"),
-///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-///         crypto: None,
-///         signature_auth: SignatureAuthConfig::default(),
-///     };
-///     let node = DataFoldNode::new(config)?;
-///     let tcp_server = TcpServer::new(node, 9000).await?;
-///     Ok(())
-/// }
+    ///     let config = NodeConfig {
+    ///         storage_path: PathBuf::from("data"),
+    ///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
+    ///         crypto: None,
+    ///         signature_auth: SignatureAuthConfig::default(),
+    ///     };
+    ///     let node = DataFoldNode::new(config)?;
+    ///     let tcp_server = TcpServer::new(node, 9000).await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn new(node: DataFoldNode, port: u16) -> FoldDbResult<Self> {
         let addr = format!("127.0.0.1:{}", port);
@@ -134,23 +134,23 @@ impl TcpServer {
     ///
     /// ```rust,no_run
     /// use datafold::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
-///     use datafold::datafold_node::signature_auth::SignatureAuthConfig;
+    ///     use datafold::datafold_node::signature_auth::SignatureAuthConfig;
     /// use datafold::error::FoldDbResult;
     /// use std::path::PathBuf;
     ///
     /// #[tokio::main]
-/// async fn main() -> FoldDbResult<()> {
-///     let config = NodeConfig {
-///         storage_path: PathBuf::from("data"),
-///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
-///         crypto: None,
-///         signature_auth: SignatureAuthConfig::default(),
-///     };
-///     let node = DataFoldNode::new(config)?;
-///     let tcp_server = TcpServer::new(node, 9000).await?;
-///     tcp_server.run().await?;
-///     Ok(())
-/// }
+    /// async fn main() -> FoldDbResult<()> {
+    ///     let config = NodeConfig {
+    ///         storage_path: PathBuf::from("data"),
+    ///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
+    ///         crypto: None,
+    ///         signature_auth: SignatureAuthConfig::default(),
+    ///     };
+    ///     let node = DataFoldNode::new(config)?;
+    ///     let tcp_server = TcpServer::new(node, 9000).await?;
+    ///     tcp_server.run().await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn run(&self) -> FoldDbResult<()> {
         info!("TCP server running...");

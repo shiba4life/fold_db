@@ -47,12 +47,13 @@
 //! ```
 
 use super::core::DbOperations;
-use super::encryption_wrapper_async::{AsyncEncryptionWrapper, AsyncWrapperConfig};
 use super::encryption_wrapper::contexts;
-use crate::crypto::{MasterKeyPair, CryptoError, CryptoResult};
+use super::encryption_wrapper_async::{AsyncEncryptionWrapper, AsyncWrapperConfig};
 use crate::config::crypto::CryptoConfig;
+use crate::crypto::{CryptoError, CryptoResult, MasterKeyPair};
 use crate::schema::SchemaError;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -61,7 +62,6 @@ use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::sync::{RwLock, Semaphore};
 use tokio::task;
-use sha2::{Sha256, Digest};
 use uuid::Uuid;
 
 /// Configuration for async backup operations
@@ -111,7 +111,7 @@ impl AsyncBackupConfig {
             ..Default::default()
         }
     }
-    
+
     /// Create configuration optimized for fast backup/restore
     pub fn fast_mode() -> Self {
         Self {
@@ -123,7 +123,7 @@ impl AsyncBackupConfig {
             ..Default::default()
         }
     }
-    
+
     /// Create configuration optimized for network operations
     pub fn network_optimized() -> Self {
         Self {
@@ -173,29 +173,29 @@ impl ProgressInfo {
             throughput_bytes_per_sec: 0.0,
         }
     }
-    
+
     fn update(&mut self, items_delta: u64, bytes_delta: u64) {
         self.items_processed += items_delta;
         self.bytes_processed += bytes_delta;
-        
+
         let elapsed = self.start_time.elapsed().unwrap_or(Duration::from_secs(1));
         let elapsed_secs = elapsed.as_secs_f64().max(1.0);
-        
+
         self.throughput_items_per_sec = self.items_processed as f64 / elapsed_secs;
         self.throughput_bytes_per_sec = self.bytes_processed as f64 / elapsed_secs;
-        
+
         // Estimate completion time if total is known
         if let Some(total_items) = self.total_items {
             if self.items_processed > 0 && self.items_processed < total_items {
                 let remaining_items = total_items - self.items_processed;
-                let estimated_remaining_secs = remaining_items as f64 / self.throughput_items_per_sec;
-                self.estimated_completion = Some(
-                    SystemTime::now() + Duration::from_secs_f64(estimated_remaining_secs)
-                );
+                let estimated_remaining_secs =
+                    remaining_items as f64 / self.throughput_items_per_sec;
+                self.estimated_completion =
+                    Some(SystemTime::now() + Duration::from_secs_f64(estimated_remaining_secs));
             }
         }
     }
-    
+
     /// Calculate progress percentage (0-100)
     pub fn progress_percentage(&self) -> Option<f64> {
         if let Some(total) = self.total_items {
@@ -307,14 +307,12 @@ impl AsyncEncryptedBackup {
         config: AsyncBackupConfig,
     ) -> CryptoResult<Self> {
         let async_wrapper_config = AsyncWrapperConfig::default();
-        let encryption = AsyncEncryptionWrapper::new(
-            db_ops.clone(),
-            master_keypair,
-            async_wrapper_config,
-        ).await?;
-        
+        let encryption =
+            AsyncEncryptionWrapper::new(db_ops.clone(), master_keypair, async_wrapper_config)
+                .await?;
+
         let operation_semaphore = Arc::new(Semaphore::new(config.max_concurrent_operations));
-        
+
         Ok(Self {
             db_ops,
             encryption,
@@ -323,7 +321,7 @@ impl AsyncEncryptedBackup {
             progress: Arc::new(RwLock::new(None)),
         })
     }
-    
+
     /// Create an encrypted backup asynchronously
     pub async fn create_backup_async<P: AsRef<Path>>(
         &self,
@@ -331,23 +329,23 @@ impl AsyncEncryptedBackup {
     ) -> Result<BackupInfo, SchemaError> {
         let start_time = Instant::now();
         let backup_path = backup_path.as_ref().to_path_buf();
-        
+
         // Initialize progress tracking
         if self.config.enable_progress_tracking {
             let mut progress = self.progress.write().await;
             *progress = Some(ProgressInfo::new("backup".to_string()));
         }
-        
+
         // Collect all database items first to get total count
         let all_items = self.collect_database_items().await?;
-        
+
         // Update progress with total count
         if self.config.enable_progress_tracking {
             if let Some(ref mut progress) = *self.progress.write().await {
                 progress.total_items = Some(all_items.len() as u64);
             }
         }
-        
+
         // Create backup file
         let backup_file = OpenOptions::new()
             .create(true)
@@ -355,10 +353,12 @@ impl AsyncEncryptedBackup {
             .truncate(true)
             .open(&backup_path)
             .await
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to create backup file: {}", e)))?;
-        
+            .map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to create backup file: {}", e))
+            })?;
+
         let mut writer = BufWriter::with_capacity(self.config.buffer_size, backup_file);
-        
+
         // Write backup header
         let backup_id = Uuid::new_v4().to_string();
         let mut metadata = BackupMetadata {
@@ -369,89 +369,112 @@ impl AsyncEncryptedBackup {
             total_size: 0, // Will be updated at the end
             compression_level: self.config.compression_level,
             integrity_hash: String::new(), // Will be computed at the end
-            encryption_contexts: contexts::all_contexts().iter().map(|s| s.to_string()).collect(),
+            encryption_contexts: contexts::all_contexts()
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             additional_info: HashMap::new(),
         };
-        
-        let header_bytes = serde_json::to_vec(&metadata)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize backup header: {}", e)))?;
-        
-        writer.write_u32(header_bytes.len() as u32).await
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to write header length: {}", e)))?;
-        writer.write_all(&header_bytes).await
+
+        let header_bytes = serde_json::to_vec(&metadata).map_err(|e| {
+            SchemaError::InvalidData(format!("Failed to serialize backup header: {}", e))
+        })?;
+
+        writer
+            .write_u32(header_bytes.len() as u32)
+            .await
+            .map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to write header length: {}", e))
+            })?;
+        writer
+            .write_all(&header_bytes)
+            .await
             .map_err(|e| SchemaError::InvalidData(format!("Failed to write header: {}", e)))?;
-        
+
         // Write encrypted items in batches
         let mut hasher = Sha256::new();
         let mut total_bytes = 0u64;
         let mut error_count = 0u64;
-        
+
         for chunk in all_items.chunks(self.config.batch_size) {
             let encrypted_chunk = self.encrypt_items_batch(chunk).await?;
-            
+
             for (key, encrypted_data) in encrypted_chunk {
-                let item_data = serde_json::to_vec(&(key, encrypted_data))
-                    .map_err(|e| {
-                        error_count += 1;
-                        SchemaError::InvalidData(format!("Failed to serialize item: {}", e))
-                    })?;
-                
+                let item_data = serde_json::to_vec(&(key, encrypted_data)).map_err(|e| {
+                    error_count += 1;
+                    SchemaError::InvalidData(format!("Failed to serialize item: {}", e))
+                })?;
+
                 // Apply compression if enabled
                 let final_data = if self.config.compression_level > 0 {
                     self.compress_data(&item_data).await?
                 } else {
                     item_data
                 };
-                
+
                 // Write item size and data
-                writer.write_u32(final_data.len() as u32).await
-                    .map_err(|e| SchemaError::InvalidData(format!("Failed to write item size: {}", e)))?;
-                writer.write_all(&final_data).await
-                    .map_err(|e| SchemaError::InvalidData(format!("Failed to write item data: {}", e)))?;
-                
+                writer
+                    .write_u32(final_data.len() as u32)
+                    .await
+                    .map_err(|e| {
+                        SchemaError::InvalidData(format!("Failed to write item size: {}", e))
+                    })?;
+                writer.write_all(&final_data).await.map_err(|e| {
+                    SchemaError::InvalidData(format!("Failed to write item data: {}", e))
+                })?;
+
                 total_bytes += final_data.len() as u64 + 4; // Include size prefix
                 hasher.update(&final_data);
-                
+
                 // Update progress
                 if self.config.enable_progress_tracking {
                     if let Some(ref mut progress) = *self.progress.write().await {
                         progress.update(1, final_data.len() as u64);
                     }
                 }
-                
+
                 // Create checkpoint if enabled
-                if self.config.enable_resume && 
-                   (total_bytes as usize / self.config.checkpoint_interval) > 0 {
+                if self.config.enable_resume
+                    && (total_bytes as usize / self.config.checkpoint_interval) > 0
+                {
                     self.create_checkpoint(&backup_path, total_bytes).await?;
                 }
             }
         }
-        
+
         // Finalize backup
         let integrity_hash = hex::encode(hasher.finalize());
         metadata.total_size = total_bytes;
         metadata.integrity_hash = integrity_hash;
-        
+
         // Write updated metadata at the end
-        let final_header_bytes = serde_json::to_vec(&metadata)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize final metadata: {}", e)))?;
-        
-        writer.write_u32(final_header_bytes.len() as u32).await
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to write final header length: {}", e)))?;
-        writer.write_all(&final_header_bytes).await
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to write final header: {}", e)))?;
-        
-        writer.flush().await
+        let final_header_bytes = serde_json::to_vec(&metadata).map_err(|e| {
+            SchemaError::InvalidData(format!("Failed to serialize final metadata: {}", e))
+        })?;
+
+        writer
+            .write_u32(final_header_bytes.len() as u32)
+            .await
+            .map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to write final header length: {}", e))
+            })?;
+        writer.write_all(&final_header_bytes).await.map_err(|e| {
+            SchemaError::InvalidData(format!("Failed to write final header: {}", e))
+        })?;
+
+        writer
+            .flush()
+            .await
             .map_err(|e| SchemaError::InvalidData(format!("Failed to flush backup file: {}", e)))?;
-        
+
         let duration = start_time.elapsed();
-        
+
         // Clear progress
         if self.config.enable_progress_tracking {
             let mut progress = self.progress.write().await;
             *progress = None;
         }
-        
+
         Ok(BackupInfo {
             metadata,
             duration,
@@ -460,7 +483,7 @@ impl AsyncEncryptedBackup {
             error_count,
         })
     }
-    
+
     /// Restore from an encrypted backup asynchronously
     pub async fn restore_backup_async<P: AsRef<Path>>(
         &self,
@@ -469,30 +492,35 @@ impl AsyncEncryptedBackup {
     ) -> Result<RestoreInfo, SchemaError> {
         let start_time = Instant::now();
         let backup_path = backup_path.as_ref();
-        
+
         // Initialize progress tracking
         if self.config.enable_progress_tracking {
             let mut progress = self.progress.write().await;
             *progress = Some(ProgressInfo::new("restore".to_string()));
         }
-        
+
         // Open backup file
-        let backup_file = File::open(backup_path).await
+        let backup_file = File::open(backup_path)
+            .await
             .map_err(|e| SchemaError::InvalidData(format!("Failed to open backup file: {}", e)))?;
-        
+
         let mut reader = BufReader::with_capacity(self.config.buffer_size, backup_file);
-        
+
         // Read and parse backup header
-        let header_len = reader.read_u32().await
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to read header length: {}", e)))?;
-        
+        let header_len = reader.read_u32().await.map_err(|e| {
+            SchemaError::InvalidData(format!("Failed to read header length: {}", e))
+        })?;
+
         let mut header_bytes = vec![0u8; header_len as usize];
-        reader.read_exact(&mut header_bytes).await
+        reader
+            .read_exact(&mut header_bytes)
+            .await
             .map_err(|e| SchemaError::InvalidData(format!("Failed to read header: {}", e)))?;
-        
-        let metadata: BackupMetadata = serde_json::from_slice(&header_bytes)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to parse backup header: {}", e)))?;
-        
+
+        let metadata: BackupMetadata = serde_json::from_slice(&header_bytes).map_err(|e| {
+            SchemaError::InvalidData(format!("Failed to parse backup header: {}", e))
+        })?;
+
         // Update progress with total count
         if self.config.enable_progress_tracking {
             if let Some(ref mut progress) = *self.progress.write().await {
@@ -500,56 +528,61 @@ impl AsyncEncryptedBackup {
                 progress.total_bytes = Some(metadata.total_size);
             }
         }
-        
+
         // Create target encryption wrapper
         let _crypto_config = CryptoConfig::default();
-        let master_keypair = self.get_master_keypair().await
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to get master keypair: {}", e)))?;
+        let master_keypair = self.get_master_keypair().await.map_err(|e| {
+            SchemaError::InvalidData(format!("Failed to get master keypair: {}", e))
+        })?;
         let async_wrapper_config = AsyncWrapperConfig::default();
-        let target_encryption = AsyncEncryptionWrapper::new(
-            target_db_ops,
-            &master_keypair,
-            async_wrapper_config,
-        ).await.map_err(|e| SchemaError::InvalidData(format!("Failed to create target encryption: {}", e)))?;
-        
+        let target_encryption =
+            AsyncEncryptionWrapper::new(target_db_ops, &master_keypair, async_wrapper_config)
+                .await
+                .map_err(|e| {
+                    SchemaError::InvalidData(format!("Failed to create target encryption: {}", e))
+                })?;
+
         // Read and restore items
         let mut hasher = Sha256::new();
         let mut items_restored = 0u64;
         let mut bytes_restored = 0u64;
         let mut error_count = 0u64;
         let mut batch_items = Vec::new();
-        
+
         // Read items until we reach the final metadata
         while items_restored < metadata.total_items {
             let item_size = match reader.read_u32().await {
                 Ok(size) => size,
                 Err(_) => break, // End of items, final metadata follows
             };
-            
+
             let mut item_bytes = vec![0u8; item_size as usize];
-            reader.read_exact(&mut item_bytes).await
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to read item data: {}", e)))?;
-            
+            reader.read_exact(&mut item_bytes).await.map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to read item data: {}", e))
+            })?;
+
             hasher.update(&item_bytes);
-            
+
             // Decompress if needed
             let decompressed_data = if self.config.compression_level > 0 {
                 self.decompress_data(&item_bytes).await?
             } else {
                 item_bytes
             };
-            
-            let (key, encrypted_data): (String, Vec<u8>) = serde_json::from_slice(&decompressed_data)
-                .map_err(|e| {
+
+            let (key, encrypted_data): (String, Vec<u8>) =
+                serde_json::from_slice(&decompressed_data).map_err(|e| {
                     error_count += 1;
                     SchemaError::InvalidData(format!("Failed to parse item: {}", e))
                 })?;
-            
+
             batch_items.push((key, encrypted_data));
-            
+
             // Process batch when full
             if batch_items.len() >= self.config.batch_size {
-                let batch_result = self.restore_items_batch(&target_encryption, batch_items).await;
+                let batch_result = self
+                    .restore_items_batch(&target_encryption, batch_items)
+                    .await;
                 match batch_result {
                     Ok(batch_count) => {
                         items_restored += batch_count;
@@ -558,7 +591,7 @@ impl AsyncEncryptedBackup {
                     Err(_) => error_count += 1,
                 }
                 batch_items = Vec::new();
-                
+
                 // Update progress
                 if self.config.enable_progress_tracking {
                     if let Some(ref mut progress) = *self.progress.write().await {
@@ -567,10 +600,12 @@ impl AsyncEncryptedBackup {
                 }
             }
         }
-        
+
         // Process remaining items
         if !batch_items.is_empty() {
-            let batch_result = self.restore_items_batch(&target_encryption, batch_items).await;
+            let batch_result = self
+                .restore_items_batch(&target_encryption, batch_items)
+                .await;
             match batch_result {
                 Ok(batch_count) => {
                     items_restored += batch_count;
@@ -578,7 +613,7 @@ impl AsyncEncryptedBackup {
                 Err(_) => error_count += 1,
             }
         }
-        
+
         // Verify integrity if enabled
         let verification_passed = if self.config.verify_integrity {
             let computed_hash = hex::encode(hasher.finalize());
@@ -586,15 +621,15 @@ impl AsyncEncryptedBackup {
         } else {
             None
         };
-        
+
         let duration = start_time.elapsed();
-        
+
         // Clear progress
         if self.config.enable_progress_tracking {
             let mut progress = self.progress.write().await;
             *progress = None;
         }
-        
+
         Ok(RestoreInfo {
             total_items: items_restored,
             total_bytes: bytes_restored,
@@ -605,12 +640,12 @@ impl AsyncEncryptedBackup {
             verification_passed,
         })
     }
-    
+
     /// Get current progress information
     pub async fn get_progress(&self) -> Option<ProgressInfo> {
         self.progress.read().await.clone()
     }
-    
+
     /// Cancel ongoing operation
     pub async fn cancel_operation(&self) {
         if self.config.enable_progress_tracking {
@@ -618,7 +653,7 @@ impl AsyncEncryptedBackup {
             *progress = None;
         }
     }
-    
+
     /// List available backup checkpoints for resume
     pub async fn list_checkpoints<P: AsRef<Path>>(
         &self,
@@ -628,54 +663,62 @@ impl AsyncEncryptedBackup {
         if !checkpoint_dir.exists() {
             return Ok(Vec::new());
         }
-        
+
         let mut checkpoints = Vec::new();
-        let mut entries = tokio::fs::read_dir(checkpoint_dir).await
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to read checkpoint directory: {}", e)))?;
-        
-        while let Some(entry) = entries.next_entry().await
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to read checkpoint entry: {}", e)))? {
-            
-            if entry.file_type().await
+        let mut entries = tokio::fs::read_dir(checkpoint_dir).await.map_err(|e| {
+            SchemaError::InvalidData(format!("Failed to read checkpoint directory: {}", e))
+        })?;
+
+        while let Some(entry) = entries.next_entry().await.map_err(|e| {
+            SchemaError::InvalidData(format!("Failed to read checkpoint entry: {}", e))
+        })? {
+            if entry
+                .file_type()
+                .await
                 .map_err(|e| SchemaError::InvalidData(format!("Failed to get file type: {}", e)))?
-                .is_file() {
-                
-                let checkpoint_data = tokio::fs::read(entry.path()).await
-                    .map_err(|e| SchemaError::InvalidData(format!("Failed to read checkpoint file: {}", e)))?;
-                
-                let checkpoint: CheckpointInfo = serde_json::from_slice(&checkpoint_data)
-                    .map_err(|e| SchemaError::InvalidData(format!("Failed to parse checkpoint: {}", e)))?;
-                
+                .is_file()
+            {
+                let checkpoint_data = tokio::fs::read(entry.path()).await.map_err(|e| {
+                    SchemaError::InvalidData(format!("Failed to read checkpoint file: {}", e))
+                })?;
+
+                let checkpoint: CheckpointInfo =
+                    serde_json::from_slice(&checkpoint_data).map_err(|e| {
+                        SchemaError::InvalidData(format!("Failed to parse checkpoint: {}", e))
+                    })?;
+
                 checkpoints.push(checkpoint);
             }
         }
-        
+
         // Sort by timestamp
         checkpoints.sort_by_key(|c| c.timestamp);
         Ok(checkpoints)
     }
-    
+
     /// Collect all database items for backup
     async fn collect_database_items(&self) -> Result<Vec<(String, Vec<u8>)>, SchemaError> {
         let mut items = Vec::new();
-        
+
         // Collect from main database
         for result in self.db_ops.db().iter() {
-            let (key, value) = result.map_err(|e| SchemaError::InvalidData(format!("Database iteration error: {}", e)))?;
+            let (key, value) = result.map_err(|e| {
+                SchemaError::InvalidData(format!("Database iteration error: {}", e))
+            })?;
             let key_str = String::from_utf8_lossy(&key).to_string();
             items.push((key_str, value.to_vec()));
         }
-        
+
         Ok(items)
     }
-    
+
     /// Encrypt a batch of items
     async fn encrypt_items_batch(
         &self,
         items: &[(String, Vec<u8>)],
     ) -> Result<Vec<(String, Vec<u8>)>, SchemaError> {
         let mut encrypted_items = Vec::new();
-        
+
         for (key, data) in items {
             // Determine appropriate context based on key prefix
             let _context = if key.starts_with("atom:") {
@@ -687,17 +730,18 @@ impl AsyncEncryptedBackup {
             } else {
                 contexts::METADATA
             };
-            
+
             // Serialize the data for backup
-            let serialized_data = serde_json::to_vec(data)
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize item: {}", e)))?;
-            
+            let serialized_data = serde_json::to_vec(data).map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to serialize item: {}", e))
+            })?;
+
             encrypted_items.push((key.clone(), serialized_data));
         }
-        
+
         Ok(encrypted_items)
     }
-    
+
     /// Restore a batch of items
     async fn restore_items_batch(
         &self,
@@ -705,7 +749,7 @@ impl AsyncEncryptedBackup {
         items: Vec<(String, Vec<u8>)>,
     ) -> Result<u64, SchemaError> {
         let mut restored_count = 0u64;
-        
+
         for (key, _encrypted_data) in items {
             // Determine appropriate context based on key prefix
             let context = if key.starts_with("atom:") {
@@ -717,67 +761,86 @@ impl AsyncEncryptedBackup {
             } else {
                 contexts::METADATA
             };
-            
+
             // Decrypt and store in target database
-            let decrypted_data: Vec<u8> = self.encryption.get_encrypted_item_async(&key, context).await
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to decrypt item {}: {}", key, e)))?
-                .ok_or_else(|| SchemaError::InvalidData(format!("Item not found during restore: {}", key)))?;
-            
-            target_encryption.store_encrypted_item_async(&key, &decrypted_data, context).await
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to store restored item {}: {}", key, e)))?;
-            
+            let decrypted_data: Vec<u8> = self
+                .encryption
+                .get_encrypted_item_async(&key, context)
+                .await
+                .map_err(|e| {
+                    SchemaError::InvalidData(format!("Failed to decrypt item {}: {}", key, e))
+                })?
+                .ok_or_else(|| {
+                    SchemaError::InvalidData(format!("Item not found during restore: {}", key))
+                })?;
+
+            target_encryption
+                .store_encrypted_item_async(&key, &decrypted_data, context)
+                .await
+                .map_err(|e| {
+                    SchemaError::InvalidData(format!(
+                        "Failed to store restored item {}: {}",
+                        key, e
+                    ))
+                })?;
+
             restored_count += 1;
         }
-        
+
         Ok(restored_count)
     }
-    
+
     /// Compress data using the configured compression level
     async fn compress_data(&self, data: &[u8]) -> Result<Vec<u8>, SchemaError> {
         if self.config.compression_level == 0 {
             return Ok(data.to_vec());
         }
-        
+
         // Use async compression in a blocking task
         let data_clone = data.to_vec();
         let compression_level = self.config.compression_level;
-        
+
         task::spawn_blocking(move || {
-            use flate2::Compression;
             use flate2::write::GzEncoder;
+            use flate2::Compression;
             use std::io::Write;
-            
+
             let mut encoder = GzEncoder::new(Vec::new(), Compression::new(compression_level));
-            encoder.write_all(&data_clone)
+            encoder
+                .write_all(&data_clone)
                 .map_err(|e| SchemaError::InvalidData(format!("Compression write error: {}", e)))?;
-            encoder.finish()
+            encoder
+                .finish()
                 .map_err(|e| SchemaError::InvalidData(format!("Compression finish error: {}", e)))
-        }).await
+        })
+        .await
         .map_err(|e| SchemaError::InvalidData(format!("Compression task failed: {}", e)))?
     }
-    
+
     /// Decompress data
     async fn decompress_data(&self, data: &[u8]) -> Result<Vec<u8>, SchemaError> {
         if self.config.compression_level == 0 {
             return Ok(data.to_vec());
         }
-        
+
         // Use async decompression in a blocking task
         let data_clone = data.to_vec();
-        
+
         task::spawn_blocking(move || {
             use flate2::read::GzDecoder;
             use std::io::Read;
-            
+
             let mut decoder = GzDecoder::new(&data_clone[..]);
             let mut decompressed = Vec::new();
-            decoder.read_to_end(&mut decompressed)
+            decoder
+                .read_to_end(&mut decompressed)
                 .map_err(|e| SchemaError::InvalidData(format!("Decompression error: {}", e)))?;
             Ok(decompressed)
-        }).await
+        })
+        .await
         .map_err(|e| SchemaError::InvalidData(format!("Decompression task failed: {}", e)))?
     }
-    
+
     /// Create a checkpoint for resume capability
     async fn create_checkpoint<P: AsRef<Path>>(
         &self,
@@ -787,11 +850,14 @@ impl AsyncEncryptedBackup {
         if !self.config.enable_resume {
             return Ok(());
         }
-        
+
         let checkpoint_dir = backup_path.as_ref().with_extension("checkpoints");
-        tokio::fs::create_dir_all(&checkpoint_dir).await
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to create checkpoint directory: {}", e)))?;
-        
+        tokio::fs::create_dir_all(&checkpoint_dir)
+            .await
+            .map_err(|e| {
+                SchemaError::InvalidData(format!("Failed to create checkpoint directory: {}", e))
+            })?;
+
         let checkpoint = CheckpointInfo {
             id: Uuid::new_v4().to_string(),
             operation: "backup".to_string(),
@@ -800,22 +866,26 @@ impl AsyncEncryptedBackup {
             last_key: None, // Could be enhanced to track actual key
             timestamp: SystemTime::now(),
         };
-        
-        let checkpoint_data = serde_json::to_vec(&checkpoint)
-            .map_err(|e| SchemaError::InvalidData(format!("Failed to serialize checkpoint: {}", e)))?;
-        
+
+        let checkpoint_data = serde_json::to_vec(&checkpoint).map_err(|e| {
+            SchemaError::InvalidData(format!("Failed to serialize checkpoint: {}", e))
+        })?;
+
         let checkpoint_file = checkpoint_dir.join(format!("{}.json", checkpoint.id));
-        tokio::fs::write(checkpoint_file, checkpoint_data).await
+        tokio::fs::write(checkpoint_file, checkpoint_data)
+            .await
             .map_err(|e| SchemaError::InvalidData(format!("Failed to write checkpoint: {}", e)))?;
-        
+
         Ok(())
     }
-    
+
     /// Get master keypair (placeholder - would need actual implementation)
     async fn get_master_keypair(&self) -> CryptoResult<MasterKeyPair> {
         // This would need to be implemented based on how the master keypair is stored/accessed
         // For now, return an error
-        Err(CryptoError::InvalidInput("Master keypair access not implemented".to_string()))
+        Err(CryptoError::InvalidInput(
+            "Master keypair access not implemented".to_string(),
+        ))
     }
 }
 
@@ -824,7 +894,7 @@ mod tests {
     use super::*;
     use crate::crypto::generate_master_keypair;
     use tempfile::{tempdir, NamedTempFile};
-    
+
     async fn create_test_backup_manager() -> AsyncEncryptedBackup {
         let temp_dir = tempdir().unwrap();
         let db = sled::open(temp_dir.path()).unwrap();
@@ -837,10 +907,12 @@ mod tests {
             compression_level: 0, // No compression for tests
             ..Default::default()
         };
-        
-        AsyncEncryptedBackup::new(db_ops, &master_keypair, config).await.unwrap()
+
+        AsyncEncryptedBackup::new(db_ops, &master_keypair, config)
+            .await
+            .unwrap()
     }
-    
+
     #[tokio::test]
     async fn test_backup_config_variants() {
         let configs = vec![
@@ -849,32 +921,32 @@ mod tests {
             AsyncBackupConfig::fast_mode(),
             AsyncBackupConfig::network_optimized(),
         ];
-        
+
         for config in configs {
             assert!(config.buffer_size > 0);
             assert!(config.batch_size > 0);
             assert!(config.max_concurrent_operations > 0);
         }
     }
-    
+
     #[tokio::test]
     async fn test_progress_info() {
         let mut progress = ProgressInfo::new("test".to_string());
         assert_eq!(progress.items_processed, 0);
         assert_eq!(progress.bytes_processed, 0);
-        
+
         progress.update(10, 1024);
         assert_eq!(progress.items_processed, 10);
         assert_eq!(progress.bytes_processed, 1024);
         assert!(progress.throughput_items_per_sec > 0.0);
         assert!(progress.throughput_bytes_per_sec > 0.0);
-        
+
         // Test with total items set
         progress.total_items = Some(100);
         let percentage = progress.progress_percentage().unwrap();
         assert!((percentage - 10.0).abs() < 0.1);
     }
-    
+
     #[tokio::test]
     async fn test_backup_metadata() {
         let metadata = BackupMetadata {
@@ -888,16 +960,16 @@ mod tests {
             encryption_contexts: vec!["atom_data".to_string()],
             additional_info: HashMap::new(),
         };
-        
+
         // Test serialization
         let serialized = serde_json::to_vec(&metadata).unwrap();
         let deserialized: BackupMetadata = serde_json::from_slice(&serialized).unwrap();
-        
+
         assert_eq!(metadata.version, deserialized.version);
         assert_eq!(metadata.database_id, deserialized.database_id);
         assert_eq!(metadata.total_items, deserialized.total_items);
     }
-    
+
     #[tokio::test]
     async fn test_compression_decompression() {
         // Create a custom config with no compression
@@ -905,39 +977,47 @@ mod tests {
             compression_level: 0,
             ..Default::default()
         };
-        
+
         let temp_dir = tempfile::tempdir().unwrap();
         let db_path = temp_dir.path().join("test_db");
         let db = sled::open(&db_path).unwrap();
         let db_ops = DbOperations::new(db).unwrap();
         let master_keypair = crate::crypto::generate_master_keypair().unwrap();
-        
-        let backup_manager = AsyncEncryptedBackup::new(db_ops, &master_keypair, config).await.unwrap();
-        
+
+        let backup_manager = AsyncEncryptedBackup::new(db_ops, &master_keypair, config)
+            .await
+            .unwrap();
+
         let test_data = b"This is test data for compression";
-        
+
         // Test without compression
         let uncompressed = backup_manager.compress_data(test_data).await.unwrap();
         assert_eq!(uncompressed, test_data);
-        
+
         let decompressed = backup_manager.decompress_data(&uncompressed).await.unwrap();
         assert_eq!(decompressed, test_data);
     }
-    
+
     #[tokio::test]
     async fn test_checkpoint_creation() {
         let backup_manager = create_test_backup_manager().await;
         let temp_file = NamedTempFile::new().unwrap();
-        
+
         // Test checkpoint creation
-        backup_manager.create_checkpoint(temp_file.path(), 1024).await.unwrap();
-        
+        backup_manager
+            .create_checkpoint(temp_file.path(), 1024)
+            .await
+            .unwrap();
+
         // Check that checkpoint directory was created
         let checkpoint_dir = temp_file.path().with_extension("checkpoints");
         assert!(checkpoint_dir.exists());
-        
+
         // List checkpoints
-        let checkpoints = backup_manager.list_checkpoints(temp_file.path()).await.unwrap();
+        let checkpoints = backup_manager
+            .list_checkpoints(temp_file.path())
+            .await
+            .unwrap();
         assert_eq!(checkpoints.len(), 1);
         assert_eq!(checkpoints[0].bytes_processed, 1024);
     }

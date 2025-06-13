@@ -160,30 +160,40 @@ impl SchemaCore {
 
     /// Auto-register field transforms with TransformManager during schema loading
     fn register_schema_transforms(&self, schema: &Schema) -> Result<(), SchemaError> {
-        info!("🔧 DEBUG: Auto-registering transforms for schema: {}", schema.name);
-        info!("🔍 DEBUG: Schema has {} fields to check for transforms", schema.fields.len());
-        
+        info!(
+            "🔧 DEBUG: Auto-registering transforms for schema: {}",
+            schema.name
+        );
+        info!(
+            "🔍 DEBUG: Schema has {} fields to check for transforms",
+            schema.fields.len()
+        );
+
         for (field_name, field) in &schema.fields {
-            info!("🔍 DEBUG: Checking field '{}.{}' for transforms", schema.name, field_name);
+            info!(
+                "🔍 DEBUG: Checking field '{}.{}' for transforms",
+                schema.name, field_name
+            );
             if let Some(transform) = field.transform() {
                 info!(
                     "📋 Found transform on field {}.{}: inputs={:?}, logic={}, output={}",
-                    schema.name, field_name, transform.get_inputs(), transform.logic, transform.get_output()
+                    schema.name,
+                    field_name,
+                    transform.get_inputs(),
+                    transform.logic,
+                    transform.get_output()
                 );
-                
+
                 let transform_id = format!("{}.{}", schema.name, field_name);
-                
+
                 // Store the transform in the database so it can be loaded by TransformManager
                 if let Err(e) = self.db_ops.store_transform(&transform_id, transform) {
-                    log::error!(
-                        "Failed to store transform {}: {}",
-                        transform_id, e
-                    );
+                    log::error!("Failed to store transform {}: {}", transform_id, e);
                     continue;
                 }
-                
+
                 info!("✅ Stored transform {} for auto-registration", transform_id);
-                
+
                 // 🛠️ FIX: Create field-to-transform mappings for TransformOrchestrator
                 // This is the missing piece - we need to map each input field to this transform
                 for input_field in transform.get_inputs() {
@@ -191,12 +201,16 @@ impl SchemaCore {
                         "🔗 Creating field mapping: '{}' → '{}' transform",
                         input_field, transform_id
                     );
-                    
+
                     // Store field mapping in database for TransformManager to load
-                    if let Err(e) = self.store_field_to_transform_mapping(input_field, &transform_id) {
+                    if let Err(e) =
+                        self.store_field_to_transform_mapping(input_field, &transform_id)
+                    {
                         log::error!(
                             "Failed to store field mapping '{}' → '{}': {}",
-                            input_field, transform_id, e
+                            input_field,
+                            transform_id,
+                            e
                         );
                     } else {
                         info!(
@@ -207,37 +221,47 @@ impl SchemaCore {
                 }
             }
         }
-        
+
         Ok(())
     }
 
     /// Store field-to-transform mapping in database for TransformManager to load
-    fn store_field_to_transform_mapping(&self, field_key: &str, transform_id: &str) -> Result<(), SchemaError> {
+    fn store_field_to_transform_mapping(
+        &self,
+        field_key: &str,
+        transform_id: &str,
+    ) -> Result<(), SchemaError> {
         // Use the same key format as TransformManager
         const FIELD_TO_TRANSFORMS_KEY: &str = "map_field_to_transforms";
-        
+
         // Load existing mappings using the correct method
-        let mut field_mappings: std::collections::HashMap<String, std::collections::HashSet<String>> =
-            if let Some(data) = self.db_ops.get_transform_mapping(FIELD_TO_TRANSFORMS_KEY)? {
-                serde_json::from_slice(&data).unwrap_or_default()
-            } else {
-                std::collections::HashMap::new()
-            };
-        
+        let mut field_mappings: std::collections::HashMap<
+            String,
+            std::collections::HashSet<String>,
+        > = if let Some(data) = self.db_ops.get_transform_mapping(FIELD_TO_TRANSFORMS_KEY)? {
+            serde_json::from_slice(&data).unwrap_or_default()
+        } else {
+            std::collections::HashMap::new()
+        };
+
         // Add this mapping
         field_mappings
             .entry(field_key.to_string())
             .or_default()
             .insert(transform_id.to_string());
-        
+
         // Store updated mappings using the correct method
         let json = serde_json::to_vec(&field_mappings).map_err(|e| {
             SchemaError::InvalidData(format!("Failed to serialize field mappings: {}", e))
         })?;
-        self.db_ops.store_transform_mapping(FIELD_TO_TRANSFORMS_KEY, &json)?;
-        
-        info!("💾 Updated field mappings in database: {} fields mapped", field_mappings.len());
-        
+        self.db_ops
+            .store_transform_mapping(FIELD_TO_TRANSFORMS_KEY, &json)?;
+
+        info!(
+            "💾 Updated field mappings in database: {} fields mapped",
+            field_mappings.len()
+        );
+
         Ok(())
     }
 
@@ -280,9 +304,12 @@ impl SchemaCore {
 
         // Ensure any transforms on fields have the correct output schema
         self.fix_transform_outputs(&mut schema);
-        
+
         // Auto-register field transforms with TransformManager
-        info!("🔧 DEBUG: About to call register_schema_transforms for schema: {}", schema.name);
+        info!(
+            "🔧 DEBUG: About to call register_schema_transforms for schema: {}",
+            schema.name
+        );
         self.register_schema_transforms(&schema)?;
         info!(
             "After fix_transform_outputs, schema '{}' has {} fields: {:?}",
@@ -292,7 +319,10 @@ impl SchemaCore {
         );
 
         // Only persist if we're using the JSON version (don't overwrite good database version)
-        let should_persist = schema.fields.values().all(|field| field.ref_atom_uuid().is_none());
+        let should_persist = schema
+            .fields
+            .values()
+            .all(|field| field.ref_atom_uuid().is_none());
         if should_persist {
             self.persist_schema(&schema)?;
             info!(
@@ -398,21 +428,32 @@ impl SchemaCore {
                     "Schema '{}' field mapping successful: created {} atom references with proper types",
                     schema_name, atom_refs.len()
                 );
-                
+
                 // CRITICAL: Persist the schema with field assignments to sled
                 match self.get_schema(schema_name) {
                     Ok(Some(updated_schema)) => {
                         if let Err(e) = self.persist_schema(&updated_schema) {
-                            log::warn!("Failed to persist schema '{}' with field assignments: {}", schema_name, e);
+                            log::warn!(
+                                "Failed to persist schema '{}' with field assignments: {}",
+                                schema_name,
+                                e
+                            );
                         } else {
-                            info!("✅ Schema '{}' with field assignments persisted to sled database", schema_name);
+                            info!(
+                                "✅ Schema '{}' with field assignments persisted to sled database",
+                                schema_name
+                            );
                         }
                     }
                     Ok(None) => {
                         log::warn!("Schema '{}' not found after field mapping", schema_name);
                     }
                     Err(e) => {
-                        log::warn!("Failed to retrieve schema '{}' for persistence: {}", schema_name, e);
+                        log::warn!(
+                            "Failed to retrieve schema '{}' for persistence: {}",
+                            schema_name,
+                            e
+                        );
                     }
                 }
             }
@@ -450,7 +491,10 @@ impl SchemaCore {
     /// This is used during initialization to fix the issue where approved schemas
     /// loaded from disk remain in 'available' but map_fields() only looks in 'schemas'
     pub fn ensure_approved_schema_in_schemas(&self, schema_name: &str) -> Result<(), SchemaError> {
-        info!("Ensuring approved schema '{}' is available in schemas HashMap", schema_name);
+        info!(
+            "Ensuring approved schema '{}' is available in schemas HashMap",
+            schema_name
+        );
 
         // Check if schema is already in schemas HashMap
         {
@@ -468,19 +512,21 @@ impl SchemaCore {
             let available = self.available.lock().map_err(|_| {
                 SchemaError::InvalidData("Failed to acquire schema lock".to_string())
             })?;
-            
+
             if let Some((schema, state)) = available.get(schema_name) {
                 if *state == SchemaState::Approved {
                     Some(schema.clone())
                 } else {
-                    return Err(SchemaError::InvalidData(
-                        format!("Schema '{}' is not in Approved state", schema_name)
-                    ));
+                    return Err(SchemaError::InvalidData(format!(
+                        "Schema '{}' is not in Approved state",
+                        schema_name
+                    )));
                 }
             } else {
-                return Err(SchemaError::NotFound(
-                    format!("Schema '{}' not found in available schemas", schema_name)
-                ));
+                return Err(SchemaError::NotFound(format!(
+                    "Schema '{}' not found in available schemas",
+                    schema_name
+                )));
             }
         };
 
@@ -489,9 +535,12 @@ impl SchemaCore {
             let mut schemas = self.schemas.lock().map_err(|_| {
                 SchemaError::InvalidData("Failed to acquire schema lock".to_string())
             })?;
-            
+
             schemas.insert(schema_name.to_string(), schema);
-            info!("Successfully moved approved schema '{}' to schemas HashMap for field mapping", schema_name);
+            info!(
+                "Successfully moved approved schema '{}' to schemas HashMap for field mapping",
+                schema_name
+            );
         }
 
         Ok(())
@@ -510,14 +559,14 @@ impl SchemaCore {
         }
 
         self.set_schema_state(schema_name, SchemaState::Blocked)?;
-        
+
         // Publish SchemaChanged event for blocking
         use crate::fold_db_core::infrastructure::message_bus::SchemaChanged;
         let schema_changed_event = SchemaChanged::new(schema_name);
         if let Err(e) = self.message_bus.publish(schema_changed_event) {
             log::warn!("Failed to publish SchemaChanged event for blocking: {}", e);
         }
-        
+
         info!("Schema '{}' blocked successfully", schema_name);
         Ok(())
     }
@@ -664,10 +713,11 @@ impl SchemaCore {
                 for schema in schemas {
                     let schema_name = schema.name.clone();
                     discovered_schemas.push(schema_name.clone());
-                    
+
                     // Only update loading source if not already loaded from persistence
                     if !loading_sources.contains_key(&schema_name) {
-                        loading_sources.insert(schema_name.clone(), SchemaSource::AvailableDirectory);
+                        loading_sources
+                            .insert(schema_name.clone(), SchemaSource::AvailableDirectory);
                     }
 
                     // Only load if not already in memory
@@ -699,10 +749,11 @@ impl SchemaCore {
                     let schema_name = schema.name.clone();
                     if !discovered_schemas.contains(&schema_name) {
                         discovered_schemas.push(schema_name.clone());
-                        
+
                         // Only update loading source if not already loaded from persistence
                         if !loading_sources.contains_key(&schema_name) {
-                            loading_sources.insert(schema_name.clone(), SchemaSource::DataDirectory);
+                            loading_sources
+                                .insert(schema_name.clone(), SchemaSource::DataDirectory);
                         }
 
                         // Only load if not already in memory
@@ -1184,7 +1235,10 @@ impl SchemaCore {
 
     /// Unload schema from active memory and set to Available state (preserving field assignments)
     pub fn unload_schema(&self, schema_name: &str) -> Result<(), SchemaError> {
-        info!("Unloading schema '{}' from active memory and setting to Available", schema_name);
+        info!(
+            "Unloading schema '{}' from active memory and setting to Available",
+            schema_name
+        );
         let mut schemas = self
             .schemas
             .lock()
@@ -1409,7 +1463,7 @@ impl SchemaCore {
     /// Returns a list of AtomRefs that need to be persisted in FoldDB.
     pub fn map_fields(&self, schema_name: &str) -> Result<Vec<AtomRef>, SchemaError> {
         info!("🔧 Starting field mapping for schema '{}'", schema_name);
-        
+
         let schemas = self
             .schemas
             .lock()
@@ -1464,7 +1518,7 @@ impl SchemaCore {
 
                 // Create and store the appropriate atom reference type based on field type
                 let key = format!("ref:{}", ref_atom_uuid);
-                
+
                 match field {
                     // TODO: Collection fields are no longer supported - CollectionField has been removed
                     FieldVariant::Range(_) => {
@@ -1476,11 +1530,15 @@ impl SchemaCore {
                             info!("✅ Persisted AtomRefRange: {}", key);
                         }
                         // Create a corresponding AtomRef for the return list
-                        atom_refs.push(AtomRef::new(Uuid::new_v4().to_string(), "system".to_string()));
+                        atom_refs.push(AtomRef::new(
+                            Uuid::new_v4().to_string(),
+                            "system".to_string(),
+                        ));
                     }
                     FieldVariant::Single(_) => {
                         // For single fields, create AtomRef
-                        let atom_ref = AtomRef::new(Uuid::new_v4().to_string(), "system".to_string());
+                        let atom_ref =
+                            AtomRef::new(Uuid::new_v4().to_string(), "system".to_string());
                         if let Err(e) = self.db_ops.store_item(&key, &atom_ref) {
                             info!("Failed to persist AtomRef '{}': {}", ref_atom_uuid, e);
                         } else {

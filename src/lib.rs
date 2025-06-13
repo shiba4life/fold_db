@@ -68,32 +68,34 @@ pub use ingestion::{IngestionConfig, IngestionCore, IngestionError, IngestionRes
 
 // Re-export crypto types
 pub use crypto::{
-    CryptoError, CryptoResult, MasterKeyPair, PublicKey, generate_master_keypair,
-    Salt, Argon2Params, DerivedKey, generate_salt, derive_master_keypair, 
-    derive_master_keypair_default, generate_salt_and_derive_keypair
+    derive_master_keypair, derive_master_keypair_default, generate_master_keypair, generate_salt,
+    generate_salt_and_derive_keypair, Argon2Params, CryptoError, CryptoResult, DerivedKey,
+    MasterKeyPair, PublicKey, Salt,
 };
 
 // Re-export config types
-pub use config::crypto::{CryptoConfig, MasterKeyConfig, KeyDerivationConfig, SecurityLevel, ConfigError};
+pub use config::crypto::{
+    ConfigError, CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel,
+};
 
 // Re-export database crypto metadata types
 pub use db_operations::crypto_metadata::CryptoMetadata;
 
 // Re-export crypto initialization types
 pub use datafold_node::{
-    initialize_database_crypto, is_crypto_init_needed, get_crypto_init_status,
-    CryptoInitContext, CryptoInitError, CryptoInitResult, CryptoInitStatus,
-    validate_crypto_config_comprehensive, validate_for_database_creation,
-    validate_crypto_config_quick,
+    get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed,
+    validate_crypto_config_comprehensive, validate_crypto_config_quick,
+    validate_for_database_creation, CryptoInitContext, CryptoInitError, CryptoInitResult,
+    CryptoInitStatus,
 };
 
 // Re-export CLI types for authentication and signing
 pub use cli::{
     auth::{CliAuthProfile, CliAuthStatus, CliRequestSigner, CliSigningConfig},
-    config::{CliConfigManager, ServerConfig, CliConfig, CliSettings},
+    config::{CliConfig, CliConfigManager, CliSettings, ServerConfig},
     http_client::{AuthenticatedHttpClient, HttpClientBuilder, RetryConfig},
     signing_config::{
-        EnhancedSigningConfig, AutoSigningConfig, SigningMode, CommandSigningContext,
-        SigningDebugConfig, SigningPerformanceConfig
-    }
+        AutoSigningConfig, CommandSigningContext, EnhancedSigningConfig, SigningDebugConfig,
+        SigningMode, SigningPerformanceConfig,
+    },
 };

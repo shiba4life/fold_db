@@ -13,16 +13,16 @@ use std::path::Path;
 pub enum UnifiedConfigError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("JSON parsing error: {0}")]
     Json(#[from] serde_json::Error),
-    
+
     #[error("Configuration validation error: {0}")]
     Validation(String),
-    
+
     #[error("Environment not found: {0}")]
     EnvironmentNotFound(String),
-    
+
     #[error("Invalid configuration path: {0}")]
     InvalidPath(String),
 }
@@ -181,24 +181,24 @@ impl UnifiedConfigManager {
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> UnifiedConfigResult<Self> {
         let content = fs::read_to_string(path)?;
         let config: UnifiedConfig = serde_json::from_str(&content)?;
-        
+
         let current_environment = config.defaults.environment.clone();
-        
+
         let manager = Self {
             config,
             current_environment,
         };
-        
+
         manager.validate()?;
         Ok(manager)
     }
-    
+
     /// Load from default unified config location
     pub fn load_default() -> UnifiedConfigResult<Self> {
         let config_path = Path::new("config/unified-datafold-config.json");
         Self::load_from_file(config_path)
     }
-    
+
     /// Set current environment
     pub fn set_environment(&mut self, env: String) -> UnifiedConfigResult<()> {
         if !self.config.environments.contains_key(&env) {
@@ -207,134 +207,152 @@ impl UnifiedConfigManager {
         self.current_environment = env;
         Ok(())
     }
-    
+
     /// Get current environment configuration
     pub fn current_environment_config(&self) -> UnifiedConfigResult<&EnvironmentConfig> {
-        self.config.environments.get(&self.current_environment)
-            .ok_or_else(|| UnifiedConfigError::EnvironmentNotFound(self.current_environment.clone()))
+        self.config
+            .environments
+            .get(&self.current_environment)
+            .ok_or_else(|| {
+                UnifiedConfigError::EnvironmentNotFound(self.current_environment.clone())
+            })
     }
-    
-    
+
     /// Get security profile by name
     pub fn get_security_profile(&self, name: &str) -> Option<&SecurityProfile> {
         self.config.security_profiles.get(name)
     }
-    
+
     /// List available environments
     pub fn list_environments(&self) -> Vec<&String> {
         self.config.environments.keys().collect()
     }
-    
+
     /// List available security profiles
     pub fn list_security_profiles(&self) -> Vec<&String> {
         self.config.security_profiles.keys().collect()
     }
-    
+
     /// Validate the configuration
     fn validate(&self) -> UnifiedConfigResult<()> {
         // Validate default environment exists
-        if !self.config.environments.contains_key(&self.config.defaults.environment) {
-            return Err(UnifiedConfigError::Validation(
-                format!("Default environment '{}' not found", self.config.defaults.environment)
-            ));
+        if !self
+            .config
+            .environments
+            .contains_key(&self.config.defaults.environment)
+        {
+            return Err(UnifiedConfigError::Validation(format!(
+                "Default environment '{}' not found",
+                self.config.defaults.environment
+            )));
         }
-        
+
         // Validate each environment configuration
         for (env_name, env_config) in &self.config.environments {
             // Validate signing policy references exist
-            if !self.config.security_profiles.contains_key(&env_config.signing.policy) {
-                return Err(UnifiedConfigError::Validation(
-                    format!("Environment '{}' references unknown security profile '{}'", 
-                           env_name, env_config.signing.policy)
-                ));
+            if !self
+                .config
+                .security_profiles
+                .contains_key(&env_config.signing.policy)
+            {
+                return Err(UnifiedConfigError::Validation(format!(
+                    "Environment '{}' references unknown security profile '{}'",
+                    env_name, env_config.signing.policy
+                )));
             }
-            
+
             // Validate performance settings
             if env_config.performance.max_concurrent_signs == 0 {
-                return Err(UnifiedConfigError::Validation(
-                    format!("Environment '{}' has invalid max_concurrent_signs", env_name)
-                ));
+                return Err(UnifiedConfigError::Validation(format!(
+                    "Environment '{}' has invalid max_concurrent_signs",
+                    env_name
+                )));
             }
-            
+
             if env_config.signing.timeout_ms == 0 {
-                return Err(UnifiedConfigError::Validation(
-                    format!("Environment '{}' has invalid signing timeout", env_name)
-                ));
+                return Err(UnifiedConfigError::Validation(format!(
+                    "Environment '{}' has invalid signing timeout",
+                    env_name
+                )));
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Get current environment name
     pub fn current_environment(&self) -> &str {
         &self.current_environment
     }
-    
+
     /// Get the full unified configuration
     pub fn config(&self) -> &UnifiedConfig {
         &self.config
     }
-    
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     fn create_test_config() -> UnifiedConfig {
         let mut environments = HashMap::new();
-        environments.insert("test".to_string(), EnvironmentConfig {
-            signing: SigningConfig {
-                policy: "standard".to_string(),
-                timeout_ms: 5000,
-                required_components: vec!["@method".to_string(), "@target-uri".to_string()],
-                include_content_digest: true,
-                include_timestamp: true,
-                include_nonce: true,
-                max_body_size_mb: 10,
-                debug: DebugConfig {
-                    enabled: false,
-                    log_canonical_strings: false,
-                    log_components: false,
-                    log_timing: false,
+        environments.insert(
+            "test".to_string(),
+            EnvironmentConfig {
+                signing: SigningConfig {
+                    policy: "standard".to_string(),
+                    timeout_ms: 5000,
+                    required_components: vec!["@method".to_string(), "@target-uri".to_string()],
+                    include_content_digest: true,
+                    include_timestamp: true,
+                    include_nonce: true,
+                    max_body_size_mb: 10,
+                    debug: DebugConfig {
+                        enabled: false,
+                        log_canonical_strings: false,
+                        log_components: false,
+                        log_timing: false,
+                    },
+                },
+                verification: VerificationConfig {
+                    strict_timing: false,
+                    allow_clock_skew_seconds: 300,
+                    require_nonce: true,
+                    max_signature_age_seconds: 3600,
+                },
+                logging: LoggingConfig {
+                    level: "info".to_string(),
+                    colored_output: true,
+                    structured: false,
+                },
+                authentication: AuthenticationConfig {
+                    store_tokens: true,
+                    auto_update_check: true,
+                    prompt_on_first_sign: true,
+                },
+                performance: PerformanceConfig {
+                    cache_keys: true,
+                    max_concurrent_signs: 10,
+                    default_timeout_secs: 30,
+                    default_max_retries: 3,
                 },
             },
-            verification: VerificationConfig {
-                strict_timing: false,
-                allow_clock_skew_seconds: 300,
-                require_nonce: true,
-                max_signature_age_seconds: 3600,
-            },
-            logging: LoggingConfig {
-                level: "info".to_string(),
-                colored_output: true,
-                structured: false,
-            },
-            authentication: AuthenticationConfig {
-                store_tokens: true,
-                auto_update_check: true,
-                prompt_on_first_sign: true,
-            },
-            performance: PerformanceConfig {
-                cache_keys: true,
-                max_concurrent_signs: 10,
-                default_timeout_secs: 30,
-                default_max_retries: 3,
-            },
-        });
-        
+        );
+
         let mut security_profiles = HashMap::new();
-        security_profiles.insert("standard".to_string(), SecurityProfile {
-            description: "Standard security profile".to_string(),
-            required_components: vec!["@method".to_string(), "@target-uri".to_string()],
-            include_content_digest: true,
-            digest_algorithm: "sha-256".to_string(),
-            validate_nonces: true,
-            allow_custom_nonces: true,
-        });
-        
+        security_profiles.insert(
+            "standard".to_string(),
+            SecurityProfile {
+                description: "Standard security profile".to_string(),
+                required_components: vec!["@method".to_string(), "@target-uri".to_string()],
+                include_content_digest: true,
+                digest_algorithm: "sha-256".to_string(),
+                validate_nonces: true,
+                allow_custom_nonces: true,
+            },
+        );
+
         UnifiedConfig {
             config_format_version: "1.0".to_string(),
             environments,
@@ -347,7 +365,7 @@ mod tests {
             },
         }
     }
-    
+
     #[test]
     fn test_unified_config_validation() {
         let config = create_test_config();
@@ -355,10 +373,10 @@ mod tests {
             config,
             current_environment: "test".to_string(),
         };
-        
+
         assert!(manager.validate().is_ok());
     }
-    
+
     #[test]
     fn test_environment_switching() {
         let config = create_test_config();
@@ -366,16 +384,16 @@ mod tests {
             config,
             current_environment: "test".to_string(),
         };
-        
+
         assert_eq!(manager.current_environment(), "test");
-        
+
         // Test environment configuration access
         let env_config = manager.current_environment_config().unwrap();
         assert_eq!(env_config.signing.policy, "standard");
         assert_eq!(env_config.signing.timeout_ms, 5000);
         assert_eq!(env_config.logging.level, "info");
     }
-    
+
     #[test]
     fn test_security_profile_access() {
         let config = create_test_config();
@@ -383,7 +401,7 @@ mod tests {
             config,
             current_environment: "test".to_string(),
         };
-        
+
         let profile = manager.get_security_profile("standard").unwrap();
         assert_eq!(profile.description, "Standard security profile");
         assert!(profile.include_content_digest);

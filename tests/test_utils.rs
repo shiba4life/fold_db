@@ -7,12 +7,12 @@
 //! - 7+ duplicate NodeConfig patterns
 //! - Multiple duplicate registration/transform creation patterns
 
+use datafold::datafold_node::config::NodeConfig;
+use datafold::datafold_node::DataFoldNode;
 use datafold::db_operations::DbOperations;
 use datafold::fold_db_core::infrastructure::message_bus::MessageBus;
 use datafold::fold_db_core::transform_manager::TransformManager;
-use datafold::datafold_node::config::NodeConfig;
-use datafold::datafold_node::DataFoldNode;
-use datafold::schema::types::{Transform, TransformRegistration, SchemaError};
+use datafold::schema::types::{SchemaError, Transform, TransformRegistration};
 use std::sync::Arc;
 use tempfile::TempDir;
 use uuid::Uuid;
@@ -35,7 +35,8 @@ pub struct CommonTestFixture {
 /// Specialized fixture for orchestrator testing
 pub struct DirectEventTestFixture {
     pub transform_manager: Arc<TransformManager>,
-    pub transform_orchestrator: datafold::fold_db_core::orchestration::transform_orchestrator::TransformOrchestrator,
+    pub transform_orchestrator:
+        datafold::fold_db_core::orchestration::transform_orchestrator::TransformOrchestrator,
     pub message_bus: Arc<MessageBus>,
     pub db_ops: Arc<DbOperations>,
     pub _temp_dir: TempDir,
@@ -47,7 +48,7 @@ impl TestFixture {
         let temp_dir = tempfile::tempdir().map_err(|e| {
             SchemaError::InvalidData(format!("Failed to create temp directory: {}", e))
         })?;
-        
+
         // Unified database setup - consolidates 7+ sled::Config patterns
         let db = sled::Config::new()
             .path(temp_dir.path())
@@ -63,11 +64,9 @@ impl TestFixture {
 
         // Unified MessageBus creation - consolidates 18+ duplicate patterns
         let message_bus = Arc::new(MessageBus::new());
-        
-        let transform_manager = TransformManager::new(
-            Arc::clone(&db_ops),
-            Arc::clone(&message_bus),
-        )?;
+
+        let transform_manager =
+            TransformManager::new(Arc::clone(&db_ops), Arc::clone(&message_bus))?;
 
         Ok(Self {
             transform_manager: Arc::new(transform_manager),
@@ -79,10 +78,7 @@ impl TestFixture {
 
     /// Unified transform creation - consolidates transform creation patterns
     pub fn create_sample_transform() -> Transform {
-        Transform::new(
-            "input1".to_string(),
-            "test.output".to_string(),
-        )
+        Transform::new("input1".to_string(), "test.output".to_string())
     }
 
     /// Unified registration creation - consolidates registration patterns
@@ -101,10 +97,7 @@ impl TestFixture {
 
     /// Unified named transform creation
     pub fn create_named_transform(transform_id: &str) -> Transform {
-        Transform::new(
-            "input1".to_string(),
-            format!("test.{}", transform_id),
-        )
+        Transform::new("input1".to_string(), format!("test.{}", transform_id))
     }
 
     /// Unified named registration creation
@@ -124,20 +117,20 @@ impl TestFixture {
     /// Unified orchestrator fixture creation
     pub fn new_with_orchestrator() -> Result<DirectEventTestFixture, Box<dyn std::error::Error>> {
         let temp_dir = tempfile::tempdir()?;
-        
+
         let db = sled::Config::new()
             .path(temp_dir.path())
             .temporary(true)
             .open()?;
-            
+
         let db_ops = Arc::new(DbOperations::new(db)?);
         let message_bus = Arc::new(MessageBus::new());
-        
+
         let transform_manager = Arc::new(TransformManager::new(
             Arc::clone(&db_ops),
             Arc::clone(&message_bus),
         )?);
-        
+
         let orchestrator_tree = {
             let orchestrator_db = sled::Config::new()
                 .path(temp_dir.path().join("orchestrator"))
@@ -145,14 +138,14 @@ impl TestFixture {
                 .open()?;
             orchestrator_db.open_tree("transform_orchestrator")?
         };
-        
+
         let transform_orchestrator = datafold::fold_db_core::orchestration::transform_orchestrator::TransformOrchestrator::new(
             Arc::clone(&transform_manager) as Arc<dyn datafold::fold_db_core::transform_manager::types::TransformRunner>,
             orchestrator_tree,
             Arc::clone(&message_bus),
             Arc::clone(&db_ops),
         );
-        
+
         Ok(DirectEventTestFixture {
             transform_manager,
             transform_orchestrator,
@@ -182,23 +175,41 @@ impl CommonTestFixture {
 
         // Unified NodeConfig setup - consolidates 7+ duplicate patterns
         let config = NodeConfig::new(temp_dir.path().to_path_buf());
-        let node = DataFoldNode::load(config).await.map_err(|e| {
-            SchemaError::InvalidData(format!("Failed to load DataFoldNode: {}", e))
-        })?;
+        let node = DataFoldNode::load(config)
+            .await
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to load DataFoldNode: {}", e)))?;
 
         let node_clone = node.clone();
         {
-            let fold_db = node_clone.get_fold_db().map_err(|e|
+            let fold_db = node_clone.get_fold_db().map_err(|e| {
                 SchemaError::InvalidData(format!("Failed to get FoldDB from node: {}", e))
-            )?;
+            })?;
 
-            fold_db.schema_manager().approve_schema("TransformBase")
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to approve TransformBase schema: {}", e)))?;
-            fold_db.schema_manager().approve_schema("TransformSchema")
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to approve TransformSchema schema: {}", e)))?;
+            fold_db
+                .schema_manager()
+                .approve_schema("TransformBase")
+                .map_err(|e| {
+                    SchemaError::InvalidData(format!(
+                        "Failed to approve TransformBase schema: {}",
+                        e
+                    ))
+                })?;
+            fold_db
+                .schema_manager()
+                .approve_schema("TransformSchema")
+                .map_err(|e| {
+                    SchemaError::InvalidData(format!(
+                        "Failed to approve TransformSchema schema: {}",
+                        e
+                    ))
+                })?;
 
-            fold_db.transform_manager().reload_transforms()
-                .map_err(|e| SchemaError::InvalidData(format!("Failed to reload transforms: {}", e)))?;
+            fold_db
+                .transform_manager()
+                .reload_transforms()
+                .map_err(|e| {
+                    SchemaError::InvalidData(format!("Failed to reload transforms: {}", e))
+                })?;
         }
 
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
@@ -211,9 +222,9 @@ impl CommonTestFixture {
         let temp_dir = tempfile::tempdir().map_err(|e| {
             SchemaError::InvalidData(format!("Failed to create temp directory: {}", e))
         })?;
-        
+
         let basic_fixture = TestFixture::new()?;
-        
+
         let config = NodeConfig::new(temp_dir.path().to_path_buf());
         let node = DataFoldNode::new(config).map_err(|e| {
             SchemaError::InvalidData(format!("Failed to create DataFoldNode: {}", e))
@@ -229,8 +240,10 @@ impl CommonTestFixture {
     /// Create from existing node
     fn new_from_node(node: DataFoldNode, temp_dir: TempDir) -> Self {
         let node_clone = node.clone();
-        let fold_db = node_clone.get_fold_db().expect("FoldDB should be available");
-        
+        let fold_db = node_clone
+            .get_fold_db()
+            .expect("FoldDB should be available");
+
         let message_bus = fold_db.message_bus().clone();
         let transform_manager = fold_db.transform_manager().clone();
         let db_ops = fold_db.db_ops();
@@ -267,7 +280,7 @@ impl DirectEventTestFixture {
             "TransformSchema.result".to_string(),
         )
     }
-    
+
     /// Register test transforms
     pub fn register_test_transforms(&self) -> Result<(), Box<dyn std::error::Error>> {
         println!("🔧 Simulating transform registration for testing...");

@@ -18,6 +18,9 @@ pub mod encryption_at_rest;
 pub mod encryption_at_rest_async;
 pub mod error;
 pub mod http_server;
+pub mod key_cache_manager;
+pub mod key_rotation_compliance;
+pub mod key_rotation_routes;
 pub mod log_routes;
 pub mod network_routes;
 pub mod node;
@@ -37,12 +40,12 @@ mod transform_queue;
 pub use config::load_node_config;
 pub use config::NodeConfig;
 pub use crypto_init::{
-    initialize_database_crypto, is_crypto_init_needed, get_crypto_init_status,
-    CryptoInitContext, CryptoInitError, CryptoInitResult, CryptoInitStatus,
+    get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed, CryptoInitContext,
+    CryptoInitError, CryptoInitResult, CryptoInitStatus,
 };
 pub use crypto_validation::{
-    validate_crypto_config_comprehensive, validate_for_database_creation,
-    validate_crypto_config_quick,
+    validate_crypto_config_comprehensive, validate_crypto_config_quick,
+    validate_for_database_creation,
 };
 pub use http_server::DataFoldHttpServer;
 pub use node::DataFoldNode;

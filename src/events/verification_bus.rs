@@ -3,16 +3,16 @@
 //! This module implements the centralized event bus for security operations monitoring.
 //! It provides async event processing, pluggable handlers, and cross-platform support.
 
-use super::event_types::{SecurityEvent, EventSeverity};
-use super::handlers::{EventHandler, EventHandlerResult};
 use super::correlation::CorrelationManager;
-use crate::config::unified_config::{UnifiedConfig, EnvironmentConfig};
+use super::event_types::{EventSeverity, SecurityEvent};
+use super::handlers::{EventHandler, EventHandlerResult};
+use crate::config::unified_config::{EnvironmentConfig, UnifiedConfig};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{broadcast, RwLock, Mutex};
+use tokio::sync::{broadcast, Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::{interval, timeout};
 use uuid::Uuid;
@@ -169,8 +169,13 @@ impl VerificationEventBus {
     }
 
     /// Create from unified configuration
-    pub fn from_unified_config(unified_config: &UnifiedConfig, environment: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let env_config = unified_config.environments.get(environment)
+    pub fn from_unified_config(
+        unified_config: &UnifiedConfig,
+        environment: &str,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let env_config = unified_config
+            .environments
+            .get(environment)
             .ok_or_else(|| format!("Environment '{}' not found in configuration", environment))?;
 
         let config = VerificationBusConfig::from_environment_config(env_config);
@@ -191,25 +196,37 @@ impl VerificationEventBus {
         let stats_handle = self.start_statistics_updater().await?;
         self._stats_handle = Some(stats_handle);
 
-        log::info!("🚀 VerificationEventBus started with {} buffer size", self.config.buffer_size);
+        log::info!(
+            "🚀 VerificationEventBus started with {} buffer size",
+            self.config.buffer_size
+        );
         Ok(())
     }
 
     /// Register an event handler
-    pub async fn register_handler(&self, handler: Box<dyn EventHandler + Send + Sync>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn register_handler(
+        &self,
+        handler: Box<dyn EventHandler + Send + Sync>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut handlers = self.handlers.write().await;
         handlers.push(handler);
-        
+
         // Update statistics
         let mut stats = self.statistics.write().await;
         stats.active_handlers = handlers.len();
-        
-        log::info!("📝 Registered new event handler. Total handlers: {}", handlers.len());
+
+        log::info!(
+            "📝 Registered new event handler. Total handlers: {}",
+            handlers.len()
+        );
         Ok(())
     }
 
     /// Publish a security event to the bus
-    pub async fn publish_event(&self, event: SecurityEvent) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn publish_event(
+        &self,
+        event: SecurityEvent,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         if !self.config.enabled {
             return Ok(()); // Silently ignore if disabled
         }
@@ -232,13 +249,13 @@ impl VerificationEventBus {
                 let mut stats = self.statistics.write().await;
                 stats.total_events += 1;
                 stats.last_event_time = Some(Utc::now());
-                
+
                 let severity_key = format!("{:?}", event.severity());
                 *stats.events_by_severity.entry(severity_key).or_insert(0) += 1;
-                
+
                 let category_key = format!("{:?}", event.category());
                 *stats.events_by_category.entry(category_key).or_insert(0) += 1;
-                
+
                 let platform_key = format!("{:?}", event.platform());
                 *stats.events_by_platform.entry(platform_key).or_insert(0) += 1;
 
@@ -248,9 +265,12 @@ impl VerificationEventBus {
                 // Channel is full or has no receivers
                 let mut stats = self.statistics.write().await;
                 stats.dropped_events += 1;
-                
+
                 if self.config.graceful_degradation {
-                    log::warn!("⚠️ Event bus buffer full, dropping event: {}", event.base_event().event_id);
+                    log::warn!(
+                        "⚠️ Event bus buffer full, dropping event: {}",
+                        event.base_event().event_id
+                    );
                     Ok(())
                 } else {
                     Err("Event bus buffer full".into())
@@ -307,7 +327,7 @@ impl VerificationEventBus {
     /// Stop the event bus gracefully
     pub async fn stop(&mut self) {
         log::info!("🛑 Stopping VerificationEventBus...");
-        
+
         // Cancel background tasks
         if let Some(handle) = self._processor_handle.take() {
             handle.abort();
@@ -315,14 +335,16 @@ impl VerificationEventBus {
         if let Some(handle) = self._stats_handle.take() {
             handle.abort();
         }
-        
+
         log::info!("✅ VerificationEventBus stopped");
     }
 
     // Private methods
 
     /// Start the background event processor
-    async fn start_event_processor(&self) -> Result<JoinHandle<()>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn start_event_processor(
+        &self,
+    ) -> Result<JoinHandle<()>, Box<dyn std::error::Error + Send + Sync>> {
         let mut receiver = self.event_sender.subscribe();
         let handlers = Arc::clone(&self.handlers);
         let statistics = Arc::clone(&self.statistics);
@@ -330,31 +352,36 @@ impl VerificationEventBus {
 
         let handle = tokio::spawn(async move {
             log::info!("🔄 Event processor started");
-            
+
             while let Ok(event) = receiver.recv().await {
                 let start_time = std::time::Instant::now();
                 let event_id = event.base_event().event_id;
-                
+
                 // Process event with timeout
                 let processing_result = timeout(
                     Duration::from_millis(config.processing_timeout_ms),
-                    Self::process_event_with_handlers(event, &handlers, &config)
-                ).await;
+                    Self::process_event_with_handlers(event, &handlers, &config),
+                )
+                .await;
 
                 let duration = start_time.elapsed();
-                
+
                 match processing_result {
                     Ok(result) => {
                         // Update statistics with processing result
                         Self::update_processing_statistics(&statistics, &result, duration).await;
-                        
+
                         if !result.success {
-                            log::error!("❌ Event processing failed for {}: {:?}", event_id, result.error);
+                            log::error!(
+                                "❌ Event processing failed for {}: {:?}",
+                                event_id,
+                                result.error
+                            );
                         }
                     }
                     Err(_) => {
                         log::error!("⏰ Event processing timeout for {}", event_id);
-                        
+
                         let failed_result = EventProcessingResult {
                             event_id,
                             success: false,
@@ -362,12 +389,13 @@ impl VerificationEventBus {
                             handler_results: Vec::new(),
                             error: Some("Processing timeout".to_string()),
                         };
-                        
-                        Self::update_processing_statistics(&statistics, &failed_result, duration).await;
+
+                        Self::update_processing_statistics(&statistics, &failed_result, duration)
+                            .await;
                     }
                 }
             }
-            
+
             log::info!("🔄 Event processor stopped");
         });
 
@@ -375,16 +403,18 @@ impl VerificationEventBus {
     }
 
     /// Start the statistics updater
-    async fn start_statistics_updater(&self) -> Result<JoinHandle<()>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn start_statistics_updater(
+        &self,
+    ) -> Result<JoinHandle<()>, Box<dyn std::error::Error + Send + Sync>> {
         let statistics = Arc::clone(&self.statistics);
         let start_time = self.start_time;
 
         let handle = tokio::spawn(async move {
             let mut interval = interval(Duration::from_secs(60)); // Update every minute
-            
+
             loop {
                 interval.tick().await;
-                
+
                 let mut stats = statistics.write().await;
                 stats.uptime_seconds = (Utc::now() - start_time).num_seconds() as u64;
             }
@@ -404,20 +434,17 @@ impl VerificationEventBus {
         let mut overall_success = true;
 
         let handlers_guard = handlers.read().await;
-        
+
         for handler in handlers_guard.iter() {
             let handler_timeout = Duration::from_millis(config.handler_timeout_ms);
-            
-            let result = timeout(
-                handler_timeout,
-                handler.handle_event(&event)
-            ).await;
+
+            let result = timeout(handler_timeout, handler.handle_event(&event)).await;
 
             match result {
                 Ok(handler_result) => {
                     let success = handler_result.success;
                     handler_results.push(handler_result);
-                    
+
                     if !success {
                         overall_success = false;
                         if !config.graceful_degradation {
@@ -436,7 +463,7 @@ impl VerificationEventBus {
                     };
                     handler_results.push(timeout_result);
                     overall_success = false;
-                    
+
                     if !config.graceful_degradation {
                         break;
                     }
@@ -449,7 +476,11 @@ impl VerificationEventBus {
             success: overall_success,
             duration: Duration::from_millis(0), // Will be set by caller
             handler_results,
-            error: if overall_success { None } else { Some("One or more handlers failed".to_string()) },
+            error: if overall_success {
+                None
+            } else {
+                Some("One or more handlers failed".to_string())
+            },
         }
     }
 
@@ -460,20 +491,19 @@ impl VerificationEventBus {
         duration: Duration,
     ) {
         let mut stats = statistics.write().await;
-        
+
         // Update handler success rate
         let total_handlers = result.handler_results.len() as f64;
         if total_handlers > 0.0 {
-            let successful_handlers = result.handler_results.iter()
-                .filter(|r| r.success)
-                .count() as f64;
-            
+            let successful_handlers =
+                result.handler_results.iter().filter(|r| r.success).count() as f64;
+
             let current_rate = successful_handlers / total_handlers;
-            
+
             // Exponential moving average
             stats.handler_success_rate = 0.9 * stats.handler_success_rate + 0.1 * current_rate;
         }
-        
+
         // Update average processing time
         let current_time_ms = duration.as_millis() as f64;
         stats.avg_processing_time_ms = 0.9 * stats.avg_processing_time_ms + 0.1 * current_time_ms;
@@ -521,7 +551,9 @@ impl Drop for VerificationEventBus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::events::event_types::{SecurityEventCategory, PlatformSource, CreateVerificationEvent, VerificationEvent};
+    use crate::events::event_types::{
+        CreateVerificationEvent, PlatformSource, SecurityEventCategory, VerificationEvent,
+    };
 
     #[tokio::test]
     async fn test_event_bus_creation() {
@@ -533,10 +565,10 @@ mod tests {
     #[tokio::test]
     async fn test_event_publishing() {
         let bus = VerificationEventBus::with_default_config();
-        
+
         // Create a receiver to ensure the channel has subscribers
         let _receiver = bus.subscribe();
-        
+
         let event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Authentication,
             EventSeverity::Info,
@@ -547,21 +579,23 @@ mod tests {
 
         let result = bus.publish_event(event).await;
         assert!(result.is_ok());
-        
+
         let stats = bus.get_statistics().await;
         assert_eq!(stats.total_events, 1);
     }
 
     #[tokio::test]
     async fn test_event_filtering() {
-        let mut config = VerificationBusConfig::default();
-        config.min_severity = EventSeverity::Error;
-        
+        let config = VerificationBusConfig {
+            min_severity: EventSeverity::Error,
+            ..Default::default()
+        };
+
         let bus = VerificationEventBus::new(config);
-        
+
         // Create a receiver to ensure the channel has subscribers
         let _receiver = bus.subscribe();
-        
+
         // This should be filtered out
         let info_event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Performance,
@@ -570,7 +604,7 @@ mod tests {
             "test_component".to_string(),
             "test_operation".to_string(),
         ));
-        
+
         // This should pass through
         let error_event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Security,
@@ -579,10 +613,10 @@ mod tests {
             "security_component".to_string(),
             "security_operation".to_string(),
         ));
-        
+
         bus.publish_event(info_event).await.unwrap();
         bus.publish_event(error_event).await.unwrap();
-        
+
         let stats = bus.get_statistics().await;
         assert_eq!(stats.total_events, 1); // Only error event should be counted
     }
@@ -590,10 +624,10 @@ mod tests {
     #[tokio::test]
     async fn test_statistics_tracking() {
         let bus = VerificationEventBus::with_default_config();
-        
+
         // Create a receiver to ensure the channel has subscribers
         let _receiver = bus.subscribe();
-        
+
         let event1 = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Authentication,
             EventSeverity::Info,
@@ -601,7 +635,7 @@ mod tests {
             "auth".to_string(),
             "login".to_string(),
         ));
-        
+
         let event2 = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Security,
             EventSeverity::Critical,
@@ -609,10 +643,10 @@ mod tests {
             "security".to_string(),
             "threat_detected".to_string(),
         ));
-        
+
         bus.publish_event(event1).await.unwrap();
         bus.publish_event(event2).await.unwrap();
-        
+
         let stats = bus.get_statistics().await;
         assert_eq!(stats.total_events, 2);
         assert_eq!(stats.events_by_severity.get("Info"), Some(&1));

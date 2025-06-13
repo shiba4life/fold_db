@@ -230,12 +230,12 @@ impl EncryptionAtRest {
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         // Encrypt the data
-        let ciphertext = self
-            .cipher
-            .encrypt(nonce, plaintext)
-            .map_err(|e| CryptoError::KeyGeneration {
-                message: format!("AES-GCM encryption failed: {}", e),
-            })?;
+        let ciphertext =
+            self.cipher
+                .encrypt(nonce, plaintext)
+                .map_err(|e| CryptoError::KeyGeneration {
+                    message: format!("AES-GCM encryption failed: {}", e),
+                })?;
 
         EncryptedData::new(nonce_bytes.to_vec(), ciphertext)
     }
@@ -334,8 +334,8 @@ impl Drop for EncryptionAtRest {
 /// and comprehensive error handling.
 pub mod key_derivation {
     use super::*;
-    use crate::crypto::{MasterKeyPair, CryptoError, CryptoResult};
     use crate::config::crypto::{CryptoConfig, MasterKeyConfig};
+    use crate::crypto::{CryptoError, CryptoResult, MasterKeyPair};
     use blake3::Hasher;
     use std::collections::HashMap;
 
@@ -355,13 +355,16 @@ pub mod key_derivation {
         /// # Returns
         /// * `Ok(KeyDerivationManager)` - Ready to derive keys
         /// * `Err(CryptoError)` - If key extraction fails
-        pub fn new(master_keypair: &MasterKeyPair, crypto_config: &CryptoConfig) -> CryptoResult<Self> {
+        pub fn new(
+            master_keypair: &MasterKeyPair,
+            crypto_config: &CryptoConfig,
+        ) -> CryptoResult<Self> {
             // Extract the Ed25519 private key bytes as master key material
             let master_key_bytes = master_keypair.secret_key_bytes();
-            
+
             // Create a configuration hash for additional entropy
             let config_hash = Self::compute_config_hash(crypto_config)?;
-            
+
             Ok(Self {
                 master_key_bytes,
                 config_hash,
@@ -377,9 +380,12 @@ pub mod key_derivation {
         /// # Returns
         /// * `Ok(KeyDerivationManager)` - Ready to derive keys
         /// * `Err(CryptoError)` - If validation fails
-        pub fn from_bytes(master_key_bytes: [u8; 32], crypto_config: &CryptoConfig) -> CryptoResult<Self> {
+        pub fn from_bytes(
+            master_key_bytes: [u8; 32],
+            crypto_config: &CryptoConfig,
+        ) -> CryptoResult<Self> {
             let config_hash = Self::compute_config_hash(crypto_config)?;
-            
+
             Ok(Self {
                 master_key_bytes,
                 config_hash,
@@ -451,7 +457,11 @@ pub mod key_derivation {
         /// # Returns
         /// * `Ok(EncryptionAtRest)` - Ready-to-use encryption manager
         /// * `Err(CryptoError)` - If encryption manager creation fails
-        pub fn create_encryptor(&self, context: &str, salt: Option<&[u8]>) -> CryptoResult<EncryptionAtRest> {
+        pub fn create_encryptor(
+            &self,
+            context: &str,
+            salt: Option<&[u8]>,
+        ) -> CryptoResult<EncryptionAtRest> {
             let derived_key = self.derive_key(context, salt);
             EncryptionAtRest::new(derived_key)
         }
@@ -471,12 +481,12 @@ pub mod key_derivation {
             salt: Option<&[u8]>,
         ) -> CryptoResult<HashMap<String, EncryptionAtRest>> {
             let mut encryptors = HashMap::new();
-            
+
             for &context in contexts {
                 let encryptor = self.create_encryptor(context, salt)?;
                 encryptors.insert(context.to_string(), encryptor);
             }
-            
+
             Ok(encryptors)
         }
 
@@ -486,11 +496,11 @@ pub mod key_derivation {
         /// without exposing the actual key.
         pub fn master_key_fingerprint(&self) -> [u8; 32] {
             use sha2::{Digest, Sha256};
-            
+
             let mut hasher = Sha256::new();
             hasher.update(b"DataFold_MasterKey_Fingerprint:");
             hasher.update(self.master_key_bytes);
-            
+
             let result = hasher.finalize();
             let mut fingerprint = [0u8; 32];
             fingerprint.copy_from_slice(&result);
@@ -500,26 +510,26 @@ pub mod key_derivation {
         /// Compute a hash of the crypto configuration for additional entropy
         fn compute_config_hash(crypto_config: &CryptoConfig) -> CryptoResult<[u8; 32]> {
             use sha2::{Digest, Sha256};
-            
+
             let mut hasher = Sha256::new();
-            
+
             // Include enabled state
             hasher.update([crypto_config.enabled as u8]);
-            
+
             // Include master key config type (but not sensitive data)
             match &crypto_config.master_key {
                 MasterKeyConfig::Random => hasher.update(b"random"),
                 MasterKeyConfig::Passphrase { .. } => hasher.update(b"passphrase"),
                 MasterKeyConfig::External { .. } => hasher.update(b"external"),
             }
-            
+
             // Include key derivation parameters
             if let Ok(params) = crypto_config.key_derivation.to_argon2_params() {
                 hasher.update(params.memory_cost.to_le_bytes());
                 hasher.update(params.time_cost.to_le_bytes());
                 hasher.update(params.parallelism.to_le_bytes());
             }
-            
+
             let result = hasher.finalize();
             let mut config_hash = [0u8; 32];
             config_hash.copy_from_slice(&result);
@@ -664,16 +674,18 @@ pub mod key_derivation {
             contexts: &[&str],
         ) -> CryptoResult<(KeyDerivationManager, HashMap<String, EncryptionAtRest>)> {
             // Validate crypto config
-            crypto_config.validate().map_err(|e| CryptoError::KeyDerivation {
-                message: format!("Invalid crypto config: {}", e),
-            })?;
+            crypto_config
+                .validate()
+                .map_err(|e| CryptoError::KeyDerivation {
+                    message: format!("Invalid crypto config: {}", e),
+                })?;
 
             // Create key derivation manager
             let key_manager = KeyDerivationManager::new(master_keypair, crypto_config)?;
-            
+
             // Create encryptors for all requested contexts
             let encryptors = key_manager.create_multiple_encryptors(contexts, None)?;
-            
+
             Ok((key_manager, encryptors))
         }
 
@@ -709,30 +721,34 @@ pub mod key_derivation {
             encryptors: &HashMap<String, EncryptionAtRest>,
         ) -> CryptoResult<()> {
             let test_data = b"DataFold encryption system integration test";
-            
+
             // Test each encryptor
             for (context, encryptor) in encryptors {
                 // Test round-trip encryption
-                let encrypted = encryptor.encrypt(test_data)
-                    .map_err(|e| CryptoError::KeyGeneration {
-                        message: format!("Encryption failed for context '{}': {}", context, e),
-                    })?;
-                
-                let decrypted = encryptor.decrypt(&encrypted)
-                    .map_err(|e| CryptoError::Signature {
-                        message: format!("Decryption failed for context '{}': {}", context, e),
-                    })?;
-                
+                let encrypted =
+                    encryptor
+                        .encrypt(test_data)
+                        .map_err(|e| CryptoError::KeyGeneration {
+                            message: format!("Encryption failed for context '{}': {}", context, e),
+                        })?;
+
+                let decrypted =
+                    encryptor
+                        .decrypt(&encrypted)
+                        .map_err(|e| CryptoError::Signature {
+                            message: format!("Decryption failed for context '{}': {}", context, e),
+                        })?;
+
                 if decrypted != test_data {
                     return Err(CryptoError::Signature {
                         message: format!("Round-trip test failed for context '{}'", context),
                     });
                 }
             }
-            
+
             // Test key derivation manager fingerprint
             let _fingerprint = key_manager.master_key_fingerprint();
-            
+
             Ok(())
         }
     }
@@ -941,7 +957,8 @@ mod tests {
         assert_eq!(derived_key1, derived_key2);
 
         // Different context should produce different key
-        let different_key = key_derivation::legacy::derive_encryption_key(master_key, "different_context", salt);
+        let different_key =
+            key_derivation::legacy::derive_encryption_key(master_key, "different_context", salt);
         assert_ne!(derived_key1, different_key);
 
         // No salt should produce different key
@@ -987,84 +1004,91 @@ mod tests {
 
         assert_eq!(test_data, &decrypted[..]);
         assert!(encryptor.self_test().is_ok());
-        
+
         // Test with different contexts produce different keys
         let schema_key = key_derivation::legacy::derive_encryption_key(
             &master_key_bytes,
             key_derivation::contexts::SCHEMA_METADATA,
             None,
         );
-        
+
         assert_ne!(encryption_key, schema_key);
     }
 
     #[test]
     fn test_key_derivation_manager_creation() {
         use crate::config::crypto::CryptoConfig;
-        
+
         let master_keys = generate_master_keypair().unwrap();
         let crypto_config = CryptoConfig::with_random_key();
-        
+
         // Test creation from master keypair
         let manager = key_derivation::KeyDerivationManager::new(&master_keys, &crypto_config)
             .expect("Should create key derivation manager");
-        
+
         // Test creation from raw bytes
         let master_key_bytes = master_keys.secret_key_bytes();
-        let manager2 = key_derivation::KeyDerivationManager::from_bytes(master_key_bytes, &crypto_config)
-            .expect("Should create key derivation manager from bytes");
-        
+        let manager2 =
+            key_derivation::KeyDerivationManager::from_bytes(master_key_bytes, &crypto_config)
+                .expect("Should create key derivation manager from bytes");
+
         // Both should produce the same fingerprint
-        assert_eq!(manager.master_key_fingerprint(), manager2.master_key_fingerprint());
+        assert_eq!(
+            manager.master_key_fingerprint(),
+            manager2.master_key_fingerprint()
+        );
     }
 
     #[test]
     fn test_key_derivation_manager_key_derivation() {
         use crate::config::crypto::CryptoConfig;
-        
+
         let master_keys = generate_master_keypair().unwrap();
         let crypto_config = CryptoConfig::with_random_key();
-        let manager = key_derivation::KeyDerivationManager::new(&master_keys, &crypto_config).unwrap();
-        
+        let manager =
+            key_derivation::KeyDerivationManager::new(&master_keys, &crypto_config).unwrap();
+
         // Test single key derivation
         let key1 = manager.derive_key(key_derivation::contexts::ATOM_DATA, None);
         let key2 = manager.derive_key(key_derivation::contexts::SCHEMA_METADATA, None);
-        
+
         // Keys should be different for different contexts
         assert_ne!(key1, key2);
         assert_eq!(key1.len(), AES_KEY_SIZE);
         assert_eq!(key2.len(), AES_KEY_SIZE);
-        
+
         // Same context should produce same key
         let key1_repeat = manager.derive_key(key_derivation::contexts::ATOM_DATA, None);
         assert_eq!(key1, key1_repeat);
-        
+
         // Different salt should produce different key
-        let key1_salted = manager.derive_key(key_derivation::contexts::ATOM_DATA, Some(b"test_salt"));
+        let key1_salted =
+            manager.derive_key(key_derivation::contexts::ATOM_DATA, Some(b"test_salt"));
         assert_ne!(key1, key1_salted);
     }
 
     #[test]
     fn test_key_derivation_manager_multiple_keys() {
         use crate::config::crypto::CryptoConfig;
-        
+
         let master_keys = generate_master_keypair().unwrap();
         let crypto_config = CryptoConfig::with_random_key();
-        let manager = key_derivation::KeyDerivationManager::new(&master_keys, &crypto_config).unwrap();
-        
+        let manager =
+            key_derivation::KeyDerivationManager::new(&master_keys, &crypto_config).unwrap();
+
         let contexts = &[
             key_derivation::contexts::ATOM_DATA,
             key_derivation::contexts::SCHEMA_METADATA,
             key_derivation::contexts::BACKUP_DATA,
         ];
-        
+
         let keys = manager.derive_multiple_keys(contexts, None);
-        
+
         assert_eq!(keys.len(), 3);
         assert!(keys.contains_key(key_derivation::contexts::ATOM_DATA));
         assert!(keys.contains_key(key_derivation::contexts::SCHEMA_METADATA));
         assert!(keys.contains_key(key_derivation::contexts::BACKUP_DATA));
-        
+
         // All keys should be different
         let key_values: Vec<_> = keys.values().collect();
         for i in 0..key_values.len() {
@@ -1077,32 +1101,35 @@ mod tests {
     #[test]
     fn test_key_derivation_manager_create_encryptor() {
         use crate::config::crypto::CryptoConfig;
-        
+
         let master_keys = generate_master_keypair().unwrap();
         let crypto_config = CryptoConfig::with_random_key();
-        let manager = key_derivation::KeyDerivationManager::new(&master_keys, &crypto_config).unwrap();
-        
+        let manager =
+            key_derivation::KeyDerivationManager::new(&master_keys, &crypto_config).unwrap();
+
         // Test single encryptor creation
-        let encryptor = manager.create_encryptor(key_derivation::contexts::ATOM_DATA, None)
+        let encryptor = manager
+            .create_encryptor(key_derivation::contexts::ATOM_DATA, None)
             .expect("Should create encryptor");
-        
+
         // Test encryption/decryption
         let test_data = b"test data for encryption";
         let encrypted = encryptor.encrypt(test_data).unwrap();
         let decrypted = encryptor.decrypt(&encrypted).unwrap();
         assert_eq!(test_data, &decrypted[..]);
-        
+
         // Test multiple encryptors creation
         let contexts = &[
             key_derivation::contexts::ATOM_DATA,
             key_derivation::contexts::SCHEMA_METADATA,
         ];
-        
-        let encryptors = manager.create_multiple_encryptors(contexts, None)
+
+        let encryptors = manager
+            .create_multiple_encryptors(contexts, None)
             .expect("Should create multiple encryptors");
-        
+
         assert_eq!(encryptors.len(), 2);
-        
+
         // Test each encryptor works
         for (context, encryptor) in &encryptors {
             let encrypted = encryptor.encrypt(test_data).unwrap();
@@ -1114,7 +1141,7 @@ mod tests {
     #[test]
     fn test_key_derivation_contexts() {
         let all_contexts = key_derivation::contexts::all_contexts();
-        
+
         // Should have all expected contexts
         assert!(all_contexts.contains(&key_derivation::contexts::ATOM_DATA));
         assert!(all_contexts.contains(&key_derivation::contexts::SCHEMA_METADATA));
@@ -1124,38 +1151,43 @@ mod tests {
         assert!(all_contexts.contains(&key_derivation::contexts::TRANSFORM_QUEUE));
         assert!(all_contexts.contains(&key_derivation::contexts::NETWORK_MESSAGES));
         assert!(all_contexts.contains(&key_derivation::contexts::CONFIG_DATA));
-        
+
         // Should have at least 8 contexts
         assert!(all_contexts.len() >= 8);
-        
+
         // All contexts should be unique
         let mut unique_contexts = std::collections::HashSet::new();
         for context in all_contexts {
-            assert!(unique_contexts.insert(context), "Duplicate context: {}", context);
+            assert!(
+                unique_contexts.insert(context),
+                "Duplicate context: {}",
+                context
+            );
         }
     }
 
     #[test]
     fn test_integration_create_encryption_system() {
         use crate::config::crypto::CryptoConfig;
-        
+
         let master_keys = generate_master_keypair().unwrap();
         let crypto_config = CryptoConfig::with_random_key();
-        
+
         let contexts = &[
             key_derivation::contexts::ATOM_DATA,
             key_derivation::contexts::SCHEMA_METADATA,
             key_derivation::contexts::BACKUP_DATA,
         ];
-        
+
         let (manager, encryptors) = key_derivation::integration::create_encryption_system(
             &crypto_config,
             &master_keys,
             contexts,
-        ).expect("Should create encryption system");
-        
+        )
+        .expect("Should create encryption system");
+
         assert_eq!(encryptors.len(), 3);
-        
+
         // Test the system
         key_derivation::integration::test_encryption_system(&manager, &encryptors)
             .expect("System test should pass");
@@ -1164,23 +1196,28 @@ mod tests {
     #[test]
     fn test_integration_create_default_encryption_system() {
         use crate::config::crypto::CryptoConfig;
-        
+
         let master_keys = generate_master_keypair().unwrap();
         let crypto_config = CryptoConfig::with_random_key();
-        
+
         let (manager, encryptors) = key_derivation::integration::create_default_encryption_system(
             &crypto_config,
             &master_keys,
-        ).expect("Should create default encryption system");
-        
+        )
+        .expect("Should create default encryption system");
+
         // Should have all standard contexts
         let all_contexts = key_derivation::contexts::all_contexts();
         assert_eq!(encryptors.len(), all_contexts.len());
-        
+
         for context in all_contexts {
-            assert!(encryptors.contains_key(*context), "Missing context: {}", context);
+            assert!(
+                encryptors.contains_key(*context),
+                "Missing context: {}",
+                context
+            );
         }
-        
+
         // Test the complete system
         key_derivation::integration::test_encryption_system(&manager, &encryptors)
             .expect("Default system test should pass");
@@ -1189,51 +1226,65 @@ mod tests {
     #[test]
     fn test_key_derivation_with_different_configs() {
         use crate::config::crypto::CryptoConfig;
-        
+
         let master_keys = generate_master_keypair().unwrap();
-        
+
         // Test with different crypto configurations
         let config1 = CryptoConfig::with_random_key();
         let config2 = CryptoConfig::with_enhanced_security("test-passphrase".to_string());
-        
+
         let manager1 = key_derivation::KeyDerivationManager::new(&master_keys, &config1).unwrap();
         let manager2 = key_derivation::KeyDerivationManager::new(&master_keys, &config2).unwrap();
-        
+
         // Different configs should produce different derived keys
         let key1 = manager1.derive_key(key_derivation::contexts::ATOM_DATA, None);
         let key2 = manager2.derive_key(key_derivation::contexts::ATOM_DATA, None);
-        
-        assert_ne!(key1, key2, "Different configs should produce different keys");
-        
+
+        assert_ne!(
+            key1, key2,
+            "Different configs should produce different keys"
+        );
+
         // But same master key fingerprint (since same master key)
-        assert_eq!(manager1.master_key_fingerprint(), manager2.master_key_fingerprint());
+        assert_eq!(
+            manager1.master_key_fingerprint(),
+            manager2.master_key_fingerprint()
+        );
     }
 
     #[test]
     fn test_key_derivation_security_properties() {
         use crate::config::crypto::CryptoConfig;
-        
+
         let master_keys1 = generate_master_keypair().unwrap();
         let master_keys2 = generate_master_keypair().unwrap();
         let crypto_config = CryptoConfig::with_random_key();
-        
-        let manager1 = key_derivation::KeyDerivationManager::new(&master_keys1, &crypto_config).unwrap();
-        let manager2 = key_derivation::KeyDerivationManager::new(&master_keys2, &crypto_config).unwrap();
-        
+
+        let manager1 =
+            key_derivation::KeyDerivationManager::new(&master_keys1, &crypto_config).unwrap();
+        let manager2 =
+            key_derivation::KeyDerivationManager::new(&master_keys2, &crypto_config).unwrap();
+
         // Different master keys should produce different derived keys
         let key1 = manager1.derive_key(key_derivation::contexts::ATOM_DATA, None);
         let key2 = manager2.derive_key(key_derivation::contexts::ATOM_DATA, None);
-        
-        assert_ne!(key1, key2, "Different master keys should produce different derived keys");
-        
+
+        assert_ne!(
+            key1, key2,
+            "Different master keys should produce different derived keys"
+        );
+
         // Different master key fingerprints
-        assert_ne!(manager1.master_key_fingerprint(), manager2.master_key_fingerprint());
-        
+        assert_ne!(
+            manager1.master_key_fingerprint(),
+            manager2.master_key_fingerprint()
+        );
+
         // Keys should be uniformly distributed (basic check)
         let key = manager1.derive_key(key_derivation::contexts::ATOM_DATA, None);
         let zero_count = key.iter().filter(|&&b| b == 0).count();
         let ff_count = key.iter().filter(|&&b| b == 0xFF).count();
-        
+
         // Should not be all zeros or all 0xFF (very low probability)
         assert!(zero_count < 32, "Key should not be all zeros");
         assert!(ff_count < 32, "Key should not be all 0xFF");
@@ -1245,28 +1296,28 @@ mod tests {
     fn test_legacy_key_derivation_compatibility() {
         let master_keys = generate_master_keypair().unwrap();
         let master_key_bytes = master_keys.secret_key_bytes();
-        
+
         // Test legacy functions still work
         let contexts = &[
             key_derivation::contexts::ATOM_DATA,
             key_derivation::contexts::SCHEMA_METADATA,
             key_derivation::contexts::BACKUP_DATA,
         ];
-        
+
         // Test single key derivation
         let key = key_derivation::legacy::derive_encryption_key(
             &master_key_bytes,
             key_derivation::contexts::ATOM_DATA,
             None,
         );
-        
+
         let encryptor = EncryptionAtRest::new(key).unwrap();
         assert!(encryptor.self_test().is_ok());
-        
+
         // Test multiple key derivation
         let keys = key_derivation::legacy::derive_multiple_keys(&master_key_bytes, contexts, None);
         assert_eq!(keys.len(), 3);
-        
+
         // All keys should be different
         for i in 0..keys.len() {
             for j in (i + 1)..keys.len() {

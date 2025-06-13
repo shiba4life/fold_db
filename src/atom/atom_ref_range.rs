@@ -35,7 +35,10 @@ impl AtomRefRange {
     /// Updates or adds a reference at the specified key.
     /// If the key already exists, the atom_uuid replaces the existing value.
     pub fn set_atom_uuid(&mut self, key: String, atom_uuid: String) {
-        println!("🔑 Setting atom_uuid for aref_uuid: {} -> key: {} -> atom: {}", self.uuid, key, atom_uuid);
+        println!(
+            "🔑 Setting atom_uuid for aref_uuid: {} -> key: {} -> atom: {}",
+            self.uuid, key, atom_uuid
+        );
         self.atom_uuids.insert(key, atom_uuid);
         self.updated_at = Utc::now();
     }
@@ -46,7 +49,6 @@ impl AtomRefRange {
         self.atom_uuids.get(key)
     }
 
-
     /// Removes the reference at the specified key.
     pub fn remove_atom_uuid(&mut self, key: &str) -> Option<String> {
         let result = self.atom_uuids.remove(key);
@@ -55,7 +57,6 @@ impl AtomRefRange {
         }
         result
     }
-
 }
 
 impl AtomRefBehavior for AtomRefRange {

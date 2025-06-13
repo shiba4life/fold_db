@@ -10,6 +10,7 @@ A Rust-based distributed data platform with **mandatory signature authentication
 
 - **🔐 Mandatory Signature Authentication** - RFC 9421 HTTP Message Signatures with Ed25519 cryptography [production-ready]
 - **🛡️ Enterprise Security** - Multi-tier security profiles with comprehensive audit logging [production-ready]
+- **🔑 Key Rotation & Lifecycle** - Secure cryptographic key rotation with atomic replacement [production-ready]
 - **🤖 AI-Powered Data Ingestion** - Automatic schema creation and field mapping using AI [Initial prototype]
 - **🔄 Real-Time Processing** - Event-driven architecture with automatic transform execution [working]
 - **🌐 Distributed Architecture** - P2P networking with automatic peer discovery [untested]
@@ -28,7 +29,7 @@ A Rust-based distributed data platform with **mandatory signature authentication
 
 See the [Authentication Guide](docs/guides/cli-authentication.md) for setup instructions.
 
-## � Quick Start
+##  Quick Start
 
 ### Installation
 
@@ -270,6 +271,12 @@ DataFold uses JSON configuration files with **mandatory authentication settings*
   "ingestion": {
     "enabled": true,
     "openrouter_model": "anthropic/claude-3.5-sonnet"
+  },
+  "key_rotation": {
+    "security_profile": "standard",
+    "rate_limits": {
+      "max_rotations_per_user_per_hour": 10
+    }
   }
 }
 ```
@@ -288,6 +295,7 @@ DataFold uses JSON configuration files with **mandatory authentication settings*
 
 ### Security & Authentication (Required Reading)
 - **[Authentication Guide](docs/guides/cli-authentication.md)** - **Required**: Setting up mandatory authentication
+- **[Key Rotation Guide](docs/guides/key-rotation.md)** - **Required**: Key lifecycle management and security
 - **[Signature Verification Guide](docs/guides/cli-signature-verification.md)** - Understanding signature verification
 - **[Security Best Practices](docs/security/recipes/authentication-flow.md)** - Production security recommendations
 - **[Troubleshooting Guide](docs/guides/troubleshooting.md)** - Resolving authentication issues
@@ -301,6 +309,10 @@ DataFold uses JSON configuration files with **mandatory authentication settings*
 ### Deployment & Operations
 - **[Production Deployment](docs/deployment-guide.md)** - Production setup with mandatory authentication
 - **[Migration Guide](docs/migration/migration-guide.md)** - Upgrading to mandatory authentication
+
+### Key Management & Rotation
+- **[Key Rotation Operations](docs/guides/key-rotation.md)** - Complete guide to key lifecycle management
+- **[PBI-12: Key Rotation](docs/delivery/12/prd.md)** - Current implementation status
 
 ## 🤝 Contributing
 

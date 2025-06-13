@@ -12,11 +12,11 @@ pub struct CryptoConfig {
     /// Whether database encryption is enabled
     #[serde(default = "default_enabled")]
     pub enabled: bool,
-    
+
     /// Master key configuration for database encryption
     #[serde(default)]
     pub master_key: MasterKeyConfig,
-    
+
     /// Key derivation configuration (when using passphrase-based keys)
     #[serde(default)]
     pub key_derivation: KeyDerivationConfig,
@@ -26,14 +26,12 @@ fn default_enabled() -> bool {
     false
 }
 
-
-
 impl CryptoConfig {
     /// Create a new crypto configuration with encryption disabled
     pub fn disabled() -> Self {
         Self::default()
     }
-    
+
     /// Create a new crypto configuration with passphrase-based encryption
     pub fn with_passphrase(passphrase: String) -> Self {
         Self {
@@ -42,7 +40,7 @@ impl CryptoConfig {
             key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Balanced),
         }
     }
-    
+
     /// Create a new crypto configuration with random key generation
     pub fn with_random_key() -> Self {
         Self {
@@ -51,7 +49,7 @@ impl CryptoConfig {
             key_derivation: KeyDerivationConfig::default(),
         }
     }
-    
+
     /// Create a new crypto configuration with enhanced security parameters
     pub fn with_enhanced_security(passphrase: String) -> Self {
         Self {
@@ -60,27 +58,27 @@ impl CryptoConfig {
             key_derivation: KeyDerivationConfig::sensitive(),
         }
     }
-    
+
     /// Validate the crypto configuration
     pub fn validate(&self) -> CryptoResult<()> {
         if !self.enabled {
             return Ok(());
         }
-        
+
         // Validate master key configuration
         self.master_key.validate()?;
-        
+
         // Validate key derivation parameters
         self.key_derivation.validate()?;
-        
+
         Ok(())
     }
-    
+
     /// Check if the configuration requires a passphrase
     pub fn requires_passphrase(&self) -> bool {
         self.enabled && matches!(self.master_key, MasterKeyConfig::Passphrase { .. })
     }
-    
+
     /// Check if the configuration uses random key generation
     pub fn uses_random_key(&self) -> bool {
         self.enabled && matches!(self.master_key, MasterKeyConfig::Random)
@@ -93,14 +91,14 @@ impl CryptoConfig {
 pub enum MasterKeyConfig {
     /// Generate a random master key pair (highest security, no password recovery)
     Random,
-    
+
     /// Derive master key from user passphrase (allows password recovery)
     Passphrase {
         /// The passphrase to use for key derivation
         /// Note: In production, this should be provided at runtime, not stored
         passphrase: String,
     },
-    
+
     /// Use an existing key pair from external source (advanced use case)
     External {
         /// Path to the external key file or key identifier
@@ -125,24 +123,24 @@ impl MasterKeyConfig {
                         message: "Passphrase cannot be empty".to_string(),
                     });
                 }
-                
+
                 if passphrase.len() < 6 {
                     return Err(CryptoError::InvalidKey {
                         message: "Passphrase must be at least 6 characters".to_string(),
                     });
                 }
-                
+
                 Ok(())
-            },
+            }
             Self::External { key_source } => {
                 if key_source.is_empty() {
                     return Err(CryptoError::InvalidKey {
                         message: "External key source cannot be empty".to_string(),
                     });
                 }
-                
+
                 Ok(())
-            },
+            }
         }
     }
 }
@@ -153,15 +151,15 @@ pub struct KeyDerivationConfig {
     /// Memory cost in KB (minimum 8 KB, recommended 64 MB+)
     #[serde(default = "default_memory_cost")]
     pub memory_cost: u32,
-    
+
     /// Time cost (iterations, minimum 1, recommended 3+)
     #[serde(default = "default_time_cost")]
     pub time_cost: u32,
-    
+
     /// Parallelism degree (threads, minimum 1, recommended 4)
     #[serde(default = "default_parallelism")]
     pub parallelism: u32,
-    
+
     /// Security level preset (overrides individual parameters if set)
     #[serde(default)]
     pub preset: Option<SecurityLevel>,
@@ -200,7 +198,7 @@ impl KeyDerivationConfig {
             preset: Some(SecurityLevel::Interactive),
         }
     }
-    
+
     /// Create configuration optimized for sensitive operations (slower, more secure)
     pub fn sensitive() -> Self {
         Self {
@@ -210,7 +208,7 @@ impl KeyDerivationConfig {
             preset: Some(SecurityLevel::Sensitive),
         }
     }
-    
+
     /// Create configuration for a specific security level
     pub fn for_security_level(level: SecurityLevel) -> Self {
         match level {
@@ -222,7 +220,7 @@ impl KeyDerivationConfig {
             SecurityLevel::Sensitive => Self::sensitive(),
         }
     }
-    
+
     /// Create configuration with custom parameters
     pub fn custom(memory_cost: u32, time_cost: u32, parallelism: u32) -> CryptoResult<Self> {
         let config = Self {
@@ -231,11 +229,11 @@ impl KeyDerivationConfig {
             parallelism,
             preset: None,
         };
-        
+
         config.validate()?;
         Ok(config)
     }
-    
+
     /// Validate the key derivation configuration
     pub fn validate(&self) -> CryptoResult<()> {
         // Use preset parameters if specified
@@ -248,13 +246,13 @@ impl KeyDerivationConfig {
         } else {
             (self.memory_cost, self.time_cost, self.parallelism)
         };
-        
+
         // Validate using Argon2Params validation
         Argon2Params::new(memory_cost, time_cost, parallelism)?;
-        
+
         Ok(())
     }
-    
+
     /// Convert to Argon2Params for use with crypto module
     pub fn to_argon2_params(&self) -> CryptoResult<Argon2Params> {
         let (memory_cost, time_cost, parallelism) = if let Some(preset) = &self.preset {
@@ -266,7 +264,7 @@ impl KeyDerivationConfig {
         } else {
             (self.memory_cost, self.time_cost, self.parallelism)
         };
-        
+
         Argon2Params::new(memory_cost, time_cost, parallelism)
     }
 }
@@ -277,10 +275,10 @@ impl KeyDerivationConfig {
 pub enum SecurityLevel {
     /// Fast parameters for interactive use (32 MB, 2 iterations, 2 threads)
     Interactive,
-    
+
     /// Balanced parameters for general use (64 MB, 3 iterations, 4 threads)
     Balanced,
-    
+
     /// High security parameters for sensitive operations (128 MB, 4 iterations, 8 threads)
     Sensitive,
 }
@@ -301,10 +299,10 @@ impl SecurityLevel {
 pub enum ConfigError {
     #[error("Crypto configuration validation failed: {0}")]
     CryptoValidation(#[from] CryptoError),
-    
+
     #[error("Invalid configuration parameter: {message}")]
     InvalidParameter { message: String },
-    
+
     #[error("Configuration serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 }
@@ -394,13 +392,17 @@ mod tests {
     #[test]
     fn test_key_derivation_config_to_argon2_params() {
         let config = KeyDerivationConfig::interactive();
-        let params = config.to_argon2_params().expect("Should convert to Argon2Params");
+        let params = config
+            .to_argon2_params()
+            .expect("Should convert to Argon2Params");
         assert_eq!(params.memory_cost, 32768);
         assert_eq!(params.time_cost, 2);
         assert_eq!(params.parallelism, 2);
 
         let config = KeyDerivationConfig::sensitive();
-        let params = config.to_argon2_params().expect("Should convert to Argon2Params");
+        let params = config
+            .to_argon2_params()
+            .expect("Should convert to Argon2Params");
         assert_eq!(params.memory_cost, 131072);
         assert_eq!(params.time_cost, 4);
         assert_eq!(params.parallelism, 8);
@@ -408,8 +410,7 @@ mod tests {
 
     #[test]
     fn test_key_derivation_config_custom() {
-        let config = KeyDerivationConfig::custom(1024, 2, 2)
-            .expect("Should create custom config");
+        let config = KeyDerivationConfig::custom(1024, 2, 2).expect("Should create custom config");
         assert_eq!(config.memory_cost, 1024);
         assert_eq!(config.time_cost, 2);
         assert_eq!(config.parallelism, 2);
@@ -424,13 +425,15 @@ mod tests {
     #[test]
     fn test_config_serialization() {
         let config = CryptoConfig::with_passphrase("test-passphrase".to_string());
-        
+
         let json = serde_json::to_string(&config).expect("Should serialize");
-        let deserialized: CryptoConfig = serde_json::from_str(&json)
-            .expect("Should deserialize");
-        
+        let deserialized: CryptoConfig = serde_json::from_str(&json).expect("Should deserialize");
+
         assert_eq!(config.enabled, deserialized.enabled);
-        assert!(matches!(deserialized.master_key, MasterKeyConfig::Passphrase { .. }));
+        assert!(matches!(
+            deserialized.master_key,
+            MasterKeyConfig::Passphrase { .. }
+        ));
     }
 
     #[test]
@@ -438,7 +441,7 @@ mod tests {
         let config = CryptoConfig::disabled();
         assert!(!config.enabled);
         assert!(config.validate().is_ok());
-        
+
         // Even with invalid passphrase, disabled config should pass validation
         let config = CryptoConfig {
             master_key: MasterKeyConfig::Passphrase {
@@ -448,4 +451,4 @@ mod tests {
         };
         assert!(config.validate().is_ok());
     }
-} 
+}

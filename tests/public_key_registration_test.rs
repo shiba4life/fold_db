@@ -3,22 +3,20 @@
 //! This module provides comprehensive tests for the public key registration
 //! functionality including validation, storage, and retrieval.
 
-use tempfile::TempDir;
 use actix_web::{test, web, App};
 use std::sync::Arc;
+use tempfile::TempDir;
 use tokio::sync::Mutex;
 
-use datafold::datafold_node::{
-    DataFoldNode,
-    NodeConfig,
-    http_server::AppState,
-    crypto_routes::{
-        register_public_key, get_public_key_status,
-        PublicKeyRegistrationRequest, ApiResponse, PublicKeyRegistrationResponse,
-        PublicKeyStatusResponse,
-    },
-};
 use datafold::crypto::ed25519::generate_master_keypair;
+use datafold::datafold_node::{
+    crypto_routes::{
+        get_public_key_status, register_public_key, ApiResponse, PublicKeyRegistrationRequest,
+        PublicKeyRegistrationResponse, PublicKeyStatusResponse,
+    },
+    http_server::AppState,
+    DataFoldNode, NodeConfig,
+};
 
 /// Test fixture for public key registration tests
 struct PublicKeyRegistrationTestFixture {
@@ -33,18 +31,19 @@ impl PublicKeyRegistrationTestFixture {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
         let config = NodeConfig::new(temp_dir.path().to_path_buf());
         let node = DataFoldNode::new(config).expect("Failed to create test node");
-        
+
         // Create default signature auth config for testing
         let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
-        let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
-            .expect("Failed to create signature verification state for test");
-        
+        let signature_auth =
+            datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+                .expect("Failed to create signature verification state for test");
+
         let app_state = web::Data::new(AppState {
             signature_auth: Arc::new(signature_auth),
             node: Arc::new(Mutex::new(node.clone())),
         });
 
-        Self { 
+        Self {
             _temp_dir: temp_dir,
             node,
             app_state,
@@ -77,8 +76,9 @@ async fn test_register_public_key_success() {
     let app = test::init_service(
         App::new()
             .app_data(fixture.app_state.clone())
-            .route("/register", web::post().to(register_public_key))
-    ).await;
+            .route("/register", web::post().to(register_public_key)),
+    )
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/register")
@@ -90,7 +90,7 @@ async fn test_register_public_key_success() {
 
     let body: ApiResponse<PublicKeyRegistrationResponse> = test::read_body_json(resp).await;
     assert!(body.success);
-    
+
     let data = body.data.unwrap();
     assert_eq!(data.client_id, "test-client-1");
     assert_eq!(data.public_key, public_key);
@@ -115,8 +115,9 @@ async fn test_register_public_key_auto_generate_client_id() {
     let app = test::init_service(
         App::new()
             .app_data(fixture.app_state.clone())
-            .route("/register", web::post().to(register_public_key))
-    ).await;
+            .route("/register", web::post().to(register_public_key)),
+    )
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/register")
@@ -128,7 +129,7 @@ async fn test_register_public_key_auto_generate_client_id() {
 
     let body: ApiResponse<PublicKeyRegistrationResponse> = test::read_body_json(resp).await;
     assert!(body.success);
-    
+
     let data = body.data.unwrap();
     assert!(data.client_id.starts_with("client_"));
     assert_eq!(data.public_key, public_key);
@@ -150,8 +151,9 @@ async fn test_register_public_key_invalid_hex() {
     let app = test::init_service(
         App::new()
             .app_data(fixture.app_state.clone())
-            .route("/register", web::post().to(register_public_key))
-    ).await;
+            .route("/register", web::post().to(register_public_key)),
+    )
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/register")
@@ -182,8 +184,9 @@ async fn test_register_public_key_wrong_length() {
     let app = test::init_service(
         App::new()
             .app_data(fixture.app_state.clone())
-            .route("/register", web::post().to(register_public_key))
-    ).await;
+            .route("/register", web::post().to(register_public_key)),
+    )
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/register")
@@ -213,8 +216,9 @@ async fn test_register_public_key_empty() {
     let app = test::init_service(
         App::new()
             .app_data(fixture.app_state.clone())
-            .route("/register", web::post().to(register_public_key))
-    ).await;
+            .route("/register", web::post().to(register_public_key)),
+    )
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/register")
@@ -238,8 +242,9 @@ async fn test_register_duplicate_client_id() {
     let app = test::init_service(
         App::new()
             .app_data(fixture.app_state.clone())
-            .route("/register", web::post().to(register_public_key))
-    ).await;
+            .route("/register", web::post().to(register_public_key)),
+    )
+    .await;
 
     // First registration should succeed
     let request1 = PublicKeyRegistrationRequest {
@@ -288,8 +293,9 @@ async fn test_register_duplicate_public_key() {
     let app = test::init_service(
         App::new()
             .app_data(fixture.app_state.clone())
-            .route("/register", web::post().to(register_public_key))
-    ).await;
+            .route("/register", web::post().to(register_public_key)),
+    )
+    .await;
 
     // First registration should succeed
     let request1 = PublicKeyRegistrationRequest {
@@ -340,8 +346,9 @@ async fn test_get_public_key_status_success() {
         App::new()
             .app_data(fixture.app_state.clone())
             .route("/register", web::post().to(register_public_key))
-            .route("/status/{client_id}", web::get().to(get_public_key_status))
-    ).await;
+            .route("/status/{client_id}", web::get().to(get_public_key_status)),
+    )
+    .await;
 
     // First register a key
     let register_request = PublicKeyRegistrationRequest {
@@ -349,9 +356,10 @@ async fn test_get_public_key_status_success() {
         user_id: Some("test-user".to_string()),
         public_key: public_key.clone(),
         key_name: Some("Status Test Key".to_string()),
-        metadata: Some(std::collections::HashMap::from([
-            ("test".to_string(), "true".to_string()),
-        ])),
+        metadata: Some(std::collections::HashMap::from([(
+            "test".to_string(),
+            "true".to_string(),
+        )])),
     };
 
     let register_req = test::TestRequest::post()
@@ -372,7 +380,7 @@ async fn test_get_public_key_status_success() {
 
     let body: ApiResponse<PublicKeyStatusResponse> = test::read_body_json(status_resp).await;
     assert!(body.success);
-    
+
     let data = body.data.unwrap();
     assert_eq!(data.client_id, client_id);
     assert_eq!(data.public_key, public_key);
@@ -389,8 +397,9 @@ async fn test_get_public_key_status_not_found() {
     let app = test::init_service(
         App::new()
             .app_data(fixture.app_state.clone())
-            .route("/status/{client_id}", web::get().to(get_public_key_status))
-    ).await;
+            .route("/status/{client_id}", web::get().to(get_public_key_status)),
+    )
+    .await;
 
     let req = test::TestRequest::get()
         .uri("/status/nonexistent-client")
@@ -423,8 +432,9 @@ async fn test_invalid_ed25519_public_key() {
     let app = test::init_service(
         App::new()
             .app_data(fixture.app_state.clone())
-            .route("/register", web::post().to(register_public_key))
-    ).await;
+            .route("/register", web::post().to(register_public_key)),
+    )
+    .await;
 
     let req = test::TestRequest::post()
         .uri("/register")

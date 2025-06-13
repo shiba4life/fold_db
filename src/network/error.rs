@@ -26,6 +26,18 @@ pub enum NetworkError {
 
     #[error("libp2p error: {0}")]
     Libp2pError(String),
+
+    #[error("Configuration error: {0}")]
+    ConfigurationError(String),
+
+    #[error("Operation timeout: {0}")]
+    Timeout(String),
+
+    #[error("Operation not found: {0}")]
+    OperationNotFound(String),
+
+    #[error("Conflict detected: {0}")]
+    ConflictDetected(String),
 }
 
 impl From<libp2p::TransportError<std::io::Error>> for NetworkError {

@@ -1,10 +1,10 @@
-use actix_web::{web, HttpResponse, Responder, HttpRequest};
+use actix_web::{web, HttpRequest, HttpResponse, Responder};
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use log::{info, error};
 
 use super::http_server::AppState;
-use super::signature_auth::{SignatureComponents, AuthenticationError};
+use super::signature_auth::{AuthenticationError, SignatureComponents};
 
 /// Get system status information
 pub async fn get_system_status(_state: web::Data<AppState>) -> impl Responder {
@@ -42,7 +42,7 @@ pub struct ResetDatabaseResponse {
 /// This is a destructive operation that cannot be undone.
 pub async fn reset_database(
     state: web::Data<AppState>,
-    req: web::Json<ResetDatabaseRequest>
+    req: web::Json<ResetDatabaseRequest>,
 ) -> impl Responder {
     // Require explicit confirmation
     if !req.confirm {
@@ -85,7 +85,7 @@ pub async fn reset_database(
 pub async fn get_signature_auth_status(state: web::Data<AppState>) -> impl Responder {
     let sig_auth = &state.signature_auth;
     let config = sig_auth.get_config();
-    
+
     HttpResponse::Ok().json(json!({
         "signature_auth": {
             "enabled": true,
@@ -127,20 +127,23 @@ pub struct SignatureValidationResponse {
 pub async fn test_signature_validation(
     state: web::Data<AppState>,
     _req: HttpRequest,
-    body: web::Json<SignatureValidationRequest>
+    body: web::Json<SignatureValidationRequest>,
 ) -> impl Responder {
     let sig_auth = &state.signature_auth;
     let correlation_id = sig_auth.generate_correlation_id_public();
-    
-    info!("Testing signature validation for correlation_id: {}", correlation_id);
-    
+
+    info!(
+        "Testing signature validation for correlation_id: {}",
+        correlation_id
+    );
+
     // Create a mock service request for testing signature parsing
     let test_req = actix_web::test::TestRequest::get()
         .uri("/test")
         .insert_header(("signature-input", body.signature_input.as_str()))
         .insert_header(("signature", body.signature.as_str()))
         .to_srv_request();
-    
+
     // Test signature component parsing
     match SignatureComponents::parse_from_headers(&test_req) {
         Ok(components) => {
@@ -162,10 +165,11 @@ pub async fn test_signature_validation(
             } else {
                 None
             };
-            
+
             HttpResponse::Ok().json(SignatureValidationResponse {
                 valid: true,
-                message: "Signature format validation passed. Headers parsed successfully.".to_string(),
+                message: "Signature format validation passed. Headers parsed successfully."
+                    .to_string(),
                 details,
                 correlation_id,
             })
@@ -184,7 +188,7 @@ pub async fn test_signature_validation(
                             correlation_id: correlation_id.clone(),
                         }
                     };
-                    
+
                     sig_auth.create_error_response(&auth_error)
                 }
                 _ => {
@@ -195,11 +199,13 @@ pub async fn test_signature_validation(
                     sig_auth.create_error_response(&auth_error)
                 }
             };
-            
+
             HttpResponse::BadRequest().json(SignatureValidationResponse {
                 valid: false,
                 message: error_response.message,
-                details: error_response.details.map(|d| serde_json::to_value(d).unwrap_or_default()),
+                details: error_response
+                    .details
+                    .map(|d| serde_json::to_value(d).unwrap_or_default()),
                 correlation_id,
             })
         }
@@ -209,7 +215,7 @@ pub async fn test_signature_validation(
 /// Get nonce store statistics for monitoring
 pub async fn get_nonce_store_stats(state: web::Data<AppState>) -> impl Responder {
     let sig_auth = &state.signature_auth;
-    
+
     match sig_auth.get_nonce_store_stats() {
         Ok(stats) => {
             HttpResponse::Ok().json(json!({
@@ -234,8 +240,10 @@ pub async fn get_nonce_store_stats(state: web::Data<AppState>) -> impl Responder
 /// Get security metrics for monitoring
 pub async fn get_security_metrics(state: web::Data<AppState>) -> impl Responder {
     let sig_auth = &state.signature_auth;
-    let metrics = sig_auth.get_metrics_collector().get_enhanced_security_metrics(10000);
-    
+    let metrics = sig_auth
+        .get_metrics_collector()
+        .get_enhanced_security_metrics(10000);
+
     HttpResponse::Ok().json(json!({
         "security_metrics": {
             "processing_time_ms": metrics.processing_time_ms,
@@ -255,24 +263,22 @@ pub struct TimestampValidationRequest {
 /// Test timestamp validation
 pub async fn test_timestamp_validation(
     state: web::Data<AppState>,
-    body: web::Json<TimestampValidationRequest>
+    body: web::Json<TimestampValidationRequest>,
 ) -> impl Responder {
     let sig_auth = &state.signature_auth;
     let correlation_id = sig_auth.generate_correlation_id_public();
-    
+
     match sig_auth.validate_timestamp_enhanced_public(body.timestamp, &correlation_id) {
-        Ok(_) => {
-            HttpResponse::Ok().json(json!({
-                "valid": true,
-                "message": "Timestamp validation passed",
-                "timestamp": body.timestamp,
-                "server_time": std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs(),
-                "correlation_id": correlation_id
-            }))
-        }
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "valid": true,
+            "message": "Timestamp validation passed",
+            "timestamp": body.timestamp,
+            "server_time": std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            "correlation_id": correlation_id
+        })),
         Err(auth_error) => {
             let error_response = sig_auth.create_error_response(&auth_error);
             HttpResponse::BadRequest().json(json!({
@@ -300,29 +306,27 @@ pub struct NonceValidationRequest {
 /// Test nonce validation (without storing)
 pub async fn test_nonce_validation(
     state: web::Data<AppState>,
-    body: web::Json<NonceValidationRequest>
+    body: web::Json<NonceValidationRequest>,
 ) -> impl Responder {
     let sig_auth = &state.signature_auth;
     let correlation_id = sig_auth.generate_correlation_id_public();
-    
+
     // Test nonce format validation without actually storing it
     match sig_auth.validate_nonce_format(&body.nonce) {
-        Ok(_) => {
-            HttpResponse::Ok().json(json!({
-                "valid": true,
-                "message": "Nonce format validation passed",
-                "nonce": body.nonce,
-                "timestamp": body.timestamp,
-                "correlation_id": correlation_id
-            }))
-        }
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "valid": true,
+            "message": "Nonce format validation passed",
+            "nonce": body.nonce,
+            "timestamp": body.timestamp,
+            "correlation_id": correlation_id
+        })),
         Err(e) => {
             let auth_error = AuthenticationError::NonceValidationFailed {
                 nonce: body.nonce.clone(),
                 reason: e.to_string(),
                 correlation_id: correlation_id.clone(),
             };
-            
+
             let error_response = sig_auth.create_error_response(&auth_error);
             HttpResponse::BadRequest().json(json!({
                 "valid": false,
@@ -338,8 +342,8 @@ pub async fn test_nonce_validation(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datafold_node::{DataFoldNode, NodeConfig};
     use crate::datafold_node::signature_auth::{SignatureAuthConfig, SignatureVerificationState};
+    use crate::datafold_node::{DataFoldNode, NodeConfig};
     use actix_web::test;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -354,7 +358,7 @@ mod tests {
         let sig_config = SignatureAuthConfig::default();
         let signature_auth = SignatureVerificationState::new(sig_config)
             .expect("Failed to create signature verification state for test");
-        
+
         let state = web::Data::new(AppState {
             signature_auth: Arc::new(signature_auth),
             node: Arc::new(tokio::sync::Mutex::new(node)),
@@ -375,7 +379,7 @@ mod tests {
         let sig_config = SignatureAuthConfig::default();
         let signature_auth = SignatureVerificationState::new(sig_config)
             .expect("Failed to create signature verification state for test");
-        
+
         let state = web::Data::new(AppState {
             signature_auth: Arc::new(signature_auth),
             node: Arc::new(tokio::sync::Mutex::new(node)),
@@ -385,8 +389,10 @@ mod tests {
         let req = test::TestRequest::post()
             .set_json(&req_body)
             .to_http_request();
-        
-        let resp = reset_database(state, web::Json(req_body)).await.respond_to(&req);
+
+        let resp = reset_database(state, web::Json(req_body))
+            .await
+            .respond_to(&req);
         assert_eq!(resp.status(), 400);
     }
 
@@ -400,7 +406,7 @@ mod tests {
         let sig_config = SignatureAuthConfig::default();
         let signature_auth = SignatureVerificationState::new(sig_config)
             .expect("Failed to create signature verification state for test");
-        
+
         let state = web::Data::new(AppState {
             signature_auth: Arc::new(signature_auth),
             node: Arc::new(tokio::sync::Mutex::new(node)),
@@ -410,12 +416,14 @@ mod tests {
         let req = test::TestRequest::post()
             .set_json(&req_body)
             .to_http_request();
-        
-        let resp = reset_database(state, web::Json(req_body)).await.respond_to(&req);
+
+        let resp = reset_database(state, web::Json(req_body))
+            .await
+            .respond_to(&req);
         // The response should be either 200 (success) or 500 (expected failure in test env)
         // Both are acceptable as the API is working correctly
         assert!(resp.status() == 200 || resp.status() == 500);
-        
+
         // If it's a 500, verify it's the expected database reset error
         if resp.status() == 500 {
             // This is expected in the test environment due to file system constraints

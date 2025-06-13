@@ -40,7 +40,10 @@ impl<'a> SchemaValidator<'a> {
             self.validate_range_field_consistency(schema, range_key)?;
         }
 
-        ValidationUtils::require_positive(schema.payment_config.base_multiplier, "Schema base_multiplier")?;
+        ValidationUtils::require_positive(
+            schema.payment_config.base_multiplier,
+            "Schema base_multiplier",
+        )?;
 
         for (field_name, field) in &schema.fields {
             if field.payment_config().base_multiplier <= 0.0 {
@@ -153,7 +156,7 @@ impl<'a> SchemaValidator<'a> {
                 let field_type = match field_variant {
                     crate::schema::types::field::FieldVariant::Single(_) => "Single",
                     crate::schema::types::field::FieldVariant::Range(_) => "Range", // Should not reach here
-                    // TODO: Collection fields are no longer supported - CollectionField has been removed
+                                                                                    // TODO: Collection fields are no longer supported - CollectionField has been removed
                 };
                 return Err(SchemaError::InvalidField(format!(
                     "RangeSchema '{}' has range_key field '{}' that is a {} field, but range_key must be a Range field",
@@ -184,8 +187,7 @@ impl<'a> SchemaValidator<'a> {
                         or convert '{}' to a Range field to maintain RangeSchema consistency.",
                         schema.name, field_name, field_name
                     )));
-                }
-                // TODO: Collection fields are no longer supported - CollectionField has been removed
+                } // TODO: Collection fields are no longer supported - CollectionField has been removed
             }
         }
 

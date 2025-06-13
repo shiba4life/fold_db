@@ -34,7 +34,6 @@ pub enum SigningMode {
     Manual,
 }
 
-
 impl FromStr for SigningMode {
     type Err = String;
 
@@ -42,7 +41,10 @@ impl FromStr for SigningMode {
         match s.to_lowercase().as_str() {
             "auto" | "automatic" | "always" => Ok(SigningMode::Auto),
             "manual" | "explicit" | "on-demand" => Ok(SigningMode::Manual),
-            _ => Err(format!("Invalid signing mode: {}. Valid options: auto, manual", s)),
+            _ => Err(format!(
+                "Invalid signing mode: {}. Valid options: auto, manual",
+                s
+            )),
         }
     }
 }
@@ -61,8 +63,7 @@ impl Default for AutoSigningConfig {
 }
 
 /// Enhanced signing configuration with automatic injection support
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EnhancedSigningConfig {
     /// Base signing configuration
     #[serde(flatten)]
@@ -76,8 +77,7 @@ pub struct EnhancedSigningConfig {
 }
 
 /// Debug configuration for signature troubleshooting
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SigningDebugConfig {
     /// Whether to enable debug logging for signatures
     pub enabled: bool,
@@ -102,8 +102,6 @@ pub struct SigningPerformanceConfig {
     pub max_concurrent_signs: usize,
 }
 
-
-
 impl Default for SigningPerformanceConfig {
     fn default() -> Self {
         Self {
@@ -114,9 +112,7 @@ impl Default for SigningPerformanceConfig {
     }
 }
 
-
 impl SigningMode {
-
     /// Convert to string representation
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -177,7 +173,7 @@ impl EnhancedSigningConfig {
     /// Create configuration for a specific command context
     pub fn for_command(&self, command: &str) -> CommandSigningContext {
         let mode = self.auto_signing.get_command_mode(command);
-        
+
         CommandSigningContext {
             mode: mode.clone(),
             should_auto_sign: self.auto_signing.is_effective_auto_signing(command),
@@ -226,7 +222,10 @@ impl EnhancedSigningConfig {
         // Validate debug output directory if specified
         if let Some(debug_dir) = &self.debug.debug_output_dir {
             if !std::path::Path::new(debug_dir).exists() {
-                return Err(format!("Debug output directory does not exist: {}", debug_dir));
+                return Err(format!(
+                    "Debug output directory does not exist: {}",
+                    debug_dir
+                ));
             }
         }
 
@@ -274,7 +273,10 @@ mod tests {
     #[test]
     fn test_signing_mode_parsing() {
         assert_eq!("auto".parse::<SigningMode>().unwrap(), SigningMode::Auto);
-        assert_eq!("MANUAL".parse::<SigningMode>().unwrap(), SigningMode::Manual);
+        assert_eq!(
+            "MANUAL".parse::<SigningMode>().unwrap(),
+            SigningMode::Manual
+        );
         assert!("disabled".parse::<SigningMode>().is_err());
         assert!("invalid".parse::<SigningMode>().is_err());
     }
@@ -291,7 +293,7 @@ mod tests {
     #[test]
     fn test_auto_signing_config() {
         let mut config = AutoSigningConfig::default();
-        
+
         // Test command-specific overrides
         config.set_command_mode("query".to_string(), SigningMode::Auto);
         assert_eq!(config.get_command_mode("query"), SigningMode::Auto);
@@ -317,11 +319,14 @@ mod tests {
     #[test]
     fn test_cli_overrides() {
         let mut config = EnhancedSigningConfig::default();
-        
+
         config.apply_cli_overrides(Some(true), Some("prod".to_string()), Some(true));
-        
+
         assert_eq!(config.auto_signing.default_mode, SigningMode::Auto);
-        assert_eq!(config.auto_signing.default_profile, Some("prod".to_string()));
+        assert_eq!(
+            config.auto_signing.default_profile,
+            Some("prod".to_string())
+        );
         assert!(config.debug.enabled);
     }
 }

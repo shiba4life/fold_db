@@ -27,12 +27,16 @@ pub mod core;
 pub mod discovery;
 pub mod error;
 pub mod forward;
+pub mod key_propagation;
+pub mod key_rotation_integration;
 pub mod schema_protocol;
 pub mod schema_service;
 
 pub use config::NetworkConfig;
 pub use core::NetworkCore;
 pub use error::{NetworkError, NetworkResult};
+pub use key_propagation::{KeyPropagationConfig, KeyPropagationManager};
+pub use key_rotation_integration::{KeyRotationNetworkConfig, KeyRotationNetworkIntegration};
 pub use schema_service::SchemaService;
 
 // Re-export types needed for public API

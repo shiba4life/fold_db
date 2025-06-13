@@ -7,6 +7,7 @@ pub mod encrypted_backup_async;
 pub mod encryption_wrapper;
 pub mod encryption_wrapper_async;
 pub mod error_utils;
+pub mod key_rotation_operations;
 mod metadata_operations;
 mod orchestrator_operations;
 mod schema_operations;
@@ -19,10 +20,16 @@ mod utility_operations;
 pub use core::DbOperations;
 pub use crypto_metadata::CryptoMetadata;
 pub use encrypted_backup::{
-    EncryptedBackupManager, BackupMode, BackupOptions, RestoreOptions,
-    BackupMetadata, BackupResult, RestoreStats, BackupError
+    BackupError, BackupMetadata, BackupMode, BackupOptions, BackupResult, EncryptedBackupManager,
+    RestoreOptions, RestoreStats,
 };
-pub use encrypted_backup_async::{AsyncEncryptedBackup, AsyncBackupConfig, ProgressInfo};
-pub use encryption_wrapper::{EncryptionWrapper, contexts, MigrationMode, MigrationConfig};
-pub use encryption_wrapper_async::{AsyncEncryptionWrapper, AsyncWrapperConfig, AsyncWrapperMetrics};
+pub use encrypted_backup_async::{AsyncBackupConfig, AsyncEncryptedBackup, ProgressInfo};
+pub use encryption_wrapper::{contexts, EncryptionWrapper, MigrationConfig, MigrationMode};
+pub use encryption_wrapper_async::{
+    AsyncEncryptionWrapper, AsyncWrapperConfig, AsyncWrapperMetrics,
+};
 pub use error_utils::ErrorUtils;
+pub use key_rotation_operations::{
+    KeyAssociation, KeyRotationRecord, RotationStatus, KEY_ASSOCIATIONS_TREE,
+    KEY_ROTATION_INDEX_TREE, KEY_ROTATION_RECORDS_TREE,
+};

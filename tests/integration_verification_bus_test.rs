@@ -3,13 +3,12 @@
 //! This test demonstrates the complete verification event bus architecture
 //! including event publishing, handling, correlation, and cross-platform support.
 
-use datafold::config::unified_config::{UnifiedConfig, EnvironmentConfig};
+use datafold::config::unified_config::{EnvironmentConfig, UnifiedConfig};
 use datafold::events::{
-    VerificationEventBus, VerificationBusConfig, SecurityEvent, EventSeverity,
-    CreateVerificationEvent, VerificationEvent, SecurityEventCategory, PlatformSource,
-    AuditLogHandler, MetricsHandler, SecurityAlertHandler, AlertDestination,
-    CorrelationManager, TransportFactory, TransportConfig, TransportProtocol,
-    EventEnvelope, PlatformInfo,
+    AlertDestination, AuditLogHandler, CorrelationManager, CreateVerificationEvent, EventEnvelope,
+    EventSeverity, MetricsHandler, PlatformInfo, PlatformSource, SecurityAlertHandler,
+    SecurityEvent, SecurityEventCategory, TransportConfig, TransportFactory, TransportProtocol,
+    VerificationBusConfig, VerificationEvent, VerificationEventBus,
 };
 use std::time::Duration;
 use tokio::time::sleep;
@@ -19,43 +18,48 @@ use uuid::Uuid;
 async fn test_verification_bus_integration() {
     // Initialize logging for the test
     let _ = env_logger::builder().is_test(true).try_init();
-    
+
     // Create event bus configuration
     let mut config = VerificationBusConfig::default();
     config.buffer_size = 1000;
     config.min_severity = EventSeverity::Info;
     config.enable_correlation = true;
-    
+
     // Create event bus
     let mut event_bus = VerificationEventBus::new(config);
-    
+
     // Start the event bus
     event_bus.start().await.expect("Failed to start event bus");
-    
+
     // Register built-in handlers
-    
+
     // 1. Audit logging handler
     let audit_handler = AuditLogHandler::new("test_audit.log".to_string())
         .with_name("test_audit_handler".to_string());
-    event_bus.register_handler(Box::new(audit_handler)).await
+    event_bus
+        .register_handler(Box::new(audit_handler))
+        .await
         .expect("Failed to register audit handler");
-    
+
     // 2. Metrics collection handler
-    let metrics_handler = MetricsHandler::new()
-        .with_name("test_metrics_handler".to_string());
-    event_bus.register_handler(Box::new(metrics_handler)).await
+    let metrics_handler = MetricsHandler::new().with_name("test_metrics_handler".to_string());
+    event_bus
+        .register_handler(Box::new(metrics_handler))
+        .await
         .expect("Failed to register metrics handler");
-    
+
     // 3. Security alerting handler
     let alert_handler = SecurityAlertHandler::new(EventSeverity::Warning)
         .add_destination(AlertDestination::Console)
         .with_name("test_alert_handler".to_string());
-    event_bus.register_handler(Box::new(alert_handler)).await
+    event_bus
+        .register_handler(Box::new(alert_handler))
+        .await
         .expect("Failed to register alert handler");
-    
+
     // Test cross-platform event correlation
     let trace_id = Uuid::new_v4().to_string();
-    
+
     // Simulate events from different platforms with same trace ID
     let mut rust_event = VerificationEvent::create_base_event(
         SecurityEventCategory::Authentication,
@@ -68,7 +72,7 @@ async fn test_verification_bus_integration() {
     rust_event.actor = Some("user123".to_string());
     rust_event.result = datafold::events::event_types::OperationResult::Success;
     rust_event.duration = Some(Duration::from_millis(150));
-    
+
     let mut js_event = VerificationEvent::create_base_event(
         SecurityEventCategory::Authorization,
         EventSeverity::Info,
@@ -80,7 +84,7 @@ async fn test_verification_bus_integration() {
     js_event.actor = Some("user123".to_string());
     js_event.result = datafold::events::event_types::OperationResult::Success;
     js_event.duration = Some(Duration::from_millis(75));
-    
+
     let mut python_event = VerificationEvent::create_base_event(
         SecurityEventCategory::Verification,
         EventSeverity::Info,
@@ -92,17 +96,23 @@ async fn test_verification_bus_integration() {
     python_event.actor = Some("user123".to_string());
     python_event.result = datafold::events::event_types::OperationResult::Success;
     python_event.duration = Some(Duration::from_millis(95));
-    
+
     // Publish events
-    event_bus.publish_event(SecurityEvent::Generic(rust_event.clone())).await
+    event_bus
+        .publish_event(SecurityEvent::Generic(rust_event.clone()))
+        .await
         .expect("Failed to publish Rust event");
-    
-    event_bus.publish_event(SecurityEvent::Generic(js_event.clone())).await
+
+    event_bus
+        .publish_event(SecurityEvent::Generic(js_event.clone()))
+        .await
         .expect("Failed to publish JavaScript event");
-    
-    event_bus.publish_event(SecurityEvent::Generic(python_event.clone())).await
+
+    event_bus
+        .publish_event(SecurityEvent::Generic(python_event.clone()))
+        .await
         .expect("Failed to publish Python event");
-    
+
     // Test security threat event
     let mut threat_event = VerificationEvent::create_base_event(
         SecurityEventCategory::Security,
@@ -117,7 +127,7 @@ async fn test_verification_bus_integration() {
         error_message: "Multiple failed login attempts detected".to_string(),
         error_code: Some("SEC_001".to_string()),
     };
-    
+
     let security_threat = datafold::events::event_types::SecurityThreatEvent {
         base: threat_event,
         threat_type: "BruteForceAttack".to_string(),
@@ -138,42 +148,55 @@ async fn test_verification_bus_integration() {
         ],
         auto_response_triggered: true,
     };
-    
-    event_bus.publish_event(SecurityEvent::Security(security_threat)).await
+
+    event_bus
+        .publish_event(SecurityEvent::Security(security_threat))
+        .await
         .expect("Failed to publish security threat event");
-    
+
     // Wait for event processing
     sleep(Duration::from_millis(500)).await;
-    
+
     // Check event bus statistics
     let stats = event_bus.get_statistics().await;
     println!("Event Bus Statistics:");
     println!("  Total events: {}", stats.total_events);
     println!("  Active handlers: {}", stats.active_handlers);
-    println!("  Handler success rate: {:.2}%", stats.handler_success_rate * 100.0);
-    println!("  Average processing time: {:.2}ms", stats.avg_processing_time_ms);
-    
+    println!(
+        "  Handler success rate: {:.2}%",
+        stats.handler_success_rate * 100.0
+    );
+    println!(
+        "  Average processing time: {:.2}ms",
+        stats.avg_processing_time_ms
+    );
+
     // Verify we processed multiple events
     assert!(stats.total_events >= 4);
     assert_eq!(stats.active_handlers, 3);
-    
+
     // Test correlation functionality
     let correlations = event_bus.get_correlations(rust_event.event_id).await;
     println!("Correlated events found: {}", correlations.len());
-    
+
     // Should have correlated the events with the same trace ID
-    assert!(correlations.len() >= 2, "Expected at least 2 correlated events, got {}", correlations.len());
-    
+    assert!(
+        correlations.len() >= 2,
+        "Expected at least 2 correlated events, got {}",
+        correlations.len()
+    );
+
     // Test event filtering by severity
-    let filtered_events: Vec<&SecurityEvent> = correlations.iter()
+    let filtered_events: Vec<&SecurityEvent> = correlations
+        .iter()
         .filter(|event| event.should_alert(EventSeverity::Warning))
         .collect();
-    
+
     println!("Events above warning threshold: {}", filtered_events.len());
-    
+
     // Stop the event bus
     event_bus.stop().await;
-    
+
     println!("✅ Verification event bus integration test completed successfully");
 }
 
@@ -187,16 +210,19 @@ async fn test_cross_platform_transport() {
         connection_timeout_ms: 5000,
         ..Default::default()
     };
-    
+
     let platform_info = TransportFactory::get_platform_info();
-    
+
     let mut transport = TransportFactory::create_transport(transport_config, platform_info.clone())
         .expect("Failed to create transport");
-    
+
     // Initialize transport
-    transport.initialize().await.expect("Failed to initialize transport");
+    transport
+        .initialize()
+        .await
+        .expect("Failed to initialize transport");
     assert!(transport.is_healthy().await, "Transport should be healthy");
-    
+
     // Create test event
     let event = SecurityEvent::Generic(VerificationEvent::create_base_event(
         SecurityEventCategory::Performance,
@@ -205,7 +231,7 @@ async fn test_cross_platform_transport() {
         "perf_monitor".to_string(),
         "latency_measurement".to_string(),
     ));
-    
+
     // Create transport envelope
     let envelope = EventEnvelope {
         version: "1.0".to_string(),
@@ -222,21 +248,27 @@ async fn test_cross_platform_transport() {
         envelope_timestamp: chrono::Utc::now(),
         envelope_id: Uuid::new_v4(),
     };
-    
+
     // Send event through transport
-    let result = transport.send_event(envelope).await.expect("Failed to send event");
+    let result = transport
+        .send_event(envelope)
+        .await
+        .expect("Failed to send event");
     assert!(result.success, "Transport send should succeed");
-    assert!(result.bytes_transferred.is_some(), "Should report bytes transferred");
-    
+    assert!(
+        result.bytes_transferred.is_some(),
+        "Should report bytes transferred"
+    );
+
     // Check transport statistics
     let transport_stats = transport.get_statistics().await;
     assert_eq!(transport_stats.events_sent, 1);
     assert!(transport_stats.bytes_sent > 0);
     assert!(transport_stats.connected);
-    
+
     // Close transport
     transport.close().await.expect("Failed to close transport");
-    
+
     println!("✅ Cross-platform transport test completed successfully");
 }
 
@@ -247,7 +279,7 @@ async fn test_unified_config_integration() {
         config_format_version: "1.0".to_string(),
         environments: {
             let mut envs = std::collections::HashMap::new();
-            
+
             let env_config = EnvironmentConfig {
                 signing: datafold::config::unified_config::SigningConfig {
                     policy: "standard".to_string(),
@@ -287,7 +319,7 @@ async fn test_unified_config_integration() {
                     default_max_retries: 3,
                 },
             };
-            
+
             envs.insert("test".to_string(), env_config);
             envs
         },
@@ -299,15 +331,15 @@ async fn test_unified_config_integration() {
             verbosity: 1,
         },
     };
-    
+
     // Create event bus from unified config
     let event_bus = VerificationEventBus::from_unified_config(&unified_config, "test")
         .expect("Failed to create event bus from unified config");
-    
+
     // Verify configuration was applied correctly
     assert!(event_bus.get_config().enabled);
     assert_eq!(event_bus.get_config().min_severity, EventSeverity::Info); // Should match "info" log level
-    
+
     println!("✅ Unified config integration test completed successfully");
 }
 
@@ -315,10 +347,10 @@ async fn test_unified_config_integration() {
 async fn test_event_correlation_scenarios() {
     // Test various correlation scenarios
     let mut correlation_manager = CorrelationManager::new(Duration::from_secs(3600));
-    
+
     // Scenario 1: Trace ID correlation across platforms
     let trace_id = Uuid::new_v4().to_string();
-    
+
     let mut event1 = VerificationEvent::create_base_event(
         SecurityEventCategory::Authentication,
         EventSeverity::Info,
@@ -327,7 +359,7 @@ async fn test_event_correlation_scenarios() {
         "login".to_string(),
     );
     event1.trace_id = Some(trace_id.clone());
-    
+
     let mut event2 = VerificationEvent::create_base_event(
         SecurityEventCategory::Authorization,
         EventSeverity::Info,
@@ -336,17 +368,26 @@ async fn test_event_correlation_scenarios() {
         "permission_check".to_string(),
     );
     event2.trace_id = Some(trace_id.clone());
-    
-    correlation_manager.add_event(&SecurityEvent::Generic(event1.clone())).await;
-    correlation_manager.add_event(&SecurityEvent::Generic(event2.clone())).await;
-    
+
+    correlation_manager
+        .add_event(&SecurityEvent::Generic(event1.clone()))
+        .await;
+    correlation_manager
+        .add_event(&SecurityEvent::Generic(event2.clone()))
+        .await;
+
     // Should find correlated events
-    let correlated = correlation_manager.get_correlated_events(event1.event_id).await;
-    assert!(correlated.len() >= 2, "Should find at least 2 correlated events");
-    
+    let correlated = correlation_manager
+        .get_correlated_events(event1.event_id)
+        .await;
+    assert!(
+        correlated.len() >= 2,
+        "Should find at least 2 correlated events"
+    );
+
     // Scenario 2: Session ID correlation
     let session_id = "session_abc123".to_string();
-    
+
     let mut event3 = VerificationEvent::create_base_event(
         SecurityEventCategory::Configuration,
         EventSeverity::Warning,
@@ -355,7 +396,7 @@ async fn test_event_correlation_scenarios() {
         "policy_update".to_string(),
     );
     event3.session_id = Some(session_id.clone());
-    
+
     let mut event4 = VerificationEvent::create_base_event(
         SecurityEventCategory::Performance,
         EventSeverity::Info,
@@ -364,35 +405,58 @@ async fn test_event_correlation_scenarios() {
         "metric_update".to_string(),
     );
     event4.session_id = Some(session_id.clone());
-    
-    correlation_manager.add_event(&SecurityEvent::Generic(event3.clone())).await;
-    correlation_manager.add_event(&SecurityEvent::Generic(event4.clone())).await;
-    
+
+    correlation_manager
+        .add_event(&SecurityEvent::Generic(event3.clone()))
+        .await;
+    correlation_manager
+        .add_event(&SecurityEvent::Generic(event4.clone()))
+        .await;
+
     // Give some time for correlation processing
     tokio::time::sleep(Duration::from_millis(10)).await;
-    
+
     // Check cross-platform correlations
     let cross_platform_correlations = correlation_manager.get_cross_platform_correlations().await;
-    println!("Cross-platform correlations found: {}", cross_platform_correlations.len());
-    
+    println!(
+        "Cross-platform correlations found: {}",
+        cross_platform_correlations.len()
+    );
+
     // Check if we have any correlations at all
     let all_correlations = correlation_manager.get_all_correlations().await;
     println!("Total correlations found: {}", all_correlations.len());
     for correlation in &all_correlations {
-        println!("  Correlation: {} platforms, {} events, strategy: {:?}",
-                 correlation.platforms.len(), correlation.events.len(), correlation.strategy);
+        println!(
+            "  Correlation: {} platforms, {} events, strategy: {:?}",
+            correlation.platforms.len(),
+            correlation.events.len(),
+            correlation.strategy
+        );
     }
-    
+
     // We should have at least some correlations, and at least one should be cross-platform
-    assert!(!all_correlations.is_empty(), "Should have created some correlations");
+    assert!(
+        !all_correlations.is_empty(),
+        "Should have created some correlations"
+    );
     let has_cross_platform = all_correlations.iter().any(|c| c.is_cross_platform());
-    assert!(has_cross_platform, "Should have at least one cross-platform correlation");
-    
+    assert!(
+        has_cross_platform,
+        "Should have at least one cross-platform correlation"
+    );
+
     // Check correlation statistics
     let stats = correlation_manager.get_statistics().await;
-    assert!(stats.total_correlations > 0, "Should have created correlations");
-    assert!(stats.cross_platform_correlations > 0, "Should have cross-platform correlations");
-    
+    assert!(
+        stats.total_correlations > 0,
+        "Should have created correlations"
+    );
+    assert!(
+        stats.cross_platform_correlations > 0,
+        "Should have cross-platform correlations"
+    );
+
     println!("✅ Event correlation scenarios test completed successfully");
 }
 
@@ -409,7 +473,7 @@ impl TestEventHandler {
             processed_events: std::sync::Arc::new(tokio::sync::Mutex::new(Vec::new())),
         }
     }
-    
+
     async fn get_processed_events(&self) -> Vec<SecurityEvent> {
         self.processed_events.lock().await.clone()
     }
@@ -417,12 +481,15 @@ impl TestEventHandler {
 
 #[async_trait::async_trait]
 impl datafold::events::handlers::EventHandler for TestEventHandler {
-    async fn handle_event(&self, event: &SecurityEvent) -> datafold::events::handlers::EventHandlerResult {
+    async fn handle_event(
+        &self,
+        event: &SecurityEvent,
+    ) -> datafold::events::handlers::EventHandlerResult {
         let start_time = std::time::Instant::now();
-        
+
         // Store the event
         self.processed_events.lock().await.push(event.clone());
-        
+
         datafold::events::handlers::EventHandlerResult {
             handler_name: self.name.clone(),
             success: true,
@@ -431,7 +498,7 @@ impl datafold::events::handlers::EventHandler for TestEventHandler {
             metadata: std::collections::HashMap::new(),
         }
     }
-    
+
     fn handler_name(&self) -> String {
         self.name.clone()
     }
@@ -442,15 +509,19 @@ async fn test_custom_event_handler() {
     // Test custom event handler implementation
     let mut event_bus = VerificationEventBus::with_default_config();
     event_bus.start().await.expect("Failed to start event bus");
-    
+
     let custom_handler = TestEventHandler::new("custom_test_handler".to_string());
     let handler_ref = std::sync::Arc::new(custom_handler);
-    
+
     // Register custom handler
     let handler_clone = handler_ref.clone();
-    event_bus.register_handler(Box::new(TestEventHandler::new("custom_test_handler".to_string()))).await
+    event_bus
+        .register_handler(Box::new(TestEventHandler::new(
+            "custom_test_handler".to_string(),
+        )))
+        .await
         .expect("Failed to register custom handler");
-    
+
     // Publish test events
     for i in 0..5 {
         let event = SecurityEvent::Generic(VerificationEvent::create_base_event(
@@ -460,19 +531,22 @@ async fn test_custom_event_handler() {
             "test_system".to_string(),
             format!("test_operation_{}", i),
         ));
-        
-        event_bus.publish_event(event).await.expect("Failed to publish test event");
+
+        event_bus
+            .publish_event(event)
+            .await
+            .expect("Failed to publish test event");
     }
-    
+
     // Wait for processing
     sleep(Duration::from_millis(200)).await;
-    
+
     // Verify events were processed by our custom handler
     let stats = event_bus.get_statistics().await;
     assert_eq!(stats.total_events, 5);
     assert_eq!(stats.active_handlers, 1);
-    
+
     event_bus.stop().await;
-    
+
     println!("✅ Custom event handler test completed successfully");
 }

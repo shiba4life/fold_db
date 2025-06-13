@@ -14,7 +14,10 @@ pub enum TransportProtocol {
     /// In-memory transport (for single process)
     InMemory,
     /// HTTP/HTTPS transport
-    Http { endpoint: String, headers: HashMap<String, String> },
+    Http {
+        endpoint: String,
+        headers: HashMap<String, String>,
+    },
     /// WebSocket transport
     WebSocket { url: String },
     /// TCP socket transport
@@ -22,7 +25,10 @@ pub enum TransportProtocol {
     /// Unix domain socket transport
     UnixSocket { path: String },
     /// Message queue transport (Redis, RabbitMQ, etc.)
-    MessageQueue { broker_url: String, queue_name: String },
+    MessageQueue {
+        broker_url: String,
+        queue_name: String,
+    },
 }
 
 /// Configuration for event transport
@@ -191,25 +197,28 @@ pub struct TransportStatistics {
 pub trait EventTransport: Send + Sync {
     /// Initialize the transport
     async fn initialize(&mut self) -> Result<(), TransportError>;
-    
+
     /// Send an event through the transport
     async fn send_event(&self, envelope: EventEnvelope) -> Result<TransportResult, TransportError>;
-    
+
     /// Send multiple events in batch
-    async fn send_batch(&self, envelopes: Vec<EventEnvelope>) -> Result<Vec<TransportResult>, TransportError>;
-    
+    async fn send_batch(
+        &self,
+        envelopes: Vec<EventEnvelope>,
+    ) -> Result<Vec<TransportResult>, TransportError>;
+
     /// Receive events from transport (for subscribers)
     async fn receive_events(&self) -> Result<Vec<EventEnvelope>, TransportError>;
-    
+
     /// Subscribe to events (returns a receiver)
     async fn subscribe(&self) -> Result<broadcast::Receiver<EventEnvelope>, TransportError>;
-    
+
     /// Get transport statistics
     async fn get_statistics(&self) -> TransportStatistics;
-    
+
     /// Check if transport is connected/healthy
     async fn is_healthy(&self) -> bool;
-    
+
     /// Close the transport connection
     async fn close(&mut self) -> Result<(), TransportError>;
 }
@@ -219,31 +228,31 @@ pub trait EventTransport: Send + Sync {
 pub enum TransportError {
     #[error("Connection error: {0}")]
     ConnectionError(String),
-    
+
     #[error("Serialization error: {0}")]
     SerializationError(String),
-    
+
     #[error("Transport timeout")]
     Timeout,
-    
+
     #[error("Authentication failed: {0}")]
     AuthenticationFailed(String),
-    
+
     #[error("Transport not initialized")]
     NotInitialized,
-    
+
     #[error("Protocol error: {0}")]
     ProtocolError(String),
-    
+
     #[error("Buffer overflow")]
     BufferOverflow,
-    
+
     #[error("Encryption error: {0}")]
     EncryptionError(String),
-    
+
     #[error("Configuration error: {0}")]
     ConfigurationError(String),
-    
+
     #[error("Transport closed")]
     TransportClosed,
 }
@@ -265,7 +274,7 @@ impl InMemoryTransport {
     /// Create new in-memory transport
     pub fn new(config: TransportConfig, platform_info: PlatformInfo) -> Self {
         let (sender, _) = broadcast::channel(config.buffer_size);
-        
+
         Self {
             config,
             sender,
@@ -293,10 +302,10 @@ impl EventTransport for InMemoryTransport {
         // In-memory transport is always ready
         Ok(())
     }
-    
+
     async fn send_event(&self, envelope: EventEnvelope) -> Result<TransportResult, TransportError> {
         let start_time = std::time::Instant::now();
-        
+
         // Serialize envelope to calculate size
         let serialized = match self.config.serialization {
             SerializationFormat::Json => serde_json::to_vec(&envelope)
@@ -307,19 +316,19 @@ impl EventTransport for InMemoryTransport {
                     .map_err(|e| TransportError::SerializationError(e.to_string()))?
             }
         };
-        
+
         let bytes_size = serialized.len();
-        
+
         // Send through broadcast channel
         match self.sender.send(envelope) {
             Ok(_) => {
                 let latency = start_time.elapsed();
-                
+
                 // Update statistics
                 let mut stats = self.statistics.write().await;
                 stats.events_sent += 1;
                 stats.bytes_sent += bytes_size as u64;
-                
+
                 // Update average latency (exponential moving average)
                 let latency_ms = latency.as_millis() as f64;
                 stats.avg_send_latency_ms = if stats.avg_send_latency_ms == 0.0 {
@@ -327,7 +336,7 @@ impl EventTransport for InMemoryTransport {
                 } else {
                     0.9 * stats.avg_send_latency_ms + 0.1 * latency_ms
                 };
-                
+
                 Ok(TransportResult {
                     success: true,
                     latency,
@@ -340,18 +349,18 @@ impl EventTransport for InMemoryTransport {
                 // Channel has no receivers - this is okay for a broadcast channel
                 // We'll still consider it a successful send
                 let latency = start_time.elapsed();
-                
+
                 let mut stats = self.statistics.write().await;
                 stats.events_sent += 1;
                 stats.bytes_sent += bytes_size as u64;
-                
+
                 let latency_ms = latency.as_millis() as f64;
                 stats.avg_send_latency_ms = if stats.avg_send_latency_ms == 0.0 {
                     latency_ms
                 } else {
                     0.9 * stats.avg_send_latency_ms + 0.1 * latency_ms
                 };
-                
+
                 Ok(TransportResult {
                     success: true,
                     latency,
@@ -366,36 +375,39 @@ impl EventTransport for InMemoryTransport {
             }
         }
     }
-    
-    async fn send_batch(&self, envelopes: Vec<EventEnvelope>) -> Result<Vec<TransportResult>, TransportError> {
+
+    async fn send_batch(
+        &self,
+        envelopes: Vec<EventEnvelope>,
+    ) -> Result<Vec<TransportResult>, TransportError> {
         let mut results = Vec::new();
-        
+
         for envelope in envelopes {
             let result = self.send_event(envelope).await;
             results.push(result?);
         }
-        
+
         Ok(results)
     }
-    
+
     async fn receive_events(&self) -> Result<Vec<EventEnvelope>, TransportError> {
         // For in-memory transport, receiving is handled through subscription
         // This method could be used for polling-based receivers
         Ok(Vec::new())
     }
-    
+
     async fn subscribe(&self) -> Result<broadcast::Receiver<EventEnvelope>, TransportError> {
         Ok(self.sender.subscribe())
     }
-    
+
     async fn get_statistics(&self) -> TransportStatistics {
         self.statistics.read().await.clone()
     }
-    
+
     async fn is_healthy(&self) -> bool {
         true // In-memory transport is always healthy
     }
-    
+
     async fn close(&mut self) -> Result<(), TransportError> {
         // Nothing to close for in-memory transport
         let mut stats = self.statistics.write().await;
@@ -409,12 +421,13 @@ pub struct EventSerializer;
 
 impl EventSerializer {
     /// Serialize event envelope to bytes
-    pub fn serialize(envelope: &EventEnvelope, format: &SerializationFormat) -> Result<Vec<u8>, TransportError> {
+    pub fn serialize(
+        envelope: &EventEnvelope,
+        format: &SerializationFormat,
+    ) -> Result<Vec<u8>, TransportError> {
         match format {
-            SerializationFormat::Json => {
-                serde_json::to_vec(envelope)
-                    .map_err(|e| TransportError::SerializationError(e.to_string()))
-            }
+            SerializationFormat::Json => serde_json::to_vec(envelope)
+                .map_err(|e| TransportError::SerializationError(e.to_string())),
             SerializationFormat::MessagePack => {
                 // Placeholder - would use rmp_serde crate
                 serde_json::to_vec(envelope)
@@ -432,14 +445,15 @@ impl EventSerializer {
             }
         }
     }
-    
+
     /// Deserialize bytes to event envelope
-    pub fn deserialize(bytes: &[u8], format: &SerializationFormat) -> Result<EventEnvelope, TransportError> {
+    pub fn deserialize(
+        bytes: &[u8],
+        format: &SerializationFormat,
+    ) -> Result<EventEnvelope, TransportError> {
         match format {
-            SerializationFormat::Json => {
-                serde_json::from_slice(bytes)
-                    .map_err(|e| TransportError::SerializationError(e.to_string()))
-            }
+            SerializationFormat::Json => serde_json::from_slice(bytes)
+                .map_err(|e| TransportError::SerializationError(e.to_string())),
             SerializationFormat::MessagePack => {
                 // Placeholder - would use rmp_serde crate
                 serde_json::from_slice(bytes)
@@ -474,33 +488,45 @@ impl TransportFactory {
             }
             TransportProtocol::Http { .. } => {
                 // Placeholder for HTTP transport implementation
-                Err(TransportError::ConfigurationError("HTTP transport not yet implemented".to_string()))
+                Err(TransportError::ConfigurationError(
+                    "HTTP transport not yet implemented".to_string(),
+                ))
             }
             TransportProtocol::WebSocket { .. } => {
                 // Placeholder for WebSocket transport implementation
-                Err(TransportError::ConfigurationError("WebSocket transport not yet implemented".to_string()))
+                Err(TransportError::ConfigurationError(
+                    "WebSocket transport not yet implemented".to_string(),
+                ))
             }
             TransportProtocol::Tcp { .. } => {
                 // Placeholder for TCP transport implementation
-                Err(TransportError::ConfigurationError("TCP transport not yet implemented".to_string()))
+                Err(TransportError::ConfigurationError(
+                    "TCP transport not yet implemented".to_string(),
+                ))
             }
             TransportProtocol::UnixSocket { .. } => {
                 // Placeholder for Unix socket transport implementation
-                Err(TransportError::ConfigurationError("Unix socket transport not yet implemented".to_string()))
+                Err(TransportError::ConfigurationError(
+                    "Unix socket transport not yet implemented".to_string(),
+                ))
             }
             TransportProtocol::MessageQueue { .. } => {
                 // Placeholder for message queue transport implementation
-                Err(TransportError::ConfigurationError("Message queue transport not yet implemented".to_string()))
+                Err(TransportError::ConfigurationError(
+                    "Message queue transport not yet implemented".to_string(),
+                ))
             }
         }
     }
-    
+
     /// Get default platform info for current platform
     pub fn get_platform_info() -> PlatformInfo {
         PlatformInfo {
             platform_type: "rust-cli".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
-            host: std::env::var("HOSTNAME").ok().or_else(|| std::env::var("COMPUTERNAME").ok()),
+            host: std::env::var("HOSTNAME")
+                .ok()
+                .or_else(|| std::env::var("COMPUTERNAME").ok()),
             instance_id: Some(uuid::Uuid::new_v4().to_string()),
             metadata: {
                 let mut metadata = HashMap::new();
@@ -516,19 +542,22 @@ impl TransportFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::events::event_types::{SecurityEvent, CreateVerificationEvent, VerificationEvent, SecurityEventCategory, EventSeverity, PlatformSource};
+    use crate::events::event_types::{
+        CreateVerificationEvent, EventSeverity, PlatformSource, SecurityEvent,
+        SecurityEventCategory, VerificationEvent,
+    };
 
     #[tokio::test]
     async fn test_in_memory_transport() {
         let config = TransportConfig::default();
         let platform_info = TransportFactory::get_platform_info();
-        
+
         let mut transport = InMemoryTransport::new(config, platform_info.clone());
-        
+
         // Initialize transport
         transport.initialize().await.unwrap();
         assert!(transport.is_healthy().await);
-        
+
         // Create test event
         let event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Authentication,
@@ -537,7 +566,7 @@ mod tests {
             "test_component".to_string(),
             "test_operation".to_string(),
         ));
-        
+
         let envelope = EventEnvelope {
             version: "1.0".to_string(),
             source: platform_info,
@@ -547,12 +576,12 @@ mod tests {
             envelope_timestamp: chrono::Utc::now(),
             envelope_id: uuid::Uuid::new_v4(),
         };
-        
+
         // Send event
         let result = transport.send_event(envelope).await.unwrap();
         assert!(result.success);
         assert!(result.bytes_transferred.is_some());
-        
+
         // Check statistics
         let stats = transport.get_statistics().await;
         assert_eq!(stats.events_sent, 1);
@@ -568,7 +597,7 @@ mod tests {
             "security_monitor".to_string(),
             "threat_detected".to_string(),
         ));
-        
+
         let envelope = EventEnvelope {
             version: "1.0".to_string(),
             source: TransportFactory::get_platform_info(),
@@ -578,12 +607,13 @@ mod tests {
             envelope_timestamp: chrono::Utc::now(),
             envelope_id: uuid::Uuid::new_v4(),
         };
-        
+
         // Test JSON serialization
         let serialized = EventSerializer::serialize(&envelope, &SerializationFormat::Json).unwrap();
         assert!(!serialized.is_empty());
-        
-        let deserialized = EventSerializer::deserialize(&serialized, &SerializationFormat::Json).unwrap();
+
+        let deserialized =
+            EventSerializer::deserialize(&serialized, &SerializationFormat::Json).unwrap();
         assert_eq!(envelope.envelope_id, deserialized.envelope_id);
         assert_eq!(envelope.version, deserialized.version);
     }
@@ -592,10 +622,10 @@ mod tests {
     fn test_transport_factory() {
         let config = TransportConfig::default();
         let platform_info = TransportFactory::get_platform_info();
-        
+
         let transport = TransportFactory::create_transport(config, platform_info);
         assert!(transport.is_ok());
-        
+
         // Test platform info
         let platform_info = TransportFactory::get_platform_info();
         assert_eq!(platform_info.platform_type, "rust-cli");

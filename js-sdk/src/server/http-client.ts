@@ -889,6 +889,86 @@ export class DataFoldHttpClient {
       metadata: request.metadata
     });
   }
+
+  /**
+   * Submit key rotation request to server
+   */
+  async submitKeyRotation(request: {
+    rotation_request: any;
+    actor?: string;
+    force?: boolean;
+  }): Promise<{
+    success: boolean;
+    new_key_id: string;
+    old_key_invalidated: boolean;
+    correlation_id: string;
+    timestamp: string;
+    warnings: string[];
+    associations_updated: number;
+  }> {
+    return this.makeRequest('POST', '/keys/rotate', request);
+  }
+
+  /**
+   * Get key rotation status
+   */
+  async getKeyRotationStatus(correlationId: string): Promise<{
+    correlation_id: string;
+    status: string;
+    old_public_key: string;
+    new_public_key: string;
+    reason: string;
+    started_at: string;
+    completed_at?: string;
+    associations_updated: number;
+    error_details?: string;
+  }> {
+    return this.makeRequest('POST', '/keys/rotate/status', {
+      correlation_id: correlationId
+    });
+  }
+
+  /**
+   * Get key rotation history
+   */
+  async getKeyRotationHistory(publicKey: string, limit?: number): Promise<{
+    public_key: string;
+    rotations: Array<{
+      correlation_id: string;
+      status: string;
+      old_public_key: string;
+      new_public_key: string;
+      reason: string;
+      started_at: string;
+      completed_at?: string;
+      actor?: string;
+    }>;
+    total_count: number;
+  }> {
+    return this.makeRequest('POST', '/keys/rotate/history', {
+      public_key: publicKey,
+      limit: limit || 50
+    });
+  }
+
+  /**
+   * Validate key rotation request
+   */
+  async validateKeyRotationRequest(rotationRequest: any): Promise<{
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+    request_id: string;
+  }> {
+    return this.makeRequest('POST', '/keys/rotate/validate', rotationRequest);
+  }
+
+  /**
+   * Get key rotation statistics
+   */
+  async getKeyRotationStatistics(): Promise<any> {
+    return this.makeRequest('GET', '/keys/rotate/stats');
+  }
 }
 
 /**

@@ -141,6 +141,12 @@ impl From<crate::network::NetworkError> for NetworkErrorKind {
             }
             crate::network::NetworkError::InvalidPeerId(msg) => NetworkErrorKind::Connection(msg),
             crate::network::NetworkError::Libp2pError(msg) => NetworkErrorKind::Protocol(msg),
+            crate::network::NetworkError::ConfigurationError(msg) => {
+                NetworkErrorKind::Protocol(msg)
+            }
+            crate::network::NetworkError::Timeout(msg) => NetworkErrorKind::Timeout(msg),
+            crate::network::NetworkError::OperationNotFound(msg) => NetworkErrorKind::Message(msg),
+            crate::network::NetworkError::ConflictDetected(msg) => NetworkErrorKind::Protocol(msg),
         }
     }
 }

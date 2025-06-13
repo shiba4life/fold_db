@@ -1,5 +1,5 @@
 use super::core::DbOperations;
-use super::encryption_wrapper::{EncryptionWrapper, contexts};
+use super::encryption_wrapper::{contexts, EncryptionWrapper};
 use crate::atom::{Atom, AtomRef, AtomRefRange, AtomStatus};
 use crate::schema::SchemaError;
 use serde_json::Value;
@@ -54,7 +54,7 @@ impl DbOperations {
         encryption_wrapper.store_encrypted_item(
             &format!("atom:{}", atom.uuid()),
             &atom,
-            contexts::ATOM_DATA
+            contexts::ATOM_DATA,
         )?;
         Ok(atom)
     }
@@ -76,11 +76,18 @@ impl DbOperations {
         source_pub_key: String,
     ) -> Result<AtomRef, SchemaError> {
         // DIAGNOSTIC: Log the update attempt
-        log::info!("🔍 DIAGNOSTIC: update_atom_ref called - aref_uuid: {}, atom_uuid: {}", aref_uuid, atom_uuid);
-        
+        log::info!(
+            "🔍 DIAGNOSTIC: update_atom_ref called - aref_uuid: {}, atom_uuid: {}",
+            aref_uuid,
+            atom_uuid
+        );
+
         let mut aref = match self.get_item::<AtomRef>(&format!("ref:{}", aref_uuid))? {
             Some(existing_aref) => {
-                log::info!("🔍 DIAGNOSTIC: Found existing AtomRef - current atom_uuid: {}", existing_aref.get_atom_uuid());
+                log::info!(
+                    "🔍 DIAGNOSTIC: Found existing AtomRef - current atom_uuid: {}",
+                    existing_aref.get_atom_uuid()
+                );
                 existing_aref
             }
             None => {
@@ -90,31 +97,50 @@ impl DbOperations {
         };
 
         // DIAGNOSTIC: Log before update
-        log::info!("🔍 DIAGNOSTIC: Before set_atom_uuid - current: {}, new: {}", aref.get_atom_uuid(), atom_uuid);
-        
+        log::info!(
+            "🔍 DIAGNOSTIC: Before set_atom_uuid - current: {}, new: {}",
+            aref.get_atom_uuid(),
+            atom_uuid
+        );
+
         aref.set_atom_uuid(atom_uuid.clone());
-        
+
         // DIAGNOSTIC: Log after update
-        log::info!("🔍 DIAGNOSTIC: After set_atom_uuid - updated to: {}", aref.get_atom_uuid());
-        
+        log::info!(
+            "🔍 DIAGNOSTIC: After set_atom_uuid - updated to: {}",
+            aref.get_atom_uuid()
+        );
+
         // DIAGNOSTIC: Log before persistence
-        log::info!("🔍 DIAGNOSTIC: About to persist AtomRef with key: ref:{}", aref_uuid);
-        
+        log::info!(
+            "🔍 DIAGNOSTIC: About to persist AtomRef with key: ref:{}",
+            aref_uuid
+        );
+
         self.store_item(&format!("ref:{}", aref_uuid), &aref)?;
-        
+
         // DIAGNOSTIC: Verify persistence by reading back
         match self.get_item::<AtomRef>(&format!("ref:{}", aref_uuid))? {
             Some(persisted_aref) => {
-                log::info!("🔍 DIAGNOSTIC: Persistence verification - stored atom_uuid: {}", persisted_aref.get_atom_uuid());
+                log::info!(
+                    "🔍 DIAGNOSTIC: Persistence verification - stored atom_uuid: {}",
+                    persisted_aref.get_atom_uuid()
+                );
                 if persisted_aref.get_atom_uuid() != &atom_uuid {
-                    log::error!("❌ DIAGNOSTIC: PERSISTENCE MISMATCH! Expected: {}, Got: {}", atom_uuid, persisted_aref.get_atom_uuid());
+                    log::error!(
+                        "❌ DIAGNOSTIC: PERSISTENCE MISMATCH! Expected: {}, Got: {}",
+                        atom_uuid,
+                        persisted_aref.get_atom_uuid()
+                    );
                 }
             }
             None => {
-                log::error!("❌ DIAGNOSTIC: PERSISTENCE FAILED! Could not read back stored AtomRef");
+                log::error!(
+                    "❌ DIAGNOSTIC: PERSISTENCE FAILED! Could not read back stored AtomRef"
+                );
             }
         }
-        
+
         Ok(aref)
     }
 
@@ -127,11 +153,20 @@ impl DbOperations {
         source_pub_key: String,
     ) -> Result<AtomRef, SchemaError> {
         // DIAGNOSTIC: Log the update attempt
-        log::info!("🔍 DIAGNOSTIC: update_atom_ref_encrypted called - aref_uuid: {}, atom_uuid: {}", aref_uuid, atom_uuid);
-        
-        let mut aref = match encryption_wrapper.get_encrypted_item::<AtomRef>(&format!("ref:{}", aref_uuid), contexts::ATOM_DATA)? {
+        log::info!(
+            "🔍 DIAGNOSTIC: update_atom_ref_encrypted called - aref_uuid: {}, atom_uuid: {}",
+            aref_uuid,
+            atom_uuid
+        );
+
+        let mut aref = match encryption_wrapper
+            .get_encrypted_item::<AtomRef>(&format!("ref:{}", aref_uuid), contexts::ATOM_DATA)?
+        {
             Some(existing_aref) => {
-                log::info!("🔍 DIAGNOSTIC: Found existing encrypted AtomRef - current atom_uuid: {}", existing_aref.get_atom_uuid());
+                log::info!(
+                    "🔍 DIAGNOSTIC: Found existing encrypted AtomRef - current atom_uuid: {}",
+                    existing_aref.get_atom_uuid()
+                );
                 existing_aref
             }
             None => {
@@ -141,31 +176,56 @@ impl DbOperations {
         };
 
         // DIAGNOSTIC: Log before update
-        log::info!("🔍 DIAGNOSTIC: Before set_atom_uuid - current: {}, new: {}", aref.get_atom_uuid(), atom_uuid);
-        
+        log::info!(
+            "🔍 DIAGNOSTIC: Before set_atom_uuid - current: {}, new: {}",
+            aref.get_atom_uuid(),
+            atom_uuid
+        );
+
         aref.set_atom_uuid(atom_uuid.clone());
-        
+
         // DIAGNOSTIC: Log after update
-        log::info!("🔍 DIAGNOSTIC: After set_atom_uuid - updated to: {}", aref.get_atom_uuid());
-        
+        log::info!(
+            "🔍 DIAGNOSTIC: After set_atom_uuid - updated to: {}",
+            aref.get_atom_uuid()
+        );
+
         // DIAGNOSTIC: Log before persistence
-        log::info!("🔍 DIAGNOSTIC: About to persist encrypted AtomRef with key: ref:{}", aref_uuid);
-        
-        encryption_wrapper.store_encrypted_item(&format!("ref:{}", aref_uuid), &aref, contexts::ATOM_DATA)?;
-        
+        log::info!(
+            "🔍 DIAGNOSTIC: About to persist encrypted AtomRef with key: ref:{}",
+            aref_uuid
+        );
+
+        encryption_wrapper.store_encrypted_item(
+            &format!("ref:{}", aref_uuid),
+            &aref,
+            contexts::ATOM_DATA,
+        )?;
+
         // DIAGNOSTIC: Verify persistence by reading back
-        match encryption_wrapper.get_encrypted_item::<AtomRef>(&format!("ref:{}", aref_uuid), contexts::ATOM_DATA)? {
+        match encryption_wrapper
+            .get_encrypted_item::<AtomRef>(&format!("ref:{}", aref_uuid), contexts::ATOM_DATA)?
+        {
             Some(persisted_aref) => {
-                log::info!("🔍 DIAGNOSTIC: Persistence verification - stored atom_uuid: {}", persisted_aref.get_atom_uuid());
+                log::info!(
+                    "🔍 DIAGNOSTIC: Persistence verification - stored atom_uuid: {}",
+                    persisted_aref.get_atom_uuid()
+                );
                 if persisted_aref.get_atom_uuid() != &atom_uuid {
-                    log::error!("❌ DIAGNOSTIC: PERSISTENCE MISMATCH! Expected: {}, Got: {}", atom_uuid, persisted_aref.get_atom_uuid());
+                    log::error!(
+                        "❌ DIAGNOSTIC: PERSISTENCE MISMATCH! Expected: {}, Got: {}",
+                        atom_uuid,
+                        persisted_aref.get_atom_uuid()
+                    );
                 }
             }
             None => {
-                log::error!("❌ DIAGNOSTIC: PERSISTENCE FAILED! Could not read back stored AtomRef");
+                log::error!(
+                    "❌ DIAGNOSTIC: PERSISTENCE FAILED! Could not read back stored AtomRef"
+                );
             }
         }
-        
+
         Ok(aref)
     }
 
@@ -198,13 +258,20 @@ impl DbOperations {
         key: String,
         source_pub_key: String,
     ) -> Result<AtomRefRange, SchemaError> {
-        let mut aref = match encryption_wrapper.get_encrypted_item::<AtomRefRange>(&format!("ref:{}", aref_uuid), contexts::ATOM_DATA)? {
+        let mut aref = match encryption_wrapper.get_encrypted_item::<AtomRefRange>(
+            &format!("ref:{}", aref_uuid),
+            contexts::ATOM_DATA,
+        )? {
             Some(existing_aref) => existing_aref,
             None => AtomRefRange::new(source_pub_key),
         };
 
         aref.set_atom_uuid(key, atom_uuid);
-        encryption_wrapper.store_encrypted_item(&format!("ref:{}", aref_uuid), &aref, contexts::ATOM_DATA)?;
+        encryption_wrapper.store_encrypted_item(
+            &format!("ref:{}", aref_uuid),
+            &aref,
+            contexts::ATOM_DATA,
+        )?;
         Ok(aref)
     }
 }

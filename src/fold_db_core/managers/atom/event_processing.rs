@@ -2,10 +2,10 @@
 
 use super::AtomManager;
 use crate::fold_db_core::infrastructure::message_bus::{
-    AtomCreateRequest, AtomUpdateRequest, AtomRefCreateRequest, 
-    AtomRefUpdateRequest, FieldValueSetRequest,
+    AtomCreateRequest, AtomRefCreateRequest, AtomRefUpdateRequest, AtomUpdateRequest,
+    FieldValueSetRequest,
 };
-use log::{info, warn, error};
+use log::{error, info, warn};
 use std::sync::mpsc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -14,43 +14,46 @@ impl AtomManager {
     /// Start background event processing threads for request/response handling
     pub(super) fn start_event_processing(&self) {
         info!("🚀 Starting AtomManager pure event processing");
-        
+
         let mut threads = self.event_threads.lock().unwrap();
-        
+
         // Thread 1: AtomCreateRequest processing
         let atom_create_thread = self.start_atom_create_processing();
         threads.push(atom_create_thread);
-        
+
         // Thread 2: AtomUpdateRequest processing
         let atom_update_thread = self.start_atom_update_processing();
         threads.push(atom_update_thread);
-        
+
         // Thread 3: AtomRefCreateRequest processing
         let atomref_create_thread = self.start_atomref_create_processing();
         threads.push(atomref_create_thread);
-        
+
         // Thread 4: AtomRefUpdateRequest processing
         let atomref_update_thread = self.start_atomref_update_processing();
         threads.push(atomref_update_thread);
-        
+
         // Thread 5: FieldValueSetRequest processing - CRITICAL MUTATION BUG FIX
         let fieldvalueset_thread = self.start_fieldvalueset_processing();
         threads.push(fieldvalueset_thread);
-        
+
         // DIAGNOSTIC LOG: All handlers now implemented
         info!("🔍 DIAGNOSTIC: AtomManager event threads - AtomCreateRequest: ✅, AtomUpdateRequest: ✅, AtomRefCreateRequest: ✅, AtomRefUpdateRequest: ✅, FieldValueSetRequest: ✅ FIXED");
-        
-        info!("✅ AtomManager started {} event processing threads", threads.len());
+
+        info!(
+            "✅ AtomManager started {} event processing threads",
+            threads.len()
+        );
     }
 
     /// Process AtomCreateRequest events
     fn start_atom_create_processing(&self) -> JoinHandle<()> {
         let mut consumer = self.message_bus.subscribe::<AtomCreateRequest>();
         let manager = self.clone();
-        
+
         thread::spawn(move || {
             info!("⚛️ AtomCreateRequest processor started");
-            
+
             loop {
                 match consumer.recv_timeout(Duration::from_millis(100)) {
                     Ok(request) => {
@@ -74,10 +77,10 @@ impl AtomManager {
     fn start_atom_update_processing(&self) -> JoinHandle<()> {
         let mut consumer = self.message_bus.subscribe::<AtomUpdateRequest>();
         let manager = self.clone();
-        
+
         thread::spawn(move || {
             info!("🔄 AtomUpdateRequest processor started");
-            
+
             loop {
                 match consumer.recv_timeout(Duration::from_millis(100)) {
                     Ok(request) => {
@@ -101,10 +104,10 @@ impl AtomManager {
     fn start_atomref_create_processing(&self) -> JoinHandle<()> {
         let mut consumer = self.message_bus.subscribe::<AtomRefCreateRequest>();
         let manager = self.clone();
-        
+
         thread::spawn(move || {
             info!("🔗 AtomRefCreateRequest processor started");
-            
+
             loop {
                 match consumer.recv_timeout(Duration::from_millis(100)) {
                     Ok(request) => {
@@ -128,10 +131,10 @@ impl AtomManager {
     fn start_atomref_update_processing(&self) -> JoinHandle<()> {
         let mut consumer = self.message_bus.subscribe::<AtomRefUpdateRequest>();
         let manager = self.clone();
-        
+
         thread::spawn(move || {
             info!("🔄 AtomRefUpdateRequest processor started");
-            
+
             loop {
                 match consumer.recv_timeout(Duration::from_millis(100)) {
                     Ok(request) => {
@@ -155,10 +158,10 @@ impl AtomManager {
     fn start_fieldvalueset_processing(&self) -> JoinHandle<()> {
         let mut consumer = self.message_bus.subscribe::<FieldValueSetRequest>();
         let manager = self.clone();
-        
+
         thread::spawn(move || {
             info!("📝 FieldValueSetRequest processor started - CRITICAL MUTATION BUG FIX");
-            
+
             loop {
                 match consumer.recv_timeout(Duration::from_millis(100)) {
                     Ok(request) => {

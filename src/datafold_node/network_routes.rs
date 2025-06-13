@@ -114,8 +114,8 @@ pub async fn list_nodes(state: web::Data<AppState>) -> impl Responder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datafold_node::{config::NodeConfig, DataFoldNode};
     use crate::datafold_node::signature_auth::{SignatureAuthConfig, SignatureVerificationState};
+    use crate::datafold_node::{config::NodeConfig, DataFoldNode};
     use actix_web::web;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -129,7 +129,7 @@ mod tests {
         let sig_config = SignatureAuthConfig::default();
         let signature_auth = SignatureVerificationState::new(sig_config)
             .expect("Failed to create signature verification state for test");
-        
+
         let state = web::Data::new(super::super::http_server::AppState {
             signature_auth: Arc::new(signature_auth),
             node: Arc::new(tokio::sync::Mutex::new(node)),
@@ -148,7 +148,7 @@ mod tests {
         let sig_config = SignatureAuthConfig::default();
         let signature_auth = SignatureVerificationState::new(sig_config)
             .expect("Failed to create signature verification state for test");
-        
+
         web::Data::new(super::super::http_server::AppState {
             signature_auth: Arc::new(signature_auth),
             node: Arc::new(tokio::sync::Mutex::new(node)),

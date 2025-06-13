@@ -1,7 +1,7 @@
+use crate::config::crypto::{ConfigError, CryptoConfig};
+use crate::datafold_node::signature_auth::SignatureAuthConfig;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use crate::config::crypto::{CryptoConfig, ConfigError};
-use crate::datafold_node::signature_auth::SignatureAuthConfig;
 
 /// Configuration for a DataFoldNode instance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,7 +44,7 @@ impl NodeConfig {
             ..Default::default()
         }
     }
-    
+
     /// Create a new node configuration with cryptographic encryption enabled
     /// Signature authentication is enabled by default with standard security profile
     pub fn with_crypto(storage_path: PathBuf, crypto_config: CryptoConfig) -> Self {
@@ -55,36 +55,37 @@ impl NodeConfig {
             ..Default::default()
         }
     }
-    
+
     /// Enable cryptographic encryption for this configuration
     pub fn enable_crypto(mut self, crypto_config: CryptoConfig) -> Self {
         self.crypto = Some(crypto_config);
         self
     }
-    
+
     /// Check if cryptographic encryption is enabled
     pub fn is_crypto_enabled(&self) -> bool {
         self.crypto.as_ref().is_some_and(|c| c.enabled)
     }
-    
+
     /// Get the crypto configuration if enabled
     pub fn crypto_config(&self) -> Option<&CryptoConfig> {
         self.crypto.as_ref()
     }
-    
+
     /// Validate the configuration (including crypto and signature auth settings)
     pub fn validate(&self) -> Result<(), ConfigError> {
         // Validate crypto configuration if enabled
         if let Some(crypto) = &self.crypto {
             crypto.validate().map_err(ConfigError::CryptoValidation)?;
         }
-        
+
         // Validate signature authentication configuration (mandatory)
-        self.signature_auth.validate()
+        self.signature_auth
+            .validate()
             .map_err(|e| ConfigError::InvalidParameter {
-                message: format!("Signature auth validation failed: {}", e)
+                message: format!("Signature auth validation failed: {}", e),
             })?;
-        
+
         Ok(())
     }
 

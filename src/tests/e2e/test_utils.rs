@@ -88,7 +88,11 @@ impl E2EHttpClient {
         self.client.get(&url).send().await
     }
 
-    pub async fn post(&self, path: &str, body: serde_json::Value) -> Result<reqwest::Response, reqwest::Error> {
+    pub async fn post(
+        &self,
+        path: &str,
+        body: serde_json::Value,
+    ) -> Result<reqwest::Response, reqwest::Error> {
         let url = format!("{}{}", self.base_url, path);
         self.client.post(&url).json(&body).send().await
     }
@@ -161,18 +165,20 @@ impl TestScenario {
 
     pub async fn execute(&self, client: &E2EHttpClient) -> Result<(), Box<dyn std::error::Error>> {
         log::info!("Executing scenario: {}", self.name);
-        
+
         for step in &self.steps {
             log::debug!("Executing step: {}", step.name);
-            
+
             match &step.action {
                 TestAction::HttpGet(path) => {
                     let response = client.get(path).await?;
-                    self.validate_response(&step.expected_result, response).await?;
+                    self.validate_response(&step.expected_result, response)
+                        .await?;
                 }
                 TestAction::HttpPost(path, body) => {
                     let response = client.post(path, body.clone()).await?;
-                    self.validate_response(&step.expected_result, response).await?;
+                    self.validate_response(&step.expected_result, response)
+                        .await?;
                 }
                 TestAction::Sleep(duration) => {
                     tokio::time::sleep(tokio::time::Duration::from_secs(*duration)).await;
@@ -182,15 +188,21 @@ impl TestScenario {
                 }
             }
         }
-        
+
         Ok(())
     }
 
-    async fn validate_response(&self, expected: &ExpectedResult, response: reqwest::Response) -> Result<(), Box<dyn std::error::Error>> {
+    async fn validate_response(
+        &self,
+        expected: &ExpectedResult,
+        response: reqwest::Response,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         match expected {
             ExpectedResult::HttpStatus(status) => {
                 if response.status().as_u16() != *status {
-                    return Err(format!("Expected status {}, got {}", status, response.status()).into());
+                    return Err(
+                        format!("Expected status {}, got {}", status, response.status()).into(),
+                    );
                 }
             }
             ExpectedResult::JsonResponse(expected_json) => {
@@ -201,12 +213,18 @@ impl TestScenario {
             }
             ExpectedResult::Success => {
                 if !response.status().is_success() {
-                    return Err(format!("Expected success, got status {}", response.status()).into());
+                    return Err(
+                        format!("Expected success, got status {}", response.status()).into(),
+                    );
                 }
             }
             ExpectedResult::Failure => {
                 if response.status().is_success() {
-                    return Err(format!("Expected failure, got success status {}", response.status()).into());
+                    return Err(format!(
+                        "Expected failure, got success status {}",
+                        response.status()
+                    )
+                    .into());
                 }
             }
         }
@@ -219,11 +237,7 @@ pub mod utils {
     use super::*;
 
     pub fn create_basic_test_scenario() -> TestScenario {
-        TestScenario::new(
-            "Basic API Test",
-            "Tests basic API functionality",
-        )
-        .add_step(TestStep {
+        TestScenario::new("Basic API Test", "Tests basic API functionality").add_step(TestStep {
             name: "Health check".to_string(),
             action: TestAction::HttpGet("/health".to_string()),
             expected_result: ExpectedResult::HttpStatus(200),
@@ -231,18 +245,14 @@ pub mod utils {
     }
 
     pub fn create_authentication_test_scenario() -> TestScenario {
-        TestScenario::new(
-            "Authentication Test",
-            "Tests authentication flow",
-        )
-        .add_step(TestStep {
+        TestScenario::new("Authentication Test", "Tests authentication flow").add_step(TestStep {
             name: "Login".to_string(),
             action: TestAction::HttpPost(
                 "/auth/login".to_string(),
                 serde_json::json!({
                     "username": "test_user",
                     "password": "test_password"
-                })
+                }),
             ),
             expected_result: ExpectedResult::Success,
         })

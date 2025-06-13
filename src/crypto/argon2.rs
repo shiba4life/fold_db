@@ -1,8 +1,8 @@
 //! Argon2id passphrase-based key derivation for DataFold
 
-use crate::crypto::error::{CryptoError, CryptoResult};
 use crate::crypto::ed25519::{generate_master_keypair_from_seed, MasterKeyPair, SECRET_KEY_LENGTH};
-use argon2::{Argon2, Algorithm, Version, Params};
+use crate::crypto::error::{CryptoError, CryptoResult};
+use argon2::{Algorithm, Argon2, Params, Version};
 use rand::rngs::OsRng;
 use rand::RngCore;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -75,13 +75,13 @@ impl Argon2Params {
                 message: "Memory cost must be at least 8 KB".to_string(),
             });
         }
-        
+
         if time_cost < 1 {
             return Err(CryptoError::KeyDerivation {
                 message: "Time cost must be at least 1".to_string(),
             });
         }
-        
+
         if !(1..=16777215).contains(&parallelism) {
             return Err(CryptoError::KeyDerivation {
                 message: "Parallelism must be between 1 and 16777215".to_string(),
@@ -171,15 +171,11 @@ pub fn derive_key(
 ) -> CryptoResult<DerivedKey> {
     let argon2_params = params.to_argon2_params()?;
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, argon2_params);
-    
+
     let mut output = [0u8; OUTPUT_LENGTH];
-    
+
     argon2
-        .hash_password_into(
-            passphrase.as_bytes(),
-            salt.as_slice(),
-            &mut output,
-        )
+        .hash_password_into(passphrase.as_bytes(), salt.as_slice(), &mut output)
         .map_err(|e| CryptoError::KeyDerivation {
             message: format!("Argon2 derivation failed: {}", e),
         })?;
@@ -198,10 +194,7 @@ pub fn derive_master_keypair(
 }
 
 /// Convenience function to derive a master key pair with default parameters
-pub fn derive_master_keypair_default(
-    passphrase: &str,
-    salt: &Salt,
-) -> CryptoResult<MasterKeyPair> {
+pub fn derive_master_keypair_default(passphrase: &str, salt: &Salt) -> CryptoResult<MasterKeyPair> {
     derive_master_keypair(passphrase, salt, &Argon2Params::default())
 }
 
@@ -223,10 +216,10 @@ mod tests {
     fn test_salt_generation() {
         let salt1 = generate_salt();
         let salt2 = generate_salt();
-        
+
         assert_eq!(salt1.as_bytes().len(), SALT_LENGTH);
         assert_eq!(salt2.as_bytes().len(), SALT_LENGTH);
-        
+
         // Different salts should be different
         assert_ne!(salt1.as_bytes(), salt2.as_bytes());
     }
@@ -235,7 +228,7 @@ mod tests {
     fn test_salt_round_trip() {
         let original_bytes = [42u8; SALT_LENGTH];
         let salt = Salt::from_bytes(original_bytes);
-        
+
         assert_eq!(salt.as_bytes(), &original_bytes);
         assert_eq!(salt.as_slice(), &original_bytes[..]);
     }
@@ -247,13 +240,13 @@ mod tests {
         assert_eq!(params.memory_cost, 1024);
         assert_eq!(params.time_cost, 2);
         assert_eq!(params.parallelism, 2);
-        
+
         // Invalid memory cost
         assert!(Argon2Params::new(7, 2, 2).is_err());
-        
+
         // Invalid time cost
         assert!(Argon2Params::new(1024, 0, 2).is_err());
-        
+
         // Invalid parallelism
         assert!(Argon2Params::new(1024, 2, 0).is_err());
         assert!(Argon2Params::new(1024, 2, 16777216).is_err());
@@ -264,7 +257,7 @@ mod tests {
         let interactive = Argon2Params::interactive();
         assert!(interactive.memory_cost < DEFAULT_MEMORY_COST);
         assert!(interactive.time_cost <= DEFAULT_TIME_COST);
-        
+
         let sensitive = Argon2Params::sensitive();
         assert!(sensitive.memory_cost > DEFAULT_MEMORY_COST);
         assert!(sensitive.time_cost >= DEFAULT_TIME_COST);
@@ -275,10 +268,10 @@ mod tests {
         let passphrase = "test-passphrase-123";
         let salt = Salt::from_bytes([1u8; SALT_LENGTH]);
         let params = Argon2Params::default();
-        
+
         let key1 = derive_key(passphrase, &salt, &params).expect("Derivation 1");
         let key2 = derive_key(passphrase, &salt, &params).expect("Derivation 2");
-        
+
         assert_eq!(key1.as_bytes(), key2.as_bytes());
     }
 
@@ -288,10 +281,10 @@ mod tests {
         let salt1 = Salt::from_bytes([1u8; SALT_LENGTH]);
         let salt2 = Salt::from_bytes([2u8; SALT_LENGTH]);
         let params = Argon2Params::default();
-        
+
         let key1 = derive_key(passphrase, &salt1, &params).expect("Derivation 1");
         let key2 = derive_key(passphrase, &salt2, &params).expect("Derivation 2");
-        
+
         assert_ne!(key1.as_bytes(), key2.as_bytes());
     }
 
@@ -299,10 +292,10 @@ mod tests {
     fn test_different_passphrases_produce_different_keys() {
         let salt = Salt::from_bytes([1u8; SALT_LENGTH]);
         let params = Argon2Params::default();
-        
+
         let key1 = derive_key("passphrase1", &salt, &params).expect("Derivation 1");
         let key2 = derive_key("passphrase2", &salt, &params).expect("Derivation 2");
-        
+
         assert_ne!(key1.as_bytes(), key2.as_bytes());
     }
 
@@ -311,14 +304,16 @@ mod tests {
         let passphrase = "test-passphrase-for-keypair";
         let salt = Salt::from_bytes([3u8; SALT_LENGTH]);
         let params = Argon2Params::default();
-        
+
         let keypair = derive_master_keypair(passphrase, &salt, &params)
             .expect("Failed to derive master keypair");
-        
+
         // Test that the keypair can sign and verify
         let message = b"test message";
         let signature = keypair.sign_data(message).expect("Failed to sign");
-        keypair.verify_data(message, &signature).expect("Failed to verify");
+        keypair
+            .verify_data(message, &signature)
+            .expect("Failed to verify");
     }
 
     #[test]
@@ -326,47 +321,53 @@ mod tests {
         let passphrase = "test-passphrase-key-conversion";
         let salt = Salt::from_bytes([4u8; SALT_LENGTH]);
         let params = Argon2Params::default();
-        
-        let derived_key = derive_key(passphrase, &salt, &params)
-            .expect("Failed to derive key");
-        
-        let keypair = derived_key.to_master_keypair()
+
+        let derived_key = derive_key(passphrase, &salt, &params).expect("Failed to derive key");
+
+        let keypair = derived_key
+            .to_master_keypair()
             .expect("Failed to convert to keypair");
-        
+
         // Test that the keypair works
         let message = b"test message for keypair conversion";
         let signature = keypair.sign_data(message).expect("Failed to sign");
-        keypair.verify_data(message, &signature).expect("Failed to verify");
+        keypair
+            .verify_data(message, &signature)
+            .expect("Failed to verify");
     }
 
     #[test]
     fn test_default_derivation() {
         let passphrase = "test-default-derivation";
         let salt = Salt::from_bytes([5u8; SALT_LENGTH]);
-        
+
         let keypair = derive_master_keypair_default(passphrase, &salt)
             .expect("Failed to derive with defaults");
-        
+
         // Test that it works
         let message = b"test default derivation";
         let signature = keypair.sign_data(message).expect("Failed to sign");
-        keypair.verify_data(message, &signature).expect("Failed to verify");
+        keypair
+            .verify_data(message, &signature)
+            .expect("Failed to verify");
     }
 
     #[test]
     fn test_generate_salt_and_derive() {
         let passphrase = "test-generate-and-derive";
         let params = Argon2Params::interactive();
-        
+
         let (salt, keypair) = generate_salt_and_derive_keypair(passphrase, &params)
             .expect("Failed to generate and derive");
-        
+
         assert_eq!(salt.as_bytes().len(), SALT_LENGTH);
-        
+
         // Test that the keypair works
         let message = b"test generate and derive";
         let signature = keypair.sign_data(message).expect("Failed to sign");
-        keypair.verify_data(message, &signature).expect("Failed to verify");
+        keypair
+            .verify_data(message, &signature)
+            .expect("Failed to verify");
     }
 
     #[test]
@@ -374,17 +375,17 @@ mod tests {
         let passphrase = "consistency-test-passphrase";
         let salt = Salt::from_bytes([6u8; SALT_LENGTH]);
         let params = Argon2Params::default();
-        
+
         // Derive keypair directly
-        let keypair1 = derive_master_keypair(passphrase, &salt, &params)
-            .expect("Failed direct derivation");
-        
+        let keypair1 =
+            derive_master_keypair(passphrase, &salt, &params).expect("Failed direct derivation");
+
         // Derive key then convert to keypair
-        let derived_key = derive_key(passphrase, &salt, &params)
-            .expect("Failed key derivation");
-        let keypair2 = derived_key.to_master_keypair()
+        let derived_key = derive_key(passphrase, &salt, &params).expect("Failed key derivation");
+        let keypair2 = derived_key
+            .to_master_keypair()
             .expect("Failed key to keypair conversion");
-        
+
         // Both should produce the same public key
         assert_eq!(keypair1.public_key_bytes(), keypair2.public_key_bytes());
         assert_eq!(keypair1.secret_key_bytes(), keypair2.secret_key_bytes());
@@ -395,13 +396,17 @@ mod tests {
         let passphrase = "performance-test-passphrase";
         let salt = generate_salt();
         let params = Argon2Params::interactive(); // Faster parameters
-        
+
         let start = std::time::Instant::now();
-        let _keypair = derive_master_keypair(passphrase, &salt, &params)
-            .expect("Failed performance test");
+        let _keypair =
+            derive_master_keypair(passphrase, &salt, &params).expect("Failed performance test");
         let duration = start.elapsed();
-        
+
         // Should complete in reasonable time (less than 5 seconds for interactive params)
-        assert!(duration.as_secs() < 5, "Key derivation took too long: {:?}", duration);
+        assert!(
+            duration.as_secs() < 5,
+            "Key derivation took too long: {:?}",
+            duration
+        );
     }
-} 
+}

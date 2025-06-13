@@ -4,18 +4,18 @@
 //! initialization, including both random key generation and passphrase-based
 //! key derivation workflows.
 
-use crate::config::crypto::{CryptoConfig, MasterKeyConfig, KeyDerivationConfig, SecurityLevel};
+use crate::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel};
 use crate::datafold_node::crypto_init::{
-    initialize_database_crypto, get_crypto_init_status, validate_crypto_config_for_init,
-    is_crypto_init_needed, CryptoInitError
+    get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed,
+    validate_crypto_config_for_init, CryptoInitError,
 };
 use crate::datafold_node::http_server::AppState;
 use actix_web::{web, HttpResponse, Result as ActixResult};
-use log::{info, warn, debug, error};
+use base64;
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-use base64;
 
 /// Standard API response wrapper
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,21 +72,23 @@ impl ApiError {
 impl From<CryptoInitError> for ApiError {
     fn from(error: CryptoInitError) -> Self {
         match error {
-            CryptoInitError::AlreadyInitialized => {
-                ApiError::new("CRYPTO_ALREADY_INITIALIZED", "Database already has crypto metadata initialized")
-            }
-            CryptoInitError::InvalidConfig(msg) => {
-                ApiError::new("INVALID_CRYPTO_CONFIG", &msg)
-            }
-            CryptoInitError::Config(config_error) => {
-                ApiError::new("CONFIG_ERROR", &format!("Configuration error: {}", config_error))
-            }
-            CryptoInitError::Crypto(crypto_error) => {
-                ApiError::new("CRYPTO_ERROR", &format!("Cryptographic operation failed: {}", crypto_error))
-            }
-            CryptoInitError::Database(db_error) => {
-                ApiError::new("DATABASE_ERROR", &format!("Database operation failed: {}", db_error))
-            }
+            CryptoInitError::AlreadyInitialized => ApiError::new(
+                "CRYPTO_ALREADY_INITIALIZED",
+                "Database already has crypto metadata initialized",
+            ),
+            CryptoInitError::InvalidConfig(msg) => ApiError::new("INVALID_CRYPTO_CONFIG", &msg),
+            CryptoInitError::Config(config_error) => ApiError::new(
+                "CONFIG_ERROR",
+                &format!("Configuration error: {}", config_error),
+            ),
+            CryptoInitError::Crypto(crypto_error) => ApiError::new(
+                "CRYPTO_ERROR",
+                &format!("Cryptographic operation failed: {}", crypto_error),
+            ),
+            CryptoInitError::Database(db_error) => ApiError::new(
+                "DATABASE_ERROR",
+                &format!("Database operation failed: {}", db_error),
+            ),
             CryptoInitError::Sled(sled_error) => {
                 ApiError::new("DATABASE_ERROR", &format!("Database error: {}", sled_error))
             }
@@ -189,8 +191,8 @@ pub struct PublicKeyStatusResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SignatureVerificationRequest {
     pub client_id: String,
-    pub message: String, // Base64 or hex-encoded message data
-    pub signature: String, // Hex-encoded Ed25519 signature (64 bytes)
+    pub message: String,                  // Base64 or hex-encoded message data
+    pub signature: String,                // Hex-encoded Ed25519 signature (64 bytes)
     pub message_encoding: Option<String>, // "base64", "hex", or "utf8" (default: "utf8")
     pub metadata: Option<HashMap<String, String>>, // Optional context metadata
 }
@@ -223,17 +225,17 @@ pub const PUBLIC_KEY_REGISTRATIONS_TREE: &str = "public_key_registrations";
 pub const CLIENT_KEY_INDEX_TREE: &str = "client_key_index";
 
 /// Initialize database crypto with randomly generated keys
-/// 
+///
 /// POST /api/crypto/init/random
-pub async fn init_random_key(
-    app_state: web::Data<AppState>,
-) -> ActixResult<HttpResponse> {
+pub async fn init_random_key(app_state: web::Data<AppState>) -> ActixResult<HttpResponse> {
     info!("API request: Initialize crypto with random key");
 
     let response = async {
         // Get database operations
         let node = app_state.node.lock().await;
-        let db = node.db.lock()
+        let db = node
+            .db
+            .lock()
             .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
         let db_ops = db.db_ops();
         drop(db);
@@ -243,16 +245,18 @@ pub async fn init_random_key(
         let crypto_config = CryptoConfig::with_random_key();
 
         // Check if crypto initialization is needed
-        let needs_init = is_crypto_init_needed(db_ops.clone(), Some(&crypto_config))
-            .map_err(ApiError::from)?;
+        let needs_init =
+            is_crypto_init_needed(db_ops.clone(), Some(&crypto_config)).map_err(ApiError::from)?;
 
         if !needs_init {
-            return Err(ApiError::new("CRYPTO_ALREADY_INITIALIZED", "Database already has crypto metadata initialized"));
+            return Err(ApiError::new(
+                "CRYPTO_ALREADY_INITIALIZED",
+                "Database already has crypto metadata initialized",
+            ));
         }
 
         // Perform crypto initialization
-        let context = initialize_database_crypto(db_ops, &crypto_config)
-            .map_err(ApiError::from)?;
+        let context = initialize_database_crypto(db_ops, &crypto_config).map_err(ApiError::from)?;
 
         // Extract values before moving context
         let derivation_method = context.derivation_method.clone();
@@ -267,7 +271,8 @@ pub async fn init_random_key(
             public_key: hex::encode(public_key_bytes),
             created_at,
         })
-    }.await;
+    }
+    .await;
 
     match response {
         Ok(data) => {
@@ -282,7 +287,7 @@ pub async fn init_random_key(
 }
 
 /// Initialize database crypto with passphrase-derived keys
-/// 
+///
 /// POST /api/crypto/init/passphrase
 pub async fn init_passphrase_key(
     app_state: web::Data<AppState>,
@@ -293,16 +298,24 @@ pub async fn init_passphrase_key(
     let response = async {
         // Validate passphrase
         if request.passphrase.is_empty() {
-            return Err(ApiError::new("INVALID_PASSPHRASE", "Passphrase cannot be empty"));
+            return Err(ApiError::new(
+                "INVALID_PASSPHRASE",
+                "Passphrase cannot be empty",
+            ));
         }
 
         if request.passphrase.len() > 1024 {
-            return Err(ApiError::new("INVALID_PASSPHRASE", "Passphrase is too long (max 1024 characters)"));
+            return Err(ApiError::new(
+                "INVALID_PASSPHRASE",
+                "Passphrase is too long (max 1024 characters)",
+            ));
         }
 
         // Get database operations
         let node = app_state.node.lock().await;
-        let db = node.db.lock()
+        let db = node
+            .db
+            .lock()
             .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
         let db_ops = db.db_ops();
         drop(db);
@@ -310,7 +323,7 @@ pub async fn init_passphrase_key(
 
         // Create crypto configuration for passphrase
         let mut key_derivation = KeyDerivationConfig::for_security_level(request.security_level);
-        
+
         // Apply custom parameters if provided
         if let Some(custom_params) = &request.custom_params {
             if let Some(memory_cost) = custom_params.memory_cost {
@@ -333,20 +346,21 @@ pub async fn init_passphrase_key(
         };
 
         // Validate configuration
-        validate_crypto_config_for_init(&crypto_config)
-            .map_err(ApiError::from)?;
+        validate_crypto_config_for_init(&crypto_config).map_err(ApiError::from)?;
 
         // Check if crypto initialization is needed
-        let needs_init = is_crypto_init_needed(db_ops.clone(), Some(&crypto_config))
-            .map_err(ApiError::from)?;
+        let needs_init =
+            is_crypto_init_needed(db_ops.clone(), Some(&crypto_config)).map_err(ApiError::from)?;
 
         if !needs_init {
-            return Err(ApiError::new("CRYPTO_ALREADY_INITIALIZED", "Database already has crypto metadata initialized"));
+            return Err(ApiError::new(
+                "CRYPTO_ALREADY_INITIALIZED",
+                "Database already has crypto metadata initialized",
+            ));
         }
 
         // Perform crypto initialization
-        let context = initialize_database_crypto(db_ops, &crypto_config)
-            .map_err(ApiError::from)?;
+        let context = initialize_database_crypto(db_ops, &crypto_config).map_err(ApiError::from)?;
 
         // Extract values before moving context
         let derivation_method = context.derivation_method.clone();
@@ -361,7 +375,8 @@ pub async fn init_passphrase_key(
             public_key: hex::encode(public_key_bytes),
             created_at,
         })
-    }.await;
+    }
+    .await;
 
     match response {
         Ok(data) => {
@@ -377,34 +392,31 @@ pub async fn init_passphrase_key(
                 "INVALID_PASSPHRASE" | "INVALID_CRYPTO_CONFIG" => {
                     Ok(HttpResponse::BadRequest().json(ApiResponse::<()>::error(error)))
                 }
-                _ => {
-                    Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(error)))
-                }
+                _ => Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(error))),
             }
         }
     }
 }
 
 /// Get current crypto initialization status
-/// 
+///
 /// GET /api/crypto/status
-pub async fn get_crypto_status(
-    app_state: web::Data<AppState>,
-) -> ActixResult<HttpResponse> {
+pub async fn get_crypto_status(app_state: web::Data<AppState>) -> ActixResult<HttpResponse> {
     debug!("API request: Get crypto status");
 
     let response: Result<CryptoStatusResponse, ApiError> = async {
         // Get database operations
         let node = app_state.node.lock().await;
-        let db = node.db.lock()
+        let db = node
+            .db
+            .lock()
             .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
         let db_ops = db.db_ops();
         drop(db);
         drop(node);
 
         // Get crypto status
-        let status = get_crypto_init_status(db_ops)
-            .map_err(ApiError::from)?;
+        let status = get_crypto_init_status(db_ops).map_err(ApiError::from)?;
 
         Ok(CryptoStatusResponse {
             initialized: status.initialized,
@@ -414,7 +426,8 @@ pub async fn get_crypto_status(
             created_at: status.created_at,
             integrity_verified: status.integrity_verified,
         })
-    }.await;
+    }
+    .await;
 
     match response {
         Ok(data) => {
@@ -429,7 +442,7 @@ pub async fn get_crypto_status(
 }
 
 /// Validate crypto configuration without initializing
-/// 
+///
 /// POST /api/crypto/validate
 pub async fn validate_crypto_config(
     request: web::Json<ValidateConfigRequest>,
@@ -472,7 +485,7 @@ pub async fn validate_crypto_config(
                 }
 
                 let mut key_derivation = KeyDerivationConfig::for_security_level(request.security_level);
-                
+
                 // Apply custom parameters if provided
                 if let Some(custom_params) = &request.custom_params {
                     if let Some(memory_cost) = custom_params.memory_cost {
@@ -544,31 +557,46 @@ pub async fn register_public_key(
     let response = async {
         // Validate required fields
         if request.public_key.is_empty() {
-            return Err(ApiError::new("INVALID_PUBLIC_KEY", "Public key cannot be empty"));
+            return Err(ApiError::new(
+                "INVALID_PUBLIC_KEY",
+                "Public key cannot be empty",
+            ));
         }
 
         // Decode and validate public key
-        let public_key_bytes = hex::decode(&request.public_key)
-            .map_err(|_| ApiError::new("INVALID_PUBLIC_KEY", "Public key must be valid hex-encoded bytes"))?;
-        
+        let public_key_bytes = hex::decode(&request.public_key).map_err(|_| {
+            ApiError::new(
+                "INVALID_PUBLIC_KEY",
+                "Public key must be valid hex-encoded bytes",
+            )
+        })?;
+
         if public_key_bytes.len() != 32 {
-            return Err(ApiError::new("INVALID_PUBLIC_KEY", "Ed25519 public key must be exactly 32 bytes"));
+            return Err(ApiError::new(
+                "INVALID_PUBLIC_KEY",
+                "Ed25519 public key must be exactly 32 bytes",
+            ));
         }
 
         let mut key_bytes_array = [0u8; 32];
         key_bytes_array.copy_from_slice(&public_key_bytes);
 
         // Validate the public key by creating a PublicKey instance
-        let _public_key = crate::crypto::PublicKey::from_bytes(&key_bytes_array)
-            .map_err(|_| ApiError::new("INVALID_PUBLIC_KEY", "Invalid Ed25519 public key format"))?;
+        let _public_key = crate::crypto::PublicKey::from_bytes(&key_bytes_array).map_err(|_| {
+            ApiError::new("INVALID_PUBLIC_KEY", "Invalid Ed25519 public key format")
+        })?;
 
         // Generate client ID if not provided
-        let client_id = request.client_id.clone()
+        let client_id = request
+            .client_id
+            .clone()
             .unwrap_or_else(|| format!("client_{}", Uuid::new_v4()));
 
         // Check if client already has a registered key
         let node = app_state.node.lock().await;
-        let db = node.db.lock()
+        let db = node
+            .db
+            .lock()
             .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
         let db_ops = db.db_ops();
         drop(db);
@@ -577,13 +605,15 @@ pub async fn register_public_key(
         // Check for existing registration by client_id
         let client_key_lookup = format!("{}:{}", CLIENT_KEY_INDEX_TREE, &client_id);
         if let Ok(Some(_)) = db_ops.get_item::<String>(&client_key_lookup) {
-            return Err(ApiError::new("CLIENT_ALREADY_REGISTERED",
-                "Client already has a registered public key. Use update endpoint to change keys."));
+            return Err(ApiError::new(
+                "CLIENT_ALREADY_REGISTERED",
+                "Client already has a registered public key. Use update endpoint to change keys.",
+            ));
         }
 
         // Check for duplicate public key
         let public_key_hash = {
-            use sha2::{Sha256, Digest};
+            use sha2::{Digest, Sha256};
             let mut hasher = Sha256::new();
             hasher.update(key_bytes_array);
             hex::encode(hasher.finalize())
@@ -594,14 +624,16 @@ pub async fn register_public_key(
         for (_, value) in db_ops.db().scan_prefix(tree_prefix.as_bytes()).flatten() {
             if let Ok(registration) = serde_json::from_slice::<PublicKeyRegistration>(&value) {
                 let existing_hash = {
-                    use sha2::{Sha256, Digest};
+                    use sha2::{Digest, Sha256};
                     let mut hasher = Sha256::new();
                     hasher.update(registration.public_key_bytes);
                     hex::encode(hasher.finalize())
                 };
                 if existing_hash == public_key_hash {
-                    return Err(ApiError::new("DUPLICATE_PUBLIC_KEY",
-                        "This public key is already registered by another client"));
+                    return Err(ApiError::new(
+                        "DUPLICATE_PUBLIC_KEY",
+                        "This public key is already registered by another client",
+                    ));
                 }
             }
         }
@@ -609,7 +641,7 @@ pub async fn register_public_key(
         // Create registration record
         let registration_id = Uuid::new_v4().to_string();
         let now = chrono::Utc::now();
-        
+
         let registration = PublicKeyRegistration {
             registration_id: registration_id.clone(),
             client_id: client_id.clone(),
@@ -624,16 +656,31 @@ pub async fn register_public_key(
 
         // Store registration in database
         let registration_key = format!("{}:{}", PUBLIC_KEY_REGISTRATIONS_TREE, &registration_id);
-        
-        db_ops.store_item(&registration_key, &registration)
-            .map_err(|e| ApiError::new("DATABASE_ERROR", &format!("Failed to store registration: {}", e)))?;
+
+        db_ops
+            .store_item(&registration_key, &registration)
+            .map_err(|e| {
+                ApiError::new(
+                    "DATABASE_ERROR",
+                    &format!("Failed to store registration: {}", e),
+                )
+            })?;
 
         // Store client -> registration_id index
         let client_index_key = format!("{}:{}", CLIENT_KEY_INDEX_TREE, &client_id);
-        db_ops.store_item(&client_index_key, &registration_id)
-            .map_err(|e| ApiError::new("DATABASE_ERROR", &format!("Failed to store client index: {}", e)))?;
+        db_ops
+            .store_item(&client_index_key, &registration_id)
+            .map_err(|e| {
+                ApiError::new(
+                    "DATABASE_ERROR",
+                    &format!("Failed to store client index: {}", e),
+                )
+            })?;
 
-        info!("Public key registered successfully for client: {}", client_id);
+        info!(
+            "Public key registered successfully for client: {}",
+            client_id
+        );
 
         Ok(PublicKeyRegistrationResponse {
             registration_id,
@@ -643,7 +690,8 @@ pub async fn register_public_key(
             registered_at: now,
             status: "active".to_string(),
         })
-    }.await;
+    }
+    .await;
 
     match response {
         Ok(data) => {
@@ -659,9 +707,7 @@ pub async fn register_public_key(
                 "INVALID_PUBLIC_KEY" => {
                     Ok(HttpResponse::BadRequest().json(ApiResponse::<()>::error(error)))
                 }
-                _ => {
-                    Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(error)))
-                }
+                _ => Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(error))),
             }
         }
     }
@@ -675,11 +721,16 @@ pub async fn get_public_key_status(
     path: web::Path<String>,
 ) -> ActixResult<HttpResponse> {
     let client_id = path.into_inner();
-    debug!("API request: Get public key status for client: {}", client_id);
+    debug!(
+        "API request: Get public key status for client: {}",
+        client_id
+    );
 
     let response: Result<PublicKeyStatusResponse, ApiError> = async {
         let node = app_state.node.lock().await;
-        let db = node.db.lock()
+        let db = node
+            .db
+            .lock()
             .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
         let db_ops = db.db_ops();
         drop(db);
@@ -687,15 +738,32 @@ pub async fn get_public_key_status(
 
         // Look up registration ID by client ID
         let client_index_key = format!("{}:{}", CLIENT_KEY_INDEX_TREE, &client_id);
-        let registration_id_str = db_ops.get_item::<String>(&client_index_key)
-            .map_err(|e| ApiError::new("DATABASE_ERROR", &format!("Failed to lookup client: {}", e)))?
-            .ok_or_else(|| ApiError::new("CLIENT_NOT_FOUND", "No public key registered for this client"))?;
+        let registration_id_str = db_ops
+            .get_item::<String>(&client_index_key)
+            .map_err(|e| {
+                ApiError::new("DATABASE_ERROR", &format!("Failed to lookup client: {}", e))
+            })?
+            .ok_or_else(|| {
+                ApiError::new(
+                    "CLIENT_NOT_FOUND",
+                    "No public key registered for this client",
+                )
+            })?;
 
         // Get registration record
-        let registration_key = format!("{}:{}", PUBLIC_KEY_REGISTRATIONS_TREE, &registration_id_str);
-        let registration: PublicKeyRegistration = db_ops.get_item(&registration_key)
-            .map_err(|e| ApiError::new("DATABASE_ERROR", &format!("Failed to get registration: {}", e)))?
-            .ok_or_else(|| ApiError::new("REGISTRATION_NOT_FOUND", "Registration record not found"))?;
+        let registration_key =
+            format!("{}:{}", PUBLIC_KEY_REGISTRATIONS_TREE, &registration_id_str);
+        let registration: PublicKeyRegistration = db_ops
+            .get_item(&registration_key)
+            .map_err(|e| {
+                ApiError::new(
+                    "DATABASE_ERROR",
+                    &format!("Failed to get registration: {}", e),
+                )
+            })?
+            .ok_or_else(|| {
+                ApiError::new("REGISTRATION_NOT_FOUND", "Registration record not found")
+            })?;
 
         Ok(PublicKeyStatusResponse {
             registration_id: registration.registration_id,
@@ -706,7 +774,8 @@ pub async fn get_public_key_status(
             status: registration.status,
             last_used: registration.last_used,
         })
-    }.await;
+    }
+    .await;
 
     match response {
         Ok(data) => {
@@ -719,9 +788,7 @@ pub async fn get_public_key_status(
                 "CLIENT_NOT_FOUND" | "REGISTRATION_NOT_FOUND" => {
                     Ok(HttpResponse::NotFound().json(ApiResponse::<()>::error(error)))
                 }
-                _ => {
-                    Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(error)))
-                }
+                _ => Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(error))),
             }
         }
     }
@@ -734,12 +801,18 @@ pub async fn verify_signature(
     app_state: web::Data<AppState>,
     request: web::Json<SignatureVerificationRequest>,
 ) -> ActixResult<HttpResponse> {
-    info!("API request: Verify digital signature for client: {}", request.client_id);
+    info!(
+        "API request: Verify digital signature for client: {}",
+        request.client_id
+    );
 
     let response = async {
         // Validate required fields
         if request.client_id.is_empty() {
-            return Err(ApiError::new("INVALID_CLIENT_ID", "Client ID cannot be empty"));
+            return Err(ApiError::new(
+                "INVALID_CLIENT_ID",
+                "Client ID cannot be empty",
+            ));
         }
 
         if request.message.is_empty() {
@@ -747,15 +820,25 @@ pub async fn verify_signature(
         }
 
         if request.signature.is_empty() {
-            return Err(ApiError::new("INVALID_SIGNATURE", "Signature cannot be empty"));
+            return Err(ApiError::new(
+                "INVALID_SIGNATURE",
+                "Signature cannot be empty",
+            ));
         }
 
         // Decode signature from hex
-        let signature_bytes = hex::decode(&request.signature)
-            .map_err(|_| ApiError::new("INVALID_SIGNATURE", "Signature must be valid hex-encoded bytes"))?;
-        
+        let signature_bytes = hex::decode(&request.signature).map_err(|_| {
+            ApiError::new(
+                "INVALID_SIGNATURE",
+                "Signature must be valid hex-encoded bytes",
+            )
+        })?;
+
         if signature_bytes.len() != 64 {
-            return Err(ApiError::new("INVALID_SIGNATURE", "Ed25519 signature must be exactly 64 bytes"));
+            return Err(ApiError::new(
+                "INVALID_SIGNATURE",
+                "Ed25519 signature must be exactly 64 bytes",
+            ));
         }
 
         let mut signature_array = [0u8; 64];
@@ -768,16 +851,26 @@ pub async fn verify_signature(
             "hex" => hex::decode(&request.message)
                 .map_err(|_| ApiError::new("INVALID_MESSAGE", "Invalid hex-encoded message"))?,
             "base64" => {
-                use base64::{Engine as _, engine::general_purpose};
-                general_purpose::STANDARD.decode(&request.message)
-                    .map_err(|_| ApiError::new("INVALID_MESSAGE", "Invalid base64-encoded message"))?
-            },
-            _ => return Err(ApiError::new("INVALID_ENCODING", "Message encoding must be 'utf8', 'hex', or 'base64'")),
+                use base64::{engine::general_purpose, Engine as _};
+                general_purpose::STANDARD
+                    .decode(&request.message)
+                    .map_err(|_| {
+                        ApiError::new("INVALID_MESSAGE", "Invalid base64-encoded message")
+                    })?
+            }
+            _ => {
+                return Err(ApiError::new(
+                    "INVALID_ENCODING",
+                    "Message encoding must be 'utf8', 'hex', or 'base64'",
+                ))
+            }
         };
 
         // Get database operations
         let node = app_state.node.lock().await;
-        let db = node.db.lock()
+        let db = node
+            .db
+            .lock()
             .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
         let db_ops = db.db_ops();
         drop(db);
@@ -785,50 +878,93 @@ pub async fn verify_signature(
 
         // Look up registration by client ID
         let client_index_key = format!("{}:{}", CLIENT_KEY_INDEX_TREE, &request.client_id);
-        let registration_id_str = db_ops.get_item::<String>(&client_index_key)
-            .map_err(|e| ApiError::new("DATABASE_ERROR", &format!("Failed to lookup client: {}", e)))?
-            .ok_or_else(|| ApiError::new("CLIENT_NOT_FOUND", "No public key registered for this client"))?;
+        let registration_id_str = db_ops
+            .get_item::<String>(&client_index_key)
+            .map_err(|e| {
+                ApiError::new("DATABASE_ERROR", &format!("Failed to lookup client: {}", e))
+            })?
+            .ok_or_else(|| {
+                ApiError::new(
+                    "CLIENT_NOT_FOUND",
+                    "No public key registered for this client",
+                )
+            })?;
 
         // Get registration record
-        let registration_key = format!("{}:{}", PUBLIC_KEY_REGISTRATIONS_TREE, &registration_id_str);
-        let mut registration: PublicKeyRegistration = db_ops.get_item(&registration_key)
-            .map_err(|e| ApiError::new("DATABASE_ERROR", &format!("Failed to get registration: {}", e)))?
-            .ok_or_else(|| ApiError::new("REGISTRATION_NOT_FOUND", "Registration record not found"))?;
+        let registration_key =
+            format!("{}:{}", PUBLIC_KEY_REGISTRATIONS_TREE, &registration_id_str);
+        let mut registration: PublicKeyRegistration = db_ops
+            .get_item(&registration_key)
+            .map_err(|e| {
+                ApiError::new(
+                    "DATABASE_ERROR",
+                    &format!("Failed to get registration: {}", e),
+                )
+            })?
+            .ok_or_else(|| {
+                ApiError::new("REGISTRATION_NOT_FOUND", "Registration record not found")
+            })?;
 
         // Check if the public key is active
         if registration.status != "active" {
-            return Err(ApiError::new("KEY_NOT_ACTIVE", &format!("Public key status is '{}', only 'active' keys can verify signatures", registration.status)));
+            return Err(ApiError::new(
+                "KEY_NOT_ACTIVE",
+                &format!(
+                    "Public key status is '{}', only 'active' keys can verify signatures",
+                    registration.status
+                ),
+            ));
         }
 
         // Create PublicKey instance for verification
         let public_key = crate::crypto::PublicKey::from_bytes(&registration.public_key_bytes)
-            .map_err(|e| ApiError::new("INVALID_PUBLIC_KEY", &format!("Failed to load public key: {}", e)))?;
+            .map_err(|e| {
+                ApiError::new(
+                    "INVALID_PUBLIC_KEY",
+                    &format!("Failed to load public key: {}", e),
+                )
+            })?;
 
         // Verify the signature
         let verification_result = public_key.verify(&message_bytes, &signature_array);
         let verified = verification_result.is_ok();
 
         if !verified {
-            warn!("Signature verification failed for client: {}", request.client_id);
-            return Err(ApiError::new("SIGNATURE_VERIFICATION_FAILED", "Digital signature verification failed"));
+            warn!(
+                "Signature verification failed for client: {}",
+                request.client_id
+            );
+            return Err(ApiError::new(
+                "SIGNATURE_VERIFICATION_FAILED",
+                "Digital signature verification failed",
+            ));
         }
 
         // Update last_used timestamp
         let now = chrono::Utc::now();
         registration.last_used = Some(now);
-        
-        db_ops.store_item(&registration_key, &registration)
-            .map_err(|e| ApiError::new("DATABASE_ERROR", &format!("Failed to update registration: {}", e)))?;
+
+        db_ops
+            .store_item(&registration_key, &registration)
+            .map_err(|e| {
+                ApiError::new(
+                    "DATABASE_ERROR",
+                    &format!("Failed to update registration: {}", e),
+                )
+            })?;
 
         // Compute message hash for audit trail
         let message_hash = {
-            use sha2::{Sha256, Digest};
+            use sha2::{Digest, Sha256};
             let mut hasher = Sha256::new();
             hasher.update(&message_bytes);
             hex::encode(hasher.finalize())
         };
 
-        info!("Signature verification successful for client: {}", request.client_id);
+        info!(
+            "Signature verification successful for client: {}",
+            request.client_id
+        );
 
         Ok(SignatureVerificationResponse {
             verified: true,
@@ -837,7 +973,8 @@ pub async fn verify_signature(
             verified_at: now,
             message_hash,
         })
-    }.await;
+    }
+    .await;
 
     match response {
         Ok(data) => {
@@ -850,7 +987,8 @@ pub async fn verify_signature(
                 "CLIENT_NOT_FOUND" | "REGISTRATION_NOT_FOUND" => {
                     Ok(HttpResponse::NotFound().json(ApiResponse::<()>::error(error)))
                 }
-                "INVALID_CLIENT_ID" | "INVALID_MESSAGE" | "INVALID_SIGNATURE" | "INVALID_ENCODING" => {
+                "INVALID_CLIENT_ID" | "INVALID_MESSAGE" | "INVALID_SIGNATURE"
+                | "INVALID_ENCODING" => {
                     Ok(HttpResponse::BadRequest().json(ApiResponse::<()>::error(error)))
                 }
                 "KEY_NOT_ACTIVE" => {
@@ -859,9 +997,7 @@ pub async fn verify_signature(
                 "SIGNATURE_VERIFICATION_FAILED" => {
                     Ok(HttpResponse::Unauthorized().json(ApiResponse::<()>::error(error)))
                 }
-                _ => {
-                    Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(error)))
-                }
+                _ => Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(error))),
             }
         }
     }

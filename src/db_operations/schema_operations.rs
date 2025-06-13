@@ -1,9 +1,9 @@
 use super::core::DbOperations;
+use crate::atom::{Atom, AtomRef, AtomRefBehavior};
 use crate::schema::core::SchemaState;
+use crate::schema::types::field::{common::Field, FieldVariant};
 use crate::schema::Schema;
 use crate::schema::SchemaError;
-use crate::schema::types::field::{FieldVariant, common::Field};
-use crate::atom::{Atom, AtomRef, AtomRefBehavior};
 use serde_json::json;
 
 impl DbOperations {
@@ -54,10 +54,10 @@ impl DbOperations {
                 schema_name
             )));
         }
-        
+
         // Clone the schema so we can modify fields to add AtomRefs
         let mut schema_with_refs = schema.clone();
-        
+
         // Process each field to ensure it has an AtomRef for immediate queryability
         for (field_name, field_variant) in &mut schema_with_refs.fields {
             match field_variant {
@@ -70,7 +70,7 @@ impl DbOperations {
                             "initialized": false,
                             "value": null
                         });
-                        
+
                         // Create atom with placeholder content
                         let atom = Atom::new(
                             schema_name.to_string(),
@@ -78,19 +78,26 @@ impl DbOperations {
                             placeholder_content,
                         );
                         let atom_uuid = atom.uuid().to_string();
-                        
+
                         // Store the atom
                         self.store_item(&format!("atom:{}", atom_uuid), &atom)
-                            .map_err(|e| SchemaError::InvalidData(format!("Failed to store placeholder atom: {}", e)))?;
-                        
+                            .map_err(|e| {
+                                SchemaError::InvalidData(format!(
+                                    "Failed to store placeholder atom: {}",
+                                    e
+                                ))
+                            })?;
+
                         // Create atomref pointing to the atom
                         let atom_ref = AtomRef::new(atom_uuid, "system".to_string());
                         let ref_uuid = atom_ref.uuid().to_string();
-                        
+
                         // Store the atomref
                         self.store_item(&format!("ref:{}", ref_uuid), &atom_ref)
-                            .map_err(|e| SchemaError::InvalidData(format!("Failed to store atomref: {}", e)))?;
-                        
+                            .map_err(|e| {
+                                SchemaError::InvalidData(format!("Failed to store atomref: {}", e))
+                            })?;
+
                         // Link the field to the atomref
                         field.set_ref_atom_uuid(ref_uuid);
                     }
@@ -104,7 +111,7 @@ impl DbOperations {
                             "initialized": false,
                             "range_data": []
                         });
-                        
+
                         // Create atom with placeholder content
                         let atom = Atom::new(
                             schema_name.to_string(),
@@ -112,26 +119,33 @@ impl DbOperations {
                             placeholder_content,
                         );
                         let atom_uuid = atom.uuid().to_string();
-                        
+
                         // Store the atom
                         self.store_item(&format!("atom:{}", atom_uuid), &atom)
-                            .map_err(|e| SchemaError::InvalidData(format!("Failed to store placeholder atom: {}", e)))?;
-                        
+                            .map_err(|e| {
+                                SchemaError::InvalidData(format!(
+                                    "Failed to store placeholder atom: {}",
+                                    e
+                                ))
+                            })?;
+
                         // Create atomref pointing to the atom
                         let atom_ref = AtomRef::new(atom_uuid, "system".to_string());
                         let ref_uuid = atom_ref.uuid().to_string();
-                        
+
                         // Store the atomref
                         self.store_item(&format!("ref:{}", ref_uuid), &atom_ref)
-                            .map_err(|e| SchemaError::InvalidData(format!("Failed to store atomref: {}", e)))?;
-                        
+                            .map_err(|e| {
+                                SchemaError::InvalidData(format!("Failed to store atomref: {}", e))
+                            })?;
+
                         // Link the field to the atomref
                         field.set_ref_atom_uuid(ref_uuid);
                     }
                 }
             }
         }
-        
+
         // Store the immutable schema with AtomRefs
         self.store_in_tree(&self.schemas_tree, schema_name, &schema_with_refs)
     }

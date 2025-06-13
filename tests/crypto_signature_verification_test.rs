@@ -3,17 +3,14 @@
 //! This module tests the POST /api/crypto/signatures/verify endpoint
 //! which verifies Ed25519 digital signatures from registered clients.
 
-use std::sync::Arc;
 use actix_web::{test, web, App};
-use serde_json::json;
-use tempfile::TempDir;
-use datafold::datafold_node::{
-    DataFoldNode, 
-    crypto_routes,
-    http_server::AppState,
-    config::NodeConfig,
-};
 use datafold::crypto::{generate_master_keypair, MasterKeyPair};
+use datafold::datafold_node::{
+    config::NodeConfig, crypto_routes, http_server::AppState, DataFoldNode,
+};
+use serde_json::json;
+use std::sync::Arc;
+use tempfile::TempDir;
 
 /// Helper to register a public key and return the client_id and keypair
 async fn register_test_key() -> (String, MasterKeyPair, Arc<tokio::sync::Mutex<DataFoldNode>>) {
@@ -22,33 +19,39 @@ async fn register_test_key() -> (String, MasterKeyPair, Arc<tokio::sync::Mutex<D
     let config = NodeConfig::new(temp_dir.path().to_path_buf());
     let node = DataFoldNode::new(config).expect("Failed to create DataFold node");
     let node_arc = Arc::new(tokio::sync::Mutex::new(node));
-    
+
     // Create default signature auth for testing
     let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
-    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
-        .expect("Failed to create signature verification state for test");
-    
+    let signature_auth =
+        datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+            .expect("Failed to create signature verification state for test");
+
     let app_state = web::Data::new(AppState {
         signature_auth: Arc::new(signature_auth),
         node: node_arc.clone(),
     });
 
     let app = test::init_service(
-        App::new()
-            .app_data(app_state)
-            .service(
-                web::scope("/api/crypto")
-                    .route("/keys/register", web::post().to(crypto_routes::register_public_key))
-                    .route("/signatures/verify", web::post().to(crypto_routes::verify_signature))
-            )
-    ).await;
+        App::new().app_data(app_state).service(
+            web::scope("/api/crypto")
+                .route(
+                    "/keys/register",
+                    web::post().to(crypto_routes::register_public_key),
+                )
+                .route(
+                    "/signatures/verify",
+                    web::post().to(crypto_routes::verify_signature),
+                ),
+        ),
+    )
+    .await;
 
     // Generate a test keypair
     let keypair = generate_master_keypair().expect("Failed to generate test keypair");
     let public_key_hex = hex::encode(keypair.public_key_bytes());
-    
+
     let client_id = "test_client_001".to_string();
-    
+
     // Register the public key
     let registration_request = json!({
         "client_id": client_id,
@@ -73,22 +76,26 @@ async fn test_signature_verification_success_utf8() {
 
     // Create default signature auth for testing
     let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
-    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
-        .expect("Failed to create signature verification state for test");
-    
-    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
-    let app = test::init_service(
-        App::new()
-            .app_data(app_state)
-            .service(
-                web::scope("/api/crypto")
-                    .route("/signatures/verify", web::post().to(crypto_routes::verify_signature))
-            )
-    ).await;
+    let signature_auth =
+        datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+            .expect("Failed to create signature verification state for test");
+
+    let app_state = web::Data::new(AppState {
+        signature_auth: Arc::new(signature_auth),
+        node: node_arc,
+    });
+    let app = test::init_service(App::new().app_data(app_state).service(
+        web::scope("/api/crypto").route(
+            "/signatures/verify",
+            web::post().to(crypto_routes::verify_signature),
+        ),
+    ))
+    .await;
 
     // Sign a test message
     let message = "Hello, DataFold!";
-    let signature = keypair.sign_data(message.as_bytes())
+    let signature = keypair
+        .sign_data(message.as_bytes())
         .expect("Failed to sign message");
     let signature_hex = hex::encode(signature);
 
@@ -120,23 +127,27 @@ async fn test_signature_verification_success_hex() {
 
     // Create default signature auth for testing
     let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
-    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
-        .expect("Failed to create signature verification state for test");
-    
-    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
-    let app = test::init_service(
-        App::new()
-            .app_data(app_state)
-            .service(
-                web::scope("/api/crypto")
-                    .route("/signatures/verify", web::post().to(crypto_routes::verify_signature))
-            )
-    ).await;
+    let signature_auth =
+        datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+            .expect("Failed to create signature verification state for test");
+
+    let app_state = web::Data::new(AppState {
+        signature_auth: Arc::new(signature_auth),
+        node: node_arc,
+    });
+    let app = test::init_service(App::new().app_data(app_state).service(
+        web::scope("/api/crypto").route(
+            "/signatures/verify",
+            web::post().to(crypto_routes::verify_signature),
+        ),
+    ))
+    .await;
 
     // Sign a hex-encoded message
     let message_bytes = b"DataFold hex test";
     let message_hex = hex::encode(message_bytes);
-    let signature = keypair.sign_data(message_bytes)
+    let signature = keypair
+        .sign_data(message_bytes)
         .expect("Failed to sign message");
     let signature_hex = hex::encode(signature);
 
@@ -167,18 +178,21 @@ async fn test_signature_verification_invalid_signature() {
 
     // Create default signature auth for testing
     let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
-    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
-        .expect("Failed to create signature verification state for test");
-    
-    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
-    let app = test::init_service(
-        App::new()
-            .app_data(app_state)
-            .service(
-                web::scope("/api/crypto")
-                    .route("/signatures/verify", web::post().to(crypto_routes::verify_signature))
-            )
-    ).await;
+    let signature_auth =
+        datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+            .expect("Failed to create signature verification state for test");
+
+    let app_state = web::Data::new(AppState {
+        signature_auth: Arc::new(signature_auth),
+        node: node_arc,
+    });
+    let app = test::init_service(App::new().app_data(app_state).service(
+        web::scope("/api/crypto").route(
+            "/signatures/verify",
+            web::post().to(crypto_routes::verify_signature),
+        ),
+    ))
+    .await;
 
     // Use an invalid signature
     let message = "Hello, DataFold!";
@@ -214,18 +228,21 @@ async fn test_signature_verification_unregistered_client() {
 
     // Create default signature auth for testing
     let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
-    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
-        .expect("Failed to create signature verification state for test");
-    
-    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
-    let app = test::init_service(
-        App::new()
-            .app_data(app_state)
-            .service(
-                web::scope("/api/crypto")
-                    .route("/signatures/verify", web::post().to(crypto_routes::verify_signature))
-            )
-    ).await;
+    let signature_auth =
+        datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+            .expect("Failed to create signature verification state for test");
+
+    let app_state = web::Data::new(AppState {
+        signature_auth: Arc::new(signature_auth),
+        node: node_arc,
+    });
+    let app = test::init_service(App::new().app_data(app_state).service(
+        web::scope("/api/crypto").route(
+            "/signatures/verify",
+            web::post().to(crypto_routes::verify_signature),
+        ),
+    ))
+    .await;
 
     // Try to verify with unregistered client
     let unregistered_client = "unregistered_client".to_string();
@@ -258,21 +275,25 @@ async fn test_signature_verification_invalid_encoding() {
 
     // Create default signature auth for testing
     let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
-    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
-        .expect("Failed to create signature verification state for test");
-    
-    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
-    let app = test::init_service(
-        App::new()
-            .app_data(app_state)
-            .service(
-                web::scope("/api/crypto")
-                    .route("/signatures/verify", web::post().to(crypto_routes::verify_signature))
-            )
-    ).await;
+    let signature_auth =
+        datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+            .expect("Failed to create signature verification state for test");
+
+    let app_state = web::Data::new(AppState {
+        signature_auth: Arc::new(signature_auth),
+        node: node_arc,
+    });
+    let app = test::init_service(App::new().app_data(app_state).service(
+        web::scope("/api/crypto").route(
+            "/signatures/verify",
+            web::post().to(crypto_routes::verify_signature),
+        ),
+    ))
+    .await;
 
     let message = "Hello, DataFold!";
-    let signature = keypair.sign_data(message.as_bytes())
+    let signature = keypair
+        .sign_data(message.as_bytes())
         .expect("Failed to sign message");
     let signature_hex = hex::encode(signature);
 
@@ -306,18 +327,21 @@ async fn test_signature_verification_empty_fields() {
 
     // Create default signature auth for testing
     let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
-    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
-        .expect("Failed to create signature verification state for test");
-    
-    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
-    let app = test::init_service(
-        App::new()
-            .app_data(app_state)
-            .service(
-                web::scope("/api/crypto")
-                    .route("/signatures/verify", web::post().to(crypto_routes::verify_signature))
-            )
-    ).await;
+    let signature_auth =
+        datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+            .expect("Failed to create signature verification state for test");
+
+    let app_state = web::Data::new(AppState {
+        signature_auth: Arc::new(signature_auth),
+        node: node_arc,
+    });
+    let app = test::init_service(App::new().app_data(app_state).service(
+        web::scope("/api/crypto").route(
+            "/signatures/verify",
+            web::post().to(crypto_routes::verify_signature),
+        ),
+    ))
+    .await;
 
     // Test empty client_id
     let verification_request = json!({
@@ -345,21 +369,25 @@ async fn test_signature_verification_response_format() {
 
     // Create default signature auth for testing
     let sig_config = datafold::datafold_node::signature_auth::SignatureAuthConfig::default();
-    let signature_auth = datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
-        .expect("Failed to create signature verification state for test");
-    
-    let app_state = web::Data::new(AppState { signature_auth: Arc::new(signature_auth), node: node_arc });
-    let app = test::init_service(
-        App::new()
-            .app_data(app_state)
-            .service(
-                web::scope("/api/crypto")
-                    .route("/signatures/verify", web::post().to(crypto_routes::verify_signature))
-            )
-    ).await;
+    let signature_auth =
+        datafold::datafold_node::signature_auth::SignatureVerificationState::new(sig_config)
+            .expect("Failed to create signature verification state for test");
+
+    let app_state = web::Data::new(AppState {
+        signature_auth: Arc::new(signature_auth),
+        node: node_arc,
+    });
+    let app = test::init_service(App::new().app_data(app_state).service(
+        web::scope("/api/crypto").route(
+            "/signatures/verify",
+            web::post().to(crypto_routes::verify_signature),
+        ),
+    ))
+    .await;
 
     let message = "Response format test";
-    let signature = keypair.sign_data(message.as_bytes())
+    let signature = keypair
+        .sign_data(message.as_bytes())
         .expect("Failed to sign message");
     let signature_hex = hex::encode(signature);
 
@@ -379,7 +407,7 @@ async fn test_signature_verification_response_format() {
     assert_eq!(resp.status(), 200);
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    
+
     // Verify response structure
     assert_eq!(body["success"], true);
     assert!(body["data"]["verified"].as_bool().unwrap());

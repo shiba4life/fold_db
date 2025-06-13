@@ -29,30 +29,50 @@
 //! ```
 
 pub mod argon2;
-pub mod ed25519;
-pub mod error;
-pub mod enhanced_error;
 pub mod audit_logger;
+pub mod ed25519;
+pub mod enhanced_error;
+pub mod error;
+pub mod key_rotation;
+pub mod key_rotation_audit;
+pub mod key_rotation_security;
+pub mod rotation_threat_monitor;
 pub mod security_monitor;
 
 // Re-export commonly used types
 pub use argon2::{
-    generate_salt, derive_key, derive_master_keypair, derive_master_keypair_default,
-    generate_salt_and_derive_keypair, Salt, Argon2Params, DerivedKey
-};
-pub use ed25519::{generate_master_keypair, MasterKeyPair, PublicKey};
-pub use error::{CryptoError, CryptoResult};
-pub use enhanced_error::{
-    EnhancedCryptoError, EnhancedCryptoResult, ErrorSeverity, RecoveryAction,
-    ErrorContext
+    derive_key, derive_master_keypair, derive_master_keypair_default, generate_salt,
+    generate_salt_and_derive_keypair, Argon2Params, DerivedKey, Salt,
 };
 pub use audit_logger::{
-    CryptoAuditLogger, AuditConfig, AuditEvent, AuditEventType, AuditSeverity,
-    OperationResult, SecurityEventDetails, PerformanceMetrics,
-    init_global_audit_logger, get_global_audit_logger,
-    audit_encryption_operation, audit_decryption_operation, audit_security_event
+    audit_decryption_operation, audit_encryption_operation, audit_security_event,
+    get_global_audit_logger, init_global_audit_logger, AuditConfig, AuditEvent, AuditEventType,
+    AuditSeverity, CryptoAuditLogger, OperationResult, PerformanceMetrics, SecurityEventDetails,
+};
+pub use ed25519::{generate_master_keypair, MasterKeyPair, PublicKey};
+pub use enhanced_error::{
+    EnhancedCryptoError, EnhancedCryptoResult, ErrorContext, ErrorSeverity, RecoveryAction,
+};
+pub use error::{CryptoError, CryptoResult};
+pub use key_rotation::{
+    KeyRotationError, KeyRotationRequest, KeyRotationResponse, KeyRotationValidator,
+    RotationContext, RotationReason, RotationValidationResult, MAX_REQUEST_LIFETIME,
+    MAX_TIMESTAMP_DRIFT,
+};
+pub use key_rotation_audit::{
+    GeolocationInfo, KeyRotationAuditEventType, KeyRotationAuditLogger,
+    KeyRotationSecurityMetadata, RotationAuditCorrelation, RotationStatus, SessionInfo,
+    TamperProofAuditEntry,
+};
+pub use key_rotation_security::{
+    IpRestrictionConfig, KeyRotationSecurityManager, KeyRotationSecurityPolicy, RateLimitConfig,
+    RiskAssessmentConfig, SecurityEvaluationResult, SessionSecurityConfig, TimeRestrictionConfig,
+};
+pub use rotation_threat_monitor::{
+    RemediationAction, RotationThreatDetection, RotationThreatMonitor, RotationThreatMonitorConfig,
+    RotationThreatPattern, ThreatStatusSummary,
 };
 pub use security_monitor::{
-    CryptoSecurityMonitor, SecurityMonitorConfig, SecurityDetection, ThreatLevel,
-    SecurityPattern, init_global_security_monitor, get_global_security_monitor
+    get_global_security_monitor, init_global_security_monitor, CryptoSecurityMonitor,
+    SecurityDetection, SecurityMonitorConfig, SecurityPattern, ThreatLevel,
 };

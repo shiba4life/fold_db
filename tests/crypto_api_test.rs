@@ -5,15 +5,15 @@
 
 use tempfile::TempDir;
 
+use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel};
 use datafold::datafold_node::{
-    DataFoldNode,
     config::NodeConfig,
     crypto_init::{
-        initialize_database_crypto, get_crypto_init_status, validate_crypto_config_for_init,
-        is_crypto_init_needed, CryptoInitError
+        get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed,
+        validate_crypto_config_for_init, CryptoInitError,
     },
+    DataFoldNode,
 };
-use datafold::config::crypto::{CryptoConfig, MasterKeyConfig, KeyDerivationConfig, SecurityLevel};
 
 /// Test fixture for crypto initialization tests
 struct CryptoInitTestFixture {
@@ -27,8 +27,8 @@ impl CryptoInitTestFixture {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
         let config = NodeConfig::new(temp_dir.path().to_path_buf());
         let node = DataFoldNode::new(config).expect("Failed to create test node");
-        
-        Self { 
+
+        Self {
             _temp_dir: temp_dir,
             node,
         }
@@ -46,8 +46,7 @@ async fn test_crypto_status_not_initialized() {
     let fixture = CryptoInitTestFixture::new();
     let db_ops = fixture.db_ops();
 
-    let status = get_crypto_init_status(db_ops)
-        .expect("Failed to get crypto status");
+    let status = get_crypto_init_status(db_ops).expect("Failed to get crypto status");
 
     assert!(!status.initialized);
     assert!(status.version.is_none());
@@ -77,9 +76,8 @@ async fn test_random_key_initialization() {
     assert!(!hex::encode(context.public_key().to_bytes()).is_empty());
 
     // Verify status after initialization
-    let status = get_crypto_init_status(db_ops)
-        .expect("Failed to get crypto status");
-    
+    let status = get_crypto_init_status(db_ops).expect("Failed to get crypto status");
+
     assert!(status.initialized);
     assert_eq!(status.version, Some(1));
     assert_eq!(status.algorithm, Some("Ed25519".to_string()));
@@ -102,8 +100,7 @@ async fn test_passphrase_initialization() {
     };
 
     // Validate configuration
-    validate_crypto_config_for_init(&crypto_config)
-        .expect("Config validation should pass");
+    validate_crypto_config_for_init(&crypto_config).expect("Config validation should pass");
 
     // Initialize crypto
     let context = initialize_database_crypto(db_ops.clone(), &crypto_config)
@@ -113,9 +110,8 @@ async fn test_passphrase_initialization() {
     assert!(!hex::encode(context.public_key().to_bytes()).is_empty());
 
     // Verify status after initialization
-    let status = get_crypto_init_status(db_ops)
-        .expect("Failed to get crypto status");
-    
+    let status = get_crypto_init_status(db_ops).expect("Failed to get crypto status");
+
     assert!(status.initialized);
     assert!(status.derivation_method.is_some());
     assert!(status.derivation_method.unwrap().contains("Argon2id"));
@@ -140,8 +136,8 @@ async fn test_passphrase_initialization_with_custom_params() {
     };
 
     // Initialize crypto
-    let context = initialize_database_crypto(db_ops, &crypto_config)
-        .expect("Failed to initialize crypto");
+    let context =
+        initialize_database_crypto(db_ops, &crypto_config).expect("Failed to initialize crypto");
 
     assert!(context.derivation_method.contains("Argon2id"));
     assert!(context.derivation_method.contains("Custom"));
@@ -160,7 +156,7 @@ async fn test_double_initialization_error() {
 
     // Second initialization should fail
     let result = initialize_database_crypto(db_ops, &crypto_config);
-    
+
     assert!(result.is_err());
     match result.unwrap_err() {
         CryptoInitError::AlreadyInitialized => {
@@ -173,7 +169,7 @@ async fn test_double_initialization_error() {
 #[tokio::test]
 async fn test_validate_random_config() {
     let crypto_config = CryptoConfig::with_random_key();
-    
+
     let result = validate_crypto_config_for_init(&crypto_config);
     assert!(result.is_ok());
 }
@@ -219,8 +215,8 @@ async fn test_sensitive_security_level() {
         key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Sensitive),
     };
 
-    let context = initialize_database_crypto(db_ops, &crypto_config)
-        .expect("Failed to initialize crypto");
+    let context =
+        initialize_database_crypto(db_ops, &crypto_config).expect("Failed to initialize crypto");
 
     assert!(context.derivation_method.contains("Sensitive"));
 }
@@ -238,8 +234,8 @@ async fn test_interactive_security_level() {
         key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Interactive),
     };
 
-    let context = initialize_database_crypto(db_ops, &crypto_config)
-        .expect("Failed to initialize crypto");
+    let context =
+        initialize_database_crypto(db_ops, &crypto_config).expect("Failed to initialize crypto");
 
     assert!(context.derivation_method.contains("Interactive"));
 }
@@ -250,8 +246,8 @@ async fn test_complete_crypto_initialization_workflow() {
     let db_ops = fixture.db_ops();
 
     // Step 1: Check initial status (should be not initialized)
-    let initial_status = get_crypto_init_status(db_ops.clone())
-        .expect("Failed to get initial status");
+    let initial_status =
+        get_crypto_init_status(db_ops.clone()).expect("Failed to get initial status");
     assert!(!initial_status.initialized);
 
     // Step 2: Validate configuration
@@ -277,9 +273,8 @@ async fn test_complete_crypto_initialization_workflow() {
     assert!(context.derivation_method.contains("Argon2id"));
 
     // Step 5: Verify final status
-    let final_status = get_crypto_init_status(db_ops.clone())
-        .expect("Failed to get final status");
-    
+    let final_status = get_crypto_init_status(db_ops.clone()).expect("Failed to get final status");
+
     assert!(final_status.initialized);
     assert!(final_status.derivation_method.is_some());
     assert!(final_status.created_at.is_some());

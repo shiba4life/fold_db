@@ -3,8 +3,10 @@
 //! This module provides the asynchronous message bus that uses tokio::sync::mpsc
 //! for async communication between components.
 
-use super::events::{Event, EventType, FieldValueSet, AtomCreated, QueryExecuted, MutationExecuted};
 use super::error_handling::{AsyncRecvError, AsyncTryRecvError, MessageBusError, MessageBusResult};
+use super::events::{
+    AtomCreated, Event, EventType, FieldValueSet, MutationExecuted, QueryExecuted,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc as async_mpsc;
@@ -45,7 +47,9 @@ impl AsyncConsumer<Event> {
         match self.receiver.try_recv() {
             Ok(event) => Ok(event),
             Err(async_mpsc::error::TryRecvError::Empty) => Err(AsyncTryRecvError::Empty),
-            Err(async_mpsc::error::TryRecvError::Disconnected) => Err(AsyncTryRecvError::Disconnected),
+            Err(async_mpsc::error::TryRecvError::Disconnected) => {
+                Err(AsyncTryRecvError::Disconnected)
+            }
         }
     }
 
@@ -112,29 +116,37 @@ impl AsyncMessageBus {
     /// Subscribe to events of a specific type through unified Event enum
     pub async fn subscribe(&self, event_type: &str) -> AsyncConsumer<Event> {
         let (sender, receiver) = async_mpsc::unbounded_channel();
-        
+
         let mut registry = self.registry.lock().await;
         registry.add_subscriber(event_type.to_string(), sender);
-        
+
         AsyncConsumer::new(receiver)
     }
 
     /// Subscribe to all events
     pub async fn subscribe_all(&self) -> AsyncConsumer<Event> {
         let (sender, receiver) = async_mpsc::unbounded_channel();
-        
+
         let mut registry = self.registry.lock().await;
         // Subscribe to all event types
         let event_types = [
-            "FieldValueSet", "AtomCreated", "AtomUpdated", "AtomRefCreated",
-            "AtomRefUpdated", "SchemaLoaded", "TransformExecuted", "SchemaChanged",
-            "TransformTriggered", "QueryExecuted", "MutationExecuted"
+            "FieldValueSet",
+            "AtomCreated",
+            "AtomUpdated",
+            "AtomRefCreated",
+            "AtomRefUpdated",
+            "SchemaLoaded",
+            "TransformExecuted",
+            "SchemaChanged",
+            "TransformTriggered",
+            "QueryExecuted",
+            "MutationExecuted",
         ];
-        
+
         for event_type in &event_types {
             registry.add_subscriber(event_type.to_string(), sender.clone());
         }
-        
+
         AsyncConsumer::new(receiver)
     }
 
@@ -160,7 +172,7 @@ impl AsyncMessageBus {
         let registry = self.registry.lock().await;
         let event_type = event.event_type();
         let subscribers = registry.get_subscribers(event_type);
-        
+
         if subscribers.is_empty() {
             return Ok(());
         }
@@ -176,7 +188,10 @@ impl AsyncMessageBus {
 
         if failed_sends > 0 {
             return Err(MessageBusError::SendFailed {
-                reason: format!("{} of {} async subscribers failed to receive event", failed_sends, total_subscribers),
+                reason: format!(
+                    "{} of {} async subscribers failed to receive event",
+                    failed_sends, total_subscribers
+                ),
             });
         }
 
@@ -230,7 +245,7 @@ mod tests {
     #[tokio::test]
     async fn test_async_no_subscribers() {
         let bus = AsyncMessageBus::new();
-        
+
         let event = AtomCreated::new("atom-123", serde_json::json!({}));
         let result = bus.publish_atom_created(event).await;
         assert!(result.is_ok());
@@ -240,7 +255,7 @@ mod tests {
     async fn test_async_subscribe_all() {
         let bus = AsyncMessageBus::new();
         let _consumer = bus.subscribe_all().await;
-        
+
         // Should be subscribed to multiple event types
         assert!(bus.subscriber_count("FieldValueSet").await > 0);
         assert!(bus.subscriber_count("AtomCreated").await > 0);

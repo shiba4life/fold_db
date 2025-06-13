@@ -198,6 +198,7 @@ pub struct AuditStatistics {
 }
 
 /// Main audit logger for cryptographic operations
+#[derive(Clone)]
 pub struct CryptoAuditLogger {
     /// Configuration for audit logging
     config: AuditConfig,
@@ -213,7 +214,7 @@ impl CryptoAuditLogger {
     /// Create a new crypto audit logger
     pub fn new(config: AuditConfig) -> Self {
         let session_id = Uuid::new_v4().to_string();
-        
+
         Self {
             config,
             events: Arc::new(RwLock::new(Vec::new())),
@@ -246,9 +247,15 @@ impl CryptoAuditLogger {
         correlation_id: Option<Uuid>,
     ) {
         let mut metadata = HashMap::new();
-        metadata.insert("context".to_string(), serde_json::Value::String(context.to_string()));
-        metadata.insert("data_size".to_string(), serde_json::Value::Number(data_size.into()));
-        
+        metadata.insert(
+            "context".to_string(),
+            serde_json::Value::String(context.to_string()),
+        );
+        metadata.insert(
+            "data_size".to_string(),
+            serde_json::Value::Number(data_size.into()),
+        );
+
         let event = AuditEvent {
             event_id: Uuid::new_v4(),
             timestamp: Utc::now(),
@@ -282,9 +289,15 @@ impl CryptoAuditLogger {
         correlation_id: Option<Uuid>,
     ) {
         let mut metadata = HashMap::new();
-        metadata.insert("context".to_string(), serde_json::Value::String(context.to_string()));
-        metadata.insert("data_size".to_string(), serde_json::Value::Number(data_size.into()));
-        
+        metadata.insert(
+            "context".to_string(),
+            serde_json::Value::String(context.to_string()),
+        );
+        metadata.insert(
+            "data_size".to_string(),
+            serde_json::Value::Number(data_size.into()),
+        );
+
         let event = AuditEvent {
             event_id: Uuid::new_v4(),
             timestamp: Utc::now(),
@@ -317,8 +330,11 @@ impl CryptoAuditLogger {
         correlation_id: Option<Uuid>,
     ) {
         let mut metadata = HashMap::new();
-        metadata.insert("key_type".to_string(), serde_json::Value::String(key_type.to_string()));
-        
+        metadata.insert(
+            "key_type".to_string(),
+            serde_json::Value::String(key_type.to_string()),
+        );
+
         let event = AuditEvent {
             event_id: Uuid::new_v4(),
             timestamp: Utc::now(),
@@ -354,10 +370,19 @@ impl CryptoAuditLogger {
         correlation_id: Option<Uuid>,
     ) {
         let mut metadata = HashMap::new();
-        metadata.insert("backup_path".to_string(), serde_json::Value::String(backup_path.to_string()));
-        metadata.insert("items_processed".to_string(), serde_json::Value::Number(items_processed.into()));
-        metadata.insert("total_size".to_string(), serde_json::Value::Number(total_size.into()));
-        
+        metadata.insert(
+            "backup_path".to_string(),
+            serde_json::Value::String(backup_path.to_string()),
+        );
+        metadata.insert(
+            "items_processed".to_string(),
+            serde_json::Value::Number(items_processed.into()),
+        );
+        metadata.insert(
+            "total_size".to_string(),
+            serde_json::Value::Number(total_size.into()),
+        );
+
         let event = AuditEvent {
             event_id: Uuid::new_v4(),
             timestamp: Utc::now(),
@@ -389,13 +414,19 @@ impl CryptoAuditLogger {
         correlation_id: Option<Uuid>,
     ) {
         let mut metadata = HashMap::new();
-        metadata.insert("event_type".to_string(), serde_json::Value::String(security_details.event_type));
-        metadata.insert("threat_level".to_string(), serde_json::Value::String(security_details.threat_level));
-        
+        metadata.insert(
+            "event_type".to_string(),
+            serde_json::Value::String(security_details.event_type),
+        );
+        metadata.insert(
+            "threat_level".to_string(),
+            serde_json::Value::String(security_details.threat_level),
+        );
+
         if let Some(source) = security_details.source {
             metadata.insert("source".to_string(), serde_json::Value::String(source));
         }
-        
+
         if let Some(target) = security_details.target {
             metadata.insert("target".to_string(), serde_json::Value::String(target));
         }
@@ -404,7 +435,7 @@ impl CryptoAuditLogger {
         for (key, value) in security_details.security_metadata {
             metadata.insert(key, serde_json::Value::String(value));
         }
-        
+
         let severity = match result {
             OperationResult::Success => AuditSeverity::Warning,
             OperationResult::Failure { .. } => AuditSeverity::Critical,
@@ -437,19 +468,28 @@ impl CryptoAuditLogger {
         correlation_id: Option<Uuid>,
     ) {
         let mut metadata = HashMap::new();
-        
+
         if let Some(cpu_time) = metrics.cpu_time {
-            metadata.insert("cpu_time_ms".to_string(), serde_json::Value::Number((cpu_time.as_millis() as u64).into()));
+            metadata.insert(
+                "cpu_time_ms".to_string(),
+                serde_json::Value::Number((cpu_time.as_millis() as u64).into()),
+            );
         }
-        
+
         if let Some(memory_usage) = metrics.memory_usage {
-            metadata.insert("memory_usage".to_string(), serde_json::Value::Number(memory_usage.into()));
+            metadata.insert(
+                "memory_usage".to_string(),
+                serde_json::Value::Number(memory_usage.into()),
+            );
         }
-        
+
         if let Some(data_size) = metrics.data_size {
-            metadata.insert("data_size".to_string(), serde_json::Value::Number(data_size.into()));
+            metadata.insert(
+                "data_size".to_string(),
+                serde_json::Value::Number(data_size.into()),
+            );
         }
-        
+
         if let Some(throughput) = metrics.throughput {
             metadata.insert("throughput".to_string(), serde_json::json!(throughput));
         }
@@ -458,7 +498,7 @@ impl CryptoAuditLogger {
         for (key, value) in metrics.custom_metrics {
             metadata.insert(key, serde_json::json!(value));
         }
-        
+
         let event = AuditEvent {
             event_id: Uuid::new_v4(),
             timestamp: Utc::now(),
@@ -478,16 +518,18 @@ impl CryptoAuditLogger {
     }
 
     /// Log an error event from an EnhancedCryptoError
-    pub async fn log_error_event(
-        &self,
-        error: &EnhancedCryptoError,
-        correlation_id: Option<Uuid>,
-    ) {
+    pub async fn log_error_event(&self, error: &EnhancedCryptoError, correlation_id: Option<Uuid>) {
         let mut metadata = HashMap::new();
-        metadata.insert("error_type".to_string(), serde_json::Value::String(error.error_type_name().to_string()));
+        metadata.insert(
+            "error_type".to_string(),
+            serde_json::Value::String(error.error_type_name().to_string()),
+        );
         metadata.insert("severity".to_string(), serde_json::json!(error.severity()));
-        metadata.insert("recovery_actions".to_string(), serde_json::json!(error.recovery_actions()));
-        
+        metadata.insert(
+            "recovery_actions".to_string(),
+            serde_json::json!(error.recovery_actions()),
+        );
+
         // Add error context metadata
         for (key, value) in &error.context().metadata {
             metadata.insert(key.clone(), serde_json::Value::String(value.clone()));
@@ -505,7 +547,7 @@ impl CryptoAuditLogger {
             error_message: error.to_string(),
             error_code: None,
         };
-        
+
         let event = AuditEvent {
             event_id: Uuid::new_v4(),
             timestamp: Utc::now(),
@@ -546,39 +588,40 @@ impl CryptoAuditLogger {
         end_time: Option<DateTime<Utc>>,
     ) -> Vec<AuditEvent> {
         let events = self.events.read().await;
-        
-        events.iter()
+
+        events
+            .iter()
             .filter(|event| {
                 if let Some(ref et) = event_type {
                     if &event.event_type != et {
                         return false;
                     }
                 }
-                
+
                 if let Some(ref sev) = severity {
                     if &event.severity != sev {
                         return false;
                     }
                 }
-                
+
                 if let Some(ref comp) = component {
                     if event.component != *comp {
                         return false;
                     }
                 }
-                
+
                 if let Some(start) = start_time {
                     if event.timestamp < start {
                         return false;
                     }
                 }
-                
+
                 if let Some(end) = end_time {
                     if event.timestamp > end {
                         return false;
                     }
                 }
-                
+
                 true
             })
             .cloned()
@@ -595,7 +638,7 @@ impl CryptoAuditLogger {
     pub async fn clear_events(&self) {
         let mut events = self.events.write().await;
         events.clear();
-        
+
         let mut stats = self.statistics.write().await;
         *stats = AuditStatistics {
             total_events: 0,
@@ -617,8 +660,9 @@ impl CryptoAuditLogger {
         }
 
         // Check if event type should be logged
-        if !self.config.included_event_types.is_empty() && 
-           !self.config.included_event_types.contains(&event.event_type) {
+        if !self.config.included_event_types.is_empty()
+            && !self.config.included_event_types.contains(&event.event_type)
+        {
             return;
         }
 
@@ -652,27 +696,30 @@ impl CryptoAuditLogger {
     /// Update audit statistics
     async fn update_statistics(&self, event: &AuditEvent) {
         let mut stats = self.statistics.write().await;
-        
+
         stats.total_events += 1;
-        
-        *stats.events_by_type.entry(event.event_type.clone()).or_insert(0) += 1;
+
+        *stats
+            .events_by_type
+            .entry(event.event_type.clone())
+            .or_insert(0) += 1;
         *stats.events_by_severity.entry(event.severity).or_insert(0) += 1;
-        
+
         if matches!(event.result, OperationResult::Failure { .. }) {
             stats.failed_operations += 1;
         }
-        
+
         if event.event_type == AuditEventType::Security {
             stats.security_events += 1;
         }
-        
+
         stats.last_event_time = Some(event.timestamp);
-        
+
         // Update average duration if available
         if let Some(duration) = event.duration {
             if let Some(current_avg) = stats.avg_operation_duration {
                 stats.avg_operation_duration = Some(Duration::from_millis(
-                    (current_avg.as_millis() + duration.as_millis()) as u64 / 2
+                    (current_avg.as_millis() + duration.as_millis()) as u64 / 2,
                 ));
             } else {
                 stats.avg_operation_duration = Some(duration);
@@ -689,8 +736,10 @@ impl CryptoAuditLogger {
 
     /// Check if event should trigger an alert
     fn should_alert(&self, event: &AuditEvent) -> bool {
-        matches!(event.severity, AuditSeverity::Critical | AuditSeverity::Error) ||
-        event.event_type == AuditEventType::Security
+        matches!(
+            event.severity,
+            AuditSeverity::Critical | AuditSeverity::Error
+        ) || event.event_type == AuditEventType::Security
     }
 
     /// Send alert for critical events
@@ -723,7 +772,9 @@ pub fn init_global_audit_logger(config: AuditConfig) {
 /// Get the global audit logger instance
 pub fn get_global_audit_logger() -> Option<Arc<CryptoAuditLogger>> {
     #[allow(static_mut_refs)]
-    unsafe { GLOBAL_AUDIT_LOGGER.as_ref().map(Arc::clone) }
+    unsafe {
+        GLOBAL_AUDIT_LOGGER.as_ref().map(Arc::clone)
+    }
 }
 
 /// Convenience function to log an encryption operation globally
@@ -736,7 +787,16 @@ pub async fn audit_encryption_operation(
     correlation_id: Option<Uuid>,
 ) {
     if let Some(logger) = get_global_audit_logger() {
-        logger.log_encryption_operation(operation, context, data_size, duration, result, correlation_id).await;
+        logger
+            .log_encryption_operation(
+                operation,
+                context,
+                data_size,
+                duration,
+                result,
+                correlation_id,
+            )
+            .await;
     }
 }
 
@@ -750,7 +810,16 @@ pub async fn audit_decryption_operation(
     correlation_id: Option<Uuid>,
 ) {
     if let Some(logger) = get_global_audit_logger() {
-        logger.log_decryption_operation(operation, context, data_size, duration, result, correlation_id).await;
+        logger
+            .log_decryption_operation(
+                operation,
+                context,
+                data_size,
+                duration,
+                result,
+                correlation_id,
+            )
+            .await;
     }
 }
 
@@ -762,7 +831,9 @@ pub async fn audit_security_event(
     correlation_id: Option<Uuid>,
 ) {
     if let Some(logger) = get_global_audit_logger() {
-        logger.log_security_event(operation, security_details, result, correlation_id).await;
+        logger
+            .log_security_event(operation, security_details, result, correlation_id)
+            .await;
     }
 }
 
@@ -775,7 +846,7 @@ mod tests {
     async fn test_audit_logger_creation() {
         let config = AuditConfig::default();
         let logger = CryptoAuditLogger::new(config);
-        
+
         let stats = logger.get_statistics().await;
         assert_eq!(stats.total_events, 0);
     }
@@ -784,26 +855,31 @@ mod tests {
     async fn test_encryption_operation_logging() {
         let config = AuditConfig::default();
         let logger = CryptoAuditLogger::new(config);
-        
-        logger.log_encryption_operation(
-            "encrypt_data",
-            "atom_data",
-            1024,
-            Duration::from_millis(50),
-            OperationResult::Success,
-            None,
-        ).await;
-        
+
+        logger
+            .log_encryption_operation(
+                "encrypt_data",
+                "atom_data",
+                1024,
+                Duration::from_millis(50),
+                OperationResult::Success,
+                None,
+            )
+            .await;
+
         let stats = logger.get_statistics().await;
         assert_eq!(stats.total_events, 1);
-        assert_eq!(stats.events_by_type.get(&AuditEventType::Encryption), Some(&1));
+        assert_eq!(
+            stats.events_by_type.get(&AuditEventType::Encryption),
+            Some(&1)
+        );
     }
 
     #[tokio::test]
     async fn test_security_event_logging() {
         let config = AuditConfig::default();
         let logger = CryptoAuditLogger::new(config);
-        
+
         let security_details = SecurityEventDetails {
             event_type: "unauthorized_access".to_string(),
             threat_level: "high".to_string(),
@@ -811,18 +887,20 @@ mod tests {
             target: Some("encryption_key".to_string()),
             security_metadata: HashMap::new(),
         };
-        
-        logger.log_security_event(
-            "access_attempt",
-            security_details,
-            OperationResult::Failure {
-                error_type: "unauthorized".to_string(),
-                error_message: "Access denied".to_string(),
-                error_code: Some("AUTH001".to_string()),
-            },
-            None,
-        ).await;
-        
+
+        logger
+            .log_security_event(
+                "access_attempt",
+                security_details,
+                OperationResult::Failure {
+                    error_type: "unauthorized".to_string(),
+                    error_message: "Access denied".to_string(),
+                    error_code: Some("AUTH001".to_string()),
+                },
+                None,
+            )
+            .await;
+
         let stats = logger.get_statistics().await;
         assert_eq!(stats.security_events, 1);
     }
@@ -831,22 +909,35 @@ mod tests {
     async fn test_event_filtering() {
         let config = AuditConfig::default();
         let logger = CryptoAuditLogger::new(config);
-        
+
         // Log multiple events
-        logger.log_encryption_operation(
-            "encrypt1", "context1", 100, Duration::from_millis(10), OperationResult::Success, None
-        ).await;
-        
-        logger.log_decryption_operation(
-            "decrypt1", "context1", 100, Duration::from_millis(15), OperationResult::Success, None
-        ).await;
-        
+        logger
+            .log_encryption_operation(
+                "encrypt1",
+                "context1",
+                100,
+                Duration::from_millis(10),
+                OperationResult::Success,
+                None,
+            )
+            .await;
+
+        logger
+            .log_decryption_operation(
+                "decrypt1",
+                "context1",
+                100,
+                Duration::from_millis(15),
+                OperationResult::Success,
+                None,
+            )
+            .await;
+
         // Filter by event type
-        let encryption_events = logger.filter_events(
-            Some(AuditEventType::Encryption),
-            None, None, None, None
-        ).await;
-        
+        let encryption_events = logger
+            .filter_events(Some(AuditEventType::Encryption), None, None, None, None)
+            .await;
+
         assert_eq!(encryption_events.len(), 1);
         assert_eq!(encryption_events[0].operation, "encrypt1");
     }
@@ -855,21 +946,34 @@ mod tests {
     async fn test_statistics_tracking() {
         let config = AuditConfig::default();
         let logger = CryptoAuditLogger::new(config);
-        
+
         // Log successful and failed operations
-        logger.log_encryption_operation(
-            "encrypt_success", "context1", 100, Duration::from_millis(10), OperationResult::Success, None
-        ).await;
-        
-        logger.log_encryption_operation(
-            "encrypt_fail", "context1", 100, Duration::from_millis(20), 
-            OperationResult::Failure {
-                error_type: "test".to_string(),
-                error_message: "test error".to_string(),
-                error_code: None,
-            }, None
-        ).await;
-        
+        logger
+            .log_encryption_operation(
+                "encrypt_success",
+                "context1",
+                100,
+                Duration::from_millis(10),
+                OperationResult::Success,
+                None,
+            )
+            .await;
+
+        logger
+            .log_encryption_operation(
+                "encrypt_fail",
+                "context1",
+                100,
+                Duration::from_millis(20),
+                OperationResult::Failure {
+                    error_type: "test".to_string(),
+                    error_message: "test error".to_string(),
+                    error_code: None,
+                },
+                None,
+            )
+            .await;
+
         let stats = logger.get_statistics().await;
         assert_eq!(stats.total_events, 2);
         assert_eq!(stats.failed_operations, 1);

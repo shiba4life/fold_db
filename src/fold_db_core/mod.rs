@@ -1,8 +1,8 @@
 //! FoldDB Core - Event-driven database system
-//! 
+//!
 //! This module contains the core components of the FoldDB system organized
 //! into logical groups for better maintainability and understanding:
-//! 
+//!
 //! - **managers/**: Core managers for different aspects of data management
 //! - **services/**: Service layer components for operations
 //! - **infrastructure/**: Foundation components (message bus, initialization, etc.)
@@ -11,47 +11,46 @@
 //! - **transform_manager/**: Transform system (already well-organized)
 
 // Organized module declarations
-pub mod managers;
-pub mod services;
 pub mod infrastructure;
+pub mod managers;
 pub mod orchestration;
+pub mod services;
 pub mod shared;
 pub mod transform_manager;
 
 // Re-export key components for backwards compatibility
+pub use infrastructure::{EventMonitor, MessageBus};
 pub use managers::AtomManager; // FieldManager removed (was dead code), CollectionManager removed - collections no longer supported
-pub use services::field_retrieval::service::FieldRetrievalService;
-pub use infrastructure::{MessageBus, EventMonitor};
 pub use orchestration::TransformOrchestrator;
-pub use transform_manager::TransformManager;
+pub use services::field_retrieval::service::FieldRetrievalService;
 pub use shared::*;
+pub use transform_manager::TransformManager;
 
 // Import infrastructure components that are used internally
-use infrastructure::message_bus::{
-    FieldValueSetResponse, FieldUpdateResponse, SchemaLoadResponse, SchemaApprovalResponse, AtomCreateResponse, AtomRefCreateResponse,
-    AtomRefUpdateRequest,
-    MutationExecuted,
-    SystemInitializationRequest
-};
 use crate::fold_db_core::transform_manager::types::TransformRunner;
 use infrastructure::init::{init_orchestrator, init_transform_manager};
+use infrastructure::message_bus::{
+    AtomCreateResponse, AtomRefCreateResponse, AtomRefUpdateRequest, FieldUpdateResponse,
+    FieldValueSetResponse, MutationExecuted, SchemaApprovalResponse, SchemaLoadResponse,
+    SystemInitializationRequest,
+};
 
 // External dependencies
 use crate::atom::AtomRefBehavior;
 use crate::db_operations::DbOperations;
 use crate::permissions::PermissionWrapper;
 use crate::schema::core::SchemaState;
+use crate::schema::types::{Mutation, Query};
 use crate::schema::SchemaCore;
 use crate::schema::{Schema, SchemaError};
 use log::{info, warn};
 use serde_json::Value;
-use std::time::Instant;
-use crate::schema::types::{Mutation, Query};
-use uuid::Uuid;
+use sha2::Digest;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
-use sha2::Digest;
+use std::time::Instant;
+use uuid::Uuid;
 
 // REMOVED: PendingOperationRequest - marked as dead code, never used
 
@@ -152,11 +151,17 @@ impl FoldDB {
                 .map_err(|e| sled::Error::Unsupported(e.to_string()))?,
         );
         // TODO: CollectionManager removed - collections are no longer supported
-        
+
         // Use standard initialization but with deprecated closures that recommend events
-        let transform_manager = init_transform_manager(Arc::new(db_ops.clone()), Arc::clone(&message_bus))?;
-        let orchestrator =
-            init_orchestrator(&FieldRetrievalService::new(Arc::clone(&message_bus)), transform_manager.clone(), orchestrator_tree, Arc::clone(&message_bus), Arc::new(db_ops.clone()))?;
+        let transform_manager =
+            init_transform_manager(Arc::new(db_ops.clone()), Arc::clone(&message_bus))?;
+        let orchestrator = init_orchestrator(
+            &FieldRetrievalService::new(Arc::clone(&message_bus)),
+            transform_manager.clone(),
+            orchestrator_tree,
+            Arc::clone(&message_bus),
+            Arc::new(db_ops.clone()),
+        )?;
 
         info!("Loading schema states from disk during FoldDB initialization");
         if let Err(e) = schema_manager.discover_and_load_all_schemas() {
@@ -168,14 +173,17 @@ impl FoldDB {
                 schema_manager.list_schemas_by_state(SchemaState::Approved)
             {
                 info!("Moving {} approved schemas from 'available' to 'schemas' HashMap for field mapping", approved_schemas.len());
-                
+
                 // Move approved schemas from available to schemas HashMap
                 for schema_name in &approved_schemas {
                     if let Err(e) = schema_manager.ensure_approved_schema_in_schemas(schema_name) {
-                        info!("Failed to move approved schema '{}' to schemas HashMap: {}", schema_name, e);
+                        info!(
+                            "Failed to move approved schema '{}' to schemas HashMap: {}",
+                            schema_name, e
+                        );
                     }
                 }
-                
+
                 // Now proceed with field mapping for all approved schemas
                 for schema_name in approved_schemas {
                     if let Ok(atom_refs) = schema_manager.map_fields(&schema_name) {
@@ -203,13 +211,14 @@ impl FoldDB {
                             }
                         }
                     }
-                    
                 }
             }
         }
 
         // Create and start EventMonitor for system-wide observability
-        let event_monitor = Arc::new(infrastructure::event_monitor::EventMonitor::new(&message_bus));
+        let event_monitor = Arc::new(infrastructure::event_monitor::EventMonitor::new(
+            &message_bus,
+        ));
         info!("Started EventMonitor for system-wide event tracking");
 
         // AtomManager operates via direct method calls, not event consumption.
@@ -234,8 +243,6 @@ impl FoldDB {
 
     // ========== CONSOLIDATED SCHEMA API - DELEGATES TO SCHEMA_CORE ==========
 
-
-
     /// Load schema from JSON string (creates Available schema)
     pub fn load_schema_from_json(&mut self, json_str: &str) -> Result<(), SchemaError> {
         // Delegate to working schema_manager implementation
@@ -245,7 +252,8 @@ impl FoldDB {
     /// Load schema from file (creates Available schema)
     pub fn load_schema_from_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), SchemaError> {
         // Delegate to working schema_manager implementation
-        self.schema_manager.load_schema_from_file(path.as_ref().to_str().unwrap())
+        self.schema_manager
+            .load_schema_from_file(path.as_ref().to_str().unwrap())
     }
 
     /// Add a schema to available schemas (for testing compatibility)
@@ -272,7 +280,6 @@ impl FoldDB {
     ) -> Result<Option<crate::schema::Schema>, SchemaError> {
         self.schema_manager.get_schema(schema_name)
     }
-
 
     /// Provides access to the underlying database operations
     pub fn db_ops(&self) -> Arc<DbOperations> {
@@ -320,20 +327,28 @@ impl FoldDB {
     }
 
     /// Enable encryption for atom storage with the given master key pair
-    pub fn enable_atom_encryption(&mut self, master_keypair: &crate::crypto::MasterKeyPair) -> Result<(), crate::schema::SchemaError> {
-        let encryption_wrapper = crate::db_operations::EncryptionWrapper::new(
-            (*self.db_ops).clone(),
-            master_keypair
-        ).map_err(|e| crate::schema::SchemaError::InvalidData(format!("Failed to create encryption wrapper: {}", e)))?;
-        
+    pub fn enable_atom_encryption(
+        &mut self,
+        master_keypair: &crate::crypto::MasterKeyPair,
+    ) -> Result<(), crate::schema::SchemaError> {
+        let encryption_wrapper =
+            crate::db_operations::EncryptionWrapper::new((*self.db_ops).clone(), master_keypair)
+                .map_err(|e| {
+                    crate::schema::SchemaError::InvalidData(format!(
+                        "Failed to create encryption wrapper: {}",
+                        e
+                    ))
+                })?;
+
         let encryption_wrapper_arc = Arc::new(encryption_wrapper);
-        
+
         // Set encryption wrapper in atom manager
-        self.atom_manager.set_encryption_wrapper(Arc::clone(&encryption_wrapper_arc));
-        
+        self.atom_manager
+            .set_encryption_wrapper(Arc::clone(&encryption_wrapper_arc));
+
         // Store the encryption wrapper
         self.encryption_wrapper = Some(encryption_wrapper_arc);
-        
+
         Ok(())
     }
 
@@ -346,17 +361,24 @@ impl FoldDB {
         let encryption_wrapper = crate::db_operations::EncryptionWrapper::with_config(
             (*self.db_ops).clone(),
             master_keypair,
-            crypto_config
-        ).map_err(|e| crate::schema::SchemaError::InvalidData(format!("Failed to create encryption wrapper: {}", e)))?;
-        
+            crypto_config,
+        )
+        .map_err(|e| {
+            crate::schema::SchemaError::InvalidData(format!(
+                "Failed to create encryption wrapper: {}",
+                e
+            ))
+        })?;
+
         let encryption_wrapper_arc = Arc::new(encryption_wrapper);
-        
+
         // Set encryption wrapper in atom manager
-        self.atom_manager.set_encryption_wrapper(Arc::clone(&encryption_wrapper_arc));
-        
+        self.atom_manager
+            .set_encryption_wrapper(Arc::clone(&encryption_wrapper_arc));
+
         // Store the encryption wrapper
         self.encryption_wrapper = Some(encryption_wrapper_arc);
-        
+
         Ok(())
     }
 
@@ -369,11 +391,15 @@ impl FoldDB {
     /// Check if atom encryption is enabled
     pub fn is_atom_encryption_enabled(&self) -> bool {
         #[allow(clippy::unnecessary_map_or)]
-        self.encryption_wrapper.as_ref().map_or(false, |wrapper| wrapper.is_encryption_enabled())
+        self.encryption_wrapper
+            .as_ref()
+            .map_or(false, |wrapper| wrapper.is_encryption_enabled())
     }
 
     /// Get encryption statistics
-    pub fn get_encryption_stats(&self) -> Result<std::collections::HashMap<String, u64>, crate::schema::SchemaError> {
+    pub fn get_encryption_stats(
+        &self,
+    ) -> Result<std::collections::HashMap<String, u64>, crate::schema::SchemaError> {
         if let Some(encryption_wrapper) = &self.encryption_wrapper {
             encryption_wrapper.get_encryption_stats()
         } else {
@@ -392,7 +418,9 @@ impl FoldDB {
             // Use an immutable reference to perform migration
             encryption_wrapper.migrate_to_encrypted(crate::db_operations::contexts::ATOM_DATA)
         } else {
-            Err(crate::schema::SchemaError::InvalidData("Encryption is not enabled".to_string()))
+            Err(crate::schema::SchemaError::InvalidData(
+                "Encryption is not enabled".to_string(),
+            ))
         }
     }
 
@@ -409,7 +437,7 @@ impl FoldDB {
         let fields_count = mutation.fields_and_values.len();
         let operation_type = format!("{:?}", mutation.mutation_type);
         let schema_name = mutation.schema_name.clone();
-        
+
         log::info!(
             "Starting mutation execution for schema: {}",
             mutation.schema_name
@@ -425,20 +453,23 @@ impl FoldDB {
         }
 
         // 1. Prepare mutation and validate schema
-        let (schema, processed_mutation, mutation_hash) = self.prepare_mutation_and_schema(mutation)?;
+        let (schema, processed_mutation, mutation_hash) =
+            self.prepare_mutation_and_schema(mutation)?;
 
         // 2. Create mutation service and delegate field updates
-        let mutation_service = services::mutation::MutationService::new(Arc::clone(&self.message_bus));
-        let result = self.process_field_mutations_via_service(&mutation_service, &schema, &processed_mutation, &mutation_hash);
-        
+        let mutation_service =
+            services::mutation::MutationService::new(Arc::clone(&self.message_bus));
+        let result = self.process_field_mutations_via_service(
+            &mutation_service,
+            &schema,
+            &processed_mutation,
+            &mutation_hash,
+        );
+
         // 3. Publish MutationExecuted event
         let execution_time_ms = start_time.elapsed().as_millis() as u64;
-        let mutation_event = MutationExecuted::new(
-            operation_type,
-            schema_name,
-            execution_time_ms,
-            fields_count,
-        );
+        let mutation_event =
+            MutationExecuted::new(operation_type, schema_name, execution_time_ms, fields_count);
 
         if let Err(e) = self.message_bus.publish(mutation_event) {
             warn!("Failed to publish MutationExecuted event: {}", e);
@@ -470,7 +501,7 @@ impl FoldDB {
                 field_name,
                 &self.schema_manager,
             );
-            
+
             if !permission_result.allowed {
                 return Err(permission_result.error.unwrap_or_else(|| {
                     SchemaError::InvalidData(format!(
@@ -499,21 +530,27 @@ impl FoldDB {
     ) -> Result<(), SchemaError> {
         // Check if this is a range schema
         if let Some(range_key) = schema.range_key() {
-            log::info!("🎯 DEBUG: Processing range schema mutation for schema '{}' with range_key '{}'", schema.name, range_key);
-            
+            log::info!(
+                "🎯 DEBUG: Processing range schema mutation for schema '{}' with range_key '{}'",
+                schema.name,
+                range_key
+            );
+
             // Extract the range key value from the mutation data
-            let range_key_value = mutation.fields_and_values.get(range_key)
-                .ok_or_else(|| SchemaError::InvalidData(format!(
-                    "Range schema mutation missing range_key field '{}'", range_key
-                )))?;
-            
+            let range_key_value = mutation.fields_and_values.get(range_key).ok_or_else(|| {
+                SchemaError::InvalidData(format!(
+                    "Range schema mutation missing range_key field '{}'",
+                    range_key
+                ))
+            })?;
+
             let range_key_str = match range_key_value {
                 Value::String(s) => s.clone(),
                 _ => range_key_value.to_string().trim_matches('"').to_string(),
             };
-            
+
             log::info!("🎯 DEBUG: Range key value: '{}'", range_key_str);
-            
+
             // Use the specialized range schema mutation method
             return mutation_service.update_range_schema_fields(
                 schema,
@@ -522,7 +559,10 @@ impl FoldDB {
                 mutation_hash,
             );
         } else {
-            log::info!("🔍 DEBUG: Processing regular schema mutation for schema '{}'", schema.name);
+            log::info!(
+                "🔍 DEBUG: Processing regular schema mutation for schema '{}'",
+                schema.name
+            );
         }
 
         // For non-range schemas, process fields individually
@@ -533,7 +573,12 @@ impl FoldDB {
             })?;
 
             // Delegate to mutation service
-            mutation_service.update_field_value(schema, field_name.as_str(), field_value, mutation_hash)?;
+            mutation_service.update_field_value(
+                schema,
+                field_name.as_str(),
+                field_value,
+                mutation_hash,
+            )?;
         }
 
         Ok(())
@@ -546,20 +591,26 @@ impl FoldDB {
     ) -> Result<(), SchemaError> {
         // For now, return error since TransformRegistration is expected, not Transform
         Err(SchemaError::InvalidData(
-            "Transform registration not yet implemented - needs TransformRegistration type".to_string()
+            "Transform registration not yet implemented - needs TransformRegistration type"
+                .to_string(),
         ))
     }
 
     /// List all registered transforms
-    pub fn list_transforms(&self) -> Result<HashMap<String, crate::schema::types::Transform>, SchemaError> {
+    pub fn list_transforms(
+        &self,
+    ) -> Result<HashMap<String, crate::schema::types::Transform>, SchemaError> {
         self.transform_manager.list_transforms()
     }
 
     /// Execute a transform by ID using direct execution
     /// This executes the transform immediately and returns the result
     pub fn run_transform(&self, transform_id: &str) -> Result<Value, SchemaError> {
-        log::info!("🔄 run_transform called for {} - using direct execution", transform_id);
-        
+        log::info!(
+            "🔄 run_transform called for {} - using direct execution",
+            transform_id
+        );
+
         // Use direct execution through the transform manager
         match TransformRunner::execute_transform_now(&*self.transform_manager, transform_id) {
             Ok(result) => Ok(result),
@@ -584,9 +635,9 @@ impl FoldDB {
     /// Query multiple fields from a schema
     pub fn query(&self, query: Query) -> Result<Value, SchemaError> {
         use log::info;
-        
+
         info!("🔍 EVENT-DRIVEN query for schema: {}", query.schema_name);
-        
+
         // Get schema first
         let schema = match self.schema_manager.get_schema(&query.schema_name)? {
             Some(schema) => schema,
@@ -597,7 +648,7 @@ impl FoldDB {
                 )));
             }
         };
-        
+
         // Check field-level permissions for each field in the query
         for field_name in &query.fields {
             let permission_result = self.permission_wrapper.check_query_field_permission(
@@ -605,7 +656,7 @@ impl FoldDB {
                 field_name,
                 &self.schema_manager,
             );
-            
+
             if !permission_result.allowed {
                 return Err(permission_result.error.unwrap_or_else(|| {
                     SchemaError::InvalidData(format!(
@@ -615,34 +666,39 @@ impl FoldDB {
                 }));
             }
         }
-        
+
         // Extract range key filter if this is a range schema with a filter
-        let range_key_filter = if let (Some(range_key), Some(filter)) = (schema.range_key(), &query.filter) {
-            if let Some(range_filter_obj) = filter.get("range_filter") {
-                if let Some(range_filter_map) = range_filter_obj.as_object() {
-                    if let Some(range_key_value) = range_filter_map.get(range_key) {
-                        // Extract the actual filter value - handle different filter types
-                        let extracted_value = if let Some(obj) = range_key_value.as_object() {
-                            // Handle complex filters like {"Key": "1"}, {"KeyPrefix": "abc"}, etc.
-                            if let Some(key_value) = obj.get("Key") {
-                                Some(key_value.as_str().unwrap_or("").to_string())
-                            } else if let Some(prefix_value) = obj.get("KeyPrefix") {
-                                Some(prefix_value.as_str().unwrap_or("").to_string())
-                            } else if let Some(pattern_value) = obj.get("KeyPattern") {
-                                Some(pattern_value.as_str().unwrap_or("").to_string())
+        let range_key_filter =
+            if let (Some(range_key), Some(filter)) = (schema.range_key(), &query.filter) {
+                if let Some(range_filter_obj) = filter.get("range_filter") {
+                    if let Some(range_filter_map) = range_filter_obj.as_object() {
+                        if let Some(range_key_value) = range_filter_map.get(range_key) {
+                            // Extract the actual filter value - handle different filter types
+                            let extracted_value = if let Some(obj) = range_key_value.as_object() {
+                                // Handle complex filters like {"Key": "1"}, {"KeyPrefix": "abc"}, etc.
+                                if let Some(key_value) = obj.get("Key") {
+                                    Some(key_value.as_str().unwrap_or("").to_string())
+                                } else if let Some(prefix_value) = obj.get("KeyPrefix") {
+                                    Some(prefix_value.as_str().unwrap_or("").to_string())
+                                } else if let Some(pattern_value) = obj.get("KeyPattern") {
+                                    Some(pattern_value.as_str().unwrap_or("").to_string())
+                                } else {
+                                    // For other filter types, try to extract any string value
+                                    obj.values().find_map(|v| v.as_str()).map(|s| s.to_string())
+                                }
                             } else {
-                                // For other filter types, try to extract any string value
-                                obj.values()
-                                    .find_map(|v| v.as_str())
-                                    .map(|s| s.to_string())
-                            }
+                                // Simple string filter like "1"
+                                Some(range_key_value.to_string().trim_matches('"').to_string())
+                            };
+
+                            info!(
+                                "🎯 RANGE FILTER EXTRACTED: range_key='{}', filter_value={:?}",
+                                range_key, extracted_value
+                            );
+                            extracted_value
                         } else {
-                            // Simple string filter like "1"
-                            Some(range_key_value.to_string().trim_matches('"').to_string())
-                        };
-                        
-                        info!("🎯 RANGE FILTER EXTRACTED: range_key='{}', filter_value={:?}", range_key, extracted_value);
-                        extracted_value
+                            None
+                        }
                     } else {
                         None
                     }
@@ -651,14 +707,11 @@ impl FoldDB {
                 }
             } else {
                 None
-            }
-        } else {
-            None
-        };
+            };
 
         // Retrieve actual field values by accessing database directly
         let mut field_values = serde_json::Map::new();
-        
+
         for field_name in &query.fields {
             match self.get_field_value_from_db(&schema, field_name, range_key_filter.clone()) {
                 Ok(value) => {
@@ -670,17 +723,26 @@ impl FoldDB {
                 }
             }
         }
-        
+
         // Return actual field values
         Ok(serde_json::Value::Object(field_values))
     }
 
     /// Get field value directly from database using unified resolver
-    fn get_field_value_from_db(&self, schema: &Schema, field_name: &str, range_key_filter: Option<String>) -> Result<Value, SchemaError> {
+    fn get_field_value_from_db(
+        &self,
+        schema: &Schema,
+        field_name: &str,
+        range_key_filter: Option<String>,
+    ) -> Result<Value, SchemaError> {
         // Use the unified FieldValueResolver to eliminate duplicate code
-        crate::fold_db_core::transform_manager::utils::TransformUtils::resolve_field_value(&self.db_ops, schema, field_name, range_key_filter)
+        crate::fold_db_core::transform_manager::utils::TransformUtils::resolve_field_value(
+            &self.db_ops,
+            schema,
+            field_name,
+            range_key_filter,
+        )
     }
-    
 
     /// Query a schema (compatibility method)
     pub fn query_schema(&self, query: Query) -> Vec<Result<Value, SchemaError>> {

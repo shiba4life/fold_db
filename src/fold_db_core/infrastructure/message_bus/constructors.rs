@@ -41,7 +41,11 @@ impl AtomUpdated {
 
 impl AtomRefCreated {
     /// Create a new AtomRefCreated event
-    pub fn new(aref_uuid: impl Into<String>, aref_type: impl Into<String>, field_path: impl Into<String>) -> Self {
+    pub fn new(
+        aref_uuid: impl Into<String>,
+        aref_type: impl Into<String>,
+        field_path: impl Into<String>,
+    ) -> Self {
         Self {
             aref_uuid: aref_uuid.into(),
             aref_type: aref_type.into(),
@@ -52,7 +56,11 @@ impl AtomRefCreated {
 
 impl AtomRefUpdated {
     /// Create a new AtomRefUpdated event
-    pub fn new(aref_uuid: impl Into<String>, field_path: impl Into<String>, operation: impl Into<String>) -> Self {
+    pub fn new(
+        aref_uuid: impl Into<String>,
+        field_path: impl Into<String>,
+        operation: impl Into<String>,
+    ) -> Self {
         Self {
             aref_uuid: aref_uuid.into(),
             field_path: field_path.into(),
@@ -485,12 +493,7 @@ impl AtomRefQueryRequest {
 
 impl AtomRefQueryResponse {
     /// Create a new AtomRefQueryResponse
-    pub fn new(
-        correlation_id: String,
-        success: bool,
-        exists: bool,
-        error: Option<String>,
-    ) -> Self {
+    pub fn new(correlation_id: String, success: bool, exists: bool, error: Option<String>) -> Self {
         Self {
             correlation_id,
             success,
@@ -503,9 +506,7 @@ impl AtomRefQueryResponse {
 impl SchemaStatusRequest {
     /// Create a new SchemaStatusRequest
     pub fn new(correlation_id: String) -> Self {
-        Self {
-            correlation_id,
-        }
+        Self { correlation_id }
     }
 }
 
@@ -529,9 +530,7 @@ impl SchemaStatusResponse {
 impl SchemaDiscoveryRequest {
     /// Create a new SchemaDiscoveryRequest
     pub fn new(correlation_id: String) -> Self {
-        Self {
-            correlation_id,
-        }
+        Self { correlation_id }
     }
 }
 

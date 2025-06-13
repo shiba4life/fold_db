@@ -4,9 +4,9 @@
 //! recovery suggestions, and error classification for all encryption-related
 //! operations in DataFold.
 
-use thiserror::Error;
+use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
-use serde::{Serialize, Deserialize};
+use thiserror::Error;
 use uuid::Uuid;
 
 /// Result type alias for enhanced crypto operations
@@ -87,7 +87,10 @@ impl ErrorContext {
     }
 
     /// Add multiple metadata entries
-    pub fn with_multiple_metadata(mut self, metadata: std::collections::HashMap<String, String>) -> Self {
+    pub fn with_multiple_metadata(
+        mut self,
+        metadata: std::collections::HashMap<String, String>,
+    ) -> Self {
         self.metadata.extend(metadata);
         self
     }
@@ -319,22 +322,54 @@ impl EnhancedCryptoError {
     /// Get recovery actions for this error
     pub fn recovery_actions(&self) -> &[RecoveryAction] {
         match self {
-            Self::KeyGeneration { recovery_actions, .. } => recovery_actions,
-            Self::KeyDerivation { recovery_actions, .. } => recovery_actions,
-            Self::Encryption { recovery_actions, .. } => recovery_actions,
-            Self::Decryption { recovery_actions, .. } => recovery_actions,
-            Self::Signature { recovery_actions, .. } => recovery_actions,
-            Self::InvalidKey { recovery_actions, .. } => recovery_actions,
-            Self::RandomGeneration { recovery_actions, .. } => recovery_actions,
-            Self::Serialization { recovery_actions, .. } => recovery_actions,
-            Self::Configuration { recovery_actions, .. } => recovery_actions,
-            Self::Storage { recovery_actions, .. } => recovery_actions,
-            Self::Security { recovery_actions, .. } => recovery_actions,
-            Self::Performance { recovery_actions, .. } => recovery_actions,
-            Self::Network { recovery_actions, .. } => recovery_actions,
-            Self::Validation { recovery_actions, .. } => recovery_actions,
-            Self::Compatibility { recovery_actions, .. } => recovery_actions,
-            Self::ResourceExhaustion { recovery_actions, .. } => recovery_actions,
+            Self::KeyGeneration {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::KeyDerivation {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::Encryption {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::Decryption {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::Signature {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::InvalidKey {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::RandomGeneration {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::Serialization {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::Configuration {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::Storage {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::Security {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::Performance {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::Network {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::Validation {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::Compatibility {
+                recovery_actions, ..
+            } => recovery_actions,
+            Self::ResourceExhaustion {
+                recovery_actions, ..
+            } => recovery_actions,
         }
     }
 
@@ -362,14 +397,18 @@ impl EnhancedCryptoError {
 
     /// Check if this error is recoverable
     pub fn is_recoverable(&self) -> bool {
-        !self.recovery_actions().is_empty() && 
-        !self.recovery_actions().contains(&RecoveryAction::NoRecovery)
+        !self.recovery_actions().is_empty()
+            && !self
+                .recovery_actions()
+                .contains(&RecoveryAction::NoRecovery)
     }
 
     /// Check if this error should trigger an immediate alert
     pub fn should_alert(&self) -> bool {
-        matches!(self.severity(), ErrorSeverity::High | ErrorSeverity::Critical) ||
-        matches!(self, Self::Security { .. })
+        matches!(
+            self.severity(),
+            ErrorSeverity::High | ErrorSeverity::Critical
+        ) || matches!(self, Self::Security { .. })
     }
 
     /// Get a detailed description for logging
@@ -429,112 +468,112 @@ impl EnhancedCryptoError {
 impl From<crate::crypto::error::CryptoError> for EnhancedCryptoError {
     fn from(err: crate::crypto::error::CryptoError) -> Self {
         let context = ErrorContext::new("crypto", "legacy_operation");
-        
+
         match err {
-            crate::crypto::error::CryptoError::KeyGeneration { message } => {
-                Self::KeyGeneration {
-                    message,
-                    severity: ErrorSeverity::High,
-                    recovery_actions: vec![RecoveryAction::Retry, RecoveryAction::RegenerateCryptoMaterial],
-                    context,
-                    underlying_cause: None,
-                }
-            }
-            crate::crypto::error::CryptoError::Serialization { message } => {
-                Self::Serialization {
-                    message,
-                    severity: ErrorSeverity::Medium,
-                    recovery_actions: vec![RecoveryAction::Retry, RecoveryAction::CheckConfiguration],
-                    context,
-                    data_type: "unknown".to_string(),
-                    operation: "unknown".to_string(),
-                    underlying_cause: None,
-                }
-            }
-            crate::crypto::error::CryptoError::Deserialization { message } => {
-                Self::Serialization {
-                    message,
-                    severity: ErrorSeverity::Medium,
-                    recovery_actions: vec![RecoveryAction::CheckConfiguration, RecoveryAction::RestoreFromBackup],
-                    context,
-                    data_type: "unknown".to_string(),
-                    operation: "deserialize".to_string(),
-                    underlying_cause: None,
-                }
-            }
-            crate::crypto::error::CryptoError::InvalidKey { message } => {
-                Self::InvalidKey {
-                    message,
-                    severity: ErrorSeverity::High,
-                    recovery_actions: vec![RecoveryAction::RegenerateCryptoMaterial, RecoveryAction::CheckConfiguration],
-                    context,
-                    key_type: "unknown".to_string(),
-                    expected_format: None,
-                    underlying_cause: None,
-                }
-            }
-            crate::crypto::error::CryptoError::Signature { message } => {
-                Self::Signature {
-                    message,
-                    severity: ErrorSeverity::High,
-                    recovery_actions: vec![RecoveryAction::Retry, RecoveryAction::RegenerateCryptoMaterial],
-                    context,
-                    operation_type: "unknown".to_string(),
-                    underlying_cause: None,
-                }
-            }
-            crate::crypto::error::CryptoError::KeyDerivation { message } => {
-                Self::KeyDerivation {
-                    message,
-                    severity: ErrorSeverity::High,
-                    recovery_actions: vec![RecoveryAction::RetryWithDifferentParams, RecoveryAction::CheckConfiguration],
-                    context,
-                    parameters_used: None,
-                    underlying_cause: None,
-                }
-            }
+            crate::crypto::error::CryptoError::KeyGeneration { message } => Self::KeyGeneration {
+                message,
+                severity: ErrorSeverity::High,
+                recovery_actions: vec![
+                    RecoveryAction::Retry,
+                    RecoveryAction::RegenerateCryptoMaterial,
+                ],
+                context,
+                underlying_cause: None,
+            },
+            crate::crypto::error::CryptoError::Serialization { message } => Self::Serialization {
+                message,
+                severity: ErrorSeverity::Medium,
+                recovery_actions: vec![RecoveryAction::Retry, RecoveryAction::CheckConfiguration],
+                context,
+                data_type: "unknown".to_string(),
+                operation: "unknown".to_string(),
+                underlying_cause: None,
+            },
+            crate::crypto::error::CryptoError::Deserialization { message } => Self::Serialization {
+                message,
+                severity: ErrorSeverity::Medium,
+                recovery_actions: vec![
+                    RecoveryAction::CheckConfiguration,
+                    RecoveryAction::RestoreFromBackup,
+                ],
+                context,
+                data_type: "unknown".to_string(),
+                operation: "deserialize".to_string(),
+                underlying_cause: None,
+            },
+            crate::crypto::error::CryptoError::InvalidKey { message } => Self::InvalidKey {
+                message,
+                severity: ErrorSeverity::High,
+                recovery_actions: vec![
+                    RecoveryAction::RegenerateCryptoMaterial,
+                    RecoveryAction::CheckConfiguration,
+                ],
+                context,
+                key_type: "unknown".to_string(),
+                expected_format: None,
+                underlying_cause: None,
+            },
+            crate::crypto::error::CryptoError::Signature { message } => Self::Signature {
+                message,
+                severity: ErrorSeverity::High,
+                recovery_actions: vec![
+                    RecoveryAction::Retry,
+                    RecoveryAction::RegenerateCryptoMaterial,
+                ],
+                context,
+                operation_type: "unknown".to_string(),
+                underlying_cause: None,
+            },
+            crate::crypto::error::CryptoError::KeyDerivation { message } => Self::KeyDerivation {
+                message,
+                severity: ErrorSeverity::High,
+                recovery_actions: vec![
+                    RecoveryAction::RetryWithDifferentParams,
+                    RecoveryAction::CheckConfiguration,
+                ],
+                context,
+                parameters_used: None,
+                underlying_cause: None,
+            },
             crate::crypto::error::CryptoError::RandomGeneration { message } => {
                 Self::RandomGeneration {
                     message,
                     severity: ErrorSeverity::Critical,
-                    recovery_actions: vec![RecoveryAction::Retry, RecoveryAction::ContactAdministrator],
+                    recovery_actions: vec![
+                        RecoveryAction::Retry,
+                        RecoveryAction::ContactAdministrator,
+                    ],
                     context,
                     requested_bytes: None,
                     underlying_cause: None,
                 }
             }
-            crate::crypto::error::CryptoError::SignatureVerification => {
-                Self::Signature {
-                    message: "Signature verification failed".to_string(),
-                    severity: ErrorSeverity::High,
-                    recovery_actions: vec![RecoveryAction::Retry, RecoveryAction::CheckConfiguration],
-                    context,
-                    operation_type: "verify".to_string(),
-                    underlying_cause: None,
-                }
-            }
-            crate::crypto::error::CryptoError::InvalidSignature { message } => {
-                Self::Signature {
-                    message,
-                    severity: ErrorSeverity::Medium,
-                    recovery_actions: vec![RecoveryAction::CheckConfiguration, RecoveryAction::Retry],
-                    context,
-                    operation_type: "validate".to_string(),
-                    underlying_cause: None,
-                }
-            }
-            crate::crypto::error::CryptoError::InvalidInput(message) => {
-                Self::Validation {
-                    message,
-                    severity: ErrorSeverity::Medium,
-                    recovery_actions: vec![RecoveryAction::CheckConfiguration, RecoveryAction::Retry],
-                    context,
-                    field_name: None,
-                    expected_format: None,
-                    actual_value: None,
-                    underlying_cause: None,
-                }
-            }
+            crate::crypto::error::CryptoError::SignatureVerification => Self::Signature {
+                message: "Signature verification failed".to_string(),
+                severity: ErrorSeverity::High,
+                recovery_actions: vec![RecoveryAction::Retry, RecoveryAction::CheckConfiguration],
+                context,
+                operation_type: "verify".to_string(),
+                underlying_cause: None,
+            },
+            crate::crypto::error::CryptoError::InvalidSignature { message } => Self::Signature {
+                message,
+                severity: ErrorSeverity::Medium,
+                recovery_actions: vec![RecoveryAction::CheckConfiguration, RecoveryAction::Retry],
+                context,
+                operation_type: "validate".to_string(),
+                underlying_cause: None,
+            },
+            crate::crypto::error::CryptoError::InvalidInput(message) => Self::Validation {
+                message,
+                severity: ErrorSeverity::Medium,
+                recovery_actions: vec![RecoveryAction::CheckConfiguration, RecoveryAction::Retry],
+                context,
+                field_name: None,
+                expected_format: None,
+                actual_value: None,
+                underlying_cause: None,
+            },
         }
     }
 }

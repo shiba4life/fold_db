@@ -6,10 +6,16 @@
 #![allow(dead_code)]
 
 use datafold::crypto::{
-    enhanced_error::{EnhancedCryptoError, ErrorSeverity, RecoveryAction, ErrorContext},
-    audit_logger::{CryptoAuditLogger, AuditConfig, AuditEventType, AuditSeverity, OperationResult, SecurityEventDetails},
-    security_monitor::{CryptoSecurityMonitor, SecurityMonitorConfig, ThreatLevel, SecurityPattern},
-    generate_master_keypair, MasterKeyPair,
+    audit_logger::{
+        AuditConfig, AuditEventType, AuditSeverity, CryptoAuditLogger, OperationResult,
+        SecurityEventDetails,
+    },
+    enhanced_error::{EnhancedCryptoError, ErrorContext, ErrorSeverity, RecoveryAction},
+    generate_master_keypair,
+    security_monitor::{
+        CryptoSecurityMonitor, SecurityMonitorConfig, SecurityPattern, ThreatLevel,
+    },
+    MasterKeyPair,
 };
 use datafold::db_operations::{DbOperations, EncryptionWrapper};
 use std::time::Duration;
@@ -26,7 +32,7 @@ impl TestConfig {
     fn new() -> Self {
         let test_db_path = format!("test_crypto_error_audit_{}", uuid::Uuid::new_v4());
         let master_keypair = generate_master_keypair().expect("Failed to generate test keypair");
-        
+
         Self {
             test_db_path,
             master_keypair,
@@ -49,7 +55,10 @@ async fn test_enhanced_crypto_error_creation() {
     let error = EnhancedCryptoError::Encryption {
         message: "Test encryption failure".to_string(),
         severity: ErrorSeverity::High,
-        recovery_actions: vec![RecoveryAction::Retry, RecoveryAction::RegenerateCryptoMaterial],
+        recovery_actions: vec![
+            RecoveryAction::Retry,
+            RecoveryAction::RegenerateCryptoMaterial,
+        ],
         context,
         data_size: Some(1024),
         encryption_context: Some("test_context".to_string()),
@@ -81,8 +90,7 @@ async fn test_error_context_propagation() {
 
 #[tokio::test]
 async fn test_error_structured_logging() {
-    let context = ErrorContext::new("test", "test_op")
-        .with_metadata("key1", "value1");
+    let context = ErrorContext::new("test", "test_op").with_metadata("key1", "value1");
 
     let error = EnhancedCryptoError::KeyGeneration {
         message: "Test key generation failure".to_string(),
@@ -93,7 +101,7 @@ async fn test_error_structured_logging() {
     };
 
     let structured_log = error.to_structured_log();
-    
+
     assert_eq!(structured_log["error_type"], "key_generation");
     assert_eq!(structured_log["severity"], "Critical");
     assert_eq!(structured_log["component"], "test");
@@ -107,32 +115,39 @@ async fn test_audit_logger_basic_functionality() {
     let logger = CryptoAuditLogger::new(config);
 
     // Test encryption operation logging
-    logger.log_encryption_operation(
-        "encrypt_data",
-        "atom_data",
-        1024,
-        Duration::from_millis(50),
-        OperationResult::Success,
-        None,
-    ).await;
+    logger
+        .log_encryption_operation(
+            "encrypt_data",
+            "atom_data",
+            1024,
+            Duration::from_millis(50),
+            OperationResult::Success,
+            None,
+        )
+        .await;
 
     let stats = logger.get_statistics().await;
     assert_eq!(stats.total_events, 1);
-    assert_eq!(stats.events_by_type.get(&AuditEventType::Encryption), Some(&1));
+    assert_eq!(
+        stats.events_by_type.get(&AuditEventType::Encryption),
+        Some(&1)
+    );
 
     // Test decryption operation logging
-    logger.log_decryption_operation(
-        "decrypt_data",
-        "atom_data",
-        1024,
-        Duration::from_millis(30),
-        OperationResult::Failure {
-            error_type: "authentication_failed".to_string(),
-            error_message: "Invalid signature".to_string(),
-            error_code: Some("CRYPTO_001".to_string()),
-        },
-        None,
-    ).await;
+    logger
+        .log_decryption_operation(
+            "decrypt_data",
+            "atom_data",
+            1024,
+            Duration::from_millis(30),
+            OperationResult::Failure {
+                error_type: "authentication_failed".to_string(),
+                error_message: "Invalid signature".to_string(),
+                error_code: Some("CRYPTO_001".to_string()),
+            },
+            None,
+        )
+        .await;
 
     let updated_stats = logger.get_statistics().await;
     assert_eq!(updated_stats.total_events, 2);
@@ -144,25 +159,32 @@ async fn test_audit_logger_key_operations() {
     let config = AuditConfig::default();
     let logger = CryptoAuditLogger::new(config);
 
-    logger.log_key_operation(
-        "generate_master_key",
-        "ed25519",
-        Duration::from_millis(100),
-        OperationResult::Success,
-        None,
-    ).await;
+    logger
+        .log_key_operation(
+            "generate_master_key",
+            "ed25519",
+            Duration::from_millis(100),
+            OperationResult::Success,
+            None,
+        )
+        .await;
 
-    logger.log_key_operation(
-        "derive_encryption_key",
-        "aes256",
-        Duration::from_millis(75),
-        OperationResult::Success,
-        Some(Uuid::new_v4()),
-    ).await;
+    logger
+        .log_key_operation(
+            "derive_encryption_key",
+            "aes256",
+            Duration::from_millis(75),
+            OperationResult::Success,
+            Some(Uuid::new_v4()),
+        )
+        .await;
 
     let stats = logger.get_statistics().await;
     assert_eq!(stats.total_events, 2);
-    assert_eq!(stats.events_by_type.get(&AuditEventType::KeyOperation), Some(&2));
+    assert_eq!(
+        stats.events_by_type.get(&AuditEventType::KeyOperation),
+        Some(&2)
+    );
 }
 
 #[tokio::test]
@@ -178,20 +200,25 @@ async fn test_audit_logger_security_events() {
         security_metadata: std::collections::HashMap::new(),
     };
 
-    logger.log_security_event(
-        "access_attempt",
-        security_details,
-        OperationResult::Failure {
-            error_type: "unauthorized".to_string(),
-            error_message: "Access denied".to_string(),
-            error_code: Some("SEC_001".to_string()),
-        },
-        None,
-    ).await;
+    logger
+        .log_security_event(
+            "access_attempt",
+            security_details,
+            OperationResult::Failure {
+                error_type: "unauthorized".to_string(),
+                error_message: "Access denied".to_string(),
+                error_code: Some("SEC_001".to_string()),
+            },
+            None,
+        )
+        .await;
 
     let stats = logger.get_statistics().await;
     assert_eq!(stats.security_events, 1);
-    assert_eq!(stats.events_by_type.get(&AuditEventType::Security), Some(&1));
+    assert_eq!(
+        stats.events_by_type.get(&AuditEventType::Security),
+        Some(&1)
+    );
 }
 
 #[tokio::test]
@@ -200,32 +227,49 @@ async fn test_audit_logger_event_filtering() {
     let logger = CryptoAuditLogger::new(config);
 
     // Log multiple types of events
-    logger.log_encryption_operation(
-        "encrypt1", "context1", 100, Duration::from_millis(10), OperationResult::Success, None
-    ).await;
+    logger
+        .log_encryption_operation(
+            "encrypt1",
+            "context1",
+            100,
+            Duration::from_millis(10),
+            OperationResult::Success,
+            None,
+        )
+        .await;
 
-    logger.log_decryption_operation(
-        "decrypt1", "context1", 100, Duration::from_millis(15), OperationResult::Success, None
-    ).await;
+    logger
+        .log_decryption_operation(
+            "decrypt1",
+            "context1",
+            100,
+            Duration::from_millis(15),
+            OperationResult::Success,
+            None,
+        )
+        .await;
 
-    logger.log_key_operation(
-        "key_gen1", "ed25519", Duration::from_millis(20), OperationResult::Success, None
-    ).await;
+    logger
+        .log_key_operation(
+            "key_gen1",
+            "ed25519",
+            Duration::from_millis(20),
+            OperationResult::Success,
+            None,
+        )
+        .await;
 
     // Test filtering by event type
-    let encryption_events = logger.filter_events(
-        Some(AuditEventType::Encryption),
-        None, None, None, None
-    ).await;
+    let encryption_events = logger
+        .filter_events(Some(AuditEventType::Encryption), None, None, None, None)
+        .await;
     assert_eq!(encryption_events.len(), 1);
     assert_eq!(encryption_events[0].operation, "encrypt1");
 
     // Test filtering by severity
-    let info_events = logger.filter_events(
-        None,
-        Some(AuditSeverity::Info),
-        None, None, None
-    ).await;
+    let info_events = logger
+        .filter_events(None, Some(AuditSeverity::Info), None, None, None)
+        .await;
     assert_eq!(info_events.len(), 3); // All successful operations are Info level
 
     // Test getting recent events
@@ -239,14 +283,21 @@ async fn test_audit_logger_export_functionality() {
     let logger = CryptoAuditLogger::new(config);
 
     // Log some events
-    logger.log_encryption_operation(
-        "test_encrypt", "test_context", 512, Duration::from_millis(25), OperationResult::Success, None
-    ).await;
+    logger
+        .log_encryption_operation(
+            "test_encrypt",
+            "test_context",
+            512,
+            Duration::from_millis(25),
+            OperationResult::Success,
+            None,
+        )
+        .await;
 
     // Test JSON export
     let json_export = logger.export_events_json().await;
     assert!(json_export.is_ok());
-    
+
     let json_str = json_export.unwrap();
     assert!(json_str.contains("test_encrypt"));
     assert!(json_str.contains("test_context"));
@@ -275,18 +326,26 @@ async fn test_security_monitor_repeated_failure_detection() {
 
     // Simulate repeated decryption failures
     for i in 0..5 {
-        let detections = monitor.monitor_decryption_operation(
-            "decrypt_data",
-            "test_context",
-            100,
-            Duration::from_millis(10),
-            false, // failure
-            Some("test_source"),
-        ).await;
+        let detections = monitor
+            .monitor_decryption_operation(
+                "decrypt_data",
+                "test_context",
+                100,
+                Duration::from_millis(10),
+                false, // failure
+                Some("test_source"),
+            )
+            .await;
 
         if !detections.is_empty() {
-            assert_eq!(detections[0].pattern, SecurityPattern::RepeatedDecryptionFailures);
-            assert!(matches!(detections[0].threat_level, ThreatLevel::Medium | ThreatLevel::High));
+            assert_eq!(
+                detections[0].pattern,
+                SecurityPattern::RepeatedDecryptionFailures
+            );
+            assert!(matches!(
+                detections[0].threat_level,
+                ThreatLevel::Medium | ThreatLevel::High
+            ));
             detections_found = true;
             break;
         }
@@ -300,17 +359,22 @@ async fn test_security_monitor_unusual_pattern_detection() {
     let monitor = CryptoSecurityMonitor::with_default_config();
 
     // Test with unusually large data size
-    let detections = monitor.monitor_encryption_operation(
-        "encrypt_large_data",
-        "test_context",
-        200_000_000, // Very large size
-        Duration::from_millis(100),
-        true,
-        Some("test_source"),
-    ).await;
+    let detections = monitor
+        .monitor_encryption_operation(
+            "encrypt_large_data",
+            "test_context",
+            200_000_000, // Very large size
+            Duration::from_millis(100),
+            true,
+            Some("test_source"),
+        )
+        .await;
 
     assert!(!detections.is_empty());
-    assert_eq!(detections[0].pattern, SecurityPattern::UnusualEncryptionPattern);
+    assert_eq!(
+        detections[0].pattern,
+        SecurityPattern::UnusualEncryptionPattern
+    );
     assert_eq!(detections[0].threat_level, ThreatLevel::Low);
 }
 
@@ -319,17 +383,22 @@ async fn test_security_monitor_performance_detection() {
     let monitor = CryptoSecurityMonitor::with_default_config();
 
     // Test with very slow operation
-    let detections = monitor.monitor_encryption_operation(
-        "slow_encrypt",
-        "test_context",
-        1000,
-        Duration::from_millis(10000), // Very slow
-        true,
-        Some("test_source"),
-    ).await;
+    let detections = monitor
+        .monitor_encryption_operation(
+            "slow_encrypt",
+            "test_context",
+            1000,
+            Duration::from_millis(10000), // Very slow
+            true,
+            Some("test_source"),
+        )
+        .await;
 
     assert!(!detections.is_empty());
-    assert_eq!(detections[0].pattern, SecurityPattern::PerformanceDegradation);
+    assert_eq!(
+        detections[0].pattern,
+        SecurityPattern::PerformanceDegradation
+    );
     assert_eq!(detections[0].threat_level, ThreatLevel::Medium);
 }
 
@@ -337,16 +406,21 @@ async fn test_security_monitor_performance_detection() {
 async fn test_security_monitor_unauthorized_access_detection() {
     let monitor = CryptoSecurityMonitor::with_default_config();
 
-    let detections = monitor.monitor_key_operation(
-        "access_private_key",
-        "ed25519",
-        Duration::from_millis(50),
-        false, // Failed access
-        Some("unauthorized_source"),
-    ).await;
+    let detections = monitor
+        .monitor_key_operation(
+            "access_private_key",
+            "ed25519",
+            Duration::from_millis(50),
+            false, // Failed access
+            Some("unauthorized_source"),
+        )
+        .await;
 
     assert!(!detections.is_empty());
-    assert_eq!(detections[0].pattern, SecurityPattern::UnauthorizedKeyAccess);
+    assert_eq!(
+        detections[0].pattern,
+        SecurityPattern::UnauthorizedKeyAccess
+    );
     assert_eq!(detections[0].threat_level, ThreatLevel::High);
 }
 
@@ -355,8 +429,8 @@ async fn test_security_monitor_error_integration() {
     let monitor = CryptoSecurityMonitor::with_default_config();
 
     // Create an enhanced crypto error
-    let context = ErrorContext::new("crypto_test", "test_decrypt")
-        .with_metadata("source", "suspicious_ip");
+    let context =
+        ErrorContext::new("crypto_test", "test_decrypt").with_metadata("source", "suspicious_ip");
 
     let error = EnhancedCryptoError::Decryption {
         message: "Decryption failed due to invalid key".to_string(),
@@ -381,18 +455,39 @@ async fn test_security_monitor_statistics_tracking() {
     let monitor = CryptoSecurityMonitor::with_default_config();
 
     // Generate successful operations
-    monitor.monitor_encryption_operation(
-        "encrypt1", "context1", 100, Duration::from_millis(10), true, None
-    ).await;
+    monitor
+        .monitor_encryption_operation(
+            "encrypt1",
+            "context1",
+            100,
+            Duration::from_millis(10),
+            true,
+            None,
+        )
+        .await;
 
-    monitor.monitor_decryption_operation(
-        "decrypt1", "context1", 100, Duration::from_millis(15), true, None
-    ).await;
+    monitor
+        .monitor_decryption_operation(
+            "decrypt1",
+            "context1",
+            100,
+            Duration::from_millis(15),
+            true,
+            None,
+        )
+        .await;
 
     // Generate failed operation
-    monitor.monitor_decryption_operation(
-        "decrypt_fail", "context1", 100, Duration::from_millis(20), false, None
-    ).await;
+    monitor
+        .monitor_decryption_operation(
+            "decrypt_fail",
+            "context1",
+            100,
+            Duration::from_millis(20),
+            false,
+            None,
+        )
+        .await;
 
     let stats = monitor.get_statistics().await;
     assert_eq!(stats.total_events_processed, 3);
@@ -403,17 +498,21 @@ async fn test_security_monitor_detection_filtering() {
     let monitor = CryptoSecurityMonitor::with_default_config();
 
     // Generate a detection
-    let _detections = monitor.monitor_key_operation(
-        "failed_key_access",
-        "ed25519",
-        Duration::from_millis(50),
-        false,
-        Some("test_source"),
-    ).await;
+    let _detections = monitor
+        .monitor_key_operation(
+            "failed_key_access",
+            "ed25519",
+            Duration::from_millis(50),
+            false,
+            Some("test_source"),
+        )
+        .await;
 
     // Test filtering by threat level
-    let high_threat_detections = monitor.get_detections_by_threat_level(ThreatLevel::High).await;
-    
+    let high_threat_detections = monitor
+        .get_detections_by_threat_level(ThreatLevel::High)
+        .await;
+
     // Should have at least one detection for unauthorized key access
     if !high_threat_detections.is_empty() {
         assert_eq!(high_threat_detections[0].threat_level, ThreatLevel::High);
@@ -431,8 +530,8 @@ async fn test_integrated_error_and_audit_workflow() {
     let audit_logger = std::sync::Arc::new(CryptoAuditLogger::new(audit_config));
 
     let security_config = SecurityMonitorConfig::default();
-    let security_monitor = CryptoSecurityMonitor::new(security_config)
-        .with_audit_logger(audit_logger.clone());
+    let security_monitor =
+        CryptoSecurityMonitor::new(security_config).with_audit_logger(audit_logger.clone());
 
     // Simulate a crypto operation with error
     let context = ErrorContext::new("integrated_test", "full_workflow")
@@ -449,7 +548,9 @@ async fn test_integrated_error_and_audit_workflow() {
     };
 
     // Log the error to audit system
-    audit_logger.log_error_event(&error, Some(Uuid::new_v4())).await;
+    audit_logger
+        .log_error_event(&error, Some(Uuid::new_v4()))
+        .await;
 
     // Monitor for security implications
     let detections = security_monitor.monitor_crypto_error(&error).await;
@@ -524,9 +625,16 @@ async fn test_audit_logger_configuration() {
     let logger = CryptoAuditLogger::new(custom_config);
 
     // Test that encryption events are logged
-    logger.log_encryption_operation(
-        "test_encrypt", "test", 100, Duration::from_millis(10), OperationResult::Success, None
-    ).await;
+    logger
+        .log_encryption_operation(
+            "test_encrypt",
+            "test",
+            100,
+            Duration::from_millis(10),
+            OperationResult::Success,
+            None,
+        )
+        .await;
 
     // Test that performance events would be excluded (this requires internal knowledge)
     // In a real implementation, performance events would be filtered out
@@ -546,14 +654,16 @@ async fn test_memory_management() {
 
     // Add more events than the limit
     for i in 0..10 {
-        logger.log_encryption_operation(
-            &format!("encrypt_{}", i),
-            "test",
-            100,
-            Duration::from_millis(10),
-            OperationResult::Success,
-            None,
-        ).await;
+        logger
+            .log_encryption_operation(
+                &format!("encrypt_{}", i),
+                "test",
+                100,
+                Duration::from_millis(10),
+                OperationResult::Success,
+                None,
+            )
+            .await;
     }
 
     // Verify that memory usage is bounded

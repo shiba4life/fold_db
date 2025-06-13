@@ -6,7 +6,6 @@ This collection provides comprehensive security recipes and best practices for i
 
 ### Authentication & Authorization
 - **[Basic Authentication Flow](authentication-flow.md)** - Complete authentication implementation
-- **[Multi-Factor Integration](multi-factor-auth.md)** - Combining signatures with MFA
 - **[Role-Based Access Control](rbac-patterns.md)** - Authorization with signature auth
 - **[Session Management](session-management.md)** - Managing authenticated sessions
 
