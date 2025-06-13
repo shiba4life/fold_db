@@ -291,7 +291,7 @@ async fn demo_nonce_store_efficiency() {
            "Nonce store should not exceed maximum capacity");
     println!("  ✅ Nonce store size management working correctly");
     
-    if let Some(oldest_age) = final_stats.oldest_nonce_age {
+    if let Some(oldest_age) = final_stats.oldest_nonce_age_secs {
         println!("  🕐 Oldest nonce age: {} seconds", oldest_age);
     }
 }

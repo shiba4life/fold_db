@@ -179,7 +179,7 @@ async fn test_nonce_store_statistics() {
     // Initially empty
     let initial_stats = state.get_nonce_store_stats().expect("Should get stats");
     assert_eq!(initial_stats.total_nonces, 0);
-    assert_eq!(initial_stats.oldest_nonce_age, None);
+    assert_eq!(initial_stats.oldest_nonce_age_secs, None);
     
     // Add some nonces
     assert!(state.check_and_store_nonce("test-nonce-1", now - 10).is_ok());
@@ -190,8 +190,8 @@ async fn test_nonce_store_statistics() {
     let updated_stats = state.get_nonce_store_stats().expect("Should get stats");
     assert_eq!(updated_stats.total_nonces, 3);
     assert_eq!(updated_stats.max_capacity, 10000); // Default capacity
-    assert!(updated_stats.oldest_nonce_age.is_some());
-    assert!(updated_stats.oldest_nonce_age.unwrap() >= 10); // At least 10 seconds old
+    assert!(updated_stats.oldest_nonce_age_secs.is_some());
+    assert!(updated_stats.oldest_nonce_age_secs.unwrap() >= 10); // At least 10 seconds old
 }
 
 #[tokio::test]

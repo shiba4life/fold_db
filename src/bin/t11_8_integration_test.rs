@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 // =============================================================================
 // STANDALONE TEST FRAMEWORK FOR T11.8
@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 #[derive(Debug, Clone)]
 struct AuthConfig {
     max_signature_verification_time_ms: u64,
+    #[allow(dead_code)]
     nonce_store_max_size: usize,
     protected_endpoints: Vec<String>,
     exempted_endpoints: Vec<String>,
@@ -48,7 +49,9 @@ struct SecurityMetrics {
     pub nonce_validations: u64,
     pub security_violations: u64,
     pub signature_verifications: u64,
+    #[allow(dead_code)]
     pub cache_hits: u64,
+    #[allow(dead_code)]
     pub cache_misses: u64,
 }
 
@@ -179,6 +182,7 @@ enum AuthError {
     MissingSignature,
     InvalidSignature,
     NonceReplay,
+    #[allow(dead_code)]
     PerformanceThresholdExceeded(u64),
 }
 
@@ -193,6 +197,7 @@ struct IntegrationTestSuite {
 
 #[derive(Debug)]
 struct TestResult {
+    #[allow(dead_code)]
     category: String,
     test_name: String,
     passed: bool,
@@ -517,7 +522,7 @@ impl IntegrationTestSuite {
                 return Err("Mandatory mode should require authentication".to_string());
             }
 
-            Ok("Mandatory authentication validated".to_string())
+            Ok(())
         });
 
         self.run_test("Migration Compatibility", "Backward compatibility validation", || {
@@ -551,7 +556,7 @@ impl IntegrationTestSuite {
         let authenticator = MockSignatureAuthenticator::new(config);
 
         // PBI-11 Acceptance Criteria validation
-        let mut criteria_results = HashMap::new();
+        let _criteria_results: HashMap<String, bool> = HashMap::new();
 
         self.run_test("PBI-11 Criteria", "AC1: Endpoint authentication requirement", || {
             let protected_result = authenticator.authenticate_request("/api/v1/data", false, false, None);

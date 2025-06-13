@@ -126,7 +126,7 @@ pub struct SignatureValidationResponse {
 /// Test signature format validation (without actual verification)
 pub async fn test_signature_validation(
     state: web::Data<AppState>,
-    req: HttpRequest,
+    _req: HttpRequest,
     body: web::Json<SignatureValidationRequest>
 ) -> impl Responder {
     let sig_auth = &state.signature_auth;
@@ -217,7 +217,7 @@ pub async fn get_nonce_store_stats(state: web::Data<AppState>) -> impl Responder
                     "total_nonces": stats.total_nonces,
                     "max_capacity": stats.max_capacity,
                     "utilization_percent": (stats.total_nonces as f64 / stats.max_capacity as f64 * 100.0).round(),
-                    "oldest_nonce_age_secs": stats.oldest_nonce_age
+                    "oldest_nonce_age_secs": stats.oldest_nonce_age_secs
                 }
             }))
         }
@@ -234,7 +234,7 @@ pub async fn get_nonce_store_stats(state: web::Data<AppState>) -> impl Responder
 /// Get security metrics for monitoring
 pub async fn get_security_metrics(state: web::Data<AppState>) -> impl Responder {
     let sig_auth = &state.signature_auth;
-    let metrics = sig_auth.get_metrics_collector().get_security_metrics();
+    let metrics = sig_auth.get_metrics_collector().get_enhanced_security_metrics(10000);
     
     HttpResponse::Ok().json(json!({
         "security_metrics": {

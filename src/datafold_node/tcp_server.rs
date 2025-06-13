@@ -22,6 +22,7 @@ use tokio::sync::Mutex;
 ///
 /// ```rust,no_run
 /// use datafold::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
+/// use datafold::datafold_node::signature_auth::SignatureAuthConfig;
 /// use datafold::error::FoldDbResult;
 /// use std::path::PathBuf;
 ///
@@ -32,7 +33,7 @@ use tokio::sync::Mutex;
 ///         storage_path: PathBuf::from("data"),
 ///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
 ///         crypto: None,
-///         signature_auth: None,
+///         signature_auth: SignatureAuthConfig::default(),
 ///     };
 ///     let node = DataFoldNode::new(config)?;
 ///     
@@ -79,6 +80,7 @@ impl TcpServer {
     ///
     /// ```rust,no_run
     /// use datafold::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
+///     use datafold::datafold_node::signature_auth::SignatureAuthConfig;
     /// use datafold::error::FoldDbResult;
     /// use std::path::PathBuf;
     ///
@@ -88,7 +90,7 @@ impl TcpServer {
 ///         storage_path: PathBuf::from("data"),
 ///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
 ///         crypto: None,
-///         signature_auth: None,
+///         signature_auth: SignatureAuthConfig::default(),
 ///     };
 ///     let node = DataFoldNode::new(config)?;
 ///     let tcp_server = TcpServer::new(node, 9000).await?;
@@ -132,6 +134,7 @@ impl TcpServer {
     ///
     /// ```rust,no_run
     /// use datafold::datafold_node::{DataFoldNode, NodeConfig, TcpServer};
+///     use datafold::datafold_node::signature_auth::SignatureAuthConfig;
     /// use datafold::error::FoldDbResult;
     /// use std::path::PathBuf;
     ///
@@ -141,7 +144,7 @@ impl TcpServer {
 ///         storage_path: PathBuf::from("data"),
 ///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
 ///         crypto: None,
-///         signature_auth: None,
+///         signature_auth: SignatureAuthConfig::default(),
 ///     };
 ///     let node = DataFoldNode::new(config)?;
 ///     let tcp_server = TcpServer::new(node, 9000).await?;

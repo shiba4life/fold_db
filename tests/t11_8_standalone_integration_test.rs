@@ -135,22 +135,30 @@ mod t11_8_comprehensive_integration_tests {
         // Test 2: Missing signature rejection
         let test_start = Instant::now();
         let result2 = verifier.verify_request(false, false);
+        let (passed2, message2) = match &result2 {
+            Err(err) => (err.contains("Missing signature"), format!("Expected 'Missing signature' error, got: {:?}", result2)),
+            Ok(_) => (false, format!("Expected error but got success: {:?}", result2)),
+        };
         results.push(TestResult {
             category: "Authentication Enforcement".to_string(),
             test_name: "Missing signature rejection".to_string(),
-            passed: result2.is_err() && result2.unwrap_err().contains("Missing signature"),
-            message: format!("Expected 'Missing signature' error, got: {:?}", result2),
+            passed: passed2,
+            message: message2,
             duration_ms: test_start.elapsed().as_millis() as u64,
         });
 
         // Test 3: Invalid signature rejection
         let test_start = Instant::now();
         let result3 = verifier.verify_request(true, false);
+        let (passed3, message3) = match &result3 {
+            Err(err) => (err.contains("Invalid signature"), format!("Expected 'Invalid signature' error, got: {:?}", result3)),
+            Ok(_) => (false, format!("Expected error but got success: {:?}", result3)),
+        };
         results.push(TestResult {
             category: "Authentication Enforcement".to_string(),
             test_name: "Invalid signature rejection".to_string(),
-            passed: result3.is_err() && result3.unwrap_err().contains("Invalid signature"),
-            message: format!("Expected 'Invalid signature' error, got: {:?}", result3),
+            passed: passed3,
+            message: message3,
             duration_ms: test_start.elapsed().as_millis() as u64,
         });
 
@@ -316,14 +324,15 @@ mod t11_8_comprehensive_integration_tests {
             ("Expired signature rejection", true, false),
             ("Valid signature acceptance", true, true),
         ];
+        let security_tests_len = security_tests.len();
 
         let mut security_violations = 0;
         let mut successful_validations = 0;
 
-        for (test_name, has_sig, valid_sig) in security_tests {
-            let result = verifier.verify_request(has_sig, valid_sig);
+        for (test_name, has_sig, valid_sig) in security_tests.iter() {
+            let result = verifier.verify_request(*has_sig, *valid_sig);
             
-            if valid_sig {
+            if *valid_sig {
                 successful_validations += 1;
                 assert!(result.is_ok(), "Security test '{}' should pass", test_name);
                 println!("   ✅ {} - Passed", test_name);
@@ -432,7 +441,7 @@ mod t11_8_comprehensive_integration_tests {
     #[test]
     fn test_t11_8_comprehensive_integration() {
         println!("\n🚀 T11.8: Comprehensive Integration Testing for PBI-11");
-        println!("=" * 60);
+        println!("{}", "=".repeat(60));
         
         let overall_start = Instant::now();
         let mut test_results = Vec::new();
@@ -512,7 +521,7 @@ mod t11_8_comprehensive_integration_tests {
 #[test]
 fn test_t11_8_quick_validation_standalone() {
     println!("\n⚡ T11.8 Quick Validation (Standalone)");
-    println!("-" * 40);
+    println!("{}", "-".repeat(40));
     
     let verifier = MockSignatureVerifier::new(true);
     

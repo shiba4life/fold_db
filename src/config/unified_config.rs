@@ -362,7 +362,7 @@ mod tests {
     #[test]
     fn test_environment_switching() {
         let config = create_test_config();
-        let mut manager = UnifiedConfigManager {
+        let manager = UnifiedConfigManager {
             config,
             current_environment: "test".to_string(),
         };

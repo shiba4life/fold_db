@@ -141,16 +141,31 @@ async fn test_all_api_routes_require_authentication() {
             _ => continue,
         };
 
-        let resp = test::call_service(&app, req).await;
+        // Use try_call_service to handle authentication errors properly
+        let result = test::try_call_service(&app, req).await;
         
-        // These endpoints should return 401 Unauthorized due to missing signature
-        assert!(
-            resp.status() == StatusCode::UNAUTHORIZED || resp.status() == StatusCode::BAD_REQUEST,
-            "❌ Endpoint {} {} should require authentication but returned: {}",
-            method, path, resp.status()
-        );
-        
-        println!("✅ {} {} correctly requires authentication ({})", method, path, resp.status());
+        match result {
+            Ok(resp) => {
+                // If we get a response, it should be an error status
+                assert!(
+                    resp.status() == StatusCode::UNAUTHORIZED || resp.status() == StatusCode::BAD_REQUEST,
+                    "❌ Endpoint {} {} should require authentication but returned: {}",
+                    method, path, resp.status()
+                );
+                println!("✅ {} {} correctly requires authentication ({})", method, path, resp.status());
+            },
+            Err(err) => {
+                // Authentication middleware returned an error, which is expected
+                // Convert the error to check its status code
+                let error_response = err.error_response();
+                assert!(
+                    error_response.status() == StatusCode::UNAUTHORIZED || error_response.status() == StatusCode::BAD_REQUEST,
+                    "❌ Endpoint {} {} should require authentication but error returned: {}",
+                    method, path, error_response.status()
+                );
+                println!("✅ {} {} correctly requires authentication (error: {})", method, path, error_response.status());
+            }
+        }
     }
 
     // Test exempted endpoints that should work without authentication
@@ -229,15 +244,31 @@ async fn test_middleware_execution_order() {
 
     // Test that middleware blocks request before reaching handler
     let req = test::TestRequest::get().uri("/api/test").to_request();
-    let resp = test::call_service(&app, req).await;
     
-    // Should get authentication error before reaching handler
-    assert!(
-        resp.status() == StatusCode::UNAUTHORIZED || resp.status() == StatusCode::BAD_REQUEST,
-        "Middleware should block request before reaching handler"
-    );
-
-    println!("✅ Signature verification middleware correctly executes before route handlers");
+    // Use try_call_service to handle authentication errors properly
+    let result = test::try_call_service(&app, req).await;
+    
+    match result {
+        Ok(resp) => {
+            // Should get authentication error before reaching handler
+            assert!(
+                resp.status() == StatusCode::UNAUTHORIZED || resp.status() == StatusCode::BAD_REQUEST,
+                "Middleware should block request before reaching handler, got: {}",
+                resp.status()
+            );
+            println!("✅ Signature verification middleware correctly executes before route handlers (response: {})", resp.status());
+        },
+        Err(err) => {
+            // Authentication middleware returned an error, which is expected
+            let error_response = err.error_response();
+            assert!(
+                error_response.status() == StatusCode::UNAUTHORIZED || error_response.status() == StatusCode::BAD_REQUEST,
+                "Middleware should block request with proper error status, got: {}",
+                error_response.status()
+            );
+            println!("✅ Signature verification middleware correctly executes before route handlers (error: {})", error_response.status());
+        }
+    }
 }
 
 /// Test error handling and response formatting
@@ -272,12 +303,28 @@ async fn test_authentication_error_responses() {
 
     // Test missing signature headers
     let req = test::TestRequest::get().uri("/api/test").to_request();
-    let resp = test::call_service(&app, req).await;
     
-    assert!(
-        resp.status() == StatusCode::UNAUTHORIZED || resp.status() == StatusCode::BAD_REQUEST,
-        "Should return proper error status for missing signature headers"
-    );
-
-    println!("✅ Authentication error responses properly formatted");
+    // Use try_call_service to handle authentication errors properly
+    let result = test::try_call_service(&app, req).await;
+    
+    match result {
+        Ok(resp) => {
+            assert!(
+                resp.status() == StatusCode::UNAUTHORIZED || resp.status() == StatusCode::BAD_REQUEST,
+                "Should return proper error status for missing signature headers, got: {}",
+                resp.status()
+            );
+            println!("✅ Authentication error responses properly formatted (response: {})", resp.status());
+        },
+        Err(err) => {
+            // Authentication middleware returned an error, which is expected
+            let error_response = err.error_response();
+            assert!(
+                error_response.status() == StatusCode::UNAUTHORIZED || error_response.status() == StatusCode::BAD_REQUEST,
+                "Should return proper error status for missing signature headers, got: {}",
+                error_response.status()
+            );
+            println!("✅ Authentication error responses properly formatted (error: {})", error_response.status());
+        }
+    }
 }

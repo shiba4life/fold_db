@@ -3,11 +3,10 @@
 //! This module provides seamless integration between the DataFold CLI
 //! and the unified configuration system for signature authentication.
 
-use crate::config::unified_config::{UnifiedConfigManager, UnifiedConfigError, SigningConfig, EnvironmentConfig};
+use crate::config::unified_config::{UnifiedConfigManager, UnifiedConfigError, EnvironmentConfig};
 use crate::cli::auth::{CliAuthProfile, CliSigningConfig, SignatureComponent};
 use crate::cli::config::{CliConfigManager, CliConfigError, SignatureSettings};
 use crate::cli::signing_config::{EnhancedSigningConfig, SigningMode, AutoSigningConfig};
-use crate::cli::environment_utils::EnvironmentManager;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -285,8 +284,8 @@ pub mod integration_utils {
     use super::*;
     
     /// Initialize unified CLI configuration for a command
-    pub fn init_for_command(command: &str) -> UnifiedIntegrationResult<UnifiedCliConfig> {
-        let mut config = UnifiedCliConfig::new()?;
+    pub fn init_for_command(_command: &str) -> UnifiedIntegrationResult<UnifiedCliConfig> {
+        let config = UnifiedCliConfig::new()?;
         
         // Validate that mandatory authentication is properly configured
         config.validate_mandatory_auth().map_err(|e| {

@@ -12,7 +12,6 @@ use datafold::cli::config::{CliConfigManager, ServerConfig};
 use datafold::cli::environment_utils::commands as env_commands;
 use datafold::cli::http_client::{AuthenticatedHttpClient, HttpClientBuilder, RetryConfig};
 use datafold::cli::signing_config::SigningMode;
-use datafold::cli::unified_integration::{UnifiedCliConfig, integration_utils};
 use log::{info, warn, error};
 use rpassword::read_password;
 use serde_json::{Value, json};
@@ -2788,7 +2787,7 @@ async fn handle_auth_init(
     key_id: String,
     storage_dir: Option<PathBuf>,
     user_id: Option<String>,
-    environment: Option<String>,
+    _environment: Option<String>,
     force: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔐 Initializing CLI authentication...");
@@ -2854,7 +2853,7 @@ async fn handle_auth_init(
 async fn handle_auth_status(
     verbose: bool,
     profile: Option<String>,
-    environment: Option<String>,
+    _environment: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔐 CLI Authentication Status");
     println!("============================");

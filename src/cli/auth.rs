@@ -217,17 +217,24 @@ impl CliRequestSigner {
         // Add key identifier
         signature_input = signature_input.with_parameter("keyid".to_string(), self.profile.client_id.clone());
         
-        // Calculate content digest if needed
+        // Calculate content digest (always include since server requires it)
         if self.config.include_content_digest {
-            if let Some(body) = request.body() {
-                let digest = self.calculate_content_digest(body)?;
-                request.headers_mut().insert("content-digest", digest.parse()
-                    .map_err(|e| CliAuthError::HttpHeader(format!("Invalid content-digest header: {}", e)))?);
-                
-                // Add content-digest to signature components if not already present
-                if !signature_input.components.iter().any(|c| matches!(c, SignatureComponent::Header(h) if h == "content-digest")) {
-                    signature_input.components.push(SignatureComponent::Header("content-digest".to_string()));
-                }
+            // For now, always use empty body digest since calculate_content_digest
+            // already returns empty body hash as placeholder
+            let digest = if let Some(body) = request.body() {
+                self.calculate_content_digest(body)?
+            } else {
+                // For requests without body (like GET), use empty body digest
+                let empty_hash = Sha256::digest([]);
+                format!("sha-256=:{}", general_purpose::STANDARD.encode(empty_hash))
+            };
+            
+            request.headers_mut().insert("content-digest", digest.parse()
+                .map_err(|e| CliAuthError::HttpHeader(format!("Invalid content-digest header: {}", e)))?);
+            
+            // Add content-digest to signature components if not already present
+            if !signature_input.components.iter().any(|c| matches!(c, SignatureComponent::Header(h) if h == "content-digest")) {
+                signature_input.components.push(SignatureComponent::Header("content-digest".to_string()));
             }
         }
         
@@ -241,11 +248,13 @@ impl CliRequestSigner {
         // Encode signature as base64
         let signature_b64 = general_purpose::STANDARD.encode(signature_bytes);
         
-        // Add signature headers to request
-        let signature_input_header = signature_input.to_signature_input_string();
+        // Add signature headers to request with RFC 9421 format (sig1= prefix)
+        let signature_input_header = format!("sig1={}", signature_input.to_signature_input_string());
+        let signature_header = format!("sig1=:{}", signature_b64);
+        
         request.headers_mut().insert("signature-input", signature_input_header.parse()
             .map_err(|e| CliAuthError::HttpHeader(format!("Invalid signature-input header: {}", e)))?);
-        request.headers_mut().insert("signature", signature_b64.parse()
+        request.headers_mut().insert("signature", signature_header.parse()
             .map_err(|e| CliAuthError::HttpHeader(format!("Invalid signature header: {}", e)))?);
         
         // Add client identification headers
@@ -297,6 +306,7 @@ impl CliRequestSigner {
         let empty_hash = Sha256::digest([]);
         Ok(format!("sha-256=:{}", general_purpose::STANDARD.encode(empty_hash)))
     }
+    
     
     /// Build canonical signature string according to RFC 9421
     fn build_canonical_string(&self, request: &Request, signature_input: &SignatureInput) -> CliAuthResult<String> {

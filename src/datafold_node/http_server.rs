@@ -301,8 +301,89 @@ impl DataFoldHttpServer {
 mod tests {
     use super::DataFoldHttpServer;
     use crate::datafold_node::{DataFoldNode, NodeConfig};
+    use crate::cli::auth::{CliAuthProfile, CliRequestSigner, CliSigningConfig};
+    use crate::crypto::ed25519::generate_master_keypair;
+    use reqwest::{Client, Response};
+    use serde_json::json;
+    use std::collections::HashMap;
     use std::net::TcpListener;
     use tempfile::tempdir;
+    
+    /// Helper function to create an authenticated HTTP client for testing
+    async fn create_authenticated_client(server_base_url: &str) -> (Client, CliRequestSigner) {
+        // Generate a test keypair
+        let keypair = generate_master_keypair().expect("Failed to generate test keypair");
+        
+        // Create a test authentication profile
+        let mut metadata = HashMap::new();
+        metadata.insert("source".to_string(), "test".to_string());
+        
+        let profile = CliAuthProfile {
+            client_id: "test-client-123".to_string(),
+            key_id: "test-key".to_string(),
+            user_id: Some("test-user".to_string()),
+            server_url: server_base_url.to_string(),
+            metadata,
+        };
+        
+        // Create signing config
+        let signing_config = CliSigningConfig::default();
+        
+        // Create the request signer (recreate keypair from secret bytes for ownership)
+        let keypair_copy = crate::crypto::ed25519::MasterKeyPair::from_secret_bytes(&keypair.secret_key_bytes())
+            .expect("Failed to recreate keypair");
+        let signer = CliRequestSigner::new(keypair_copy, profile.clone(), signing_config);
+        
+        // Create a basic HTTP client
+        let client = Client::new();
+        
+        // Register the public key with the server (skip signature verification for registration)
+        let registration_request = json!({
+            "client_id": profile.client_id,
+            "public_key": hex::encode(keypair.public_key().to_bytes()),
+            "metadata": profile.metadata
+        });
+        
+        let registration_response = client
+            .post(&format!("{}/api/crypto/keys/register", server_base_url))
+            .json(&registration_request)
+            .send()
+            .await
+            .expect("Failed to register public key");
+        
+        assert!(registration_response.status().is_success(),
+                "Public key registration failed: {}", registration_response.status());
+        
+        (client, signer)
+    }
+    
+    /// Helper function to make an authenticated request
+    async fn make_authenticated_request(
+        client: &Client,
+        signer: &CliRequestSigner,
+        method: &str,
+        url: &str,
+    ) -> Result<Response, Box<dyn std::error::Error>> {
+        let mut request_builder = match method.to_uppercase().as_str() {
+            "GET" => client.get(url),
+            "POST" => client.post(url),
+            "PUT" => client.put(url),
+            "DELETE" => client.delete(url),
+            _ => return Err(format!("Unsupported HTTP method: {}", method).into()),
+        };
+        
+        // Add required content-type header (even for GET requests since it's required by signature auth)
+        request_builder = request_builder.header("content-type", "application/json");
+        
+        let mut request = request_builder.build()?;
+        
+        // Sign the request
+        signer.sign_request(&mut request)?;
+        
+        // Execute the signed request
+        let response = client.execute(request).await?;
+        Ok(response)
+    }
 
     /// Test the new unified schema status endpoint
     #[tokio::test]
@@ -326,16 +407,15 @@ mod tests {
         // Wait for server to start
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-        // Test new unified schema status endpoint
-        let client = reqwest::Client::new();
-        let url = format!("http://{}/api/schemas/status", bind_addr);
+        // Create authenticated client
+        let server_base_url = format!("http://{}", bind_addr);
+        let (client, signer) = create_authenticated_client(&server_base_url).await;
 
-        let response = client
-            .get(&url)
-            .timeout(std::time::Duration::from_secs(5))
-            .send()
+        // Test new unified schema status endpoint with authentication
+        let url = format!("{}/api/schemas/status", server_base_url);
+        let response = make_authenticated_request(&client, &signer, "GET", &url)
             .await
-            .expect("Failed to connect to server");
+            .expect("Failed to make authenticated request");
 
         assert!(response.status().is_success());
 
@@ -371,15 +451,19 @@ mod tests {
 
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-        let client = reqwest::Client::new();
-        let url = format!("http://{}/api/logs", bind_addr);
+        // Create authenticated client
+        let server_base_url = format!("http://{}", bind_addr);
+        let (client, signer) = create_authenticated_client(&server_base_url).await;
 
-        let logs: serde_json::Value = client
-            .get(&url)
-            .timeout(std::time::Duration::from_secs(5))
-            .send()
+        // Test logs endpoint with authentication
+        let url = format!("{}/api/logs", server_base_url);
+        let response = make_authenticated_request(&client, &signer, "GET", &url)
             .await
-            .expect("request failed")
+            .expect("Failed to make authenticated request");
+
+        assert!(response.status().is_success());
+
+        let logs: serde_json::Value = response
             .json()
             .await
             .expect("invalid json");

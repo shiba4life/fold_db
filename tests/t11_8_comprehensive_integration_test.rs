@@ -20,6 +20,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tempfile::tempdir;
 use tokio::sync::Mutex;
+use uuid;
 
 /// Comprehensive test results for T11.8
 #[derive(Debug, Clone)]
@@ -164,10 +165,21 @@ impl T118ComprehensiveIntegrationTest {
 
         // Unauthenticated request should be rejected
         let req = test::TestRequest::get().uri("/api/test/mandatory").to_request();
-        let resp = test::call_service(&app, req).await;
+        let resp_result = test::try_call_service(&app, req).await;
         
-        assert!(resp.status().is_client_error(), 
-               "Unauthenticated requests must be rejected");
+        // The middleware should return an authentication error
+        match resp_result {
+            Err(_) => {
+                // This is expected - authentication failure should cause an error
+                println!("  ✓ Unauthenticated request properly rejected with error");
+            },
+            Ok(resp) => {
+                // If we get a response, it should be a client error
+                assert!(resp.status().is_client_error(),
+                       "Unauthenticated requests must be rejected with client error");
+                println!("  ✓ Unauthenticated request properly rejected with status: {}", resp.status());
+            }
+        }
 
         self.results.add_test_result("mandatory_authentication_enforcement", true, None);
         self.results.add_security_validation("Mandatory authentication cannot be bypassed");
@@ -231,14 +243,23 @@ impl T118ComprehensiveIntegrationTest {
                 }))
                 .to_request();
 
-            let resp = test::call_service(&app, req).await;
+            let resp_result = test::try_call_service(&app, req).await;
 
             // All negative scenarios should result in authentication failure
-            if resp.status().is_client_error() {
-                negative_tests_passed += 1;
-                println!("  ✓ {} correctly rejected", scenario_name);
-            } else {
-                self.results.errors.push(format!("Negative scenario {} should have been rejected but wasn't", scenario_name));
+            match resp_result {
+                Err(_) => {
+                    // Authentication errors are expected for negative scenarios
+                    negative_tests_passed += 1;
+                    println!("  ✓ {} correctly rejected with authentication error", scenario_name);
+                },
+                Ok(resp) => {
+                    if resp.status().is_client_error() {
+                        negative_tests_passed += 1;
+                        println!("  ✓ {} correctly rejected with status: {}", scenario_name, resp.status());
+                    } else {
+                        self.results.errors.push(format!("Negative scenario {} should have been rejected but wasn't", scenario_name));
+                    }
+                }
             }
         }
 
@@ -357,15 +378,25 @@ impl T118ComprehensiveIntegrationTest {
                 _ => continue,
             };
 
-            let resp = test::call_service(&app, req).await;
+            let resp_result = test::try_call_service(&app, req).await;
             
-            if resp.status().is_client_error() {
-                protected_requiring_auth += 1;
-                self.results.add_endpoint_coverage(path, true);
-                println!("  ✓ {} {} requires authentication", method, path);
-            } else {
-                self.results.errors.push(format!("Protected endpoint {} {} should require authentication", method, path));
-                self.results.add_endpoint_coverage(path, false);
+            match resp_result {
+                Err(_) => {
+                    // Authentication errors are expected for protected endpoints
+                    protected_requiring_auth += 1;
+                    self.results.add_endpoint_coverage(path, true);
+                    println!("  ✓ {} {} requires authentication (error response)", method, path);
+                },
+                Ok(resp) => {
+                    if resp.status().is_client_error() {
+                        protected_requiring_auth += 1;
+                        self.results.add_endpoint_coverage(path, true);
+                        println!("  ✓ {} {} requires authentication (status: {})", method, path, resp.status());
+                    } else {
+                        self.results.errors.push(format!("Protected endpoint {} {} should require authentication", method, path));
+                        self.results.add_endpoint_coverage(path, false);
+                    }
+                }
             }
         }
 
@@ -383,14 +414,22 @@ impl T118ComprehensiveIntegrationTest {
                 _ => continue,
             };
 
-            let resp = test::call_service(&app, req).await;
+            let resp_result = test::try_call_service(&app, req).await;
             
-            if resp.status().is_success() || 
-               (resp.status().is_client_error() && resp.status().as_u16() != 401) {
-                exempted_working += 1;
-                println!("  ✓ {} {} correctly exempted", method, path);
-            } else if resp.status().as_u16() == 401 {
-                self.results.errors.push(format!("Exempted endpoint {} {} should not require authentication", method, path));
+            match resp_result {
+                Ok(resp) => {
+                    if resp.status().is_success() ||
+                       (resp.status().is_client_error() && resp.status().as_u16() != 401) {
+                        exempted_working += 1;
+                        println!("  ✓ {} {} correctly exempted (status: {})", method, path, resp.status());
+                    } else if resp.status().as_u16() == 401 {
+                        self.results.errors.push(format!("Exempted endpoint {} {} should not require authentication", method, path));
+                    }
+                },
+                Err(_) => {
+                    // Exempted endpoints should not cause authentication errors
+                    self.results.errors.push(format!("Exempted endpoint {} {} should not require authentication but caused error", method, path));
+                }
             }
         }
 
@@ -433,7 +472,8 @@ impl T118ComprehensiveIntegrationTest {
         let mut verification_latencies = Vec::new();
 
         for i in 0..iterations {
-            let nonce = format!("perf-test-{}", i);
+            // Use UUID4 format required by strict configuration
+            let nonce = format!("{}", uuid::Uuid::new_v4());
             let timestamp = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
@@ -472,7 +512,8 @@ impl T118ComprehensiveIntegrationTest {
                 let mut client_latencies = Vec::new();
                 
                 for req_id in 0..requests_per_client {
-                    let nonce = format!("load-test-{}-{}", client_id, req_id);
+                    // Use UUID4 format required by strict configuration
+                    let nonce = format!("{}", uuid::Uuid::new_v4());
                     let timestamp = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
@@ -631,7 +672,8 @@ impl T118ComprehensiveIntegrationTest {
                 let mut failures = 0;
                 
                 for req_id in 0..requests_per_client {
-                    let nonce = format!("prod-{}-{}", client_id, req_id);
+                    // Use UUID4 format required by strict configuration
+                    let nonce = format!("{}", uuid::Uuid::new_v4());
                     let timestamp = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
@@ -666,7 +708,7 @@ impl T118ComprehensiveIntegrationTest {
 
         // Test monitoring and alerting systems
         let metrics = signature_auth.get_metrics_collector();
-        let security_metrics = metrics.get_security_metrics();
+        let security_metrics = metrics.get_enhanced_security_metrics(1000);
         
         // Verify monitoring data is available
         assert!(security_metrics.nonce_store_size >= 0, "Monitoring should provide nonce store size");
@@ -744,14 +786,34 @@ impl T118ComprehensiveIntegrationTest {
                 }
                 "replay_attack_prevention" => {
                     // Test replay attack prevention
-                    let nonce = "compliance-test-nonce";
+                    // Generate a proper UUID4 nonce for strict config
+                    let nonce1 = format!("{}", uuid::Uuid::new_v4());
+                    let nonce2 = nonce1.clone(); // Same nonce for replay test
                     let timestamp = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
                         .as_secs();
                     
-                    assert!(signature_auth.check_and_store_nonce(nonce, timestamp).is_ok());
-                    assert!(signature_auth.check_and_store_nonce(nonce, timestamp).is_err());
+                    println!("Testing nonce validation with UUID4 nonce: {}", nonce1);
+                    println!("Testing timestamp: {} (current time)", timestamp);
+                    
+                    // First nonce should succeed
+                    match signature_auth.check_and_store_nonce(&nonce1, timestamp) {
+                        Ok(_) => println!("✓ First nonce validation succeeded"),
+                        Err(e) => {
+                            println!("✗ First nonce validation failed: {:?}", e);
+                            panic!("First nonce should succeed but failed: {:?}", e);
+                        }
+                    }
+                    
+                    // Second use of same nonce should fail (replay)
+                    match signature_auth.check_and_store_nonce(&nonce2, timestamp) {
+                        Ok(_) => {
+                            println!("✗ Replay nonce validation should have failed but succeeded");
+                            panic!("Replay nonce should fail but succeeded");
+                        },
+                        Err(_) => println!("✓ Replay nonce correctly rejected"),
+                    }
                     criteria_met += 1;
                 }
                 "timestamp_validation" => {

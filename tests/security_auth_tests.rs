@@ -20,7 +20,7 @@ async fn test_authentication_error_types() {
     assert_eq!(missing_headers_error.http_status_code(), StatusCode::BAD_REQUEST);
     assert_eq!(missing_headers_error.severity(), SecurityEventSeverity::Info);
     assert_eq!(missing_headers_error.correlation_id(), &correlation_id);
-    assert_eq!(missing_headers_error.public_message(), "Missing required authentication headers");
+    assert_eq!(missing_headers_error.public_message(), "Missing required authentication headers. Please include Signature-Input and Signature headers.");
     
     // Test signature verification failed error
     let sig_failed_error = AuthenticationError::SignatureVerificationFailed {
@@ -30,7 +30,7 @@ async fn test_authentication_error_types() {
     
     assert_eq!(sig_failed_error.http_status_code(), StatusCode::UNAUTHORIZED);
     assert_eq!(sig_failed_error.severity(), SecurityEventSeverity::Warn);
-    assert_eq!(sig_failed_error.public_message(), "Signature verification failed");
+    assert_eq!(sig_failed_error.public_message(), "Signature verification failed. Please check your signature calculation and key.");
     
     // Test nonce replay error (should be critical)
     let replay_error = AuthenticationError::NonceValidationFailed {
@@ -41,7 +41,7 @@ async fn test_authentication_error_types() {
     
     assert_eq!(replay_error.http_status_code(), StatusCode::UNAUTHORIZED);
     assert_eq!(replay_error.severity(), SecurityEventSeverity::Critical);
-    assert_eq!(replay_error.public_message(), "Request validation failed");
+    assert_eq!(replay_error.public_message(), "Request validation failed. Please use a unique nonce for each request.");
     
     // Test rate limit error
     let rate_limit_error = AuthenticationError::RateLimitExceeded {
@@ -51,7 +51,7 @@ async fn test_authentication_error_types() {
     
     assert_eq!(rate_limit_error.http_status_code(), StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(rate_limit_error.severity(), SecurityEventSeverity::Critical);
-    assert_eq!(rate_limit_error.public_message(), "Rate limit exceeded");
+    assert_eq!(rate_limit_error.public_message(), "Rate limit exceeded. Please reduce request frequency and try again later.");
 }
 
 #[tokio::test]

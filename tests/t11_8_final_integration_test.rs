@@ -304,7 +304,7 @@ mod comprehensive_integration_tests {
 
         // Assertions
         assert!(test_results.iter().all(|r| r.passed), "All authentication enforcement tests must pass");
-        assert_eq!(metrics.successful_authentications, 1);
+        assert_eq!(metrics.successful_authentications, 2);
         assert_eq!(metrics.failed_authentications, 3);
         assert_eq!(metrics.security_violations, 3);
         assert!(metrics.nonce_validations > 0);

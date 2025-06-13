@@ -4,15 +4,10 @@
 //! cryptography for authentication and replay prevention with comprehensive security logging.
 
 use crate::datafold_node::error::NodeResult;
-// use crate::datafold_node::performance_monitoring::{
-//     EnhancedSecurityMetricsCollector, PerformanceMonitor, PublicKeyCache,
-//     CacheWarmupResult, CacheStats, PerformanceMetrics, SystemHealthStatus,
-//     PerformanceAlert, PerformanceAlertType, AlertSeverity
-// };
 use crate::error::FoldDbError;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    Error, HttpMessage,
+    Error, HttpMessage, HttpResponse,
     http::StatusCode,
 };
 use futures_util::future::LocalBoxFuture;
@@ -24,6 +19,69 @@ use std::sync::{Arc, RwLock, atomic::{AtomicU64, AtomicUsize, Ordering}};
 use std::time::{SystemTime, UNIX_EPOCH, Duration, Instant};
 use std::rc::Rc;
 use uuid::Uuid;
+
+/// Cache warmup result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheWarmupResult {
+    pub keys_loaded: u64,
+    pub errors: u64,
+    pub duration_ms: u64,
+    pub cache_size_after: u64,
+}
+
+/// Cache statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheStats {
+    pub size: usize,
+    pub hit_rate: f64,
+    pub warmup_completed: bool,
+}
+
+/// Performance metrics for monitoring dashboard
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceMetrics {
+    pub security_metrics: SecurityMetrics,
+    pub nonce_store_stats: NonceStorePerformanceStats,
+    pub cache_stats: CacheStats,
+    pub performance_alerts: Vec<PerformanceAlert>,
+    pub system_health: SystemHealthStatus,
+}
+
+/// System health status
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemHealthStatus {
+    pub status: String,
+    pub health_score: f64,
+    pub issues: Vec<String>,
+    pub last_updated: u64,
+}
+
+/// Nonce store performance statistics
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct NonceStorePerformanceStats {
+    pub total_nonces: usize,
+    pub max_capacity: usize,
+    pub utilization_percent: f64,
+    pub oldest_nonce_age_secs: Option<u64>,
+    pub cleanup_operations: u64,
+    pub memory_usage_bytes: u64,
+}
+
+/// Performance breakdown for detailed analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceBreakdown {
+    pub total_requests: u64,
+    pub success_rate: f64,
+    pub avg_processing_time_ms: f64,
+    pub avg_signature_verification_ms: f64,
+    pub avg_database_lookup_ms: f64,
+    pub avg_nonce_validation_ms: f64,
+    pub p50_latency_ms: f64,
+    pub p95_latency_ms: f64,
+    pub p99_latency_ms: f64,
+    pub cache_hit_rate: f64,
+    pub requests_per_second: f64,
+}
 
 /// Enhanced error types for authentication failures with detailed categorization
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -682,7 +740,7 @@ pub struct SignatureVerificationState {
     /// Configuration for signature verification
     config: SignatureAuthConfig,
     /// High-performance nonce store for replay prevention
-    nonce_store: Arc<RwLock<OptimizedNonceStore>>,
+    nonce_store: Arc<RwLock<NonceStore>>,
     /// Public key cache for performance optimization
     key_cache: Arc<RwLock<PublicKeyCache>>,
     /// Security event logger
@@ -966,12 +1024,14 @@ impl PublicKeyCache {
 #[derive(Debug)]
 pub struct PerformanceMonitor {
     /// Current requests per second
+    #[allow(dead_code)]
     current_rps: f64,
     /// Recent latency measurements
     recent_latencies: VecDeque<u64>,
     /// Performance alerts
     alerts: Vec<PerformanceAlert>,
     /// Monitoring start time
+    #[allow(dead_code)]
     start_time: Instant,
     /// Last monitoring update
     last_update: Instant,
@@ -981,7 +1041,7 @@ pub struct PerformanceMonitor {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerformanceAlert {
     pub alert_id: String,
-    pub timestamp: Instant,
+    pub timestamp_ms: u64, // Unix timestamp in milliseconds
     pub alert_type: PerformanceAlertType,
     pub message: String,
     pub metric_value: f64,
@@ -1008,6 +1068,12 @@ pub enum AlertSeverity {
     Critical,
 }
 
+impl Default for PerformanceMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PerformanceMonitor {
     pub fn new() -> Self {
         Self {
@@ -1030,8 +1096,8 @@ impl PerformanceMonitor {
         self.last_update = Instant::now();
     }
     
-    pub fn check_performance_thresholds(&mut self, config: &SignatureAuthConfig) {
-        let now = Instant::now();
+    pub fn check_performance_thresholds(&mut self, _config: &SignatureAuthConfig) {
+        let _now = Instant::now();
         
         // Check latency threshold (>100ms)
         if let Some(avg_latency) = self.get_average_latency() {
@@ -1072,7 +1138,10 @@ impl PerformanceMonitor {
     ) {
         let alert = PerformanceAlert {
             alert_id: Uuid::new_v4().to_string(),
-            timestamp: Instant::now(),
+            timestamp_ms: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64,
             alert_type,
             message,
             metric_value,
@@ -1306,20 +1375,29 @@ impl AttackDetector {
     }
 }
 
-impl Default for SecurityMetricsCollector {
+impl Default for EnhancedSecurityMetricsCollector {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl SecurityMetricsCollector {
+impl EnhancedSecurityMetricsCollector {
     pub fn new() -> Self {
         Self {
             total_attempts: AtomicU64::new(0),
             total_successes: AtomicU64::new(0),
             total_failures: AtomicU64::new(0),
-            processing_times: Arc::new(RwLock::new(Vec::new())),
+            processing_times: Arc::new(RwLock::new(LatencyHistogram::new(10000))),
+            signature_verification_times: Arc::new(RwLock::new(LatencyHistogram::new(10000))),
+            database_lookup_times: Arc::new(RwLock::new(LatencyHistogram::new(10000))),
+            nonce_validation_times: Arc::new(RwLock::new(LatencyHistogram::new(10000))),
             nonce_store_utilization: AtomicUsize::new(0),
+            cache_hits: AtomicU64::new(0),
+            cache_misses: AtomicU64::new(0),
+            request_timestamps: Arc::new(RwLock::new(VecDeque::new())),
+            memory_usage_bytes: AtomicU64::new(0),
+            performance_alerts: AtomicU64::new(0),
+            cleanup_operations: AtomicU64::new(0),
         }
     }
 
@@ -1332,11 +1410,22 @@ impl SecurityMetricsCollector {
             self.total_failures.fetch_add(1, Ordering::Relaxed);
         }
 
-        // Record processing time (keep only recent measurements)
+        // Record processing time in histogram
         if let Ok(mut times) = self.processing_times.write() {
-            times.push(processing_time_ms);
-            if times.len() > 1000 {
-                times.drain(0..500); // Keep only the most recent 500 measurements
+            times.record(processing_time_ms);
+        }
+        
+        // Track request timestamps for RPS calculation
+        if let Ok(mut timestamps) = self.request_timestamps.write() {
+            timestamps.push_back(Instant::now());
+            // Keep only last 60 seconds
+            let cutoff = Instant::now() - Duration::from_secs(60);
+            while let Some(&front) = timestamps.front() {
+                if front < cutoff {
+                    timestamps.pop_front();
+                } else {
+                    break;
+                }
             }
         }
     }
@@ -1345,19 +1434,69 @@ impl SecurityMetricsCollector {
         self.nonce_store_utilization.store(size, Ordering::Relaxed);
     }
 
-    pub fn get_security_metrics(&self) -> SecurityMetrics {
+    pub fn get_enhanced_security_metrics(&self, nonce_store_max_size: usize) -> SecurityMetrics {
         let processing_times = self.processing_times.read().unwrap();
-        let avg_processing_time = if processing_times.is_empty() {
-            0
+        let sig_times = self.signature_verification_times.read().unwrap();
+        let db_times = self.database_lookup_times.read().unwrap();
+        let nonce_times = self.nonce_validation_times.read().unwrap();
+        
+        let nonce_utilization = self.nonce_store_utilization.load(Ordering::Relaxed);
+        let utilization_percent = if nonce_store_max_size > 0 {
+            (nonce_utilization as f64 / nonce_store_max_size as f64) * 100.0
         } else {
-            processing_times.iter().sum::<u64>() / processing_times.len() as u64
+            0.0
         };
 
         SecurityMetrics {
-            processing_time_ms: avg_processing_time,
-            nonce_store_size: self.nonce_store_utilization.load(Ordering::Relaxed),
+            processing_time_ms: processing_times.average() as u64,
+            signature_verification_time_ms: sig_times.average() as u64,
+            database_lookup_time_ms: db_times.average() as u64,
+            nonce_validation_time_ms: nonce_times.average() as u64,
+            nonce_store_size: nonce_utilization,
+            nonce_store_utilization_percent: utilization_percent,
             recent_failures: self.total_failures.load(Ordering::Relaxed) as usize,
-            pattern_score: 0.0, // This would be calculated based on detected patterns
+            pattern_score: 0.0,
+            cache_hit_rate: self.get_cache_hit_rate(),
+            cache_miss_count: self.cache_misses.load(Ordering::Relaxed),
+            requests_per_second: self.get_requests_per_second(),
+            avg_latency_ms: processing_times.average(),
+            p95_latency_ms: processing_times.percentile(95.0).unwrap_or(0) as f64,
+            p99_latency_ms: processing_times.percentile(99.0).unwrap_or(0) as f64,
+            memory_usage_bytes: self.memory_usage_bytes.load(Ordering::Relaxed),
+            nonce_cleanup_operations: self.cleanup_operations.load(Ordering::Relaxed),
+            performance_alert_count: self.performance_alerts.load(Ordering::Relaxed),
+        }
+    }
+
+    fn get_cache_hit_rate(&self) -> f64 {
+        let hits = self.cache_hits.load(Ordering::Relaxed);
+        let misses = self.cache_misses.load(Ordering::Relaxed);
+        let total = hits + misses;
+        
+        if total == 0 {
+            0.0
+        } else {
+            hits as f64 / total as f64
+        }
+    }
+
+    fn get_requests_per_second(&self) -> f64 {
+        if let Ok(timestamps) = self.request_timestamps.read() {
+            let count = timestamps.len();
+            if count == 0 {
+                return 0.0;
+            }
+            
+            // Calculate RPS over the last 60 seconds
+            let duration = if let (Some(&first), Some(&last)) = (timestamps.front(), timestamps.back()) {
+                last.duration_since(first).as_secs_f64()
+            } else {
+                1.0
+            };
+            
+            count as f64 / duration.max(1.0)
+        } else {
+            0.0
         }
     }
 }
@@ -1367,15 +1506,17 @@ impl SignatureVerificationState {
         // Validate configuration before creating state
         config.validate()?;
         
-        let metrics_collector = Arc::new(SecurityMetricsCollector::new());
+        let metrics_collector = Arc::new(EnhancedSecurityMetricsCollector::new());
         
         Ok(Self {
             config: config.clone(),
             nonce_store: Arc::new(RwLock::new(NonceStore::new())),
+            key_cache: Arc::new(RwLock::new(PublicKeyCache::new(1000))),
             security_logger: Arc::new(SecurityLogger::new(config.security_logging.clone())),
             rate_limiter: Arc::new(RwLock::new(RateLimiter::new())),
             attack_detector: Arc::new(RwLock::new(AttackDetector::new())),
             metrics_collector,
+            performance_monitor: Arc::new(RwLock::new(PerformanceMonitor::new())),
         })
     }
 
@@ -1821,9 +1962,22 @@ impl SignatureVerificationState {
             error_details: Some(error.clone()),
             metrics: SecurityMetrics {
                 processing_time_ms: processing_time,
+                signature_verification_time_ms: 0,
+                database_lookup_time_ms: 0,
+                nonce_validation_time_ms: 0,
                 nonce_store_size: self.nonce_store.read().unwrap().size(),
+                nonce_store_utilization_percent: 0.0,
                 recent_failures: 1,
                 pattern_score: 0.0,
+                cache_hit_rate: 0.0,
+                cache_miss_count: 0,
+                requests_per_second: 0.0,
+                avg_latency_ms: processing_time as f64,
+                p95_latency_ms: 0.0,
+                p99_latency_ms: 0.0,
+                memory_usage_bytes: 0,
+                nonce_cleanup_operations: 0,
+                performance_alert_count: 0,
             },
         };
 
@@ -1849,9 +2003,22 @@ impl SignatureVerificationState {
                     error_details: None,
                     metrics: SecurityMetrics {
                         processing_time_ms: processing_time,
+                        signature_verification_time_ms: 0,
+                        database_lookup_time_ms: 0,
+                        nonce_validation_time_ms: 0,
                         nonce_store_size: self.nonce_store.read().unwrap().size(),
+                        nonce_store_utilization_percent: 0.0,
                         recent_failures: 1,
                         pattern_score: pattern.severity_score,
+                        cache_hit_rate: 0.0,
+                        cache_miss_count: 0,
+                        requests_per_second: 0.0,
+                        avg_latency_ms: processing_time as f64,
+                        p95_latency_ms: 0.0,
+                        p99_latency_ms: 0.0,
+                        memory_usage_bytes: 0,
+                        nonce_cleanup_operations: 0,
+                        performance_alert_count: 0,
                     },
                 };
                 
@@ -1881,9 +2048,22 @@ impl SignatureVerificationState {
             error_details: None,
             metrics: SecurityMetrics {
                 processing_time_ms: processing_time,
+                signature_verification_time_ms: 0,
+                database_lookup_time_ms: 0,
+                nonce_validation_time_ms: 0,
                 nonce_store_size: self.nonce_store.read().unwrap().size(),
+                nonce_store_utilization_percent: 0.0,
                 recent_failures: 0,
                 pattern_score: 0.0,
+                cache_hit_rate: 0.0,
+                cache_miss_count: 0,
+                requests_per_second: 0.0,
+                avg_latency_ms: processing_time as f64,
+                p95_latency_ms: 0.0,
+                p99_latency_ms: 0.0,
+                memory_usage_bytes: 0,
+                nonce_cleanup_operations: 0,
+                performance_alert_count: 0,
             },
         };
 
@@ -1966,7 +2146,7 @@ impl SignatureVerificationState {
         &self.config
     }
 
-    pub fn get_metrics_collector(&self) -> &SecurityMetricsCollector {
+    pub fn get_metrics_collector(&self) -> &EnhancedSecurityMetricsCollector {
         &self.metrics_collector
     }
 
@@ -1990,7 +2170,7 @@ impl SignatureVerificationState {
     }
 
     #[cfg(test)]
-    pub fn get_metrics_collector_test(&self) -> &SecurityMetricsCollector {
+    pub fn get_metrics_collector_test(&self) -> &EnhancedSecurityMetricsCollector {
         &self.metrics_collector
     }
 
@@ -2158,17 +2338,17 @@ impl SignatureVerificationState {
         let store = self.nonce_store.read()
             .map_err(|_| FoldDbError::Permission("Failed to acquire read lock".to_string()))?;
         
-        Ok(store.get_performance_stats())
+        Ok(store.get_performance_stats(self.config.max_nonce_store_size))
     }
 
     /// Warm up the public key cache by preloading frequently used keys
     pub async fn warm_cache(
         &self,
-        db_ops: std::sync::Arc<crate::db_operations::core::DbOperations>,
+        _db_ops: std::sync::Arc<crate::db_operations::core::DbOperations>,
     ) -> NodeResult<CacheWarmupResult> {
         let warmup_start = Instant::now();
-        let mut keys_loaded = 0;
-        let mut errors = 0;
+        let keys_loaded = 0;
+        let errors = 0;
         
         info!("Starting public key cache warmup...");
         
@@ -2440,6 +2620,25 @@ impl NonceStore {
             requests_per_second: recent_count as f64 / window_secs as f64,
         }
     }
+
+    pub fn get_performance_stats(&self, max_capacity: usize) -> NonceStorePerformanceStats {
+        let oldest_age = self.get_oldest_nonce_age();
+        let total_nonces = self.nonces.len();
+        let utilization_percent = if max_capacity > 0 {
+            (total_nonces as f64 / max_capacity as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        NonceStorePerformanceStats {
+            total_nonces,
+            max_capacity,
+            utilization_percent,
+            oldest_nonce_age_secs: oldest_age,
+            cleanup_operations: 0, // This would be tracked separately
+            memory_usage_bytes: (total_nonces * 64) as u64, // Rough estimate
+        }
+    }
 }
 
 /// Statistics for sliding window analysis
@@ -2507,6 +2706,7 @@ impl SignatureComponents {
         // Extract required parameters
         let created = params.get("created")
             .ok_or_else(|| FoldDbError::Permission("Missing 'created' parameter".to_string()))?
+            .trim_matches('"')
             .parse::<u64>()
             .map_err(|_| FoldDbError::Permission("Invalid 'created' timestamp".to_string()))?;
 
@@ -2635,6 +2835,41 @@ impl SignatureComponents {
     }
 }
 
+/// Custom error type for authentication failures that implements ResponseError
+#[derive(Debug)]
+pub struct CustomAuthError {
+    auth_error: AuthenticationError,
+    error_message: String,
+}
+
+impl std::fmt::Display for CustomAuthError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.error_message)
+    }
+}
+
+impl actix_web::ResponseError for CustomAuthError {
+    fn status_code(&self) -> StatusCode {
+        self.auth_error.http_status_code()
+    }
+
+    fn error_response(&self) -> HttpResponse {
+        let status = self.status_code();
+        match status {
+            StatusCode::BAD_REQUEST => HttpResponse::BadRequest(),
+            StatusCode::UNAUTHORIZED => HttpResponse::Unauthorized(),
+            StatusCode::TOO_MANY_REQUESTS => HttpResponse::TooManyRequests(),
+            StatusCode::INTERNAL_SERVER_ERROR => HttpResponse::InternalServerError(),
+            _ => HttpResponse::Unauthorized(),
+        }.json(serde_json::json!({
+            "error": true,
+            "error_code": self.auth_error.error_code(),
+            "message": self.error_message,
+            "correlation_id": self.auth_error.correlation_id()
+        }))
+    }
+}
+
 /// Signature verification middleware
 pub struct SignatureVerificationMiddleware {
     state: Rc<SignatureVerificationState>,
@@ -2739,14 +2974,14 @@ where
                     // Create error message with appropriate detail level
                     let error_message = state.get_error_message(&auth_error);
                     
-                    // Return appropriate actix_web error based on authentication error type
-                    match auth_error.http_status_code() {
-                        StatusCode::BAD_REQUEST => Err(actix_web::error::ErrorBadRequest(error_message)),
-                        StatusCode::UNAUTHORIZED => Err(actix_web::error::ErrorUnauthorized(error_message)),
-                        StatusCode::TOO_MANY_REQUESTS => Err(actix_web::error::ErrorTooManyRequests(error_message)),
-                        StatusCode::INTERNAL_SERVER_ERROR => Err(actix_web::error::ErrorInternalServerError(error_message)),
-                        _ => Err(actix_web::error::ErrorUnauthorized(error_message)),
-                    }
+                    // Create custom error that implements ResponseError for proper HTTP response
+                    let custom_error = CustomAuthError {
+                        auth_error,
+                        error_message,
+                    };
+                    
+                    // Use actix-web's error handling - CustomAuthError implements ResponseError
+                    Err(actix_web::Error::from(custom_error))
                 }
             }
         })
@@ -2813,6 +3048,7 @@ fn should_skip_verification(path: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[allow(unused_imports)]
     use crate::crypto::ed25519::{generate_master_keypair, MasterKeyPair};
     use actix_web::{test, web, App, HttpResponse};
     
@@ -2827,7 +3063,7 @@ mod tests {
         let state = SignatureVerificationState::new(config).expect("Config should be valid");
         
         // Create test app with middleware
-        let app = test::init_service(
+        let _app = test::init_service(
             App::new()
                 .wrap(SignatureVerificationMiddleware::new(state))
                 .route("/test", web::get().to(test_handler))
