@@ -1,5 +1,6 @@
 //! Performance benchmarking system for DataFold signature authentication
 
+use crate::reporting::types::{UnifiedReportConfig, UnifiedReportFormat, UnifiedSummarySection};
 use crate::security_types::Severity;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -62,6 +63,8 @@ impl Default for PerformanceTargets {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerformanceAnalysisConfig {
+    /// Base unified configuration for reports
+    pub base_config: UnifiedReportConfig,
     pub regression_threshold_percent: f64,
     pub improvement_threshold_percent: f64,
     pub min_sample_size: usize,
@@ -71,25 +74,65 @@ pub struct PerformanceAnalysisConfig {
     pub historical_retention_days: u64,
 }
 
+impl PerformanceAnalysisConfig {
+    /// Create new performance analysis config with unified base
+    pub fn new() -> Self {
+        Self {
+            base_config: UnifiedReportConfig::with_formats(vec![
+                UnifiedReportFormat::Json,
+                UnifiedReportFormat::Html,
+            ]),
+            regression_threshold_percent: 5.0,
+            improvement_threshold_percent: 10.0,
+            min_sample_size: 50,
+            confidence_level: 0.95,
+            enable_trend_analysis: true,
+            enable_outlier_detection: true,
+            historical_retention_days: 90,
+        }
+    }
+}
+
+impl Default for PerformanceAnalysisConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReportConfig {
+    /// Base unified configuration
+    pub base_config: UnifiedReportConfig,
     pub output_directory: String,
     pub include_charts: bool,
     pub include_historical_comparison: bool,
     pub include_regression_analysis: bool,
     pub include_recommendations: bool,
     pub include_system_metrics: bool,
-    pub formats: Vec<ReportFormat>,
     pub chart_options: ChartOptions,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ReportFormat {
-    Html,
-    Json,
-    Markdown,
-    Pdf,
+impl ReportConfig {
+    /// Create new report config with unified base
+    pub fn new(output_directory: String) -> Self {
+        Self {
+            base_config: UnifiedReportConfig::with_formats(vec![
+                UnifiedReportFormat::Html,
+                UnifiedReportFormat::Json,
+                UnifiedReportFormat::Pdf,
+            ]),
+            output_directory,
+            include_charts: true,
+            include_historical_comparison: true,
+            include_regression_analysis: true,
+            include_recommendations: true,
+            include_system_metrics: true,
+            chart_options: ChartOptions::default(),
+        }
+    }
 }
+
+// Remove duplicate ReportFormat - use UnifiedReportFormat instead
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChartOptions {
@@ -130,6 +173,42 @@ pub struct PerformanceMeasurement {
 }
 
 impl PerformanceMeasurement {
+    /// Convert to unified PerformanceSummary section
+    pub fn to_summary(&self) -> crate::reporting::types::PerformanceSummary {
+        let mut throughput_metrics = HashMap::new();
+        throughput_metrics.insert(
+            "operations_per_second".to_string(),
+            self.operations_per_second,
+        );
+        if let Some(memory) = self.memory_usage_bytes {
+            throughput_metrics.insert(
+                "memory_usage_mb".to_string(),
+                memory as f64 / 1024.0 / 1024.0,
+            );
+        }
+        if let Some(cpu) = self.cpu_usage_percent {
+            throughput_metrics.insert("cpu_usage_percent".to_string(), cpu);
+        }
+
+        let mut trends = Vec::new();
+        if self.success_rate_percent >= 99.0 {
+            trends.push("High reliability maintained".to_string());
+        }
+        if self.avg_operation_time_ms < 10.0 {
+            trends.push("Excellent response times".to_string());
+        }
+
+        crate::reporting::types::PerformanceSummary {
+            avg_response_time_ms: self.avg_operation_time_ms,
+            max_response_time_ms: self.max_operation_time_ms,
+            throughput_metrics,
+            error_rate_percent: 100.0 - self.success_rate_percent,
+            trends,
+        }
+    }
+}
+
+impl PerformanceMeasurement {
     pub fn meets_targets(&self, targets: &PerformanceTargets) -> bool {
         let target_time_ms = match self.component.as_str() {
             "server" => targets.server_verification_ms,
@@ -166,6 +245,12 @@ pub struct PerformanceSummary {
     pub total_targets: usize,
     pub performance_score: f64,
     pub component_summaries: HashMap<String, ComponentSummary>,
+}
+
+impl UnifiedSummarySection for PerformanceSummary {
+    fn section_name(&self) -> &'static str {
+        "performance_summary"
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -500,7 +585,6 @@ pub struct PerformanceAlert {
     pub severity: Severity,
     pub message: String,
 }
-
 
 impl PerformanceMetricsCollector {
     pub fn new(config: MetricsCollectorConfig) -> Self {

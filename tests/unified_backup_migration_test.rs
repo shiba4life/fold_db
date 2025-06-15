@@ -3,7 +3,6 @@
 //! Tests the migration from legacy formats to the new unified format,
 //! ensuring cross-platform compatibility.
 
-
 /// Test migration utilities for converting legacy backups to unified format
 #[test]
 fn test_legacy_format_migration_structure() {

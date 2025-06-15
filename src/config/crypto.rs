@@ -270,7 +270,6 @@ impl KeyDerivationConfig {
     }
 }
 
-
 /// Configuration validation errors
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {

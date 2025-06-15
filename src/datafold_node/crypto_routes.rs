@@ -5,12 +5,12 @@
 //! key derivation workflows.
 
 use crate::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
-use crate::security_types::SecurityLevel;
 use crate::datafold_node::crypto_init::{
     get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed,
     validate_crypto_config_for_init, CryptoInitError,
 };
 use crate::datafold_node::http_server::AppState;
+use crate::security_types::SecurityLevel;
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use base64;
 use log::{debug, error, info, warn};

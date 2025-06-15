@@ -89,7 +89,6 @@ pub struct IpRestrictionConfig {
     pub block_vpn_proxy: bool,
 }
 
-
 /// Time-based restriction configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeRestrictionConfig {

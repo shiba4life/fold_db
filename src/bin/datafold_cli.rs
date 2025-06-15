@@ -4,13 +4,13 @@ use datafold::cli::config::{CliConfigManager, ServerConfig};
 use datafold::cli::environment_utils::commands as env_commands;
 use datafold::cli::http_client::{AuthenticatedHttpClient, HttpClientBuilder, RetryConfig};
 use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
-use datafold::security_types::SecurityLevel;
 use datafold::crypto::ed25519::{generate_master_keypair, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH};
 use datafold::crypto::MasterKeyPair;
 use datafold::datafold_node::crypto_init::{
     get_crypto_init_status, initialize_database_crypto, validate_crypto_config_for_init,
 };
 use datafold::schema::SchemaHasher;
+use datafold::security_types::SecurityLevel;
 use datafold::{load_node_config, DataFoldNode, MutationType, Operation, SchemaState};
 // Removed: Admin key rotation commands have been removed for security
 use base64::{engine::general_purpose, Engine as _};
@@ -5849,7 +5849,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         | Commands::VerifyResponse { .. }
         | Commands::VerificationConfig { .. }
         | Commands::Environment { .. } => unreachable!(), // Already handled above
-                                                         // Removed: Admin key rotation commands have been removed for security
+                                                          // Removed: Admin key rotation commands have been removed for security
     }
 
     Ok(())

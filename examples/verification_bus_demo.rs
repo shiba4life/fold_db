@@ -6,9 +6,9 @@
 use datafold::crypto::audit_logger::{AuditConfig, CryptoAuditLogger};
 use datafold::events::{
     AlertDestination, AuditLogHandler, AuthenticationEvent, AuthorizationEvent,
-    CreateVerificationEvent, MetricsHandler, PlatformSource, SecurityAlertHandler,
-    SecurityEvent, SecurityEventCategory, SecurityThreatEvent, VerificationBusConfig,
-    VerificationEvent, VerificationEventBus,
+    CreateVerificationEvent, MetricsHandler, PlatformSource, SecurityAlertHandler, SecurityEvent,
+    SecurityEventCategory, SecurityThreatEvent, VerificationBusConfig, VerificationEvent,
+    VerificationEventBus,
 };
 use datafold::security_types::Severity;
 use std::time::Duration;

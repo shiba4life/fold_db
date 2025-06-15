@@ -3,9 +3,7 @@
 //! This module extends the existing audit system with key rotation-specific
 //! audit events, tamper-proof trails, and enhanced security metadata.
 
-use super::audit_logger::{
-    AuditEvent, AuditEventType, CryptoAuditLogger, OperationResult,
-};
+use super::audit_logger::{AuditEvent, AuditEventType, CryptoAuditLogger, OperationResult};
 use super::key_rotation::{KeyRotationRequest, RotationReason};
 use crate::security_types::{RotationStatus, Severity};
 use chrono::{DateTime, Utc};
@@ -786,10 +784,13 @@ mod tests {
         // Verify audit chain has entries
         let audit_chain = audit_logger.get_audit_chain().await;
         assert!(!audit_chain.is_empty());
-        
+
         // Verify the logged event was recorded
         let last_entry = audit_chain.last().unwrap();
-        assert!(matches!(last_entry.event_type, KeyRotationAuditEventType::RotationRequested));
+        assert!(matches!(
+            last_entry.event_type,
+            KeyRotationAuditEventType::RotationRequested
+        ));
     }
 
     #[tokio::test]

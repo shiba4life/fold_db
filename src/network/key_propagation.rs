@@ -5,9 +5,7 @@
 
 use super::core::NetworkCore;
 use super::error::{NetworkError, NetworkResult};
-use crate::events::event_types::{
-    KeyPropagationStatus, KeyRotationEvent, SecurityEvent,
-};
+use crate::events::event_types::{KeyPropagationStatus, KeyRotationEvent, SecurityEvent};
 use crate::events::transport::{EventEnvelope, EventTransport, PlatformInfo, TransportResult};
 use chrono::{DateTime, Utc};
 use log::{debug, info, warn};
@@ -603,10 +601,10 @@ mod tests {
     use crate::events::event_types::{
         OperationResult, PlatformSource, SecurityEventCategory, VerificationEvent,
     };
-    use crate::security_types::Severity;
-    use crate::events::KeyRotationEventType;
     use crate::events::transport::{InMemoryTransport, TransportConfig};
+    use crate::events::KeyRotationEventType;
     use crate::network::NetworkConfig;
+    use crate::security_types::Severity;
 
     #[tokio::test]
     async fn test_propagation_operation_lifecycle() {

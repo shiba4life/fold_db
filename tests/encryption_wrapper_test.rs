@@ -456,10 +456,12 @@ fn test_concurrent_context_usage() {
     let wrapper = create_test_encryption_wrapper();
 
     // Store data with multiple contexts simultaneously
-    let contexts_and_data = [(contexts::ATOM_DATA, "atom data"),
+    let contexts_and_data = [
+        (contexts::ATOM_DATA, "atom data"),
         (contexts::SCHEMA_DATA, "schema data"),
         (contexts::METADATA, "metadata"),
-        (contexts::TRANSFORM_DATA, "transform data")];
+        (contexts::TRANSFORM_DATA, "transform data"),
+    ];
 
     // Store all data
     for (i, (context, data)) in contexts_and_data.iter().enumerate() {

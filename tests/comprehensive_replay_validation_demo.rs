@@ -6,9 +6,7 @@
 //! This is a complete demonstration of all validation components
 //! working together to provide comprehensive security assessment.
 
-use datafold::datafold_node::signature_auth::{
-    SignatureAuthConfig, SignatureVerificationState,
-};
+use datafold::datafold_node::signature_auth::{SignatureAuthConfig, SignatureVerificationState};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 

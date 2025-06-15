@@ -15,7 +15,8 @@ A Rust-based distributed data platform with **mandatory signature authentication
 - **🔄 Real-Time Processing** - Event-driven architecture with automatic transform execution [working]
 - **🌐 Distributed Architecture** - P2P networking with automatic peer discovery [untested]
 - **📊 Flexible Schema System** - Dynamic schema management with validation [working]
-- **🔐 Permission Management** - Fine-grained access control and trust-based permissions [working]
+- **📋 Unified Reporting** - Standardized reporting across all modules with digital signatures [production-ready]
+- **� Permission Management** - Fine-grained access control and trust-based permissions [working]
 - **⚡ High Performance** - Rust-based core with optimized storage and query execution [maybe]
 - **🔌 Extensible Ingestion** - Plugin system for social media and external data sources [not yet begun]
 

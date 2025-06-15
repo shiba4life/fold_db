@@ -705,8 +705,7 @@ fn test_edge_cases_prevention() {
                 large_data.clone(),
                 &format!("large_data_{}", description),
             )
-            .unwrap_or_else(|_| panic!("Failed to execute large data mutation: {}",
-                description));
+            .unwrap_or_else(|_| panic!("Failed to execute large data mutation: {}", description));
 
         let duration = start_time.elapsed();
 
@@ -800,8 +799,12 @@ fn test_edge_cases_prevention() {
                 value.clone(),
                 &format!("special_char_{}", description),
             )
-            .unwrap_or_else(|_| panic!("Failed to execute special character mutation: {}",
-                description));
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Failed to execute special character mutation: {}",
+                    description
+                )
+            });
 
         assert!(
             result.success,
@@ -821,8 +824,7 @@ fn test_edge_cases_prevention() {
             "edge_field",
             None,
         )
-        .unwrap_or_else(|_| panic!("Failed to query special characters: {}",
-            description));
+        .unwrap_or_else(|_| panic!("Failed to query special characters: {}", description));
 
         assert_eq!(query_result, value);
         println!("✅ Special characters handled: {}", description);

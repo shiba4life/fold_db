@@ -4,7 +4,7 @@
 //! operations including encryption/decryption, key derivation, backup/restore,
 //! and security events.
 
-use super::enhanced_error::{EnhancedCryptoError};
+use super::enhanced_error::EnhancedCryptoError;
 use crate::security_types::Severity;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,6 @@ pub enum AuditEventType {
     /// System startup and shutdown
     System,
 }
-
 
 /// Detailed audit event metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -720,10 +719,8 @@ impl CryptoAuditLogger {
 
     /// Check if event should trigger an alert
     fn should_alert(&self, event: &AuditEvent) -> bool {
-        matches!(
-            event.severity,
-            Severity::Critical | Severity::Error
-        ) || event.event_type == AuditEventType::Security
+        matches!(event.severity, Severity::Critical | Severity::Error)
+            || event.event_type == AuditEventType::Security
     }
 
     /// Send alert for critical events

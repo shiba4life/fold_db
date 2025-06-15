@@ -7,18 +7,15 @@
 
 use datafold::crypto::{
     audit_logger::{
-        AuditConfig, AuditEventType, CryptoAuditLogger, OperationResult,
-        SecurityEventDetails,
+        AuditConfig, AuditEventType, CryptoAuditLogger, OperationResult, SecurityEventDetails,
     },
     enhanced_error::{EnhancedCryptoError, ErrorContext, RecoveryAction},
     generate_master_keypair,
-    security_monitor::{
-        CryptoSecurityMonitor, SecurityMonitorConfig, SecurityPattern,
-    },
+    security_monitor::{CryptoSecurityMonitor, SecurityMonitorConfig, SecurityPattern},
     MasterKeyPair,
 };
-use datafold::security_types::{Severity, ThreatLevel};
 use datafold::db_operations::{DbOperations, EncryptionWrapper};
+use datafold::security_types::{Severity, ThreatLevel};
 use std::time::Duration;
 use uuid::Uuid;
 

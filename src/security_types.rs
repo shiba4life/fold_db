@@ -198,9 +198,9 @@ impl SecurityLevel {
     /// Returns Argon2 parameters (memory, time, parallelism) for this security level
     pub fn argon2_params(&self) -> (u32, u32, u32) {
         match self {
-            Self::Low => (32768, 2, 2),        // Fast/Interactive: ~50ms
-            Self::Standard => (65536, 3, 4),   // Balanced: ~200ms
-            Self::High => (131_072, 4, 8),      // High security/Sensitive: ~500ms
+            Self::Low => (32768, 2, 2),      // Fast/Interactive: ~50ms
+            Self::Standard => (65536, 3, 4), // Balanced: ~200ms
+            Self::High => (131_072, 4, 8),   // High security/Sensitive: ~500ms
         }
     }
 
@@ -243,7 +243,7 @@ impl std::fmt::Display for SecurityLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Low => write!(f, "Low"),
-            Self::Standard => write!(f, "Standard"), 
+            Self::Standard => write!(f, "Standard"),
             Self::High => write!(f, "High"),
         }
     }
@@ -427,7 +427,7 @@ mod tests {
         assert!(Severity::Critical > Severity::Error);
         assert!(Severity::Error > Severity::Warning);
         assert!(Severity::Warning > Severity::Info);
-        
+
         assert!(Severity::Critical.meets_threshold(Severity::Warning));
         assert!(!Severity::Info.meets_threshold(Severity::Error));
     }
@@ -436,10 +436,10 @@ mod tests {
     fn test_security_level_params() {
         let low_params = SecurityLevel::Low.argon2_params();
         let high_params = SecurityLevel::High.argon2_params();
-        
+
         // High security should have higher memory usage
         assert!(high_params.0 > low_params.0);
-        
+
         assert!(SecurityLevel::Low.is_interactive());
         assert!(!SecurityLevel::High.is_interactive());
     }
@@ -449,7 +449,7 @@ mod tests {
         assert!(HealthStatus::Healthy.is_operational());
         assert!(HealthStatus::Warning.is_operational());
         assert!(!HealthStatus::Failed.is_operational());
-        
+
         assert_eq!(HealthStatus::Critical.to_severity(), Severity::Error);
         assert_eq!(HealthStatus::Failed.to_severity(), Severity::Critical);
     }
@@ -459,7 +459,7 @@ mod tests {
         assert!(ThreatLevel::Critical > ThreatLevel::High);
         assert!(ThreatLevel::High > ThreatLevel::Medium);
         assert!(ThreatLevel::Medium > ThreatLevel::Low);
-        
+
         assert!(ThreatLevel::Critical.meets_threshold(ThreatLevel::Medium));
         assert!(!ThreatLevel::Low.meets_threshold(ThreatLevel::High));
     }
@@ -470,10 +470,10 @@ mod tests {
         assert!(ThreatLevel::High.requires_immediate_action());
         assert!(!ThreatLevel::Medium.requires_immediate_action());
         assert!(!ThreatLevel::Low.requires_immediate_action());
-        
+
         assert!(ThreatLevel::Critical.is_active_threat());
         assert!(!ThreatLevel::High.is_active_threat());
-        
+
         assert_eq!(ThreatLevel::Critical.to_severity(), Severity::Critical);
         assert_eq!(ThreatLevel::High.to_severity(), Severity::Error);
     }

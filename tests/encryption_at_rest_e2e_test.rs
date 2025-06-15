@@ -44,7 +44,6 @@
 
 use datafold::{
     config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig},
-    security_types::SecurityLevel,
     crypto::{generate_master_keypair, MasterKeyPair},
     datafold_node::encryption_at_rest::{
         key_derivation::KeyDerivationManager, EncryptionAtRest, AES_KEY_SIZE,
@@ -55,6 +54,7 @@ use datafold::{
         encryption_wrapper::{contexts, EncryptionWrapper, MigrationMode},
         DbOperations,
     },
+    security_types::SecurityLevel,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

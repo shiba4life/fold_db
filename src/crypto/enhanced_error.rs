@@ -13,7 +13,6 @@ use uuid::Uuid;
 /// Result type alias for enhanced crypto operations
 pub type EnhancedCryptoResult<T> = Result<T, EnhancedCryptoError>;
 
-
 /// Error recovery suggestions for automated and manual resolution
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RecoveryAction {
@@ -394,10 +393,8 @@ impl EnhancedCryptoError {
 
     /// Check if this error should trigger an immediate alert
     pub fn should_alert(&self) -> bool {
-        matches!(
-            self.severity(),
-            Severity::Error | Severity::Critical
-        ) || matches!(self, Self::Security { .. })
+        matches!(self.severity(), Severity::Error | Severity::Critical)
+            || matches!(self, Self::Security { .. })
     }
 
     /// Get a detailed description for logging

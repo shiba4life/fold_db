@@ -8,6 +8,7 @@ use datafold::crypto::ed25519::{generate_master_keypair, PrivateKey, PublicKey};
 use datafold::datafold_node::signature_auth::{
     SecurityProfile, SignatureAuthConfig, SignatureVerificationState,
 };
+use datafold::reporting::types::UnifiedSummarySection;
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -723,7 +724,8 @@ impl CrossPlatformValidator {
             error_message_consistency: 0.95, // Would be calculated from actual error analysis
             timing_consistency_score: timing_consistency,
             security_effectiveness_variance: detection_rates
-                .iter().copied()
+                .iter()
+                .copied()
                 .collect::<Vec<_>>()
                 .iter()
                 .fold(0.0, |acc, &x| acc + (x - 0.95).powi(2))
@@ -999,6 +1001,12 @@ impl CrossPlatformReport {
             recommendations: Vec::new(),
             scenario_results: results.to_vec(),
         }
+    }
+}
+
+impl UnifiedSummarySection for CrossPlatformReport {
+    fn section_name(&self) -> &'static str {
+        "cross_platform_report"
     }
 }
 

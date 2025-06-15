@@ -49,6 +49,19 @@ The system validates against the following performance targets:
 
 6. **Performance Analysis** (`tests/performance/performance_analysis.rs`)
    - Statistical analysis and regression detection
+   - Performance trend analysis and forecasting
+   - **Unified Reporting Integration** for comprehensive performance reports
+
+7. **Metrics Collection** (`tests/performance/metrics_collector.rs`)
+   - Real-time performance monitoring
+   - System metrics collection
+   - Integration with unified reporting system
+
+8. **Reporting** (`tests/performance/reporting.rs`)
+   - Multi-format report generation using [Unified Reporting](../reporting/unified-reporting-architecture.md)
+   - Performance visualizations and charts
+   - Executive summaries and detailed technical analysis
+   - Statistical analysis and regression detection
    - Trend analysis over time
    - Optimization recommendations
 
@@ -187,6 +200,7 @@ let alerts = collector.get_active_alerts();
 - Interactive charts and visualizations
 - Executive summary with key insights
 - Detailed benchmark results
+- **Uses [Unified Reporting](../reporting/unified-reporting-architecture.md)** for consistent format and metadata
 - Performance recommendations
 
 ### JSON Reports
@@ -204,6 +218,7 @@ let alerts = collector.get_active_alerts();
 ### Markdown Reports
 - Documentation-friendly format
 - GitHub/GitLab compatible
+- **Generated via [Unified Reporting API](../reporting/api.md)**
 - Technical team sharing
 - Wiki integration ready
 
@@ -397,3 +412,46 @@ For detailed API documentation, see the individual module documentation:
 - [`tests::performance::client_benchmarks`](../src/tests/performance/client_benchmarks.rs)
 - [`tests::performance::performance_analysis`](../src/tests/performance/performance_analysis.rs)
 - [`tests::performance::reporting`](../src/tests/performance/reporting.rs)
+
+## Unified Reporting Integration
+
+The performance benchmarking system integrates with the [DataFold Unified Reporting](../reporting/unified-reporting-architecture.md) system to provide:
+
+- **Consistent Report Structure**: All performance reports use standardized metadata and section formats
+- **Multi-Format Output**: Generate performance reports in PDF, JSON, HTML, CSV, XML, and Markdown formats
+- **Digital Signatures**: Optional cryptographic verification for performance audit trails
+- **Executive Summaries**: High-level performance assessments using standardized summary sections
+- **Cross-Module Integration**: Combine performance data with security, compliance, and operational metrics
+
+### Performance Report Sections
+
+Performance reports include the following standardized sections:
+
+- **Executive Summary**: High-level performance assessment and key findings
+- **Performance Metrics**: Detailed timing, throughput, and resource utilization data
+- **Benchmark Results**: Individual test results and statistical analysis
+- **Trend Analysis**: Performance changes over time with regression detection
+- **Recommendations**: Suggested optimizations and remediation actions
+
+See the [Performance Reporting API](../reporting/api.md#performancesummary) for implementation details.
+## Unified Reporting Integration
+
+The performance benchmarking system integrates with the [DataFold Unified Reporting](../reporting/unified-reporting-architecture.md) system to provide:
+
+- **Consistent Report Structure**: All performance reports use standardized metadata and section formats
+- **Multi-Format Output**: Generate performance reports in PDF, JSON, HTML, CSV, XML, and Markdown formats
+- **Digital Signatures**: Optional cryptographic verification for performance audit trails
+- **Executive Summaries**: High-level performance assessments using standardized summary sections
+- **Cross-Module Integration**: Combine performance data with security, compliance, and operational metrics
+
+### Performance Report Sections
+
+Performance reports include the following standardized sections:
+
+- **Executive Summary**: High-level performance assessment and key findings
+- **Performance Metrics**: Detailed timing, throughput, and resource utilization data  
+- **Benchmark Results**: Individual test results and statistical analysis
+- **Trend Analysis**: Performance changes over time with regression detection
+- **Recommendations**: Suggested optimizations and remediation actions
+
+See the [Performance Reporting API](../reporting/api.md#performancesummary) for implementation details.

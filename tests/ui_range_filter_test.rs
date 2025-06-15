@@ -11,10 +11,7 @@ use datafold::{
     },
     schema::{
         field_factory::FieldFactory,
-        types::{
-            field::FieldVariant,
-            Schema,
-        },
+        types::{field::FieldVariant, Schema},
     },
 };
 use log::info;

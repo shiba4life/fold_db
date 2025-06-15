@@ -513,7 +513,6 @@ impl std::fmt::Display for AuthenticationError {
 
 impl std::error::Error for AuthenticationError {}
 
-
 /// Security event types for structured logging
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityEvent {
@@ -1303,13 +1302,12 @@ impl SecurityLogger {
     fn should_log_severity(&self, severity: &Severity) -> bool {
         matches!(
             (&self.config.min_severity, severity),
-            (
-                Severity::Critical,
-                Severity::Critical
-            ) | (
-                Severity::Warning,
-                Severity::Warning | Severity::Error | Severity::Critical
-            ) | (Severity::Info, _)
+            (Severity::Critical, Severity::Critical)
+                | (
+                    Severity::Warning,
+                    Severity::Warning | Severity::Error | Severity::Critical
+                )
+                | (Severity::Info, _)
         )
     }
 

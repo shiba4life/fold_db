@@ -13,6 +13,7 @@
 //! * `fold_db_core` - Core database functionality
 //! * `network` - P2P networking layer for node communication
 //! * `permissions` - Access control and permission management
+//! * `reporting` - Unified reporting system with standardized formats and digital signatures
 //! * `schema` - Schema definition, validation, and execution
 //!
 //! ## Architecture
@@ -41,6 +42,7 @@ pub mod ingestion;
 pub mod logging;
 pub mod network;
 pub mod permissions;
+pub mod reporting;
 pub mod schema;
 pub mod security_types;
 pub mod testing_utils;
@@ -75,9 +77,7 @@ pub use crypto::{
 };
 
 // Re-export config types
-pub use config::crypto::{
-    ConfigError, CryptoConfig, KeyDerivationConfig, MasterKeyConfig,
-};
+pub use config::crypto::{ConfigError, CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
 
 // Re-export database crypto metadata types
 pub use db_operations::crypto_metadata::CryptoMetadata;

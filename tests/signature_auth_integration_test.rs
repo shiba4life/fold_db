@@ -9,8 +9,7 @@ use datafold::datafold_node::config::NodeConfig;
 use datafold::datafold_node::crypto_routes::{register_public_key, PublicKeyRegistrationRequest};
 use datafold::datafold_node::http_server::AppState;
 use datafold::datafold_node::signature_auth::{
-    SecurityProfile, SignatureAuthConfig,
-    SignatureVerificationState,
+    SecurityProfile, SignatureAuthConfig, SignatureVerificationState,
 };
 use datafold::datafold_node::DataFoldNode;
 use serde_json::json;
@@ -146,7 +145,6 @@ async fn test_node_config_signature_auth_methods() {
 #[tokio::test]
 async fn test_signature_auth_skip_paths() {
     // Test the skip paths functionality
-    
 
     // These paths should skip verification
     let skip_paths = [
@@ -233,10 +231,7 @@ async fn test_authentication_error_types() {
         missing_headers_error.http_status_code(),
         StatusCode::BAD_REQUEST
     );
-    assert_eq!(
-        missing_headers_error.severity(),
-        Severity::Info
-    );
+    assert_eq!(missing_headers_error.severity(), Severity::Info);
 
     let signature_failed_error = AuthenticationError::SignatureVerificationFailed {
         key_id: "test-key".to_string(),
@@ -246,10 +241,7 @@ async fn test_authentication_error_types() {
         signature_failed_error.http_status_code(),
         StatusCode::UNAUTHORIZED
     );
-    assert_eq!(
-        signature_failed_error.severity(),
-        Severity::Warning
-    );
+    assert_eq!(signature_failed_error.severity(), Severity::Warning);
 
     let replay_error = AuthenticationError::NonceValidationFailed {
         nonce: "test-nonce".to_string(),

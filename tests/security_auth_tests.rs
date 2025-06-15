@@ -21,10 +21,7 @@ async fn test_authentication_error_types() {
         missing_headers_error.http_status_code(),
         StatusCode::BAD_REQUEST
     );
-    assert_eq!(
-        missing_headers_error.severity(),
-        Severity::Info
-    );
+    assert_eq!(missing_headers_error.severity(), Severity::Info);
     assert_eq!(missing_headers_error.correlation_id(), &correlation_id);
     assert_eq!(missing_headers_error.public_message(), "Missing required authentication headers. Please include Signature-Input and Signature headers.");
 
@@ -123,10 +120,7 @@ async fn test_configuration_structures() {
     assert!(config.security_logging.include_client_info);
     assert!(config.security_logging.include_performance_metrics);
     assert!(!config.security_logging.log_successful_auth);
-    assert_eq!(
-        config.security_logging.min_severity,
-        Severity::Info
-    );
+    assert_eq!(config.security_logging.min_severity, Severity::Info);
     assert_eq!(config.security_logging.max_log_entry_size, 8192);
 
     // Test rate limiting configuration

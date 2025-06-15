@@ -4,8 +4,7 @@
 //! to validate the effectiveness of DataFold's replay prevention mechanisms.
 
 use datafold::datafold_node::signature_auth::{
-    SecurityProfile, SignatureAuthConfig,
-    SignatureVerificationState,
+    SecurityProfile, SignatureAuthConfig, SignatureVerificationState,
 };
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};

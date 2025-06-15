@@ -6,7 +6,6 @@
 use tempfile::TempDir;
 
 use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
-use datafold::security_types::SecurityLevel;
 use datafold::datafold_node::{
     config::NodeConfig,
     crypto_init::{
@@ -15,6 +14,7 @@ use datafold::datafold_node::{
     },
     DataFoldNode,
 };
+use datafold::security_types::SecurityLevel;
 
 /// Test fixture for crypto initialization tests
 struct CryptoInitTestFixture {

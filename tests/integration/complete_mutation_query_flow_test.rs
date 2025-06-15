@@ -297,10 +297,12 @@ fn test_multiple_mutation_cycles_on_same_field() {
     let schema = fixture.create_transform_base_schema();
 
     // Test multiple mutation cycles on the same field
-    let mutation_cycles = [(json!("initial_value"), "cycle_1"),
+    let mutation_cycles = [
+        (json!("initial_value"), "cycle_1"),
         (json!(100), "cycle_2"),
         (json!("updated_value"), "cycle_3"),
-        (json!(200), "cycle_4")];
+        (json!(200), "cycle_4"),
+    ];
 
     let mut aref_uuids = Vec::new();
 

@@ -7,9 +7,9 @@
 //! - Transactional integrity
 
 use super::audit_logger::{CryptoAuditLogger, OperationResult};
-use crate::security_types::Severity;
 use super::ed25519::{PrivateKey, PublicKey};
 use super::error::{CryptoError, CryptoResult};
+use crate::security_types::Severity;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -514,13 +514,7 @@ mod tests {
             RotationReason::Compromise.audit_severity(),
             Severity::Critical
         );
-        assert_eq!(
-            RotationReason::Policy.audit_severity(),
-            Severity::Warning
-        );
-        assert_eq!(
-            RotationReason::Scheduled.audit_severity(),
-            Severity::Info
-        );
+        assert_eq!(RotationReason::Policy.audit_severity(), Severity::Warning);
+        assert_eq!(RotationReason::Scheduled.audit_severity(), Severity::Info);
     }
 }

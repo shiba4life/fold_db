@@ -48,6 +48,11 @@ pub struct FoldDB {
 
 **Storage Engine:**
 - Uses Sled embedded database for persistence
+
+**Reporting System:**
+- [Unified Reporting Architecture](reporting/unified-reporting-architecture.md) for consistent cross-module reporting
+- Standardized report formats, metadata, and digital signature support
+- Integration with compliance, performance, and security monitoring
 - Atomic operations with ACID guarantees
 - Efficient key-value storage with range queries
 

@@ -3,15 +3,13 @@
 //! This module demonstrates how to integrate key rotation events with network propagation,
 //! cache invalidation, and consistency guarantees across a distributed DataFold network.
 
-use crate::crypto::key_rotation::{
-    KeyRotationRequest, RotationContext, RotationValidationResult,
-};
+use crate::crypto::key_rotation::{KeyRotationRequest, RotationContext, RotationValidationResult};
 use crate::datafold_node::key_cache_manager::{KeyCacheConfig, KeyCacheManager};
 use crate::events::transport::{EventTransport, InMemoryTransport, PlatformInfo, TransportConfig};
 use crate::events::{
-    KeyPropagationStatus, KeyRotationEvent, KeyRotationEventType,
-    KeyRotationHandlerConfig, KeyRotationPropagationHandler, OperationResult, PlatformSource,
-    SecurityEvent, SecurityEventCategory, VerificationEvent, VerificationEventBus,
+    KeyPropagationStatus, KeyRotationEvent, KeyRotationEventType, KeyRotationHandlerConfig,
+    KeyRotationPropagationHandler, OperationResult, PlatformSource, SecurityEvent,
+    SecurityEventCategory, VerificationEvent, VerificationEventBus,
 };
 use crate::network::{KeyPropagationConfig, KeyPropagationManager, NetworkCore};
 use crate::security_types::Severity;
@@ -267,7 +265,8 @@ impl KeyRotationNetworkIntegration {
                 op.event
                     .operation_id
                     .as_ref()
-                    .and_then(|id| Uuid::parse_str(id).ok()) == Some(correlation_id)
+                    .and_then(|id| Uuid::parse_str(id).ok())
+                    == Some(correlation_id)
             });
 
             if !has_active {

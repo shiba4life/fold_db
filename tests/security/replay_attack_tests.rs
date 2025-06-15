@@ -13,8 +13,7 @@
 //! Validates across all security profiles (Strict, Standard, Lenient)
 
 use datafold::datafold_node::signature_auth::{
-    SecurityProfile,
-    SignatureAuthConfig, SignatureVerificationState,
+    SecurityProfile, SignatureAuthConfig, SignatureVerificationState,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

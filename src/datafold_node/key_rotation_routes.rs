@@ -6,12 +6,9 @@
 //! - Audit trail creation
 //! - Error handling and recovery
 
-use crate::crypto::audit_logger::{
-    CryptoAuditLogger, OperationResult, SecurityEventDetails,
-};
+use crate::crypto::audit_logger::{CryptoAuditLogger, OperationResult, SecurityEventDetails};
 use crate::crypto::key_rotation::{
-    KeyRotationRequest, KeyRotationValidator,
-    RotationContext, RotationReason,
+    KeyRotationRequest, KeyRotationValidator, RotationContext, RotationReason,
 };
 use crate::datafold_node::crypto_routes::{ApiError, ApiResponse};
 use crate::datafold_node::http_server::AppState;

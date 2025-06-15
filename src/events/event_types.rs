@@ -46,7 +46,6 @@ impl std::fmt::Display for SecurityEventCategory {
     }
 }
 
-
 /// Platform source for cross-platform event correlation
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PlatformSource {

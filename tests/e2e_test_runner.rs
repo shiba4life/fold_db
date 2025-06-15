@@ -250,7 +250,9 @@ impl E2ETestRunner {
         }
 
         // Check for Rust and Cargo
-        if self.should_test_platform(&TestPlatform::CLI) && Command::new("cargo").arg("--version").output().is_err() {
+        if self.should_test_platform(&TestPlatform::CLI)
+            && Command::new("cargo").arg("--version").output().is_err()
+        {
             missing_tools.push("Cargo");
         }
 

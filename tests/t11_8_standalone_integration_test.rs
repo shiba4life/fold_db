@@ -363,10 +363,12 @@ mod t11_8_comprehensive_integration_tests {
         let verifier = MockSignatureVerifier::new(true);
 
         // Test various security scenarios
-        let security_tests = [("Replay attack prevention", false, false),
+        let security_tests = [
+            ("Replay attack prevention", false, false),
             ("Signature tampering detection", true, false),
             ("Expired signature rejection", true, false),
-            ("Valid signature acceptance", true, true)];
+            ("Valid signature acceptance", true, true),
+        ];
         let security_tests_len = security_tests.len();
 
         let mut security_violations = 0;

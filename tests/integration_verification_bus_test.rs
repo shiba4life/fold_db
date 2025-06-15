@@ -6,8 +6,8 @@
 use datafold::config::unified_config::{EnvironmentConfig, UnifiedConfig};
 use datafold::events::{
     AlertDestination, AuditLogHandler, CorrelationManager, CreateVerificationEvent, EventEnvelope,
-    MetricsHandler, PlatformInfo, PlatformSource, SecurityAlertHandler,
-    SecurityEvent, SecurityEventCategory, TransportConfig, TransportFactory, TransportProtocol,
+    MetricsHandler, PlatformInfo, PlatformSource, SecurityAlertHandler, SecurityEvent,
+    SecurityEventCategory, TransportConfig, TransportFactory, TransportProtocol,
     VerificationBusConfig, VerificationEvent, VerificationEventBus,
 };
 use datafold::security_types::Severity;

@@ -8,9 +8,7 @@ use super::key_rotation_audit::{
     KeyRotationAuditLogger, KeyRotationSecurityMetadata, RotationAuditCorrelation,
 };
 use super::key_rotation_security::KeyRotationSecurityManager;
-use super::security_monitor::{
-    CryptoSecurityMonitor, SecurityDetection, SecurityPattern,
-};
+use super::security_monitor::{CryptoSecurityMonitor, SecurityDetection, SecurityPattern};
 use crate::security_types::ThreatLevel;
 use chrono::{DateTime, Duration as ChronoDuration, Timelike, Utc};
 use serde::{Deserialize, Serialize};
@@ -248,7 +246,6 @@ pub struct IntegrationSettings {
     /// SOAR platform endpoint
     pub soar_endpoint: Option<String>,
 }
-
 
 /// Rotation activity tracking for threat detection
 #[derive(Debug, Clone)]
@@ -1146,9 +1143,7 @@ pub struct ThreatStatusSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::crypto::{
-        generate_master_keypair,
-    };
+    use crate::crypto::generate_master_keypair;
     use std::net::Ipv4Addr;
 
     #[tokio::test]

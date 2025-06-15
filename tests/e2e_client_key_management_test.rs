@@ -24,8 +24,8 @@ use tempfile::TempDir;
 use tokio::time::timeout;
 
 use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
-use datafold::security_types::SecurityLevel;
 use datafold::datafold_node::{DataFoldNode, NodeConfig};
+use datafold::security_types::SecurityLevel;
 
 /// E2E Test Framework for Client-Side Key Management
 pub struct E2EKeyManagementTestSuite {

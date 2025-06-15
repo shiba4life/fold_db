@@ -3,6 +3,7 @@
 //! This module provides comprehensive monitoring, metrics collection, and reporting
 //! capabilities for the E2E test suite, with CI/CD pipeline integration support.
 
+use datafold::reporting::types::UnifiedSummarySection;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 use std::collections::HashMap;
@@ -883,6 +884,13 @@ impl TestMetrics {
                 technical_debt_indicators: Vec::new(),
             },
         }
+    }
+}
+
+// Implement UnifiedSummarySection for TestMetrics
+impl UnifiedSummarySection for TestMetrics {
+    fn section_name(&self) -> &'static str {
+        "test_metrics"
     }
 }
 

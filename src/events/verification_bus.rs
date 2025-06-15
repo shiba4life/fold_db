@@ -5,9 +5,9 @@
 
 use super::correlation::CorrelationManager;
 use super::event_types::SecurityEvent;
-use crate::security_types::Severity;
 use super::handlers::{EventHandler, EventHandlerResult};
 use crate::config::unified_config::{EnvironmentConfig, UnifiedConfig};
+use crate::security_types::Severity;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

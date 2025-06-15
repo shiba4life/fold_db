@@ -6,10 +6,10 @@
 
 use datafold::{
     config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig},
-    security_types::SecurityLevel,
     datafold_node::{DataFoldNode, NodeConfig},
     db_operations::DbOperations,
     get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed,
+    security_types::SecurityLevel,
     validate_for_database_creation,
 };
 use tempfile::tempdir;
@@ -237,8 +237,12 @@ fn test_different_security_levels() {
         };
 
         let config = create_test_node_config_with_crypto(crypto_config);
-        let node = DataFoldNode::new(config).unwrap_or_else(|_| panic!("Failed to create node with security level: {:?}",
-            security_level));
+        let node = DataFoldNode::new(config).unwrap_or_else(|_| {
+            panic!(
+                "Failed to create node with security level: {:?}",
+                security_level
+            )
+        });
 
         let status = node
             .get_crypto_status()
@@ -442,8 +446,12 @@ fn test_crypto_init_performance_different_security_levels() {
         let config = create_test_node_config_with_crypto(crypto_config);
 
         let start = Instant::now();
-        let node = DataFoldNode::new(config).unwrap_or_else(|_| panic!("Failed to create node with security level: {:?}",
-            security_level));
+        let node = DataFoldNode::new(config).unwrap_or_else(|_| {
+            panic!(
+                "Failed to create node with security level: {:?}",
+                security_level
+            )
+        });
         let duration = start.elapsed();
 
         println!(

@@ -5,6 +5,7 @@
 //! related events and building comprehensive security incident timelines.
 
 use super::event_types::{PlatformSource, SecurityEvent, SecurityEventCategory};
+use crate::reporting::types::UnifiedSummarySection;
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -202,6 +203,12 @@ pub struct CorrelationSummary {
     pub is_cross_platform: bool,
     /// Number of different severity levels
     pub severity_levels: usize,
+}
+
+impl UnifiedSummarySection for CorrelationSummary {
+    fn section_name(&self) -> &'static str {
+        "correlation_summary"
+    }
 }
 
 /// Manages event correlation across platforms
@@ -684,8 +691,8 @@ fn strategy_to_prefix(strategy: &CorrelationStrategy) -> &'static str {
 mod tests {
     use super::*;
     use crate::events::event_types::{
-        CreateVerificationEvent, PlatformSource, SecurityEvent,
-        SecurityEventCategory, VerificationEvent,
+        CreateVerificationEvent, PlatformSource, SecurityEvent, SecurityEventCategory,
+        VerificationEvent,
     };
     use crate::security_types::Severity;
 

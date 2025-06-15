@@ -50,9 +50,7 @@ pub use audit_logger::{
     CryptoAuditLogger, OperationResult, PerformanceMetrics, SecurityEventDetails,
 };
 pub use ed25519::{generate_master_keypair, MasterKeyPair, PublicKey};
-pub use enhanced_error::{
-    EnhancedCryptoError, EnhancedCryptoResult, ErrorContext, RecoveryAction,
-};
+pub use enhanced_error::{EnhancedCryptoError, EnhancedCryptoResult, ErrorContext, RecoveryAction};
 pub use error::{CryptoError, CryptoResult};
 pub use key_rotation::{
     KeyRotationError, KeyRotationRequest, KeyRotationResponse, KeyRotationValidator,
@@ -61,8 +59,7 @@ pub use key_rotation::{
 };
 pub use key_rotation_audit::{
     GeolocationInfo, KeyRotationAuditEventType, KeyRotationAuditLogger,
-    KeyRotationSecurityMetadata, RotationAuditCorrelation, SessionInfo,
-    TamperProofAuditEntry,
+    KeyRotationSecurityMetadata, RotationAuditCorrelation, SessionInfo, TamperProofAuditEntry,
 };
 // Re-export RotationStatus from security_types module
 pub use crate::security_types::RotationStatus;

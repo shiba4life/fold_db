@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Instant;
 use tracing::{info, warn, error};
+use crate::reporting::types::UnifiedSummarySection;
 
 /// Main validation result encompassing all test categories
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -370,6 +371,11 @@ impl Default for ValidationConfig {
             },
         }
     }
+}
+
+// Implement UnifiedSummarySection for ValidationSummary
+impl UnifiedSummarySection for ValidationSummary {
+    fn section_name(&self) -> &'static str { "validation_summary" }
 }
 
 #[cfg(test)]

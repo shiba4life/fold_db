@@ -9,10 +9,10 @@ use std::path::PathBuf;
 use tempfile::tempdir;
 
 use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
-use datafold::security_types::SecurityLevel;
 use datafold::datafold_node::config::NodeConfig;
 use datafold::datafold_node::crypto_init::{get_crypto_init_status, initialize_database_crypto};
 use datafold::datafold_node::{load_node_config, DataFoldNode};
+use datafold::security_types::SecurityLevel;
 
 /// Helper function to create a temporary node configuration with crypto settings
 fn create_test_node_config_with_crypto(

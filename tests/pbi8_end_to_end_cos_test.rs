@@ -6,12 +6,12 @@
 
 use datafold::{
     config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig},
-    security_types::SecurityLevel,
     datafold_node::crypto_init::{
         get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed,
         validate_crypto_config_for_init,
     },
     datafold_node::{DataFoldNode, NodeConfig},
+    security_types::SecurityLevel,
 };
 use std::time::{Duration, Instant};
 use tempfile::TempDir;

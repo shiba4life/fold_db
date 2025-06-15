@@ -194,8 +194,7 @@ async fn test_multiple_node_creation_with_different_crypto_configs() {
         ),
         (
             "passphrase_sensitive",
-            fixture
-                .config_with_passphrase_crypto("secure_test_passphrase", SecurityLevel::High),
+            fixture.config_with_passphrase_crypto("secure_test_passphrase", SecurityLevel::High),
         ),
         ("no_crypto", fixture.config_without_crypto()),
     ];
@@ -206,7 +205,8 @@ async fn test_multiple_node_creation_with_different_crypto_configs() {
         // Use different storage paths for each node
         config.storage_path = fixture.temp_dir.path().join(format!("db_{}", name));
 
-        let node = DataFoldNode::new(config).unwrap_or_else(|_| panic!("Failed to create node: {}", name));
+        let node =
+            DataFoldNode::new(config).unwrap_or_else(|_| panic!("Failed to create node: {}", name));
 
         nodes.push((name, node));
         println!("✅ Created node: {}", name);

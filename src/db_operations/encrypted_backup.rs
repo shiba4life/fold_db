@@ -267,7 +267,7 @@ impl EncryptedBackupManager {
             created_at: metadata.created_at,
             mode: metadata.mode,
             source_db_path: metadata.source_db_path.clone(),
-            total_items: 9_999_999,   // Large placeholder value
+            total_items: 9_999_999,    // Large placeholder value
             total_size: 9_999_999_999, // Large placeholder value
             compression_level: metadata.compression_level,
             encryption_params: metadata.encryption_params.clone(),

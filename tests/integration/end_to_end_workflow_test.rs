@@ -605,13 +605,21 @@ fn test_multi_schema_dependency_chain() {
                 "transform_simulation",
                 2000,
             )
-            .unwrap_or_else(|_| panic!("Failed to store transform result for {}.{}",
-                schema_name, field_name));
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Failed to store transform result for {}.{}",
+                    schema_name, field_name
+                )
+            });
 
         let result = fixture
             .query_field_value(schema_name, field_name)
-            .unwrap_or_else(|_| panic!("Failed to query transform result for {}.{}",
-                schema_name, field_name));
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Failed to query transform result for {}.{}",
+                    schema_name, field_name
+                )
+            });
 
         assert_eq!(result, expected_value);
         println!(
@@ -918,9 +926,11 @@ fn test_error_recovery_scenarios() {
     }
 
     // Try to corrupt with invalid data types (system should handle gracefully)
-    let corruption_attempts = [json!(null),
+    let corruption_attempts = [
+        json!(null),
         json!([1, 2, 3]),
-        json!({"deeply": {"nested": {"invalid": "structure"}}})];
+        json!({"deeply": {"nested": {"invalid": "structure"}}}),
+    ];
 
     for (i, corrupt_data) in corruption_attempts.iter().enumerate() {
         let corruption_result = fixture.mutate_field_and_wait(

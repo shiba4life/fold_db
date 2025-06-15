@@ -4,10 +4,10 @@
 //! enabling validation of server responses and command-line signature verification tools.
 
 use crate::cli::auth::CliAuthError;
-use crate::security_types::SecurityLevel;
 use crate::cli::auth::SignatureComponent;
 use crate::crypto::ed25519::{verify_signature, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use crate::error::FoldDbError;
+use crate::security_types::SecurityLevel;
 use base64::{engine::general_purpose, Engine as _};
 use chrono::Utc;
 use reqwest::Response;
@@ -348,7 +348,6 @@ pub struct SecurityAnalysis {
     /// Security recommendations
     pub recommendations: Vec<String>,
 }
-
 
 /// Performance metrics
 #[derive(Debug, Clone, Serialize, Deserialize)]

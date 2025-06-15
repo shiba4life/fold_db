@@ -543,8 +543,8 @@ impl TransportFactory {
 mod tests {
     use super::*;
     use crate::events::event_types::{
-        CreateVerificationEvent, PlatformSource, SecurityEvent,
-        SecurityEventCategory, VerificationEvent,
+        CreateVerificationEvent, PlatformSource, SecurityEvent, SecurityEventCategory,
+        VerificationEvent,
     };
     use crate::security_types::Severity;
 
