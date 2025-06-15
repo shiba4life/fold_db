@@ -2,15 +2,23 @@
 //!
 //! This module handles configuration storage and retrieval for DataFold CLI,
 //! including authentication profiles, server settings, and user preferences.
-//! Now supports both JSON and TOML configuration formats.
+//! Now supports both JSON and TOML configuration formats and integrates with
+//! the new cross-platform configuration system.
 
 use crate::cli::auth::{CliAuthProfile, CliAuthStatus};
 use crate::cli::signing_config::{EnhancedSigningConfig, SigningMode};
+use crate::config::{
+    EnhancedConfigurationManager, EnhancedConfig, ConfigValue, ConfigError as NewConfigError,
+    ConfigResult as NewConfigResult, ConfigMigrationManager, MigrationStrategy,
+    create_platform_keystore, PlatformKeystore,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use async_trait::async_trait;
 
 /// Errors that can occur during CLI configuration operations
 #[derive(Debug, thiserror::Error)]
@@ -172,10 +180,19 @@ impl Default for ServerConfig {
     }
 }
 
-/// CLI configuration manager
+/// CLI configuration manager with cross-platform support
 pub struct CliConfigManager {
     config_path: PathBuf,
     config: CliConfig,
+    enhanced_manager: Option<Arc<EnhancedConfigurationManager>>,
+    keystore: Arc<dyn PlatformKeystore>,
+    migration_performed: bool,
+}
+
+/// Enhanced CLI configuration manager using the new cross-platform system
+pub struct EnhancedCliConfigManager {
+    enhanced_manager: Arc<EnhancedConfigurationManager>,
+    legacy_manager: CliConfigManager,
 }
 
 impl CliConfigManager {
@@ -198,7 +215,127 @@ impl CliConfigManager {
         Ok(Self {
             config_path,
             config,
+            enhanced_manager: None,
+            keystore: Arc::new(create_platform_keystore()),
+            migration_performed: false,
         })
+    }
+
+    /// Create with enhanced configuration management
+    pub async fn new_enhanced() -> CliConfigResult<Self> {
+        let enhanced_manager = EnhancedConfigurationManager::new().await
+            .map_err(|e| CliConfigError::Validation(format!("Failed to create enhanced manager: {}", e)))?;
+        
+        let config_path = Self::default_config_path()?;
+        let config = if config_path.exists() {
+            Self::load_config(&config_path)?
+        } else {
+            CliConfig::default()
+        };
+
+        let mut manager = Self {
+            config_path,
+            config,
+            enhanced_manager: Some(Arc::new(enhanced_manager)),
+            keystore: Arc::new(create_platform_keystore()),
+            migration_performed: false,
+        };
+
+        // Perform migration if needed
+        manager.migrate_to_enhanced().await?;
+
+        Ok(manager)
+    }
+
+    /// Migrate CLI configuration to enhanced cross-platform system
+    pub async fn migrate_to_enhanced(&mut self) -> CliConfigResult<()> {
+        if self.migration_performed {
+            return Ok(());
+        }
+
+        let migration_manager = ConfigMigrationManager::new();
+        let migration_result = migration_manager.migrate_cli_config().await
+            .map_err(|e| CliConfigError::Validation(format!("Migration failed: {}", e)))?;
+
+        if migration_result.success {
+            self.migration_performed = true;
+            
+            // Store sensitive data in keystore
+            if self.keystore.is_available() {
+                for (profile_name, profile) in &self.config.profiles {
+                    let key = format!("cli_profile:{}", profile_name);
+                    let profile_data = serde_json::to_vec(profile)
+                        .map_err(|e| CliConfigError::Json(e))?;
+                    
+                    self.keystore.store_secret(&key, &profile_data).await
+                        .map_err(|e| CliConfigError::Validation(format!("Failed to store profile in keystore: {}", e)))?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Get configuration from enhanced system if available
+    pub async fn get_enhanced_config(&self) -> CliConfigResult<Option<Arc<EnhancedConfig>>> {
+        if let Some(ref enhanced_manager) = self.enhanced_manager {
+            let config = enhanced_manager.get_enhanced().await
+                .map_err(|e| CliConfigError::Validation(format!("Failed to get enhanced config: {}", e)))?;
+            Ok(Some(config))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Store authentication profiles in keystore
+    pub async fn store_profile_in_keystore(&self, name: &str, profile: &CliAuthProfile) -> CliConfigResult<()> {
+        if !self.keystore.is_available() {
+            return Err(CliConfigError::Validation("Keystore not available".to_string()));
+        }
+
+        let key = format!("cli_profile:{}", name);
+        let profile_data = serde_json::to_vec(profile)?;
+        
+        self.keystore.store_secret(&key, &profile_data).await
+            .map_err(|e| CliConfigError::Validation(format!("Failed to store profile: {}", e)))?;
+
+        Ok(())
+    }
+
+    /// Load authentication profile from keystore
+    pub async fn load_profile_from_keystore(&self, name: &str) -> CliConfigResult<Option<CliAuthProfile>> {
+        if !self.keystore.is_available() {
+            return Ok(None);
+        }
+
+        let key = format!("cli_profile:{}", name);
+        
+        if let Some(profile_data) = self.keystore.get_secret(&key).await
+            .map_err(|e| CliConfigError::Validation(format!("Failed to load profile: {}", e)))? {
+            
+            let profile: CliAuthProfile = serde_json::from_slice(&profile_data)?;
+            Ok(Some(profile))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Remove authentication profile from keystore
+    pub async fn remove_profile_from_keystore(&self, name: &str) -> CliConfigResult<()> {
+        if !self.keystore.is_available() {
+            return Ok(());
+        }
+
+        let key = format!("cli_profile:{}", name);
+        self.keystore.delete_secret(&key).await
+            .map_err(|e| CliConfigError::Validation(format!("Failed to remove profile: {}", e)))?;
+
+        Ok(())
+    }
+
+    /// Get keystore instance
+    pub fn keystore(&self) -> &Arc<dyn PlatformKeystore> {
+        &self.keystore
     }
 
     /// Get the default configuration file path (TOML format)
@@ -523,6 +660,170 @@ impl CliConfigManager {
             .signing
             .auto_signing
             .is_effective_auto_signing(command)
+    }
+
+    /// Sync with enhanced configuration system
+    pub async fn sync_with_enhanced(&mut self) -> CliConfigResult<()> {
+        if let Some(ref enhanced_manager) = self.enhanced_manager {
+            // Load enhanced configuration
+            let enhanced_config = enhanced_manager.get_enhanced().await
+                .map_err(|e| CliConfigError::Validation(format!("Failed to get enhanced config: {}", e)))?;
+
+            // Extract CLI-specific sections
+            if let Ok(cli_section) = enhanced_config.base.get_section("cli") {
+                // Update CLI configuration from enhanced config
+                self.update_from_config_value(cli_section)?;
+            }
+
+            // Store updated configuration
+            self.save()?;
+        }
+
+        Ok(())
+    }
+
+    /// Update CLI configuration from ConfigValue
+    fn update_from_config_value(&mut self, cli_section: &ConfigValue) -> CliConfigResult<()> {
+        if let Some(obj) = cli_section.as_object() {
+            // Update settings if present
+            if let Some(settings_value) = obj.get("settings") {
+                if let Some(settings_obj) = settings_value.as_object() {
+                    if let Some(output_format) = settings_obj.get("output_format") {
+                        if let Some(format_str) = output_format.as_string() {
+                            self.config.settings.output_format = format_str.clone();
+                        }
+                    }
+                    
+                    if let Some(colored_output) = settings_obj.get("colored_output") {
+                        if let Some(colored) = colored_output.as_boolean() {
+                            self.config.settings.colored_output = *colored;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Enhanced CLI configuration manager implementation
+impl EnhancedCliConfigManager {
+    /// Create new enhanced CLI configuration manager
+    pub async fn new() -> CliConfigResult<Self> {
+        let enhanced_manager = Arc::new(
+            EnhancedConfigurationManager::new().await
+                .map_err(|e| CliConfigError::Validation(format!("Failed to create enhanced manager: {}", e)))?
+        );
+        
+        let legacy_manager = CliConfigManager::new_enhanced().await?;
+
+        Ok(Self {
+            enhanced_manager,
+            legacy_manager,
+        })
+    }
+
+    /// Get CLI configuration from enhanced system
+    pub async fn get_cli_config(&self) -> CliConfigResult<CliConfig> {
+        // Try enhanced configuration first
+        let enhanced_config = self.enhanced_manager.get_enhanced().await
+            .map_err(|e| CliConfigError::Validation(format!("Failed to get enhanced config: {}", e)))?;
+
+        // Extract CLI configuration from enhanced config
+        if let Ok(cli_section) = enhanced_config.base.get_section("cli") {
+            self.extract_cli_config_from_section(cli_section)
+        } else {
+            // Fall back to legacy configuration
+            Ok(self.legacy_manager.config.clone())
+        }
+    }
+
+    /// Store CLI configuration in enhanced system
+    pub async fn set_cli_config(&mut self, cli_config: CliConfig) -> CliConfigResult<()> {
+        // Update legacy manager
+        self.legacy_manager.config = cli_config.clone();
+        
+        // Convert to enhanced configuration
+        let mut enhanced_config = self.enhanced_manager.get_enhanced().await
+            .map_err(|e| CliConfigError::Validation(format!("Failed to get enhanced config: {}", e)))?;
+
+        // Convert CLI config to ConfigValue
+        let cli_section = self.cli_config_to_config_value(&cli_config)?;
+        
+        // Update enhanced configuration
+        let mut new_enhanced = (*enhanced_config).clone();
+        new_enhanced.base.set_section("cli".to_string(), cli_section);
+
+        // Store enhanced configuration
+        self.enhanced_manager.set_enhanced(new_enhanced).await
+            .map_err(|e| CliConfigError::Validation(format!("Failed to set enhanced config: {}", e)))?;
+
+        // Store profiles in keystore
+        for (profile_name, profile) in &cli_config.profiles {
+            self.legacy_manager.store_profile_in_keystore(profile_name, profile).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Extract CLI configuration from ConfigValue section
+    fn extract_cli_config_from_section(&self, cli_section: &ConfigValue) -> CliConfigResult<CliConfig> {
+        // For now, return the legacy configuration
+        // In a full implementation, this would parse the ConfigValue structure
+        Ok(self.legacy_manager.config.clone())
+    }
+
+    /// Convert CLI configuration to ConfigValue
+    fn cli_config_to_config_value(&self, cli_config: &CliConfig) -> CliConfigResult<ConfigValue> {
+        let mut cli_obj = HashMap::new();
+
+        // Add version
+        cli_obj.insert("version".to_string(), ConfigValue::string(cli_config.version.clone()));
+
+        // Add default profile
+        if let Some(ref default_profile) = cli_config.default_profile {
+            cli_obj.insert("default_profile".to_string(), ConfigValue::string(default_profile.clone()));
+        }
+
+        // Add servers (profiles are stored in keystore)
+        let mut servers_obj = HashMap::new();
+        for (server_name, server_config) in &cli_config.servers {
+            let mut server_obj = HashMap::new();
+            server_obj.insert("url".to_string(), ConfigValue::string(server_config.url.clone()));
+            server_obj.insert("name".to_string(), ConfigValue::string(server_config.name.clone()));
+            server_obj.insert("timeout_secs".to_string(), ConfigValue::integer(server_config.timeout_secs as i64));
+            server_obj.insert("verify_ssl".to_string(), ConfigValue::boolean(server_config.verify_ssl));
+            
+            servers_obj.insert(server_name.clone(), ConfigValue::object(server_obj));
+        }
+        cli_obj.insert("servers".to_string(), ConfigValue::object(servers_obj));
+
+        // Add settings
+        let mut settings_obj = HashMap::new();
+        settings_obj.insert("output_format".to_string(), ConfigValue::string(cli_config.settings.output_format.clone()));
+        settings_obj.insert("colored_output".to_string(), ConfigValue::boolean(cli_config.settings.colored_output));
+        settings_obj.insert("verbosity".to_string(), ConfigValue::integer(cli_config.settings.verbosity as i64));
+        settings_obj.insert("auto_update_check".to_string(), ConfigValue::boolean(cli_config.settings.auto_update_check));
+        
+        cli_obj.insert("settings".to_string(), ConfigValue::object(settings_obj));
+
+        Ok(ConfigValue::object(cli_obj))
+    }
+
+    /// Get access to enhanced configuration manager
+    pub fn enhanced_manager(&self) -> &Arc<EnhancedConfigurationManager> {
+        &self.enhanced_manager
+    }
+
+    /// Get access to legacy configuration manager
+    pub fn legacy_manager(&self) -> &CliConfigManager {
+        &self.legacy_manager
+    }
+
+    /// Get mutable access to legacy configuration manager
+    pub fn legacy_manager_mut(&mut self) -> &mut CliConfigManager {
+        &mut self.legacy_manager
     }
 }
 

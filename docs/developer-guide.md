@@ -13,6 +13,54 @@ This guide provides comprehensive information for developers integrating Fold DB
 7. [Performance Optimization](#performance-optimization)
 8. [Error Handling](#error-handling)
 9. [Examples and Templates](#examples-and-templates)
+## Configuration Management
+
+**Cross-Platform Configuration System (PBI 27)**
+
+All DataFold components now use a unified cross-platform configuration system. This provides consistent configuration management across CLI tools, embedded databases, and services.
+
+### Basic Configuration Usage
+
+```rust
+use datafold::config::{ConfigurationManager, EnhancedConfigurationManager};
+
+// Basic configuration management
+let config_manager = ConfigurationManager::new();
+let config = config_manager.get().await?;
+
+// Enhanced configuration with platform optimizations
+let enhanced_manager = EnhancedConfigurationManager::new().await?;
+let enhanced_config = enhanced_manager.get_enhanced().await?;
+```
+
+### Configuration-Driven Development
+
+Design your applications to be configuration-driven:
+
+```rust
+use datafold::config::{ConfigValue, ConfigResult};
+
+pub struct MyService {
+    config: Arc<ConfigValue>,
+}
+
+impl MyService {
+    pub async fn from_config() -> ConfigResult<Self> {
+        let config_manager = EnhancedConfigurationManager::new().await?;
+        let config = config_manager.get_enhanced().await?;
+        let service_config = config.base.get_section("my_service")?;
+        
+        Ok(Self {
+            config: Arc::new(service_config.clone()),
+        })
+    }
+}
+```
+
+For complete configuration documentation, see:
+- [Configuration Architecture](config/architecture.md)
+- [Configuration API Reference](config/api.md)
+- [Integration Guide](config/integration.md)
 
 ## Integration Patterns
 

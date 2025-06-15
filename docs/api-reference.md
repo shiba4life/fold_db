@@ -27,6 +27,8 @@ cargo build --release --workspace
 ```bash
 datafold_cli [OPTIONS] <COMMAND>
 
+-c, --config <PATH>    Configuration file path [default: platform-specific config.toml]
+    --config-format <FORMAT>  Configuration format [default: toml] [possible: toml, json]
 OPTIONS:
     -c, --config <PATH>    Configuration file path [default: config/node_config.json]
     -h, --help            Print help information

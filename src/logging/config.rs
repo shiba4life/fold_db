@@ -1,11 +1,13 @@
 //! Configuration management for the logging system
 //!
 //! This module handles loading and managing logging configuration from TOML files,
-//! environment variables, and runtime updates.
+//! environment variables, and runtime updates. Now integrates with the cross-platform
+//! configuration system for consistent path handling.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
+use crate::config::{create_platform_resolver, PlatformConfigPaths};
 
 /// Main logging configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,9 +150,15 @@ impl Default for ConsoleConfig {
 
 impl Default for FileConfig {
     fn default() -> Self {
+        // Use platform-specific logs directory
+        let platform_paths = create_platform_resolver();
+        let default_path = platform_paths.logs_dir()
+            .map(|dir| dir.join("datafold.log").to_string_lossy().to_string())
+            .unwrap_or_else(|_| "logs/datafold.log".to_string());
+
         Self {
             enabled: false,
-            path: "logs/datafold.log".to_string(),
+            path: default_path,
             level: "DEBUG".to_string(),
             max_size: "10MB".to_string(),
             max_files: 5,
@@ -175,10 +183,16 @@ impl Default for WebConfig {
 
 impl Default for StructuredConfig {
     fn default() -> Self {
+        // Use platform-specific logs directory
+        let platform_paths = create_platform_resolver();
+        let default_path = platform_paths.logs_dir()
+            .map(|dir| dir.join("datafold-structured.json").to_string_lossy().to_string())
+            .unwrap_or_else(|_| "logs/datafold-structured.json".to_string());
+
         Self {
             enabled: false,
             level: "DEBUG".to_string(),
-            path: Some("logs/datafold-structured.json".to_string()),
+            path: Some(default_path),
             include_context: true,
             include_metrics: false,
         }
@@ -362,6 +376,185 @@ impl LogConfig {
                 .parse()
                 .map_err(|_| ConfigError::InvalidFileSize(size_str.clone()))
         }
+    }
+}
+
+/// Enhanced logging configuration with cross-platform support
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnhancedLogConfig {
+    /// Base logging configuration
+    #[serde(flatten)]
+    pub base: LogConfig,
+    
+    /// Platform-specific settings
+    pub platform: PlatformLogSettings,
+    
+    /// Cross-platform path settings
+    pub paths: LogPathSettings,
+}
+
+/// Platform-specific logging settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlatformLogSettings {
+    /// Use platform-specific log directory
+    pub use_platform_paths: bool,
+    
+    /// Enable platform-specific optimizations
+    pub enable_optimizations: bool,
+    
+    /// Platform-specific rotation settings
+    pub rotation: PlatformRotationSettings,
+}
+
+/// Cross-platform log path settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogPathSettings {
+    /// Base logs directory (uses platform default if not specified)
+    pub logs_dir: Option<String>,
+    
+    /// Main log file name
+    pub main_log_file: String,
+    
+    /// Structured log file name
+    pub structured_log_file: String,
+    
+    /// Error log file name
+    pub error_log_file: String,
+}
+
+/// Platform-specific log rotation settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlatformRotationSettings {
+    /// Use platform-specific compression
+    pub use_platform_compression: bool,
+    
+    /// Cleanup old logs automatically
+    pub auto_cleanup: bool,
+    
+    /// Maximum total log directory size
+    pub max_total_size: String,
+}
+
+impl Default for EnhancedLogConfig {
+    fn default() -> Self {
+        Self {
+            base: LogConfig::default(),
+            platform: PlatformLogSettings::default(),
+            paths: LogPathSettings::default(),
+        }
+    }
+}
+
+impl Default for PlatformLogSettings {
+    fn default() -> Self {
+        Self {
+            use_platform_paths: true,
+            enable_optimizations: true,
+            rotation: PlatformRotationSettings::default(),
+        }
+    }
+}
+
+impl Default for LogPathSettings {
+    fn default() -> Self {
+        Self {
+            logs_dir: None, // Will use platform default
+            main_log_file: "datafold.log".to_string(),
+            structured_log_file: "datafold-structured.json".to_string(),
+            error_log_file: "datafold-error.log".to_string(),
+        }
+    }
+}
+
+impl Default for PlatformRotationSettings {
+    fn default() -> Self {
+        Self {
+            use_platform_compression: true,
+            auto_cleanup: true,
+            max_total_size: "100MB".to_string(),
+        }
+    }
+}
+
+impl EnhancedLogConfig {
+    /// Create enhanced log configuration with platform-specific paths
+    pub fn with_platform_paths() -> Result<Self, ConfigError> {
+        let platform_paths = create_platform_resolver();
+        let logs_dir = platform_paths.logs_dir()
+            .map_err(|e| ConfigError::Parse(format!("Failed to get platform logs directory: {}", e)))?;
+
+        let mut config = Self::default();
+        
+        // Update file paths to use platform-specific directory
+        config.base.outputs.file.path = logs_dir.join(&config.paths.main_log_file)
+            .to_string_lossy().to_string();
+        
+        if let Some(ref structured_path) = config.base.outputs.structured.path {
+            config.base.outputs.structured.path = Some(
+                logs_dir.join(&config.paths.structured_log_file)
+                    .to_string_lossy().to_string()
+            );
+        }
+
+        config.paths.logs_dir = Some(logs_dir.to_string_lossy().to_string());
+
+        Ok(config)
+    }
+
+    /// Migrate existing log configuration to enhanced format
+    pub fn from_legacy(legacy: LogConfig) -> Result<Self, ConfigError> {
+        let mut enhanced = Self::default();
+        enhanced.base = legacy;
+
+        // Update paths to use platform-specific directories if enabled
+        if enhanced.platform.use_platform_paths {
+            let platform_paths = create_platform_resolver();
+            let logs_dir = platform_paths.logs_dir()
+                .map_err(|e| ConfigError::Parse(format!("Failed to get platform logs directory: {}", e)))?;
+
+            // Update file output path
+            let file_name = std::path::Path::new(&enhanced.base.outputs.file.path)
+                .file_name()
+                .unwrap_or(std::ffi::OsStr::new("datafold.log"));
+            enhanced.base.outputs.file.path = logs_dir.join(file_name)
+                .to_string_lossy().to_string();
+
+            // Update structured output path
+            if let Some(ref structured_path) = enhanced.base.outputs.structured.path {
+                let structured_file_name = std::path::Path::new(structured_path)
+                    .file_name()
+                    .unwrap_or(std::ffi::OsStr::new("datafold-structured.json"));
+                enhanced.base.outputs.structured.path = Some(
+                    logs_dir.join(structured_file_name)
+                        .to_string_lossy().to_string()
+                );
+            }
+
+            enhanced.paths.logs_dir = Some(logs_dir.to_string_lossy().to_string());
+        }
+
+        Ok(enhanced)
+    }
+
+    /// Get the effective logs directory
+    pub fn get_logs_dir(&self) -> Result<std::path::PathBuf, ConfigError> {
+        if let Some(ref logs_dir) = self.paths.logs_dir {
+            Ok(std::path::PathBuf::from(logs_dir))
+        } else {
+            let platform_paths = create_platform_resolver();
+            platform_paths.logs_dir()
+                .map_err(|e| ConfigError::Parse(format!("Failed to get platform logs directory: {}", e)))
+        }
+    }
+
+    /// Ensure all log directories exist
+    pub fn ensure_log_directories(&self) -> Result<(), ConfigError> {
+        let logs_dir = self.get_logs_dir()?;
+        
+        std::fs::create_dir_all(&logs_dir)
+            .map_err(|e| ConfigError::Io(e))?;
+
+        Ok(())
     }
 }
 

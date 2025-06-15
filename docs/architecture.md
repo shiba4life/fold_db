@@ -27,6 +27,31 @@ Fold DB is designed as a distributed, event-driven data platform built around at
 - Schema synchronization across the network
 
 ## System Components
+### Configuration Management System
+
+**PBI 27: Cross-Platform Configuration Management**
+
+The system includes a comprehensive cross-platform configuration management layer that provides:
+
+- **Unified configuration interface** across all DataFold components
+- **Platform-specific path resolution** following OS conventions
+- **Secure credential storage** with native keystore integration
+- **Real-time configuration monitoring** and automatic reloading
+- **Migration utilities** for transitioning from legacy systems
+
+For detailed information, see the [Configuration System Documentation](config/architecture.md).
+
+```rust
+// Example: Using configuration system in components
+use datafold::config::{EnhancedConfigurationManager, ConfigValue};
+
+let config_manager = EnhancedConfigurationManager::new().await?;
+let config = config_manager.get_enhanced().await?;
+
+// Components access configuration through standardized interface
+let database_config = config.base.get_section("database")?;
+let storage_path = database_config.get("storage_path")?.as_string()?;
+```
 
 ### Core Database (FoldDB)
 
