@@ -12,10 +12,10 @@ use datafold::{
     },
     db_operations::{
         core::DbOperations,
-        key_rotation_operations::{KeyAssociation, KeyRotationRecord, RotationStatus},
+        key_rotation_operations::{KeyAssociation, KeyRotationRecord},
     },
+    security_types::RotationStatus,
 };
-use serde_json::json;
 use std::collections::HashMap;
 use tempfile::tempdir;
 use uuid::Uuid;
@@ -320,21 +320,17 @@ fn test_compilation_integration() {
     let _keypair = generate_master_keypair().unwrap();
 
     // Test that all enum variants are accessible
-    let _reasons = vec![
-        RotationReason::Scheduled,
+    let _reasons = [RotationReason::Scheduled,
         RotationReason::Compromise,
         RotationReason::Policy,
         RotationReason::UserInitiated,
         RotationReason::Migration,
-        RotationReason::Maintenance,
-    ];
+        RotationReason::Maintenance];
 
-    let _statuses = vec![
-        RotationStatus::InProgress,
+    let _statuses = [RotationStatus::InProgress,
         RotationStatus::Completed,
         RotationStatus::Failed,
-        RotationStatus::RolledBack,
-    ];
+        RotationStatus::RolledBack];
 
     println!("Compilation and integration tests passed!");
 }

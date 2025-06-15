@@ -211,7 +211,7 @@ async fn test_all_api_routes_require_authentication() {
             "GET" => test::TestRequest::get().uri(path).to_request(),
             "POST" => test::TestRequest::post()
                 .uri(path)
-                .set_json(&json!({
+                .set_json(json!({
                     "client_id": "test",
                     "public_key": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
                 }))

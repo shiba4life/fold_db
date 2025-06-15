@@ -3,7 +3,8 @@ use datafold::cli::auth::{CliAuthProfile, CliSigningConfig};
 use datafold::cli::config::{CliConfigManager, ServerConfig};
 use datafold::cli::environment_utils::commands as env_commands;
 use datafold::cli::http_client::{AuthenticatedHttpClient, HttpClientBuilder, RetryConfig};
-use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel};
+use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
+use datafold::security_types::SecurityLevel;
 use datafold::crypto::ed25519::{generate_master_keypair, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH};
 use datafold::crypto::MasterKeyPair;
 use datafold::datafold_node::crypto_init::{
@@ -78,9 +79,9 @@ enum CliSecurityLevel {
 impl From<CliSecurityLevel> for SecurityLevel {
     fn from(cli_level: CliSecurityLevel) -> Self {
         match cli_level {
-            CliSecurityLevel::Interactive => SecurityLevel::Interactive,
-            CliSecurityLevel::Balanced => SecurityLevel::Balanced,
-            CliSecurityLevel::Sensitive => SecurityLevel::Sensitive,
+            CliSecurityLevel::Interactive => SecurityLevel::Low,
+            CliSecurityLevel::Balanced => SecurityLevel::Standard,
+            CliSecurityLevel::Sensitive => SecurityLevel::High,
         }
     }
 }
@@ -1365,7 +1366,7 @@ where
 /// Get the default storage directory for keys
 /// Build an HTTP client with automatic signing support
 #[allow(dead_code)]
-async fn build_authenticated_client(
+fn build_authenticated_client(
     cli: &Cli,
     command_name: &str,
     config_manager: &CliConfigManager,
@@ -2894,7 +2895,7 @@ async fn handle_sign_and_verify(
 }
 
 /// Handle CLI authentication initialization
-async fn handle_auth_init(
+fn handle_auth_init(
     server_url: String,
     profile: String,
     key_id: String,
@@ -2971,7 +2972,7 @@ async fn handle_auth_init(
 }
 
 /// Handle CLI authentication status
-async fn handle_auth_status(
+fn handle_auth_status(
     verbose: bool,
     profile: Option<String>,
     _environment: Option<String>,
@@ -5616,15 +5617,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 user_id.clone(),
                 environment.clone(),
                 *force,
-            )
-            .await;
+            );
         }
         Commands::AuthStatus {
             verbose,
             profile,
             environment,
         } => {
-            return handle_auth_status(*verbose, profile.clone(), environment.clone()).await;
+            return handle_auth_status(*verbose, profile.clone(), environment.clone());
         }
         Commands::AuthProfile { action } => {
             return handle_auth_profile((*action).clone()).await;
@@ -5820,35 +5820,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::GenerateKey { .. } => unreachable!(),    // Already handled above
         Commands::DeriveKey { .. } => unreachable!(),      // Already handled above
         Commands::ExtractPublicKey { .. } => unreachable!(), // Already handled above
-        Commands::VerifyKey { .. } => unreachable!(),      // Already handled above
-        Commands::StoreKey { .. } => unreachable!(),       // Already handled above
-        Commands::RetrieveKey { .. } => unreachable!(),    // Already handled above
-        Commands::DeleteKey { .. } => unreachable!(),      // Already handled above
-        Commands::ListKeys { .. } => unreachable!(),       // Already handled above
-        Commands::DeriveFromMaster { .. } => unreachable!(), // Already handled above
-        Commands::RotateKey { .. } => unreachable!(),      // Already handled above
-        Commands::ListKeyVersions { .. } => unreachable!(), // Already handled above
-        Commands::BackupKey { .. } => unreachable!(),      // Already handled above
-        Commands::RestoreKey { .. } => unreachable!(),     // Already handled above
-        Commands::ExportKey { .. } => unreachable!(),      // Already handled above
-        Commands::ImportKey { .. } => unreachable!(),      // Already handled above
         Commands::Execute { path } => handle_execute(path, &mut node)?,
-        Commands::RegisterKey { .. } => unreachable!(), // Already handled above
-        Commands::CheckRegistration { .. } => unreachable!(), // Already handled above
-        Commands::SignAndVerify { .. } => unreachable!(), // Already handled above
-        Commands::TestServerIntegration { .. } => unreachable!(), // Already handled above
-        Commands::AuthInit { .. } => unreachable!(),    // Already handled above
-        Commands::AuthStatus { .. } => unreachable!(),  // Already handled above
-        Commands::AuthProfile { .. } => unreachable!(), // Already handled above
-        Commands::AuthKeygen { .. } => unreachable!(),  // Already handled above
-        Commands::AuthTest { .. } => unreachable!(),    // Already handled above
-        Commands::AuthConfigure { .. } => unreachable!(), // Already handled above
-        Commands::AuthSetup { .. } => unreachable!(),   // Already handled above
-        Commands::VerifySignature { .. } => unreachable!(), // Already handled above
-        Commands::InspectSignature { .. } => unreachable!(), // Already handled above
-        Commands::VerifyResponse { .. } => unreachable!(), // Already handled above
-        Commands::VerificationConfig { .. } => unreachable!(), // Already handled above
-        Commands::Environment { .. } => unreachable!(), // Already handled above
+        Commands::VerifyKey { .. }
+        | Commands::StoreKey { .. }
+        | Commands::RetrieveKey { .. }
+        | Commands::DeleteKey { .. }
+        | Commands::ListKeys { .. }
+        | Commands::DeriveFromMaster { .. }
+        | Commands::RotateKey { .. }
+        | Commands::ListKeyVersions { .. }
+        | Commands::BackupKey { .. }
+        | Commands::RestoreKey { .. }
+        | Commands::ExportKey { .. }
+        | Commands::ImportKey { .. }
+        | Commands::RegisterKey { .. }
+        | Commands::CheckRegistration { .. }
+        | Commands::SignAndVerify { .. }
+        | Commands::TestServerIntegration { .. }
+        | Commands::AuthInit { .. }
+        | Commands::AuthStatus { .. }
+        | Commands::AuthProfile { .. }
+        | Commands::AuthKeygen { .. }
+        | Commands::AuthTest { .. }
+        | Commands::AuthConfigure { .. }
+        | Commands::AuthSetup { .. }
+        | Commands::VerifySignature { .. }
+        | Commands::InspectSignature { .. }
+        | Commands::VerifyResponse { .. }
+        | Commands::VerificationConfig { .. }
+        | Commands::Environment { .. } => unreachable!(), // Already handled above
                                                          // Removed: Admin key rotation commands have been removed for security
     }
 

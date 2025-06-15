@@ -7,7 +7,7 @@
 //! working together to provide comprehensive security assessment.
 
 use datafold::datafold_node::signature_auth::{
-    AuthenticationError, SecurityProfile, SignatureAuthConfig, SignatureVerificationState,
+    SignatureAuthConfig, SignatureVerificationState,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
@@ -177,7 +177,7 @@ async fn demo_nonce_format_validation() {
     println!("\n📋 Testing Lenient Profile (Flexible Nonce Formats)");
 
     let uuid_nonce = Uuid::new_v4().to_string();
-    let acceptable_nonces = vec!["simple-nonce-123", "another_nonce_456", &uuid_nonce];
+    let acceptable_nonces = ["simple-nonce-123", "another_nonce_456", &uuid_nonce];
 
     for (i, nonce) in acceptable_nonces.iter().enumerate() {
         let result = lenient_state.check_and_store_nonce(nonce, timestamp + i as u64 + 10);

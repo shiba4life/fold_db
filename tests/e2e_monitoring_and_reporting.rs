@@ -8,7 +8,7 @@ use serde_json::{self, Value};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Test monitoring and metrics collection system
 pub struct E2ETestMonitor {

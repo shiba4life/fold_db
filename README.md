@@ -56,6 +56,7 @@ This provides three binaries:
 ```rust
 use datafold::{DataFoldNode, IngestionCore, Schema};
 use datafold::datafold_node::config::{NodeConfig, SecurityProfile};
+use datafold::security_types::{SecurityLevel, HealthStatus, RotationStatus, Severity};
 use serde_json::json;
 
 #[tokio::main]
@@ -136,6 +137,41 @@ let schema: Schema = serde_json::from_str(&schema_json)?;
 // Execute operations
 let operation = Operation::Query(query_data);
 let result = node.execute_operation(operation).await?;
+```
+
+### Security Types
+DataFold provides unified security-related enums for consistent type safety:
+
+```rust
+use datafold::security_types::{SecurityLevel, HealthStatus, RotationStatus, Severity, ThreatLevel};
+
+// Security level configuration
+let security_level = SecurityLevel::Standard; // Low, Standard, High
+let crypto_params = security_level.argon2_params();
+
+// Health status monitoring
+let health = HealthStatus::Healthy; // Healthy, Warning, Critical, Failed, Offline
+if !health.is_operational() {
+    // Handle degraded service
+}
+
+// Key rotation status tracking
+let rotation_status = RotationStatus::InProgress; // Requested, Validating, InProgress, Completed, Failed, Cancelled, RolledBack
+if rotation_status.is_active() {
+    // Rotation in progress
+}
+
+// Event severity classification
+let severity = Severity::Critical; // Info, Warning, Error, Critical
+if severity.requires_immediate_action() {
+    // Handle critical event
+}
+
+// Threat level assessment
+let threat = ThreatLevel::High; // Low, Medium, High, Critical
+if threat.requires_immediate_action() {
+    // Respond to threat
+}
 ```
 
 ### AI-Powered Ingestion

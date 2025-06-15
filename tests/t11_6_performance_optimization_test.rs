@@ -3,12 +3,9 @@
 //! This module tests the performance enhancements implemented for signature authentication,
 //! including nonce store optimization, cache warming, and performance monitoring.
 
-use datafold::datafold_node::error::NodeResult;
 use datafold::datafold_node::signature_auth::*;
-use datafold::error::FoldDbError;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::test;
 
 /// Test configuration for performance testing
 fn create_performance_test_config() -> SignatureAuthConfig {

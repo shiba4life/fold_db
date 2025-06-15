@@ -6,7 +6,8 @@
 //! - Comprehensive audit logging
 //! - Transactional integrity
 
-use super::audit_logger::{AuditSeverity, CryptoAuditLogger, OperationResult};
+use super::audit_logger::{CryptoAuditLogger, OperationResult};
+use crate::security_types::Severity;
 use super::ed25519::{PrivateKey, PublicKey};
 use super::error::{CryptoError, CryptoResult};
 use chrono::{DateTime, Utc};
@@ -41,13 +42,13 @@ pub enum RotationReason {
 
 impl RotationReason {
     /// Get the severity level for audit logging
-    pub fn audit_severity(&self) -> AuditSeverity {
+    pub fn audit_severity(&self) -> Severity {
         match self {
-            RotationReason::Compromise => AuditSeverity::Critical,
-            RotationReason::Policy | RotationReason::Migration => AuditSeverity::Warning,
+            RotationReason::Compromise => Severity::Critical,
+            RotationReason::Policy | RotationReason::Migration => Severity::Warning,
             RotationReason::Scheduled
             | RotationReason::UserInitiated
-            | RotationReason::Maintenance => AuditSeverity::Info,
+            | RotationReason::Maintenance => Severity::Info,
         }
     }
 }
@@ -511,15 +512,15 @@ mod tests {
     fn test_rotation_reason_severity() {
         assert_eq!(
             RotationReason::Compromise.audit_severity(),
-            AuditSeverity::Critical
+            Severity::Critical
         );
         assert_eq!(
             RotationReason::Policy.audit_severity(),
-            AuditSeverity::Warning
+            Severity::Warning
         );
         assert_eq!(
             RotationReason::Scheduled.audit_severity(),
-            AuditSeverity::Info
+            Severity::Info
         );
     }
 }

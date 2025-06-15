@@ -631,8 +631,9 @@ mod tests {
     use super::*;
     use crate::crypto::ed25519::generate_master_keypair;
     use crate::events::event_types::{
-        EventSeverity, OperationResult, PlatformSource, SecurityEventCategory, VerificationEvent,
+        OperationResult, PlatformSource, SecurityEventCategory, VerificationEvent,
     };
+    use crate::security_types::Severity;
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Hangs indefinitely - needs investigation"]
@@ -692,7 +693,7 @@ mod tests {
                 event_id: Uuid::new_v4(),
                 timestamp: Utc::now(),
                 category: SecurityEventCategory::KeyRotation,
-                severity: EventSeverity::Info,
+                severity: Severity::Info,
                 platform: PlatformSource::DataFoldNode,
                 component: "key_rotation".to_string(),
                 operation: "rotate_key".to_string(),

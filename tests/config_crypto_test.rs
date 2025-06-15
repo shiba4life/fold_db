@@ -57,7 +57,7 @@ fn test_node_config_enable_crypto_fluent_api() {
     assert!(config.is_crypto_enabled());
     let crypto = config.crypto_config().unwrap();
     assert!(crypto.requires_passphrase());
-    assert_eq!(crypto.key_derivation.preset, Some(SecurityLevel::Sensitive));
+    assert_eq!(crypto.key_derivation.preset, Some(SecurityLevel::High));
     assert!(config.validate().is_ok());
 }
 
@@ -118,7 +118,7 @@ fn test_node_config_json_example_passphrase() {
                 "passphrase": "my-secure-passphrase"
             },
             "key_derivation": {
-                "preset": "sensitive"
+                "preset": "High"
             }
         }
     }"#;
@@ -129,7 +129,7 @@ fn test_node_config_json_example_passphrase() {
     assert!(config.crypto_config().unwrap().requires_passphrase());
     assert_eq!(
         config.crypto_config().unwrap().key_derivation.preset,
-        Some(SecurityLevel::Sensitive)
+        Some(SecurityLevel::High)
     );
     assert!(config.validate().is_ok());
 }
@@ -146,7 +146,7 @@ fn test_node_config_json_example_random_key() {
                 "type": "random"
             },
             "key_derivation": {
-                "preset": "interactive"
+                "preset": "Low"
             }
         }
     }"#;
@@ -157,7 +157,7 @@ fn test_node_config_json_example_random_key() {
     assert!(config.crypto_config().unwrap().uses_random_key());
     assert_eq!(
         config.crypto_config().unwrap().key_derivation.preset,
-        Some(SecurityLevel::Interactive)
+        Some(SecurityLevel::Low)
     );
     assert!(config.validate().is_ok());
 }

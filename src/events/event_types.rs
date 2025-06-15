@@ -3,6 +3,7 @@
 //! This module defines all event types that can be published through the centralized
 //! verification event bus, supporting cross-platform security monitoring and correlation.
 
+use crate::security_types::Severity;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -45,29 +46,6 @@ impl std::fmt::Display for SecurityEventCategory {
     }
 }
 
-/// Event severity levels aligned with security operations
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum EventSeverity {
-    /// Informational events for normal operations
-    Info,
-    /// Warning events for potential issues
-    Warning,
-    /// Error events for failed operations
-    Error,
-    /// Critical events requiring immediate attention
-    Critical,
-}
-
-impl std::fmt::Display for EventSeverity {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            EventSeverity::Info => write!(f, "INFO"),
-            EventSeverity::Warning => write!(f, "WARNING"),
-            EventSeverity::Error => write!(f, "ERROR"),
-            EventSeverity::Critical => write!(f, "CRITICAL"),
-        }
-    }
-}
 
 /// Platform source for cross-platform event correlation
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -106,7 +84,7 @@ pub struct VerificationEvent {
     /// Event category
     pub category: SecurityEventCategory,
     /// Event severity level
-    pub severity: EventSeverity,
+    pub severity: Severity,
     /// Platform that generated the event
     pub platform: PlatformSource,
     /// Component within the platform
@@ -419,7 +397,7 @@ impl SecurityEvent {
     }
 
     /// Get the event severity
-    pub fn severity(&self) -> EventSeverity {
+    pub fn severity(&self) -> Severity {
         self.base_event().severity
     }
 
@@ -439,15 +417,15 @@ impl SecurityEvent {
     }
 
     /// Check if this event should trigger an alert based on severity
-    pub fn should_alert(&self, minimum_severity: EventSeverity) -> bool {
+    pub fn should_alert(&self, minimum_severity: Severity) -> bool {
         match (minimum_severity, self.severity()) {
-            (EventSeverity::Info, _) => true,
-            (EventSeverity::Warning, EventSeverity::Info) => false,
-            (EventSeverity::Warning, _) => true,
-            (EventSeverity::Error, EventSeverity::Info | EventSeverity::Warning) => false,
-            (EventSeverity::Error, _) => true,
-            (EventSeverity::Critical, EventSeverity::Critical) => true,
-            (EventSeverity::Critical, _) => false,
+            (Severity::Info, _) => true,
+            (Severity::Warning, Severity::Info) => false,
+            (Severity::Warning, _) => true,
+            (Severity::Error, Severity::Info | Severity::Warning) => false,
+            (Severity::Error, _) => true,
+            (Severity::Critical, Severity::Critical) => true,
+            (Severity::Critical, _) => false,
         }
     }
 }
@@ -457,7 +435,7 @@ pub trait CreateVerificationEvent {
     /// Create a new verification event with common fields
     fn create_base_event(
         category: SecurityEventCategory,
-        severity: EventSeverity,
+        severity: Severity,
         platform: PlatformSource,
         component: String,
         operation: String,
@@ -492,14 +470,14 @@ mod tests {
     fn test_verification_event_creation() {
         let event = VerificationEvent::create_base_event(
             SecurityEventCategory::Authentication,
-            EventSeverity::Info,
+            Severity::Info,
             PlatformSource::RustCli,
             "auth_handler".to_string(),
             "login".to_string(),
         );
 
         assert_eq!(event.category, SecurityEventCategory::Authentication);
-        assert_eq!(event.severity, EventSeverity::Info);
+        assert_eq!(event.severity, Severity::Info);
         assert_eq!(event.platform, PlatformSource::RustCli);
         assert_eq!(event.component, "auth_handler");
         assert_eq!(event.operation, "login");
@@ -509,7 +487,7 @@ mod tests {
     fn test_security_event_methods() {
         let base = VerificationEvent::create_base_event(
             SecurityEventCategory::Security,
-            EventSeverity::Critical,
+            Severity::Critical,
             PlatformSource::DataFoldNode,
             "security_monitor".to_string(),
             "threat_detected".to_string(),
@@ -518,16 +496,16 @@ mod tests {
         let security_event = SecurityEvent::Generic(base);
 
         assert_eq!(security_event.category(), SecurityEventCategory::Security);
-        assert_eq!(security_event.severity(), EventSeverity::Critical);
-        assert!(security_event.should_alert(EventSeverity::Warning));
-        assert!(security_event.should_alert(EventSeverity::Critical));
+        assert_eq!(security_event.severity(), Severity::Critical);
+        assert!(security_event.should_alert(Severity::Warning));
+        assert!(security_event.should_alert(Severity::Critical));
     }
 
     #[test]
     fn test_alert_threshold_logic() {
         let info_event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Performance,
-            EventSeverity::Info,
+            Severity::Info,
             PlatformSource::JavaScriptSdk,
             "perf_monitor".to_string(),
             "metric_update".to_string(),
@@ -535,20 +513,20 @@ mod tests {
 
         let critical_event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Security,
-            EventSeverity::Critical,
+            Severity::Critical,
             PlatformSource::PythonSdk,
             "security_monitor".to_string(),
             "attack_detected".to_string(),
         ));
 
         // Info event should not trigger critical alerts
-        assert!(!info_event.should_alert(EventSeverity::Critical));
-        assert!(info_event.should_alert(EventSeverity::Info));
+        assert!(!info_event.should_alert(Severity::Critical));
+        assert!(info_event.should_alert(Severity::Info));
 
         // Critical event should trigger all alert levels
-        assert!(critical_event.should_alert(EventSeverity::Info));
-        assert!(critical_event.should_alert(EventSeverity::Warning));
-        assert!(critical_event.should_alert(EventSeverity::Error));
-        assert!(critical_event.should_alert(EventSeverity::Critical));
+        assert!(critical_event.should_alert(Severity::Info));
+        assert!(critical_event.should_alert(Severity::Warning));
+        assert!(critical_event.should_alert(Severity::Error));
+        assert!(critical_event.should_alert(Severity::Critical));
     }
 }

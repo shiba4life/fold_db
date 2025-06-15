@@ -82,7 +82,7 @@ impl Argon2Params {
             });
         }
 
-        if !(1..=16777215).contains(&parallelism) {
+        if !(1..=16_777_215).contains(&parallelism) {
             return Err(CryptoError::KeyDerivation {
                 message: "Parallelism must be between 1 and 16777215".to_string(),
             });
@@ -107,7 +107,7 @@ impl Argon2Params {
     /// Create parameters optimized for sensitive operations (slower, more secure)
     pub fn sensitive() -> Self {
         Self {
-            memory_cost: 131072, // 128 MB
+            memory_cost: 131_072, // 128 MB
             time_cost: 4,
             parallelism: 8,
         }

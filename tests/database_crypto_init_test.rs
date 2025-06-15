@@ -5,7 +5,8 @@
 //! and integration with DataFoldNode.
 
 use datafold::{
-    config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel},
+    config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig},
+    security_types::SecurityLevel,
     datafold_node::{DataFoldNode, NodeConfig},
     db_operations::DbOperations,
     get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed,
@@ -43,7 +44,7 @@ fn create_passphrase_crypto_config() -> CryptoConfig {
         master_key: MasterKeyConfig::Passphrase {
             passphrase: "test_secure_passphrase_for_database_init".to_string(),
         },
-        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Interactive),
+        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Low),
     }
 }
 
@@ -221,9 +222,9 @@ fn test_crypto_config_validation_external_keys() {
 #[test]
 fn test_different_security_levels() {
     let security_levels = [
-        SecurityLevel::Balanced,
-        SecurityLevel::Interactive,
-        SecurityLevel::Sensitive,
+        SecurityLevel::Standard,
+        SecurityLevel::Low,
+        SecurityLevel::High,
     ];
 
     for security_level in &security_levels {
@@ -236,10 +237,8 @@ fn test_different_security_levels() {
         };
 
         let config = create_test_node_config_with_crypto(crypto_config);
-        let node = DataFoldNode::new(config).expect(&format!(
-            "Failed to create node with security level: {:?}",
-            security_level
-        ));
+        let node = DataFoldNode::new(config).unwrap_or_else(|_| panic!("Failed to create node with security level: {:?}",
+            security_level));
 
         let status = node
             .get_crypto_status()
@@ -426,8 +425,8 @@ fn test_crypto_init_performance_different_security_levels() {
     use std::time::Instant;
 
     let security_levels = [
-        SecurityLevel::Balanced,
-        SecurityLevel::Interactive,
+        SecurityLevel::Standard,
+        SecurityLevel::Low,
         // Skip Sensitive for performance tests as it's very slow
     ];
 
@@ -443,10 +442,8 @@ fn test_crypto_init_performance_different_security_levels() {
         let config = create_test_node_config_with_crypto(crypto_config);
 
         let start = Instant::now();
-        let node = DataFoldNode::new(config).expect(&format!(
-            "Failed to create node with security level: {:?}",
-            security_level
-        ));
+        let node = DataFoldNode::new(config).unwrap_or_else(|_| panic!("Failed to create node with security level: {:?}",
+            security_level));
         let duration = start.elapsed();
 
         println!(
@@ -461,7 +458,7 @@ fn test_crypto_init_performance_different_security_levels() {
 
         // Performance expectations (these are rough guidelines)
         match security_level {
-            SecurityLevel::Balanced => {
+            SecurityLevel::Standard => {
                 // Should be relatively fast (under 5 seconds on most systems)
                 assert!(
                     duration.as_secs() < 5,
@@ -469,7 +466,7 @@ fn test_crypto_init_performance_different_security_levels() {
                     duration
                 );
             }
-            SecurityLevel::Interactive => {
+            SecurityLevel::Low => {
                 // Should be reasonable for interactive use (under 10 seconds)
                 assert!(
                     duration.as_secs() < 10,
@@ -477,7 +474,7 @@ fn test_crypto_init_performance_different_security_levels() {
                     duration
                 );
             }
-            SecurityLevel::Sensitive => {
+            SecurityLevel::High => {
                 // Can be slow, but should complete within reasonable time
                 assert!(
                     duration.as_secs() < 30,

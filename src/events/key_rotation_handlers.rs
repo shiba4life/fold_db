@@ -497,10 +497,11 @@ impl EventHandler for KeyRotationPropagationHandler {
 mod tests {
     use super::*;
     use crate::events::event_types::{
-        EventSeverity, OperationResult, PlatformSource, SecurityEventCategory, VerificationEvent,
+        OperationResult, PlatformSource, SecurityEventCategory, VerificationEvent,
     };
     use crate::events::transport::{InMemoryTransport, TransportConfig};
     use crate::network::NetworkConfig;
+    use crate::security_types::Severity;
     use std::time::Duration;
 
     #[tokio::test]
@@ -531,7 +532,7 @@ mod tests {
             event_id: Uuid::new_v4(),
             timestamp: Utc::now(),
             category: SecurityEventCategory::KeyRotation,
-            severity: EventSeverity::Info,
+            severity: Severity::Info,
             platform: PlatformSource::DataFoldNode,
             component: "key_rotation".to_string(),
             operation: "rotate_key".to_string(),

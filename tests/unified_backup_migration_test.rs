@@ -3,8 +3,6 @@
 //! Tests the migration from legacy formats to the new unified format,
 //! ensuring cross-platform compatibility.
 
-use serde_json;
-use std::collections::HashMap;
 
 /// Test migration utilities for converting legacy backups to unified format
 #[test]

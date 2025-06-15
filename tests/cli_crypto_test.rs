@@ -4,12 +4,12 @@
 //! initialization, including random key generation, passphrase-based derivation,
 //! and status checking.
 
-use serde_json;
 use std::fs;
 use std::path::PathBuf;
 use tempfile::tempdir;
 
-use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel};
+use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
+use datafold::security_types::SecurityLevel;
 use datafold::datafold_node::config::NodeConfig;
 use datafold::datafold_node::crypto_init::{get_crypto_init_status, initialize_database_crypto};
 use datafold::datafold_node::{load_node_config, DataFoldNode};
@@ -49,7 +49,7 @@ async fn test_crypto_init_with_random_key() {
     let (node_config, _temp_dir) = create_test_node_config_with_crypto(crypto_config);
 
     // Initialize node
-    let mut node = DataFoldNode::load(node_config).await.unwrap();
+    let node = DataFoldNode::load(node_config).await.unwrap();
 
     // Check crypto status - should be initialized
     let fold_db = node.get_fold_db().unwrap();
@@ -68,7 +68,7 @@ async fn test_crypto_init_with_passphrase() {
     let (node_config, _temp_dir) = create_test_node_config_with_crypto(crypto_config);
 
     // Initialize node
-    let mut node = DataFoldNode::load(node_config).await.unwrap();
+    let node = DataFoldNode::load(node_config).await.unwrap();
 
     // Check crypto status
     let fold_db = node.get_fold_db().unwrap();
@@ -83,9 +83,9 @@ async fn test_crypto_init_with_passphrase() {
 #[tokio::test]
 async fn test_crypto_init_with_different_security_levels() {
     for security_level in &[
-        SecurityLevel::Interactive,
-        SecurityLevel::Balanced,
-        SecurityLevel::Sensitive,
+        SecurityLevel::Low,
+        SecurityLevel::Standard,
+        SecurityLevel::High,
     ] {
         // Create configuration with specific security level
         let crypto_config = CryptoConfig {
@@ -99,7 +99,7 @@ async fn test_crypto_init_with_different_security_levels() {
         let (node_config, _temp_dir) = create_test_node_config_with_crypto(crypto_config);
 
         // Initialize node
-        let mut node = DataFoldNode::load(node_config).await.unwrap();
+        let node = DataFoldNode::load(node_config).await.unwrap();
 
         // Check crypto status
         let fold_db = node.get_fold_db().unwrap();
@@ -111,9 +111,9 @@ async fn test_crypto_init_with_different_security_levels() {
 
         let method = status.derivation_method.unwrap();
         match security_level {
-            SecurityLevel::Interactive => assert_eq!(method, "Argon2id-Interactive"),
-            SecurityLevel::Balanced => assert_eq!(method, "Argon2id-Balanced"),
-            SecurityLevel::Sensitive => assert_eq!(method, "Argon2id-Sensitive"),
+            SecurityLevel::Low => assert_eq!(method, "Argon2id-Low"),
+            SecurityLevel::Standard => assert_eq!(method, "Argon2id-Standard"),
+            SecurityLevel::High => assert_eq!(method, "Argon2id-High"),
         }
     }
 }
@@ -126,7 +126,7 @@ async fn test_crypto_status_on_uninitialized_database() {
     let node_config = NodeConfig::new(storage_path);
 
     // Initialize node
-    let mut node = DataFoldNode::load(node_config).await.unwrap();
+    let node = DataFoldNode::load(node_config).await.unwrap();
 
     // Check crypto status - should not be initialized
     let fold_db = node.get_fold_db().unwrap();
@@ -184,7 +184,7 @@ async fn test_manual_crypto_initialization() {
     let node_config = NodeConfig::new(storage_path);
 
     // Initialize node
-    let mut node = DataFoldNode::load(node_config).await.unwrap();
+    let node = DataFoldNode::load(node_config).await.unwrap();
 
     // Manually initialize crypto
     let crypto_config = CryptoConfig::with_passphrase("manual-init-passphrase".to_string());
@@ -195,7 +195,7 @@ async fn test_manual_crypto_initialization() {
 
     // Verify initialization
     assert!(!context.derivation_method.is_empty());
-    assert_eq!(context.derivation_method, "Argon2id-Balanced");
+    assert_eq!(context.derivation_method, "Argon2id-Standard");
 
     // Check status
     let status = get_crypto_init_status(db_ops).unwrap();
@@ -236,7 +236,7 @@ async fn test_crypto_double_initialization_prevention() {
     let crypto_config = CryptoConfig::with_random_key();
     let (node_config, _temp_dir) = create_test_node_config_with_crypto(crypto_config.clone());
 
-    let mut node = DataFoldNode::load(node_config).await.unwrap();
+    let node = DataFoldNode::load(node_config).await.unwrap();
 
     // Try to initialize crypto again - should fail
     let fold_db = node.get_fold_db().unwrap();
@@ -252,21 +252,21 @@ async fn test_crypto_double_initialization_prevention() {
 
 #[test]
 fn test_security_level_string_representations() {
-    assert_eq!(SecurityLevel::Interactive.as_str(), "Interactive");
-    assert_eq!(SecurityLevel::Balanced.as_str(), "Balanced");
-    assert_eq!(SecurityLevel::Sensitive.as_str(), "Sensitive");
+    assert_eq!(SecurityLevel::Low.as_str(), "Low");
+    assert_eq!(SecurityLevel::Standard.as_str(), "Standard");
+    assert_eq!(SecurityLevel::High.as_str(), "High");
 }
 
 #[test]
 fn test_key_derivation_config_presets() {
     let interactive_config = KeyDerivationConfig::interactive();
-    assert_eq!(interactive_config.preset, Some(SecurityLevel::Interactive));
+    assert_eq!(interactive_config.preset, Some(SecurityLevel::Low));
     assert_eq!(interactive_config.memory_cost, 32768); // 32 MB
     assert_eq!(interactive_config.time_cost, 2);
     assert_eq!(interactive_config.parallelism, 2);
 
     let sensitive_config = KeyDerivationConfig::sensitive();
-    assert_eq!(sensitive_config.preset, Some(SecurityLevel::Sensitive));
+    assert_eq!(sensitive_config.preset, Some(SecurityLevel::High));
     assert_eq!(sensitive_config.memory_cost, 131072); // 128 MB
     assert_eq!(sensitive_config.time_cost, 4);
     assert_eq!(sensitive_config.parallelism, 8);
@@ -283,7 +283,7 @@ async fn test_crypto_metadata_integrity() {
     let crypto_config = CryptoConfig::with_passphrase("integrity-test-passphrase".to_string());
     let (node_config, _temp_dir) = create_test_node_config_with_crypto(crypto_config);
 
-    let mut node = DataFoldNode::load(node_config).await.unwrap();
+    let node = DataFoldNode::load(node_config).await.unwrap();
 
     let fold_db = node.get_fold_db().unwrap();
     let db_ops = fold_db.db_ops();

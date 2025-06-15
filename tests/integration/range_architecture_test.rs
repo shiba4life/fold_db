@@ -11,14 +11,14 @@
 //! 5. **Range Filtering and Search** - Advanced query capabilities
 //! 6. **Range Schema Validation** - Ensure Range schemas work correctly
 
-use datafold::atom::{Atom, AtomRef};
+use datafold::atom::Atom;
 use datafold::db_operations::DbOperations;
 use datafold::fold_db_core::infrastructure::message_bus::{
     FieldValueSetRequest, FieldValueSetResponse, MessageBus,
 };
 use datafold::fold_db_core::managers::atom::AtomManager;
-use datafold::schema::types::field::range_filter::{RangeFilter, RangeFilterResult};
-use datafold::schema::types::field::{Field, FieldVariant, RangeField};
+use datafold::schema::types::field::range_filter::RangeFilter;
+use datafold::schema::types::field::{FieldVariant, RangeField};
 use datafold::schema::{field_factory::FieldFactory, Schema};
 use serde_json::json;
 use std::sync::Arc;
@@ -500,7 +500,7 @@ fn test_range_field_mutations_and_queries() {
     for (user_key, user_data) in &new_users {
         let aref_uuid = fixture
             .mutate_range_field("UserCatalog", "profile_data", "user_id", user_data.clone())
-            .expect(&format!("Failed to create user {}", user_key));
+            .unwrap_or_else(|_| panic!("Failed to create user {}", user_key));
 
         created_uuids.push(aref_uuid);
         println!("✅ Created user {}: {}", user_key, user_data["name"]);
@@ -571,7 +571,7 @@ fn test_range_field_mutations_and_queries() {
                 "user_id",
                 updated_data.clone(),
             )
-            .expect(&format!("Failed to update user {}", user_key));
+            .unwrap_or_else(|_| panic!("Failed to update user {}", user_key));
 
         println!("✅ Updated user {}: {}", user_key, updated_data["name"]);
     }

@@ -684,9 +684,10 @@ fn strategy_to_prefix(strategy: &CorrelationStrategy) -> &'static str {
 mod tests {
     use super::*;
     use crate::events::event_types::{
-        CreateVerificationEvent, EventSeverity, PlatformSource, SecurityEvent,
+        CreateVerificationEvent, PlatformSource, SecurityEvent,
         SecurityEventCategory, VerificationEvent,
     };
+    use crate::security_types::Severity;
 
     #[tokio::test]
     async fn test_correlation_manager_creation() {
@@ -702,7 +703,7 @@ mod tests {
 
         let mut event1 = VerificationEvent::create_base_event(
             SecurityEventCategory::Authentication,
-            EventSeverity::Info,
+            Severity::Info,
             PlatformSource::RustCli,
             "auth".to_string(),
             "login".to_string(),
@@ -711,7 +712,7 @@ mod tests {
 
         let mut event2 = VerificationEvent::create_base_event(
             SecurityEventCategory::Authorization,
-            EventSeverity::Info,
+            Severity::Info,
             PlatformSource::JavaScriptSdk,
             "authz".to_string(),
             "check_permission".to_string(),
@@ -741,7 +742,7 @@ mod tests {
 
         let mut event = VerificationEvent::create_base_event(
             SecurityEventCategory::Security,
-            EventSeverity::Critical,
+            Severity::Critical,
             PlatformSource::DataFoldNode,
             "security".to_string(),
             "threat_detected".to_string(),
@@ -768,7 +769,7 @@ mod tests {
     fn test_correlation_group_operations() {
         let event1 = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Authentication,
-            EventSeverity::Info,
+            Severity::Info,
             PlatformSource::RustCli,
             "auth".to_string(),
             "login".to_string(),
@@ -783,7 +784,7 @@ mod tests {
 
         let event2 = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Authorization,
-            EventSeverity::Info,
+            Severity::Info,
             PlatformSource::JavaScriptSdk,
             "authz".to_string(),
             "check_permission".to_string(),

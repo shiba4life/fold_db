@@ -265,7 +265,7 @@ fn test_multiple_field_mutations_and_queries() {
         println!("📝 Mutating field: {}", field_name);
         let aref_uuid = fixture
             .mutate_field_value("TransformBase", field_name, value.clone(), source)
-            .expect(&format!("Failed to mutate {}", field_name));
+            .unwrap_or_else(|_| panic!("Failed to mutate {}", field_name));
         aref_uuids.push(aref_uuid);
     }
 
@@ -274,7 +274,7 @@ fn test_multiple_field_mutations_and_queries() {
         println!("🔍 Querying field: {}", field_name);
         let result = fixture
             .query_field_value(&schema, field_name, expected_value)
-            .expect(&format!("Failed to query {}", field_name));
+            .unwrap_or_else(|_| panic!("Failed to query {}", field_name));
 
         assert_eq!(
             &result, expected_value,
@@ -297,12 +297,10 @@ fn test_multiple_mutation_cycles_on_same_field() {
     let schema = fixture.create_transform_base_schema();
 
     // Test multiple mutation cycles on the same field
-    let mutation_cycles = vec![
-        (json!("initial_value"), "cycle_1"),
+    let mutation_cycles = [(json!("initial_value"), "cycle_1"),
         (json!(100), "cycle_2"),
         (json!("updated_value"), "cycle_3"),
-        (json!(200), "cycle_4"),
-    ];
+        (json!(200), "cycle_4")];
 
     let mut aref_uuids = Vec::new();
 
@@ -312,13 +310,13 @@ fn test_multiple_mutation_cycles_on_same_field() {
         // Perform mutation
         let aref_uuid = fixture
             .mutate_field_value("TransformBase", "value1", value.clone(), source)
-            .expect(&format!("Failed to mutate in cycle {}", i + 1));
+            .unwrap_or_else(|_| panic!("Failed to mutate in cycle {}", i + 1));
         aref_uuids.push(aref_uuid.clone());
 
         // Verify query returns the latest value
         let result = fixture
             .query_field_value(&schema, "value1", value)
-            .expect(&format!("Failed to query in cycle {}", i + 1));
+            .unwrap_or_else(|_| panic!("Failed to query in cycle {}", i + 1));
 
         assert_eq!(
             &result,
@@ -375,12 +373,12 @@ fn test_mutation_query_flow_with_different_data_types() {
         // Perform mutation
         let aref_uuid = fixture
             .mutate_field_value("TransformBase", "value1", value.clone(), &source)
-            .expect(&format!("Failed to mutate {} data type", data_type));
+            .unwrap_or_else(|_| panic!("Failed to mutate {} data type", data_type));
 
         // Verify query returns correct value
         let result = fixture
             .query_field_value(&schema, "value1", &value)
-            .expect(&format!("Failed to query {} data type", data_type));
+            .unwrap_or_else(|_| panic!("Failed to query {} data type", data_type));
 
         assert_eq!(
             result, value,
@@ -614,11 +612,11 @@ fn test_complete_mutation_query_integration_workflow() {
     for (field_name, value, source) in &initial_values {
         fixture
             .mutate_field_value("TransformBase", field_name, value.clone(), source)
-            .expect(&format!("Failed initial mutation for {}", field_name));
+            .unwrap_or_else(|_| panic!("Failed initial mutation for {}", field_name));
 
         fixture
             .query_field_value(&schema, field_name, value)
-            .expect(&format!("Failed initial query for {}", field_name));
+            .unwrap_or_else(|_| panic!("Failed initial query for {}", field_name));
     }
 
     // Phase 2: Complex Data Updates
@@ -659,11 +657,11 @@ fn test_complete_mutation_query_integration_workflow() {
                 cycle_value.clone(),
                 &format!("rapid_cycle_{}", cycle),
             )
-            .expect(&format!("Failed rapid cycle {} mutation", cycle));
+            .unwrap_or_else(|_| panic!("Failed rapid cycle {} mutation", cycle));
 
         fixture
             .query_field_value(&schema, "value2", &cycle_value)
-            .expect(&format!("Failed rapid cycle {} query", cycle));
+            .unwrap_or_else(|_| panic!("Failed rapid cycle {} query", cycle));
 
         // Small delay between cycles
         thread::sleep(Duration::from_millis(50));

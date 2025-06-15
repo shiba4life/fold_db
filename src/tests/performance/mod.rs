@@ -1,5 +1,6 @@
 //! Performance benchmarking system for DataFold signature authentication
 
+use crate::security_types::Severity;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -496,17 +497,10 @@ pub struct CurrentMetrics {
 
 #[derive(Debug, Clone)]
 pub struct PerformanceAlert {
-    pub severity: AlertSeverity,
+    pub severity: Severity,
     pub message: String,
 }
 
-#[derive(Debug, Clone)]
-pub enum AlertSeverity {
-    Low,
-    Medium,
-    High,
-    Critical,
-}
 
 impl PerformanceMetricsCollector {
     pub fn new(config: MetricsCollectorConfig) -> Self {

@@ -4,6 +4,7 @@
 //! features for the signature authentication system.
 
 use crate::datafold_node::signature_auth::{SecurityMetrics, PerformanceBreakdown, NonceStorePerformanceStats};
+use crate::security_types::Severity;
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -57,7 +58,7 @@ pub struct PerformanceAlert {
     pub message: String,
     pub metric_value: f64,
     pub threshold: f64,
-    pub severity: AlertSeverity,
+    pub severity: Severity,
 }
 
 /// Types of performance alerts
@@ -71,13 +72,6 @@ pub enum PerformanceAlertType {
     RequestRateSpike,
 }
 
-/// Alert severity levels
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AlertSeverity {
-    Info,
-    Warning,
-    Critical,
-}
 
 /// Latency histogram for performance monitoring
 #[derive(Debug, Clone)]
@@ -313,7 +307,7 @@ impl PerformanceMonitor {
                     format!("Average latency {}ms exceeds threshold", avg_latency),
                     avg_latency,
                     100.0,
-                    AlertSeverity::Warning,
+                    Severity::Warning,
                 );
             }
         }
@@ -338,7 +332,7 @@ impl PerformanceMonitor {
         message: String,
         metric_value: f64,
         threshold: f64,
-        severity: AlertSeverity,
+        severity: Severity,
     ) {
         let alert = PerformanceAlert {
             alert_id: Uuid::new_v4().to_string(),

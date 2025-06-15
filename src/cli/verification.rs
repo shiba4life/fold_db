@@ -4,6 +4,7 @@
 //! enabling validation of server responses and command-line signature verification tools.
 
 use crate::cli::auth::CliAuthError;
+use crate::security_types::SecurityLevel;
 use crate::cli::auth::SignatureComponent;
 use crate::crypto::ed25519::{verify_signature, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use crate::error::FoldDbError;
@@ -348,13 +349,6 @@ pub struct SecurityAnalysis {
     pub recommendations: Vec<String>,
 }
 
-/// Security level assessment
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SecurityLevel {
-    Low,
-    Medium,
-    High,
-}
 
 /// Performance metrics
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -545,7 +539,7 @@ impl CliSignatureVerifier {
                 all_rules_passed: true,
             },
             security_analysis: SecurityAnalysis {
-                security_level: SecurityLevel::Medium,
+                security_level: SecurityLevel::Standard,
                 concerns: vec![],
                 recommendations: vec![],
             },
@@ -972,7 +966,7 @@ impl CliSignatureVerifier {
         };
 
         let security_analysis = SecurityAnalysis {
-            security_level: SecurityLevel::Medium, // Would do actual assessment
+            security_level: SecurityLevel::Standard, // Would do actual assessment
             concerns: vec![],
             recommendations: vec![],
         };

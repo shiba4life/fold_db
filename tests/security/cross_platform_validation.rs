@@ -4,18 +4,15 @@
 //! all DataFold client implementations (Rust server, JavaScript SDK,
 //! Python SDK, and CLI client).
 
-use actix_web::{test, web, App, HttpMessage, HttpResponse};
 use datafold::crypto::ed25519::{generate_master_keypair, PrivateKey, PublicKey};
 use datafold::datafold_node::signature_auth::{
-    AuthenticationError, SecurityProfile, SignatureAuthConfig, SignatureVerificationState,
+    SecurityProfile, SignatureAuthConfig, SignatureVerificationState,
 };
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::process::{Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tempfile::tempdir;
 use tokio::time::sleep;
 use uuid::Uuid;
 
@@ -726,8 +723,7 @@ impl CrossPlatformValidator {
             error_message_consistency: 0.95, // Would be calculated from actual error analysis
             timing_consistency_score: timing_consistency,
             security_effectiveness_variance: detection_rates
-                .iter()
-                .map(|&x| x)
+                .iter().copied()
                 .collect::<Vec<_>>()
                 .iter()
                 .fold(0.0, |acc, &x| acc + (x - 0.95).powi(2))

@@ -4,9 +4,10 @@
 //! audit events, tamper-proof trails, and enhanced security metadata.
 
 use super::audit_logger::{
-    AuditEvent, AuditEventType, AuditSeverity, CryptoAuditLogger, OperationResult,
+    AuditEvent, AuditEventType, CryptoAuditLogger, OperationResult,
 };
 use super::key_rotation::{KeyRotationRequest, RotationReason};
+use crate::security_types::{RotationStatus, Severity};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -58,16 +59,16 @@ impl KeyRotationAuditEventType {
     }
 
     /// Get the severity level for this event type
-    pub fn default_severity(&self) -> AuditSeverity {
+    pub fn default_severity(&self) -> Severity {
         match self {
             KeyRotationAuditEventType::RotationFailed
-            | KeyRotationAuditEventType::PolicyViolation => AuditSeverity::Error,
+            | KeyRotationAuditEventType::PolicyViolation => Severity::Error,
             KeyRotationAuditEventType::RateLimitExceeded
-            | KeyRotationAuditEventType::SuspiciousPattern => AuditSeverity::Warning,
+            | KeyRotationAuditEventType::SuspiciousPattern => Severity::Warning,
             KeyRotationAuditEventType::RotationCompleted
             | KeyRotationAuditEventType::NewKeyActivated
-            | KeyRotationAuditEventType::OldKeyInvalidated => AuditSeverity::Info,
-            _ => AuditSeverity::Info,
+            | KeyRotationAuditEventType::OldKeyInvalidated => Severity::Info,
+            _ => Severity::Info,
         }
     }
 }
@@ -216,24 +217,6 @@ pub struct RotationAuditCorrelation {
     pub failed_attempts: u32,
     /// Warnings collected during rotation
     pub warnings: Vec<String>,
-}
-
-/// Status of a key rotation operation
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RotationStatus {
-    /// Rotation requested but not started
-    Requested,
-    /// Validation in progress
-    Validating,
-    /// Rotation in progress
-    InProgress,
-    /// Rotation completed successfully
-    Completed,
-    /// Rotation failed
-    Failed,
-    /// Rotation cancelled
-    Cancelled,
-    // REMOVED: Bypassed status - was only used for emergency bypass functionality
 }
 
 /// Specialized audit logger for key rotation operations
@@ -450,7 +433,7 @@ impl KeyRotationAuditLogger {
             chain.push(tamper_proof_entry);
 
             // Limit chain size to prevent memory issues
-            if chain.len() > 100000 {
+            if chain.len() > 100_000 {
                 chain.drain(0..10000);
             }
         }

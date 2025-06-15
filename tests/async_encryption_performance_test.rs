@@ -13,9 +13,8 @@ use datafold::db_operations::encryption_wrapper_async::{
 use datafold::db_operations::{DbOperations, EncryptionWrapper};
 use datafold::fold_db_core::managers::atom::async_operations::{AsyncAtomConfig, AsyncAtomManager};
 use serde_json::json;
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tempfile::tempdir;
 use tokio::test;
 

@@ -4,6 +4,7 @@
 //! recovery suggestions, and error classification for all encryption-related
 //! operations in DataFold.
 
+use crate::security_types::Severity;
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 use thiserror::Error;
@@ -12,18 +13,6 @@ use uuid::Uuid;
 /// Result type alias for enhanced crypto operations
 pub type EnhancedCryptoResult<T> = Result<T, EnhancedCryptoError>;
 
-/// Enhanced error classification for error handling strategies
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ErrorSeverity {
-    /// Low severity - operation can continue with degraded functionality
-    Low,
-    /// Medium severity - operation should be retried or alternative approach used
-    Medium,
-    /// High severity - operation should be aborted but system can continue
-    High,
-    /// Critical severity - system integrity is at risk, immediate intervention required
-    Critical,
-}
 
 /// Error recovery suggestions for automated and manual resolution
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -109,7 +98,7 @@ pub enum EnhancedCryptoError {
     #[error("Key generation failed: {message}")]
     KeyGeneration {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         underlying_cause: Option<String>,
@@ -119,7 +108,7 @@ pub enum EnhancedCryptoError {
     #[error("Key derivation failed: {message}")]
     KeyDerivation {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         parameters_used: Option<String>,
@@ -130,7 +119,7 @@ pub enum EnhancedCryptoError {
     #[error("Encryption failed: {message}")]
     Encryption {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         data_size: Option<usize>,
@@ -142,7 +131,7 @@ pub enum EnhancedCryptoError {
     #[error("Decryption failed: {message}")]
     Decryption {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         data_size: Option<usize>,
@@ -154,7 +143,7 @@ pub enum EnhancedCryptoError {
     #[error("Signature operation failed: {message}")]
     Signature {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         operation_type: String, // "sign" or "verify"
@@ -165,7 +154,7 @@ pub enum EnhancedCryptoError {
     #[error("Invalid key material: {message}")]
     InvalidKey {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         key_type: String,
@@ -177,7 +166,7 @@ pub enum EnhancedCryptoError {
     #[error("Random number generation failed: {message}")]
     RandomGeneration {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         requested_bytes: Option<usize>,
@@ -188,7 +177,7 @@ pub enum EnhancedCryptoError {
     #[error("Serialization failed: {message}")]
     Serialization {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         data_type: String,
@@ -200,7 +189,7 @@ pub enum EnhancedCryptoError {
     #[error("Configuration error: {message}")]
     Configuration {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         config_key: Option<String>,
@@ -213,7 +202,7 @@ pub enum EnhancedCryptoError {
     #[error("Storage operation failed: {message}")]
     Storage {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         operation: String,
@@ -225,7 +214,7 @@ pub enum EnhancedCryptoError {
     #[error("Security violation detected: {message}")]
     Security {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         security_event: String,
@@ -237,7 +226,7 @@ pub enum EnhancedCryptoError {
     #[error("Performance issue: {message}")]
     Performance {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         operation_duration: Option<std::time::Duration>,
@@ -249,7 +238,7 @@ pub enum EnhancedCryptoError {
     #[error("Network operation failed: {message}")]
     Network {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         endpoint: Option<String>,
@@ -261,7 +250,7 @@ pub enum EnhancedCryptoError {
     #[error("Validation failed: {message}")]
     Validation {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         field_name: Option<String>,
@@ -274,7 +263,7 @@ pub enum EnhancedCryptoError {
     #[error("Compatibility issue: {message}")]
     Compatibility {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         expected_version: Option<String>,
@@ -286,7 +275,7 @@ pub enum EnhancedCryptoError {
     #[error("Resource exhausted: {message}")]
     ResourceExhaustion {
         message: String,
-        severity: ErrorSeverity,
+        severity: Severity,
         recovery_actions: Vec<RecoveryAction>,
         context: ErrorContext,
         resource_type: String,
@@ -298,7 +287,7 @@ pub enum EnhancedCryptoError {
 
 impl EnhancedCryptoError {
     /// Get the error severity level
-    pub fn severity(&self) -> &ErrorSeverity {
+    pub fn severity(&self) -> &Severity {
         match self {
             Self::KeyGeneration { severity, .. } => severity,
             Self::KeyDerivation { severity, .. } => severity,
@@ -407,7 +396,7 @@ impl EnhancedCryptoError {
     pub fn should_alert(&self) -> bool {
         matches!(
             self.severity(),
-            ErrorSeverity::High | ErrorSeverity::Critical
+            Severity::Error | Severity::Critical
         ) || matches!(self, Self::Security { .. })
     }
 
@@ -472,7 +461,7 @@ impl From<crate::crypto::error::CryptoError> for EnhancedCryptoError {
         match err {
             crate::crypto::error::CryptoError::KeyGeneration { message } => Self::KeyGeneration {
                 message,
-                severity: ErrorSeverity::High,
+                severity: Severity::Error,
                 recovery_actions: vec![
                     RecoveryAction::Retry,
                     RecoveryAction::RegenerateCryptoMaterial,
@@ -482,7 +471,7 @@ impl From<crate::crypto::error::CryptoError> for EnhancedCryptoError {
             },
             crate::crypto::error::CryptoError::Serialization { message } => Self::Serialization {
                 message,
-                severity: ErrorSeverity::Medium,
+                severity: Severity::Warning,
                 recovery_actions: vec![RecoveryAction::Retry, RecoveryAction::CheckConfiguration],
                 context,
                 data_type: "unknown".to_string(),
@@ -491,7 +480,7 @@ impl From<crate::crypto::error::CryptoError> for EnhancedCryptoError {
             },
             crate::crypto::error::CryptoError::Deserialization { message } => Self::Serialization {
                 message,
-                severity: ErrorSeverity::Medium,
+                severity: Severity::Warning,
                 recovery_actions: vec![
                     RecoveryAction::CheckConfiguration,
                     RecoveryAction::RestoreFromBackup,
@@ -503,7 +492,7 @@ impl From<crate::crypto::error::CryptoError> for EnhancedCryptoError {
             },
             crate::crypto::error::CryptoError::InvalidKey { message } => Self::InvalidKey {
                 message,
-                severity: ErrorSeverity::High,
+                severity: Severity::Error,
                 recovery_actions: vec![
                     RecoveryAction::RegenerateCryptoMaterial,
                     RecoveryAction::CheckConfiguration,
@@ -515,7 +504,7 @@ impl From<crate::crypto::error::CryptoError> for EnhancedCryptoError {
             },
             crate::crypto::error::CryptoError::Signature { message } => Self::Signature {
                 message,
-                severity: ErrorSeverity::High,
+                severity: Severity::Error,
                 recovery_actions: vec![
                     RecoveryAction::Retry,
                     RecoveryAction::RegenerateCryptoMaterial,
@@ -526,7 +515,7 @@ impl From<crate::crypto::error::CryptoError> for EnhancedCryptoError {
             },
             crate::crypto::error::CryptoError::KeyDerivation { message } => Self::KeyDerivation {
                 message,
-                severity: ErrorSeverity::High,
+                severity: Severity::Error,
                 recovery_actions: vec![
                     RecoveryAction::RetryWithDifferentParams,
                     RecoveryAction::CheckConfiguration,
@@ -538,7 +527,7 @@ impl From<crate::crypto::error::CryptoError> for EnhancedCryptoError {
             crate::crypto::error::CryptoError::RandomGeneration { message } => {
                 Self::RandomGeneration {
                     message,
-                    severity: ErrorSeverity::Critical,
+                    severity: Severity::Critical,
                     recovery_actions: vec![
                         RecoveryAction::Retry,
                         RecoveryAction::ContactAdministrator,
@@ -550,7 +539,7 @@ impl From<crate::crypto::error::CryptoError> for EnhancedCryptoError {
             }
             crate::crypto::error::CryptoError::SignatureVerification => Self::Signature {
                 message: "Signature verification failed".to_string(),
-                severity: ErrorSeverity::High,
+                severity: Severity::Error,
                 recovery_actions: vec![RecoveryAction::Retry, RecoveryAction::CheckConfiguration],
                 context,
                 operation_type: "verify".to_string(),
@@ -558,7 +547,7 @@ impl From<crate::crypto::error::CryptoError> for EnhancedCryptoError {
             },
             crate::crypto::error::CryptoError::InvalidSignature { message } => Self::Signature {
                 message,
-                severity: ErrorSeverity::Medium,
+                severity: Severity::Warning,
                 recovery_actions: vec![RecoveryAction::CheckConfiguration, RecoveryAction::Retry],
                 context,
                 operation_type: "validate".to_string(),
@@ -566,7 +555,7 @@ impl From<crate::crypto::error::CryptoError> for EnhancedCryptoError {
             },
             crate::crypto::error::CryptoError::InvalidInput(message) => Self::Validation {
                 message,
-                severity: ErrorSeverity::Medium,
+                severity: Severity::Warning,
                 recovery_actions: vec![RecoveryAction::CheckConfiguration, RecoveryAction::Retry],
                 context,
                 field_name: None,
@@ -599,13 +588,13 @@ mod tests {
         let context = ErrorContext::new("test", "test_op");
         let error = EnhancedCryptoError::KeyGeneration {
             message: "Test error".to_string(),
-            severity: ErrorSeverity::High,
+            severity: Severity::Error,
             recovery_actions: vec![RecoveryAction::Retry],
             context,
             underlying_cause: None,
         };
 
-        assert_eq!(*error.severity(), ErrorSeverity::High);
+        assert_eq!(*error.severity(), Severity::Error);
         assert_eq!(error.recovery_actions(), &[RecoveryAction::Retry]);
         assert!(error.is_recoverable());
         assert!(error.should_alert());
@@ -628,7 +617,7 @@ mod tests {
         let context = ErrorContext::new("test", "test_op");
         let error = EnhancedCryptoError::Security {
             message: "Security test".to_string(),
-            severity: ErrorSeverity::Critical,
+            severity: Severity::Critical,
             recovery_actions: vec![RecoveryAction::ContactAdministrator],
             context,
             security_event: "unauthorized_access".to_string(),

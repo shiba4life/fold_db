@@ -279,9 +279,8 @@ impl AuthenticatedHttpClient {
                     {
                         last_error = Some(HttpClientError::Request(e));
                         continue;
-                    } else {
-                        return Err(HttpClientError::Request(e));
                     }
+                    return Err(HttpClientError::Request(e));
                 }
             }
         }

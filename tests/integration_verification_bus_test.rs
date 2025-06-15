@@ -6,10 +6,11 @@
 use datafold::config::unified_config::{EnvironmentConfig, UnifiedConfig};
 use datafold::events::{
     AlertDestination, AuditLogHandler, CorrelationManager, CreateVerificationEvent, EventEnvelope,
-    EventSeverity, MetricsHandler, PlatformInfo, PlatformSource, SecurityAlertHandler,
+    MetricsHandler, PlatformInfo, PlatformSource, SecurityAlertHandler,
     SecurityEvent, SecurityEventCategory, TransportConfig, TransportFactory, TransportProtocol,
     VerificationBusConfig, VerificationEvent, VerificationEventBus,
 };
+use datafold::security_types::Severity;
 use std::time::Duration;
 use tokio::time::sleep;
 use uuid::Uuid;
@@ -22,7 +23,7 @@ async fn test_verification_bus_integration() {
     // Create event bus configuration
     let mut config = VerificationBusConfig::default();
     config.buffer_size = 1000;
-    config.min_severity = EventSeverity::Info;
+    config.min_severity = Severity::Info;
     config.enable_correlation = true;
 
     // Create event bus
@@ -49,7 +50,7 @@ async fn test_verification_bus_integration() {
         .expect("Failed to register metrics handler");
 
     // 3. Security alerting handler
-    let alert_handler = SecurityAlertHandler::new(EventSeverity::Warning)
+    let alert_handler = SecurityAlertHandler::new(Severity::Warning)
         .add_destination(AlertDestination::Console)
         .with_name("test_alert_handler".to_string());
     event_bus
@@ -63,7 +64,7 @@ async fn test_verification_bus_integration() {
     // Simulate events from different platforms with same trace ID
     let mut rust_event = VerificationEvent::create_base_event(
         SecurityEventCategory::Authentication,
-        EventSeverity::Info,
+        Severity::Info,
         PlatformSource::RustCli,
         "auth_service".to_string(),
         "user_login".to_string(),
@@ -75,7 +76,7 @@ async fn test_verification_bus_integration() {
 
     let mut js_event = VerificationEvent::create_base_event(
         SecurityEventCategory::Authorization,
-        EventSeverity::Info,
+        Severity::Info,
         PlatformSource::JavaScriptSdk,
         "authz_service".to_string(),
         "check_permission".to_string(),
@@ -87,7 +88,7 @@ async fn test_verification_bus_integration() {
 
     let mut python_event = VerificationEvent::create_base_event(
         SecurityEventCategory::Verification,
-        EventSeverity::Info,
+        Severity::Info,
         PlatformSource::PythonSdk,
         "signature_service".to_string(),
         "verify_signature".to_string(),
@@ -116,7 +117,7 @@ async fn test_verification_bus_integration() {
     // Test security threat event
     let mut threat_event = VerificationEvent::create_base_event(
         SecurityEventCategory::Security,
-        EventSeverity::Critical,
+        Severity::Critical,
         PlatformSource::DataFoldNode,
         "security_monitor".to_string(),
         "threat_detected".to_string(),
@@ -189,7 +190,7 @@ async fn test_verification_bus_integration() {
     // Test event filtering by severity
     let filtered_events: Vec<&SecurityEvent> = correlations
         .iter()
-        .filter(|event| event.should_alert(EventSeverity::Warning))
+        .filter(|event| event.should_alert(Severity::Warning))
         .collect();
 
     println!("Events above warning threshold: {}", filtered_events.len());
@@ -226,7 +227,7 @@ async fn test_cross_platform_transport() {
     // Create test event
     let event = SecurityEvent::Generic(VerificationEvent::create_base_event(
         SecurityEventCategory::Performance,
-        EventSeverity::Info,
+        Severity::Info,
         PlatformSource::RustCli,
         "perf_monitor".to_string(),
         "latency_measurement".to_string(),
@@ -338,7 +339,7 @@ async fn test_unified_config_integration() {
 
     // Verify configuration was applied correctly
     assert!(event_bus.get_config().enabled);
-    assert_eq!(event_bus.get_config().min_severity, EventSeverity::Info); // Should match "info" log level
+    assert_eq!(event_bus.get_config().min_severity, Severity::Info); // Should match "info" log level
 
     println!("✅ Unified config integration test completed successfully");
 }
@@ -353,7 +354,7 @@ async fn test_event_correlation_scenarios() {
 
     let mut event1 = VerificationEvent::create_base_event(
         SecurityEventCategory::Authentication,
-        EventSeverity::Info,
+        Severity::Info,
         PlatformSource::RustCli,
         "auth".to_string(),
         "login".to_string(),
@@ -362,7 +363,7 @@ async fn test_event_correlation_scenarios() {
 
     let mut event2 = VerificationEvent::create_base_event(
         SecurityEventCategory::Authorization,
-        EventSeverity::Info,
+        Severity::Info,
         PlatformSource::JavaScriptSdk,
         "authz".to_string(),
         "permission_check".to_string(),
@@ -390,7 +391,7 @@ async fn test_event_correlation_scenarios() {
 
     let mut event3 = VerificationEvent::create_base_event(
         SecurityEventCategory::Configuration,
-        EventSeverity::Warning,
+        Severity::Warning,
         PlatformSource::PythonSdk,
         "config".to_string(),
         "policy_update".to_string(),
@@ -399,7 +400,7 @@ async fn test_event_correlation_scenarios() {
 
     let mut event4 = VerificationEvent::create_base_event(
         SecurityEventCategory::Performance,
-        EventSeverity::Info,
+        Severity::Info,
         PlatformSource::DataFoldNode,
         "perf".to_string(),
         "metric_update".to_string(),
@@ -526,7 +527,7 @@ async fn test_custom_event_handler() {
     for i in 0..5 {
         let event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::System,
-            EventSeverity::Info,
+            Severity::Info,
             PlatformSource::RustCli,
             "test_system".to_string(),
             format!("test_operation_{}", i),

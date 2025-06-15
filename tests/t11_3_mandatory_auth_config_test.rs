@@ -6,7 +6,6 @@
 use datafold::datafold_node::config::NodeConfig;
 use datafold::datafold_node::signature_auth::{SecurityProfile, SignatureAuthConfig};
 use datafold::datafold_node::DataFoldNode;
-use std::path::PathBuf;
 use tempfile::tempdir;
 
 #[test]

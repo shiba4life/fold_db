@@ -11,7 +11,7 @@
 //! 5. **Database Scalability** - Large dataset handling and query performance
 //! 6. **Resource Cleanup and Recovery** - System stability after stress
 
-use datafold::atom::{Atom, AtomRef};
+use datafold::atom::Atom;
 use datafold::db_operations::DbOperations;
 use datafold::fold_db_core::infrastructure::message_bus::{
     FieldValueSetRequest, FieldValueSetResponse, MessageBus, TransformExecuted, TransformTriggered,

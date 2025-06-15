@@ -240,7 +240,7 @@ fn test_migration_to_encrypted() {
 
     // Create encryption wrapper
     let master_keypair = generate_master_keypair().unwrap();
-    let mut wrapper = EncryptionWrapper::new(db_ops, &master_keypair).unwrap();
+    let wrapper = EncryptionWrapper::new(db_ops, &master_keypair).unwrap();
 
     // Verify initial stats
     let initial_stats = wrapper.get_encryption_stats().unwrap();
@@ -279,7 +279,7 @@ fn test_migration_to_encrypted() {
 #[test]
 fn test_migration_with_encryption_disabled() {
     let db_ops = create_test_db_ops();
-    let mut wrapper = EncryptionWrapper::without_encryption(db_ops);
+    let wrapper = EncryptionWrapper::without_encryption(db_ops);
 
     let result = wrapper.migrate_to_encrypted(contexts::ATOM_DATA);
     assert!(result.is_err());
@@ -456,12 +456,10 @@ fn test_concurrent_context_usage() {
     let wrapper = create_test_encryption_wrapper();
 
     // Store data with multiple contexts simultaneously
-    let contexts_and_data = vec![
-        (contexts::ATOM_DATA, "atom data"),
+    let contexts_and_data = [(contexts::ATOM_DATA, "atom data"),
         (contexts::SCHEMA_DATA, "schema data"),
         (contexts::METADATA, "metadata"),
-        (contexts::TRANSFORM_DATA, "transform data"),
-    ];
+        (contexts::TRANSFORM_DATA, "transform data")];
 
     // Store all data
     for (i, (context, data)) in contexts_and_data.iter().enumerate() {

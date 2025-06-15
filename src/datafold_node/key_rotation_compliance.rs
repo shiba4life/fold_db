@@ -9,6 +9,7 @@ use crate::crypto::key_rotation_audit::{
 };
 use crate::crypto::key_rotation_security::KeyRotationSecurityManager;
 use crate::crypto::rotation_threat_monitor::RotationThreatMonitor;
+use crate::security_types::{ThreatLevel, Severity};
 use chrono::{DateTime, Datelike, Duration as ChronoDuration, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -461,8 +462,8 @@ pub struct ThreatSummary {
     pub threat_type: String,
     /// Number of occurrences
     pub count: u64,
-    /// Severity level
-    pub severity: String,
+    /// Severity level using unified severity classification
+    pub severity: Severity,
     /// Impact description
     pub impact: String,
     /// Mitigation status
@@ -519,8 +520,8 @@ pub struct ControlGap {
     pub control: ComplianceControl,
     /// Gap description
     pub description: String,
-    /// Risk level
-    pub risk_level: String,
+    /// Risk level using unified severity classification
+    pub risk_level: Severity,
     /// Recommended remediation
     pub remediation: String,
     /// Target completion date
@@ -898,14 +899,14 @@ impl KeyRotationComplianceManager {
         let threat_status = self.threat_monitor.get_threat_status().await;
 
         let overall_status = match threat_status.overall_threat_level {
-            crate::crypto::security_monitor::ThreatLevel::Low => ComplianceStatus::Compliant,
-            crate::crypto::security_monitor::ThreatLevel::Medium => {
+            ThreatLevel::Low => ComplianceStatus::Compliant,
+            ThreatLevel::Medium => {
                 ComplianceStatus::MostlyCompliant
             }
-            crate::crypto::security_monitor::ThreatLevel::High => {
+            ThreatLevel::High => {
                 ComplianceStatus::PartiallyCompliant
             }
-            crate::crypto::security_monitor::ThreatLevel::Critical => {
+            ThreatLevel::Critical => {
                 ComplianceStatus::NonCompliant
             }
         };
@@ -976,31 +977,31 @@ impl KeyRotationComplianceManager {
             incidents_by_severity: {
                 let mut map: HashMap<String, u64> = HashMap::new();
                 map.insert(
-                    "Low".to_string(),
+                    ThreatLevel::Low.to_severity().to_string(),
                     *threat_status
                         .threat_counts
-                        .get(&crate::crypto::security_monitor::ThreatLevel::Low)
+                        .get(&ThreatLevel::Low)
                         .unwrap_or(&0) as u64,
                 );
                 map.insert(
-                    "Medium".to_string(),
+                    ThreatLevel::Medium.to_severity().to_string(),
                     *threat_status
                         .threat_counts
-                        .get(&crate::crypto::security_monitor::ThreatLevel::Medium)
+                        .get(&ThreatLevel::Medium)
                         .unwrap_or(&0) as u64,
                 );
                 map.insert(
-                    "High".to_string(),
+                    ThreatLevel::High.to_severity().to_string(),
                     *threat_status
                         .threat_counts
-                        .get(&crate::crypto::security_monitor::ThreatLevel::High)
+                        .get(&ThreatLevel::High)
                         .unwrap_or(&0) as u64,
                 );
                 map.insert(
-                    "Critical".to_string(),
+                    ThreatLevel::Critical.to_severity().to_string(),
                     *threat_status
                         .threat_counts
-                        .get(&crate::crypto::security_monitor::ThreatLevel::Critical)
+                        .get(&ThreatLevel::Critical)
                         .unwrap_or(&0) as u64,
                 );
                 map

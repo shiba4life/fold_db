@@ -543,9 +543,10 @@ impl TransportFactory {
 mod tests {
     use super::*;
     use crate::events::event_types::{
-        CreateVerificationEvent, EventSeverity, PlatformSource, SecurityEvent,
+        CreateVerificationEvent, PlatformSource, SecurityEvent,
         SecurityEventCategory, VerificationEvent,
     };
+    use crate::security_types::Severity;
 
     #[tokio::test]
     async fn test_in_memory_transport() {
@@ -561,7 +562,7 @@ mod tests {
         // Create test event
         let event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Authentication,
-            EventSeverity::Info,
+            Severity::Info,
             PlatformSource::RustCli,
             "test_component".to_string(),
             "test_operation".to_string(),
@@ -592,7 +593,7 @@ mod tests {
     async fn test_event_serialization() {
         let event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Security,
-            EventSeverity::Critical,
+            Severity::Critical,
             PlatformSource::DataFoldNode,
             "security_monitor".to_string(),
             "threat_detected".to_string(),

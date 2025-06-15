@@ -5,24 +5,20 @@
 
 use datafold::{
     db_operations::DbOperations,
-    fees::types::config::FieldPaymentConfig,
     fold_db_core::{
         infrastructure::message_bus::{FieldValueSetRequest, FieldValueSetResponse, MessageBus},
         managers::atom::AtomManager,
     },
-    permissions::types::policy::PermissionsPolicy,
     schema::{
         field_factory::FieldFactory,
         types::{
-            field::{FieldVariant, RangeField},
-            operations::{Mutation, MutationType, Query},
+            field::FieldVariant,
             Schema,
         },
     },
 };
 use log::info;
 use serde_json::json;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;

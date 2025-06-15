@@ -398,7 +398,7 @@ fn test_tree_operations_backward_compatibility() {
     // Store unencrypted data in a tree
     db_ops
         .store_in_tree(
-            &db_ops.metadata_tree(),
+            db_ops.metadata_tree(),
             "legacy_metadata",
             &json!({"version": "1.0"}),
         )

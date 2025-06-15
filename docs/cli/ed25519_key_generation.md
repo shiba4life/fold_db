@@ -141,9 +141,9 @@ datafold_cli verify-key \
 ### Passphrase-Based Derivation
 - Uses Argon2id algorithm for key derivation from passphrases
 - Configurable security levels:
-  - **Interactive**: 32 MB memory, 2 iterations (fast)
-  - **Balanced**: 64 MB memory, 3 iterations (default)
-  - **Sensitive**: 128 MB memory, 4 iterations (high security)
+  - **Low**: 32 MB memory, 2 iterations (fast, formerly "Interactive")
+  - **Standard**: 64 MB memory, 3 iterations (default, formerly "Balanced")
+  - **High**: 128 MB memory, 4 iterations (high security, formerly "Sensitive")
 
 ### Memory Security
 - Private key material is automatically zeroized when dropped

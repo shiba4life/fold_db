@@ -2,8 +2,9 @@
 
 use actix_web::http::StatusCode;
 use datafold::datafold_node::signature_auth::{
-    AuthenticationError, SecurityEventSeverity, SignatureAuthConfig, SignatureVerificationState,
+    AuthenticationError, SignatureAuthConfig, SignatureVerificationState,
 };
+use datafold::security_types::Severity;
 use uuid::Uuid;
 
 #[tokio::test]
@@ -22,7 +23,7 @@ async fn test_authentication_error_types() {
     );
     assert_eq!(
         missing_headers_error.severity(),
-        SecurityEventSeverity::Info
+        Severity::Info
     );
     assert_eq!(missing_headers_error.correlation_id(), &correlation_id);
     assert_eq!(missing_headers_error.public_message(), "Missing required authentication headers. Please include Signature-Input and Signature headers.");
@@ -37,7 +38,7 @@ async fn test_authentication_error_types() {
         sig_failed_error.http_status_code(),
         StatusCode::UNAUTHORIZED
     );
-    assert_eq!(sig_failed_error.severity(), SecurityEventSeverity::Warn);
+    assert_eq!(sig_failed_error.severity(), Severity::Warning);
     assert_eq!(
         sig_failed_error.public_message(),
         "Signature verification failed. Please check your signature calculation and key."
@@ -51,7 +52,7 @@ async fn test_authentication_error_types() {
     };
 
     assert_eq!(replay_error.http_status_code(), StatusCode::UNAUTHORIZED);
-    assert_eq!(replay_error.severity(), SecurityEventSeverity::Critical);
+    assert_eq!(replay_error.severity(), Severity::Critical);
     assert_eq!(
         replay_error.public_message(),
         "Request validation failed. Please use a unique nonce for each request."
@@ -67,7 +68,7 @@ async fn test_authentication_error_types() {
         rate_limit_error.http_status_code(),
         StatusCode::TOO_MANY_REQUESTS
     );
-    assert_eq!(rate_limit_error.severity(), SecurityEventSeverity::Critical);
+    assert_eq!(rate_limit_error.severity(), Severity::Critical);
     assert_eq!(
         rate_limit_error.public_message(),
         "Rate limit exceeded. Please reduce request frequency and try again later."
@@ -124,7 +125,7 @@ async fn test_configuration_structures() {
     assert!(!config.security_logging.log_successful_auth);
     assert_eq!(
         config.security_logging.min_severity,
-        SecurityEventSeverity::Info
+        Severity::Info
     );
     assert_eq!(config.security_logging.max_log_entry_size, 8192);
 

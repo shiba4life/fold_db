@@ -6,10 +6,11 @@
 use datafold::crypto::audit_logger::{AuditConfig, CryptoAuditLogger};
 use datafold::events::{
     AlertDestination, AuditLogHandler, AuthenticationEvent, AuthorizationEvent,
-    CreateVerificationEvent, EventSeverity, MetricsHandler, PlatformSource, SecurityAlertHandler,
+    CreateVerificationEvent, MetricsHandler, PlatformSource, SecurityAlertHandler,
     SecurityEvent, SecurityEventCategory, SecurityThreatEvent, VerificationBusConfig,
     VerificationEvent, VerificationEventBus,
 };
+use datafold::security_types::Severity;
 use std::time::Duration;
 use tokio::time::sleep;
 use uuid::Uuid;
@@ -26,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = VerificationBusConfig {
         enabled: true,
         buffer_size: 5000,
-        min_severity: EventSeverity::Info,
+        min_severity: Severity::Info,
         enable_correlation: true,
         correlation_window_minutes: 30,
         graceful_degradation: true,
@@ -102,7 +103,7 @@ async fn setup_event_handlers(
         .await?;
 
     // Security alerting handler with multiple destinations
-    let alert_handler = SecurityAlertHandler::new(EventSeverity::Warning)
+    let alert_handler = SecurityAlertHandler::new(Severity::Warning)
         .add_destination(AlertDestination::Console)
         .add_destination(AlertDestination::File {
             path: "demo_security_alerts.log".to_string(),
@@ -123,7 +124,7 @@ async fn simulate_authentication_event(
 
     let mut base_event = VerificationEvent::create_base_event(
         SecurityEventCategory::Authentication,
-        EventSeverity::Info,
+        Severity::Info,
         PlatformSource::RustCli,
         "auth_service".to_string(),
         "user_login".to_string(),
@@ -161,7 +162,7 @@ async fn simulate_authorization_event(
 
     let mut base_event = VerificationEvent::create_base_event(
         SecurityEventCategory::Authorization,
-        EventSeverity::Info,
+        Severity::Info,
         PlatformSource::JavaScriptSdk,
         "authz_service".to_string(),
         "check_resource_access".to_string(),
@@ -198,7 +199,7 @@ async fn simulate_verification_event(
 
     let mut base_event = VerificationEvent::create_base_event(
         SecurityEventCategory::Verification,
-        EventSeverity::Info,
+        Severity::Info,
         PlatformSource::PythonSdk,
         "signature_service".to_string(),
         "verify_request_signature".to_string(),
@@ -234,7 +235,7 @@ async fn simulate_security_threat(
 
     let mut threat_base = VerificationEvent::create_base_event(
         SecurityEventCategory::Security,
-        EventSeverity::Critical,
+        Severity::Critical,
         PlatformSource::DataFoldNode,
         "security_monitor".to_string(),
         "suspicious_activity_detected".to_string(),

@@ -14,18 +14,17 @@
 //! - Failure scenario tests for network issues, corrupted data, and edge cases
 //! - Automated test runner validating the entire system
 
-use serde_json::{self, Value};
+use serde_json::{self};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
 use tokio::time::timeout;
-use uuid::Uuid;
 
-use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel};
+use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
+use datafold::security_types::SecurityLevel;
 use datafold::datafold_node::{DataFoldNode, NodeConfig};
 
 /// E2E Test Framework for Client-Side Key Management
@@ -168,7 +167,7 @@ impl E2EKeyManagementTestSuite {
         server_config.crypto = Some(CryptoConfig {
             enabled: true,
             master_key: MasterKeyConfig::Random,
-            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Sensitive),
+            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::High),
         });
 
         let node = DataFoldNode::load(server_config).await?;
@@ -671,7 +670,7 @@ impl E2EKeyManagementTestSuite {
                 Platform::CLI => {
                     // Run CLI key generation test - our core PBI 10 functionality
                     let output = Command::new("cargo")
-                        .args(&[
+                        .args([
                             "test",
                             "--test",
                             "cli_key_generation_test",
@@ -714,7 +713,7 @@ impl E2EKeyManagementTestSuite {
                 }
                 Platform::CLI => {
                     let output = Command::new("cargo")
-                        .args(&[
+                        .args([
                             "test",
                             "--test",
                             "cli_secure_storage_test",

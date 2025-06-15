@@ -30,6 +30,8 @@ pub use encryption_wrapper_async::{
 };
 pub use error_utils::ErrorUtils;
 pub use key_rotation_operations::{
-    KeyAssociation, KeyRotationRecord, RotationStatus, KEY_ASSOCIATIONS_TREE,
+    KeyAssociation, KeyRotationRecord, KEY_ASSOCIATIONS_TREE,
     KEY_ROTATION_INDEX_TREE, KEY_ROTATION_RECORDS_TREE,
 };
+// Re-export RotationStatus from security_types module
+pub use crate::security_types::RotationStatus;

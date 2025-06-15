@@ -4,12 +4,12 @@
 //! with DataFold's existing API infrastructure.
 
 use actix_web::{middleware::Logger, test, web, App, HttpResponse};
-use datafold::crypto::ed25519::{generate_master_keypair, PublicKey};
+use datafold::crypto::ed25519::generate_master_keypair;
 use datafold::datafold_node::config::NodeConfig;
 use datafold::datafold_node::crypto_routes::{register_public_key, PublicKeyRegistrationRequest};
 use datafold::datafold_node::http_server::AppState;
 use datafold::datafold_node::signature_auth::{
-    SecurityProfile, SignatureAuthConfig, SignatureVerificationMiddleware,
+    SecurityProfile, SignatureAuthConfig,
     SignatureVerificationState,
 };
 use datafold::datafold_node::DataFoldNode;
@@ -146,7 +146,7 @@ async fn test_node_config_signature_auth_methods() {
 #[tokio::test]
 async fn test_signature_auth_skip_paths() {
     // Test the skip paths functionality
-    use datafold::datafold_node::signature_auth;
+    
 
     // These paths should skip verification
     let skip_paths = [
@@ -219,7 +219,8 @@ async fn test_public_key_registration_for_auth() {
 #[tokio::test]
 async fn test_authentication_error_types() {
     use actix_web::http::StatusCode;
-    use datafold::datafold_node::signature_auth::{AuthenticationError, SecurityEventSeverity};
+    use datafold::datafold_node::signature_auth::AuthenticationError;
+    use datafold::security_types::Severity;
 
     // Test different authentication error types
     let correlation_id = "test-correlation-id".to_string();
@@ -234,7 +235,7 @@ async fn test_authentication_error_types() {
     );
     assert_eq!(
         missing_headers_error.severity(),
-        SecurityEventSeverity::Info
+        Severity::Info
     );
 
     let signature_failed_error = AuthenticationError::SignatureVerificationFailed {
@@ -247,7 +248,7 @@ async fn test_authentication_error_types() {
     );
     assert_eq!(
         signature_failed_error.severity(),
-        SecurityEventSeverity::Warn
+        Severity::Warning
     );
 
     let replay_error = AuthenticationError::NonceValidationFailed {
@@ -256,7 +257,7 @@ async fn test_authentication_error_types() {
         correlation_id: correlation_id.clone(),
     };
     assert_eq!(replay_error.http_status_code(), StatusCode::UNAUTHORIZED);
-    assert_eq!(replay_error.severity(), SecurityEventSeverity::Critical);
+    assert_eq!(replay_error.severity(), Severity::Critical);
 
     println!("✓ Authentication error types test passed");
 }

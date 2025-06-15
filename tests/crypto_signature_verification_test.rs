@@ -412,7 +412,7 @@ async fn test_signature_verification_response_format() {
     assert_eq!(body["success"], true);
     assert!(body["data"]["verified"].as_bool().unwrap());
     assert_eq!(body["data"]["client_id"], client_id);
-    assert!(body["data"]["public_key"].as_str().unwrap().len() > 0);
+    assert!(!body["data"]["public_key"].as_str().unwrap().is_empty());
     assert!(body["data"]["verified_at"].as_str().is_some());
     assert!(body["data"]["message_hash"].as_str().unwrap().len() == 64); // SHA256 hex
 }

@@ -98,9 +98,9 @@ datafold_cli list-keys --storage-dir /custom/path
 - **Nonce**: 12-byte random nonce per key
 
 ### Security Levels
-- **Interactive**: 32 MB memory, 2 iterations (fast)
-- **Balanced**: 64 MB memory, 3 iterations (default)
-- **Sensitive**: 128 MB memory, 4 iterations (high security)
+- **Low**: 32 MB memory, 2 iterations (fast, formerly "Interactive")
+- **Standard**: 64 MB memory, 3 iterations (default, formerly "Balanced")
+- **High**: 128 MB memory, 4 iterations (high security, formerly "Sensitive")
 
 ### Access Control
 - Keys are encrypted with user-provided passphrases

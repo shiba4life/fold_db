@@ -4,12 +4,11 @@
 //! key generation, profile management, request signing, and end-to-end workflows.
 
 use datafold::cli::auth::{CliAuthProfile, CliRequestSigner, CliSigningConfig, SignatureComponent};
-use datafold::cli::config::{CliConfigManager, CliSettings, SignatureSettings};
+use datafold::cli::config::{CliConfigManager, CliSettings};
 use datafold::cli::http_client::{HttpClientBuilder, RetryConfig};
 use datafold::crypto::ed25519::generate_master_keypair;
 use std::collections::HashMap;
 use tempfile::TempDir;
-use tokio;
 
 /// Test CLI authentication profile creation and management
 #[test]

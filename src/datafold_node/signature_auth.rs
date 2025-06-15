@@ -5,6 +5,7 @@
 
 use crate::datafold_node::error::NodeResult;
 use crate::error::FoldDbError;
+use crate::security_types::Severity;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     http::StatusCode,
@@ -394,17 +395,17 @@ impl AuthenticationError {
         }
     }
 
-    pub fn severity(&self) -> SecurityEventSeverity {
+    pub fn severity(&self) -> Severity {
         match self {
-            Self::MissingHeaders { .. } => SecurityEventSeverity::Info,
-            Self::InvalidSignatureFormat { .. } => SecurityEventSeverity::Warn,
-            Self::SignatureVerificationFailed { .. } => SecurityEventSeverity::Warn,
-            Self::TimestampValidationFailed { .. } => SecurityEventSeverity::Warn,
-            Self::NonceValidationFailed { .. } => SecurityEventSeverity::Critical,
-            Self::PublicKeyLookupFailed { .. } => SecurityEventSeverity::Warn,
-            Self::ConfigurationError { .. } => SecurityEventSeverity::Critical,
-            Self::UnsupportedAlgorithm { .. } => SecurityEventSeverity::Info,
-            Self::RateLimitExceeded { .. } => SecurityEventSeverity::Critical,
+            Self::MissingHeaders { .. } => Severity::Info,
+            Self::InvalidSignatureFormat { .. } => Severity::Warning,
+            Self::SignatureVerificationFailed { .. } => Severity::Warning,
+            Self::TimestampValidationFailed { .. } => Severity::Warning,
+            Self::NonceValidationFailed { .. } => Severity::Critical,
+            Self::PublicKeyLookupFailed { .. } => Severity::Warning,
+            Self::ConfigurationError { .. } => Severity::Critical,
+            Self::UnsupportedAlgorithm { .. } => Severity::Info,
+            Self::RateLimitExceeded { .. } => Severity::Critical,
         }
     }
 }
@@ -512,13 +513,6 @@ impl std::fmt::Display for AuthenticationError {
 
 impl std::error::Error for AuthenticationError {}
 
-/// Security event severity levels
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum SecurityEventSeverity {
-    Info,
-    Warn,
-    Critical,
-}
 
 /// Security event types for structured logging
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -527,7 +521,7 @@ pub struct SecurityEvent {
     pub correlation_id: String,
     pub timestamp: u64,
     pub event_type: SecurityEventType,
-    pub severity: SecurityEventSeverity,
+    pub severity: Severity,
     pub client_info: ClientInfo,
     pub request_info: RequestInfo,
     pub error_details: Option<AuthenticationError>,
@@ -646,7 +640,7 @@ pub struct SecurityLoggingConfig {
     /// Log successful authentications (not just failures)
     pub log_successful_auth: bool,
     /// Minimum severity level for security events
-    pub min_severity: SecurityEventSeverity,
+    pub min_severity: Severity,
     /// Maximum log entry size in bytes
     pub max_log_entry_size: usize,
 }
@@ -730,7 +724,7 @@ impl Default for SecurityLoggingConfig {
             include_client_info: true,
             include_performance_metrics: true,
             log_successful_auth: false, // Only log failures by default for performance
-            min_severity: SecurityEventSeverity::Info,
+            min_severity: Severity::Info,
             max_log_entry_size: 8192, // 8KB max log entry
         }
     }
@@ -1171,7 +1165,7 @@ pub struct PerformanceAlert {
     pub message: String,
     pub metric_value: f64,
     pub threshold: f64,
-    pub severity: AlertSeverity,
+    pub severity: Severity,
 }
 
 /// Types of performance alerts
@@ -1183,14 +1177,6 @@ pub enum PerformanceAlertType {
     NonceStoreOverflow,
     DatabaseSlowdown,
     RequestRateSpike,
-}
-
-/// Alert severity levels
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AlertSeverity {
-    Info,
-    Warning,
-    Critical,
 }
 
 impl Default for PerformanceMonitor {
@@ -1232,7 +1218,7 @@ impl PerformanceMonitor {
                     format!("Average latency {}ms exceeds threshold", avg_latency),
                     avg_latency,
                     100.0,
-                    AlertSeverity::Warning,
+                    Severity::Warning,
                 );
             }
         }
@@ -1259,7 +1245,7 @@ impl PerformanceMonitor {
         message: String,
         metric_value: f64,
         threshold: f64,
-        severity: AlertSeverity,
+        severity: Severity,
     ) {
         let alert = PerformanceAlert {
             alert_id: Uuid::new_v4().to_string(),
@@ -1303,9 +1289,9 @@ impl SecurityLogger {
             Ok(json_str) => {
                 // Log based on severity level
                 match event.severity {
-                    SecurityEventSeverity::Info => info!("SECURITY_EVENT: {}", json_str),
-                    SecurityEventSeverity::Warn => warn!("SECURITY_EVENT: {}", json_str),
-                    SecurityEventSeverity::Critical => error!("SECURITY_EVENT: {}", json_str),
+                    Severity::Info => info!("SECURITY_EVENT: {}", json_str),
+                    Severity::Warning => warn!("SECURITY_EVENT: {}", json_str),
+                    Severity::Error | Severity::Critical => error!("SECURITY_EVENT: {}", json_str),
                 }
             }
             Err(e) => {
@@ -1314,16 +1300,16 @@ impl SecurityLogger {
         }
     }
 
-    fn should_log_severity(&self, severity: &SecurityEventSeverity) -> bool {
+    fn should_log_severity(&self, severity: &Severity) -> bool {
         matches!(
             (&self.config.min_severity, severity),
             (
-                SecurityEventSeverity::Critical,
-                SecurityEventSeverity::Critical
+                Severity::Critical,
+                Severity::Critical
             ) | (
-                SecurityEventSeverity::Warn,
-                SecurityEventSeverity::Warn | SecurityEventSeverity::Critical
-            ) | (SecurityEventSeverity::Info, _)
+                Severity::Warning,
+                Severity::Warning | Severity::Error | Severity::Critical
+            ) | (Severity::Info, _)
         )
     }
 
@@ -2264,7 +2250,7 @@ impl SignatureVerificationState {
                     correlation_id: error.correlation_id().to_string(),
                     timestamp: pattern.detection_time,
                     event_type: SecurityEventType::SuspiciousActivity,
-                    severity: SecurityEventSeverity::Critical,
+                    severity: Severity::Critical,
                     client_info: client_info.clone(),
                     request_info: request_info.clone(),
                     error_details: None,
@@ -2315,7 +2301,7 @@ impl SignatureVerificationState {
                 .unwrap_or_default()
                 .as_secs(),
             event_type: SecurityEventType::AuthenticationSuccess,
-            severity: SecurityEventSeverity::Info,
+            severity: Severity::Info,
             client_info: client_info_with_key,
             request_info: request_info.clone(),
             error_details: None,

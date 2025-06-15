@@ -7,8 +7,9 @@
 //! - Rollback verification and audit
 
 use super::core::DbOperations;
-use super::key_rotation_operations::{KeyRotationRecord, RotationStatus, KeyAssociation};
+use super::key_rotation_operations::{KeyRotationRecord, KeyAssociation};
 use crate::crypto::key_rotation::{KeyRotationError, RotationContext};
+use crate::security_types::{RotationStatus, Severity};
 use crate::crypto::audit_logger::{CryptoAuditLogger, OperationResult};
 use crate::schema::SchemaError;
 use chrono::{DateTime, Utc};
@@ -434,7 +435,7 @@ impl DbOperations {
             RollbackVerificationStatus::Verified
         } else {
             let critical_issues = verification_result.issues_found.iter()
-                .any(|issue| issue.severity == RollbackIssueSeverity::Critical);
+                .any(|issue| issue.severity == Severity::Critical);
             
             if critical_issues {
                 RollbackVerificationStatus::Failed
@@ -801,22 +802,9 @@ pub struct RollbackVerificationIssue {
     /// Issue description
     pub description: String,
     /// Issue severity
-    pub severity: RollbackIssueSeverity,
+    pub severity: Severity,
     /// Suggested resolution
     pub suggested_resolution: Option<String>,
-}
-
-/// Rollback issue severity
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RollbackIssueSeverity {
-    /// Low impact issue
-    Low,
-    /// Medium impact issue
-    Medium,
-    /// High impact issue
-    High,
-    /// Critical issue
-    Critical,
 }
 
 #[cfg(test)]

@@ -324,7 +324,7 @@ pub struct SecurityAlertHandler {
     /// Name of this handler
     name: String,
     /// Minimum severity for alerts
-    min_severity: crate::events::event_types::EventSeverity,
+    min_severity: crate::security_types::Severity,
     /// Alert destinations
     alert_destinations: Vec<AlertDestination>,
     /// Rate limiting configuration
@@ -361,7 +361,7 @@ pub struct RateLimit {
 
 impl SecurityAlertHandler {
     /// Create a new security alert handler
-    pub fn new(min_severity: crate::events::event_types::EventSeverity) -> Self {
+    pub fn new(min_severity: crate::security_types::Severity) -> Self {
         Self {
             name: "security_alert_handler".to_string(),
             min_severity,
@@ -609,9 +609,10 @@ impl SecurityAlertHandler {
 mod tests {
     use super::*;
     use crate::events::event_types::{
-        CreateVerificationEvent, EventSeverity, PlatformSource, SecurityEvent,
+        CreateVerificationEvent, PlatformSource, SecurityEvent,
         SecurityEventCategory, VerificationEvent,
     };
+    use crate::security_types::Severity;
 
     #[tokio::test]
     async fn test_metrics_handler() {
@@ -619,7 +620,7 @@ mod tests {
 
         let event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Authentication,
-            EventSeverity::Info,
+            Severity::Info,
             PlatformSource::RustCli,
             "test_component".to_string(),
             "test_operation".to_string(),
@@ -636,12 +637,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_security_alert_handler() {
-        let handler = SecurityAlertHandler::new(EventSeverity::Warning);
+        let handler = SecurityAlertHandler::new(Severity::Warning);
 
         // This should trigger an alert
         let critical_event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Security,
-            EventSeverity::Critical,
+            Severity::Critical,
             PlatformSource::DataFoldNode,
             "security_monitor".to_string(),
             "threat_detected".to_string(),
@@ -653,7 +654,7 @@ mod tests {
         // This should be skipped
         let info_event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Performance,
-            EventSeverity::Info,
+            Severity::Info,
             PlatformSource::JavaScriptSdk,
             "perf_monitor".to_string(),
             "metric_update".to_string(),

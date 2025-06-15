@@ -4,11 +4,11 @@
 //! into CI/CD pipelines for continuous validation of the client-side key management system.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{self, Value};
+use serde_json::{self};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
 
@@ -250,10 +250,8 @@ impl E2ETestRunner {
         }
 
         // Check for Rust and Cargo
-        if self.should_test_platform(&TestPlatform::CLI) {
-            if Command::new("cargo").arg("--version").output().is_err() {
-                missing_tools.push("Cargo");
-            }
+        if self.should_test_platform(&TestPlatform::CLI) && Command::new("cargo").arg("--version").output().is_err() {
+            missing_tools.push("Cargo");
         }
 
         if !missing_tools.is_empty() {
@@ -500,7 +498,7 @@ impl E2ETestRunner {
 
         // Install dependencies
         let install_output = Command::new("pip")
-            .args(&["install", "-r", "requirements-dev.txt"])
+            .args(["install", "-r", "requirements-dev.txt"])
             .current_dir(&python_sdk_path)
             .output()?;
 
@@ -514,7 +512,7 @@ impl E2ETestRunner {
 
         // Run tests with pytest
         let test_output = Command::new("python")
-            .args(&[
+            .args([
                 "-m",
                 "pytest",
                 "--json-report",
@@ -537,7 +535,7 @@ impl E2ETestRunner {
 
         // Run only the most basic CLI tests to avoid hanging
         let test_output = Command::new("cargo")
-            .args(&[
+            .args([
                 "test",
                 "--test",
                 "cli_key_generation_test",
@@ -562,7 +560,7 @@ impl E2ETestRunner {
 
         // Run server-specific integration tests
         let test_output = Command::new("cargo")
-            .args(&["test", "integration", "--", "--test-threads=1"])
+            .args(["test", "integration", "--", "--test-threads=1"])
             .current_dir(&self.config.workspace_root)
             .output()?;
 
@@ -775,7 +773,7 @@ impl E2ETestRunner {
         let mut total_failed = 0;
         let mut total_skipped = 0;
 
-        for (_platform, results) in &self.results.platform_results {
+        for results in self.results.platform_results.values() {
             total_tests += results.tests_run;
             total_passed += results.tests_passed;
             total_failed += results.tests_failed;

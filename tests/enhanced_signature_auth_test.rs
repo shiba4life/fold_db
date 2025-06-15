@@ -1,7 +1,7 @@
 //! Enhanced tests for timestamp and nonce validation in signature authentication middleware
 
 use datafold::datafold_node::signature_auth::{
-    NonceStoreStats, SecurityProfile, SignatureAuthConfig, SignatureVerificationState,
+    SecurityProfile, SignatureAuthConfig, SignatureVerificationState,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 

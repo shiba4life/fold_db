@@ -20,7 +20,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tempfile::tempdir;
 use tokio::sync::Mutex;
-use uuid;
 
 /// Comprehensive test results for T11.8
 #[derive(Debug, Clone)]
@@ -33,6 +32,12 @@ pub struct T118TestResults {
     pub endpoint_coverage: HashMap<String, bool>,
     pub errors: Vec<String>,
     pub warnings: Vec<String>,
+}
+
+impl Default for T118TestResults {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl T118TestResults {
@@ -86,6 +91,12 @@ impl T118TestResults {
 /// T11.8 Comprehensive Integration Test Suite
 pub struct T118ComprehensiveIntegrationTest {
     results: T118TestResults,
+}
+
+impl Default for T118ComprehensiveIntegrationTest {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl T118ComprehensiveIntegrationTest {
@@ -274,7 +285,7 @@ impl T118ComprehensiveIntegrationTest {
             let req = test::TestRequest::post()
                 .uri("/api/test/negative")
                 .insert_header(("content-type", "application/json"))
-                .set_json(&json!({
+                .set_json(json!({
                     "test_scenario": scenario_name,
                     "description": description
                 }))
@@ -480,7 +491,7 @@ impl T118ComprehensiveIntegrationTest {
                 "GET" => test::TestRequest::get().uri(path).to_request(),
                 "POST" => test::TestRequest::post()
                     .uri(path)
-                    .set_json(&json!({
+                    .set_json(json!({
                         "client_id": "test",
                         "public_key": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
                     }))

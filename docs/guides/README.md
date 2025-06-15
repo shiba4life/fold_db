@@ -34,6 +34,7 @@ Welcome to the DataFold integration guides! These tutorials provide step-by-step
 
 ### 💻 Development Workflow
 
+- **[Security Types Guide](security-types.md)** - Understanding unified security enums and types
 - **[Local Development Setup](development/local-development-setup.md)** - Optimize your dev environment
 - **[Testing Authenticated Applications](development/testing-authenticated-apps.md)** - Testing strategies and tools
 - **[Debugging Signature Authentication](development/debugging-signature-auth.md)** - Troubleshooting guide

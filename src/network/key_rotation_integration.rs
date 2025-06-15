@@ -9,11 +9,12 @@ use crate::crypto::key_rotation::{
 use crate::datafold_node::key_cache_manager::{KeyCacheConfig, KeyCacheManager};
 use crate::events::transport::{EventTransport, InMemoryTransport, PlatformInfo, TransportConfig};
 use crate::events::{
-    EventSeverity, KeyPropagationStatus, KeyRotationEvent, KeyRotationEventType,
+    KeyPropagationStatus, KeyRotationEvent, KeyRotationEventType,
     KeyRotationHandlerConfig, KeyRotationPropagationHandler, OperationResult, PlatformSource,
     SecurityEvent, SecurityEventCategory, VerificationEvent, VerificationEventBus,
 };
 use crate::network::{KeyPropagationConfig, KeyPropagationManager, NetworkCore};
+use crate::security_types::Severity;
 use chrono::Utc;
 use log::{info, warn};
 use std::collections::HashMap;
@@ -357,10 +358,10 @@ impl KeyRotationNetworkIntegration {
                 category: SecurityEventCategory::KeyRotation,
                 severity: match rotation_type {
                     KeyRotationEventType::RotationFailed
-                    | KeyRotationEventType::PropagationFailed => EventSeverity::Error,
+                    | KeyRotationEventType::PropagationFailed => Severity::Error,
                     KeyRotationEventType::RotationStarted
-                    | KeyRotationEventType::PropagationStarted => EventSeverity::Warning,
-                    _ => EventSeverity::Info,
+                    | KeyRotationEventType::PropagationStarted => Severity::Warning,
+                    _ => Severity::Info,
                 },
                 platform: PlatformSource::DataFoldNode,
                 component: "key_rotation_network".to_string(),

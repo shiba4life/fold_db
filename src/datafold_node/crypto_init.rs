@@ -406,7 +406,8 @@ impl CryptoInitStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::crypto::{KeyDerivationConfig, SecurityLevel};
+    use crate::config::crypto::KeyDerivationConfig;
+    use crate::security_types::SecurityLevel;
     use tempfile::tempdir;
 
     fn create_test_db_ops() -> Arc<DbOperations> {
@@ -429,7 +430,7 @@ mod tests {
             master_key: MasterKeyConfig::Passphrase {
                 passphrase: "test_passphrase_for_crypto_init".to_string(),
             },
-            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Interactive),
+            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Low),
         }
     }
 

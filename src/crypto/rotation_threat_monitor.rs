@@ -9,8 +9,9 @@ use super::key_rotation_audit::{
 };
 use super::key_rotation_security::KeyRotationSecurityManager;
 use super::security_monitor::{
-    CryptoSecurityMonitor, SecurityDetection, SecurityPattern, ThreatLevel,
+    CryptoSecurityMonitor, SecurityDetection, SecurityPattern,
 };
+use crate::security_types::ThreatLevel;
 use chrono::{DateTime, Duration as ChronoDuration, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -422,7 +423,7 @@ impl RotationThreatMonitor {
 
         for threat in active_threats.values() {
             let count = threat_counts
-                .entry(threat.base_detection.threat_level.clone())
+                .entry(threat.base_detection.threat_level)
                 .or_insert(0);
             *count += 1;
 
@@ -984,7 +985,7 @@ impl RotationThreatMonitor {
             detection_id,
             timestamp: now,
             pattern: pattern.to_security_pattern(),
-            threat_level: threat_level.clone(),
+            threat_level,
             confidence,
             source: "rotation_threat_monitor".to_string(),
             description: description.clone(),

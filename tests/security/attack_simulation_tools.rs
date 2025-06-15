@@ -3,17 +3,16 @@
 //! This module provides tools for simulating various replay attack scenarios
 //! to validate the effectiveness of DataFold's replay prevention mechanisms.
 
-use actix_web::{test, web, App, HttpMessage, HttpResponse};
 use datafold::datafold_node::signature_auth::{
-    AuthenticationError, SecurityEventSeverity, SecurityProfile, SignatureAuthConfig,
+    SecurityProfile, SignatureAuthConfig,
     SignatureVerificationState,
 };
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tokio::time::{sleep, timeout};
+use tokio::time::sleep;
 use uuid::Uuid;
 
 /// Attack simulation configuration

@@ -42,6 +42,7 @@ pub mod logging;
 pub mod network;
 pub mod permissions;
 pub mod schema;
+pub mod security_types;
 pub mod testing_utils;
 pub mod transform;
 pub mod validation_utils;
@@ -75,7 +76,7 @@ pub use crypto::{
 
 // Re-export config types
 pub use config::crypto::{
-    ConfigError, CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel,
+    ConfigError, CryptoConfig, KeyDerivationConfig, MasterKeyConfig,
 };
 
 // Re-export database crypto metadata types
@@ -99,3 +100,6 @@ pub use cli::{
         SigningMode, SigningPerformanceConfig,
     },
 };
+
+// Re-export unified security types
+pub use security_types::{HealthStatus, RotationStatus, SecurityLevel, Severity};

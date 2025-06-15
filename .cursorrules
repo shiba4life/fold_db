@@ -1,5 +1,7 @@
 # Project Policy
 
+This is a pre-release system.  Do not worry about backwards compatibility. 
+
 This policy provides a single, authoritative, and machine-readable source of truth for AI coding agents and humans, ensuring that all work is governed by clear, unambiguous rules and workflows. It aims to eliminate ambiguity, reduce supervision needs, and facilitate automation while maintaining accountability and compliance with best practices.
 
 # 1. Introduction

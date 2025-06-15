@@ -4,7 +4,8 @@
 //! It provides async event processing, pluggable handlers, and cross-platform support.
 
 use super::correlation::CorrelationManager;
-use super::event_types::{EventSeverity, SecurityEvent};
+use super::event_types::SecurityEvent;
+use crate::security_types::Severity;
 use super::handlers::{EventHandler, EventHandlerResult};
 use crate::config::unified_config::{EnvironmentConfig, UnifiedConfig};
 use chrono::{DateTime, Utc};
@@ -33,7 +34,7 @@ pub struct VerificationBusConfig {
     /// Event retention period in hours
     pub retention_hours: u64,
     /// Minimum severity level for processing
-    pub min_severity: EventSeverity,
+    pub min_severity: Severity,
     /// Enable cross-platform correlation
     pub enable_correlation: bool,
     /// Correlation window size in minutes
@@ -55,7 +56,7 @@ impl Default for VerificationBusConfig {
             max_concurrent_handlers: 10,
             enable_persistence: true,
             retention_hours: 24,
-            min_severity: EventSeverity::Info,
+            min_severity: Severity::Info,
             enable_correlation: true,
             correlation_window_minutes: 60,
             graceful_degradation: true,
@@ -521,11 +522,11 @@ impl VerificationBusConfig {
             enable_persistence: true,
             retention_hours: 24,
             min_severity: match env_config.logging.level.as_str() {
-                "debug" => EventSeverity::Info,
-                "info" => EventSeverity::Info,
-                "warn" => EventSeverity::Warning,
-                "error" => EventSeverity::Error,
-                _ => EventSeverity::Info,
+                "debug" => Severity::Info,
+                "info" => Severity::Info,
+                "warn" => Severity::Warning,
+                "error" => Severity::Error,
+                _ => Severity::Info,
             },
             enable_correlation: true,
             correlation_window_minutes: 60,
@@ -571,7 +572,7 @@ mod tests {
 
         let event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Authentication,
-            EventSeverity::Info,
+            Severity::Info,
             PlatformSource::RustCli,
             "test_component".to_string(),
             "test_operation".to_string(),
@@ -587,7 +588,7 @@ mod tests {
     #[tokio::test]
     async fn test_event_filtering() {
         let config = VerificationBusConfig {
-            min_severity: EventSeverity::Error,
+            min_severity: Severity::Error,
             ..Default::default()
         };
 
@@ -599,7 +600,7 @@ mod tests {
         // This should be filtered out
         let info_event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Performance,
-            EventSeverity::Info,
+            Severity::Info,
             PlatformSource::JavaScriptSdk,
             "test_component".to_string(),
             "test_operation".to_string(),
@@ -608,7 +609,7 @@ mod tests {
         // This should pass through
         let error_event = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Security,
-            EventSeverity::Error,
+            Severity::Error,
             PlatformSource::PythonSdk,
             "security_component".to_string(),
             "security_operation".to_string(),
@@ -630,7 +631,7 @@ mod tests {
 
         let event1 = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Authentication,
-            EventSeverity::Info,
+            Severity::Info,
             PlatformSource::RustCli,
             "auth".to_string(),
             "login".to_string(),
@@ -638,7 +639,7 @@ mod tests {
 
         let event2 = SecurityEvent::Generic(VerificationEvent::create_base_event(
             SecurityEventCategory::Security,
-            EventSeverity::Critical,
+            Severity::Critical,
             PlatformSource::DataFoldNode,
             "security".to_string(),
             "threat_detected".to_string(),

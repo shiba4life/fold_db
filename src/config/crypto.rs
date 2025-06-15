@@ -4,6 +4,7 @@
 //! key derivation parameters, and crypto initialization settings.
 
 use crate::crypto::{argon2::Argon2Params, error::CryptoResult, CryptoError};
+use crate::security_types::SecurityLevel;
 use serde::{Deserialize, Serialize};
 
 /// Top-level cryptographic configuration for database encryption
@@ -37,7 +38,7 @@ impl CryptoConfig {
         Self {
             enabled: true,
             master_key: MasterKeyConfig::Passphrase { passphrase },
-            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Balanced),
+            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Standard),
         }
     }
 
@@ -195,29 +196,29 @@ impl KeyDerivationConfig {
             memory_cost: 32768, // 32 MB
             time_cost: 2,
             parallelism: 2,
-            preset: Some(SecurityLevel::Interactive),
+            preset: Some(SecurityLevel::Low),
         }
     }
 
     /// Create configuration optimized for sensitive operations (slower, more secure)
     pub fn sensitive() -> Self {
         Self {
-            memory_cost: 131072, // 128 MB
+            memory_cost: 131_072, // 128 MB
             time_cost: 4,
             parallelism: 8,
-            preset: Some(SecurityLevel::Sensitive),
+            preset: Some(SecurityLevel::High),
         }
     }
 
     /// Create configuration for a specific security level
     pub fn for_security_level(level: SecurityLevel) -> Self {
         match level {
-            SecurityLevel::Interactive => Self::interactive(),
-            SecurityLevel::Balanced => Self {
-                preset: Some(SecurityLevel::Balanced),
+            SecurityLevel::Low => Self::interactive(),
+            SecurityLevel::Standard => Self {
+                preset: Some(SecurityLevel::Standard),
                 ..Default::default()
             },
-            SecurityLevel::Sensitive => Self::sensitive(),
+            SecurityLevel::High => Self::sensitive(),
         }
     }
 
@@ -239,9 +240,9 @@ impl KeyDerivationConfig {
         // Use preset parameters if specified
         let (memory_cost, time_cost, parallelism) = if let Some(preset) = &self.preset {
             match preset {
-                SecurityLevel::Interactive => (32768, 2, 2),
-                SecurityLevel::Balanced => (65536, 3, 4),
-                SecurityLevel::Sensitive => (131072, 4, 8),
+                SecurityLevel::Low => (32768, 2, 2),
+                SecurityLevel::Standard => (65536, 3, 4),
+                SecurityLevel::High => (131_072, 4, 8),
             }
         } else {
             (self.memory_cost, self.time_cost, self.parallelism)
@@ -257,9 +258,9 @@ impl KeyDerivationConfig {
     pub fn to_argon2_params(&self) -> CryptoResult<Argon2Params> {
         let (memory_cost, time_cost, parallelism) = if let Some(preset) = &self.preset {
             match preset {
-                SecurityLevel::Interactive => return Ok(Argon2Params::interactive()),
-                SecurityLevel::Balanced => return Ok(Argon2Params::default()),
-                SecurityLevel::Sensitive => return Ok(Argon2Params::sensitive()),
+                SecurityLevel::Low => return Ok(Argon2Params::interactive()),
+                SecurityLevel::Standard => return Ok(Argon2Params::default()),
+                SecurityLevel::High => return Ok(Argon2Params::sensitive()),
             }
         } else {
             (self.memory_cost, self.time_cost, self.parallelism)
@@ -269,30 +270,6 @@ impl KeyDerivationConfig {
     }
 }
 
-/// Security level presets for key derivation
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum SecurityLevel {
-    /// Fast parameters for interactive use (32 MB, 2 iterations, 2 threads)
-    Interactive,
-
-    /// Balanced parameters for general use (64 MB, 3 iterations, 4 threads)
-    Balanced,
-
-    /// High security parameters for sensitive operations (128 MB, 4 iterations, 8 threads)
-    Sensitive,
-}
-
-impl SecurityLevel {
-    /// Get string representation of security level
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            SecurityLevel::Interactive => "Interactive",
-            SecurityLevel::Balanced => "Balanced",
-            SecurityLevel::Sensitive => "Sensitive",
-        }
-    }
-}
 
 /// Configuration validation errors
 #[derive(Debug, thiserror::Error)]
@@ -345,7 +322,7 @@ mod tests {
         let config = CryptoConfig::with_enhanced_security("strong-passphrase".to_string());
         assert!(config.enabled);
         assert!(config.requires_passphrase());
-        assert_eq!(config.key_derivation.preset, Some(SecurityLevel::Sensitive));
+        assert_eq!(config.key_derivation.preset, Some(SecurityLevel::High));
         assert!(config.validate().is_ok());
     }
 
@@ -377,11 +354,11 @@ mod tests {
     #[test]
     fn test_key_derivation_config_presets() {
         let interactive = KeyDerivationConfig::interactive();
-        assert_eq!(interactive.preset, Some(SecurityLevel::Interactive));
+        assert_eq!(interactive.preset, Some(SecurityLevel::Low));
         assert!(interactive.validate().is_ok());
 
         let sensitive = KeyDerivationConfig::sensitive();
-        assert_eq!(sensitive.preset, Some(SecurityLevel::Sensitive));
+        assert_eq!(sensitive.preset, Some(SecurityLevel::High));
         assert!(sensitive.validate().is_ok());
 
         let default = KeyDerivationConfig::default();

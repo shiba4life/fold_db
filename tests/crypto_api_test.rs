@@ -5,7 +5,8 @@
 
 use tempfile::TempDir;
 
-use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel};
+use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
+use datafold::security_types::SecurityLevel;
 use datafold::datafold_node::{
     config::NodeConfig,
     crypto_init::{
@@ -96,7 +97,7 @@ async fn test_passphrase_initialization() {
         master_key: MasterKeyConfig::Passphrase {
             passphrase: "test-passphrase-for-initialization".to_string(),
         },
-        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Interactive),
+        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Low),
     };
 
     // Validate configuration
@@ -122,7 +123,7 @@ async fn test_passphrase_initialization_with_custom_params() {
     let fixture = CryptoInitTestFixture::new();
     let db_ops = fixture.db_ops();
 
-    let mut key_derivation = KeyDerivationConfig::for_security_level(SecurityLevel::Balanced);
+    let mut key_derivation = KeyDerivationConfig::for_security_level(SecurityLevel::Standard);
     key_derivation.memory_cost = 32768;
     key_derivation.time_cost = 3;
     key_derivation.parallelism = 2;
@@ -181,7 +182,7 @@ async fn test_validate_passphrase_config() {
         master_key: MasterKeyConfig::Passphrase {
             passphrase: "good-strong-passphrase-12345".to_string(),
         },
-        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Balanced),
+        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Standard),
     };
 
     let result = validate_crypto_config_for_init(&crypto_config);
@@ -195,7 +196,7 @@ async fn test_validate_empty_passphrase_error() {
         master_key: MasterKeyConfig::Passphrase {
             passphrase: "".to_string(),
         },
-        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Interactive),
+        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Low),
     };
 
     let result = validate_crypto_config_for_init(&crypto_config);
@@ -212,13 +213,13 @@ async fn test_sensitive_security_level() {
         master_key: MasterKeyConfig::Passphrase {
             passphrase: "sensitive-security-test-passphrase".to_string(),
         },
-        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Sensitive),
+        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::High),
     };
 
     let context =
         initialize_database_crypto(db_ops, &crypto_config).expect("Failed to initialize crypto");
 
-    assert!(context.derivation_method.contains("Sensitive"));
+    assert!(context.derivation_method.contains("High"));
 }
 
 #[tokio::test]
@@ -231,13 +232,13 @@ async fn test_interactive_security_level() {
         master_key: MasterKeyConfig::Passphrase {
             passphrase: "interactive-security-test-passphrase".to_string(),
         },
-        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Interactive),
+        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Low),
     };
 
     let context =
         initialize_database_crypto(db_ops, &crypto_config).expect("Failed to initialize crypto");
 
-    assert!(context.derivation_method.contains("Interactive"));
+    assert!(context.derivation_method.contains("Low"));
 }
 
 #[tokio::test]
@@ -256,7 +257,7 @@ async fn test_complete_crypto_initialization_workflow() {
         master_key: MasterKeyConfig::Passphrase {
             passphrase: "complete-workflow-test-passphrase".to_string(),
         },
-        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Balanced),
+        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Standard),
     };
 
     let validation_result = validate_crypto_config_for_init(&crypto_config);
@@ -299,7 +300,7 @@ async fn test_crypto_config_validation_scenarios() {
         master_key: MasterKeyConfig::Passphrase {
             passphrase: "".to_string(),
         },
-        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Interactive),
+        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Low),
     };
     let result = validate_crypto_config_for_init(&empty_passphrase_config);
     assert!(result.is_err()); // Should fail because empty passphrase

@@ -47,11 +47,11 @@ pub use argon2::{
 pub use audit_logger::{
     audit_decryption_operation, audit_encryption_operation, audit_security_event,
     get_global_audit_logger, init_global_audit_logger, AuditConfig, AuditEvent, AuditEventType,
-    AuditSeverity, CryptoAuditLogger, OperationResult, PerformanceMetrics, SecurityEventDetails,
+    CryptoAuditLogger, OperationResult, PerformanceMetrics, SecurityEventDetails,
 };
 pub use ed25519::{generate_master_keypair, MasterKeyPair, PublicKey};
 pub use enhanced_error::{
-    EnhancedCryptoError, EnhancedCryptoResult, ErrorContext, ErrorSeverity, RecoveryAction,
+    EnhancedCryptoError, EnhancedCryptoResult, ErrorContext, RecoveryAction,
 };
 pub use error::{CryptoError, CryptoResult};
 pub use key_rotation::{
@@ -61,9 +61,11 @@ pub use key_rotation::{
 };
 pub use key_rotation_audit::{
     GeolocationInfo, KeyRotationAuditEventType, KeyRotationAuditLogger,
-    KeyRotationSecurityMetadata, RotationAuditCorrelation, RotationStatus, SessionInfo,
+    KeyRotationSecurityMetadata, RotationAuditCorrelation, SessionInfo,
     TamperProofAuditEntry,
 };
+// Re-export RotationStatus from security_types module
+pub use crate::security_types::RotationStatus;
 pub use key_rotation_security::{
     IpRestrictionConfig, KeyRotationSecurityManager, KeyRotationSecurityPolicy, RateLimitConfig,
     RiskAssessmentConfig, SecurityEvaluationResult, SessionSecurityConfig, TimeRestrictionConfig,
@@ -74,5 +76,5 @@ pub use rotation_threat_monitor::{
 };
 pub use security_monitor::{
     get_global_security_monitor, init_global_security_monitor, CryptoSecurityMonitor,
-    SecurityDetection, SecurityMonitorConfig, SecurityPattern, ThreatLevel,
+    SecurityDetection, SecurityMonitorConfig, SecurityPattern,
 };

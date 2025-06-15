@@ -175,9 +175,9 @@ fn validate_key_derivation_config(crypto_config: &CryptoConfig) -> CryptoInitRes
         debug!("Key derivation security level: {}", preset.as_str());
 
         // Warn about performance implications of high security levels
-        if preset == &crate::config::crypto::SecurityLevel::Sensitive {
-            warn!("Using 'Sensitive' security level - key derivation will be very slow");
-            warn!("Consider using 'Interactive' level unless high security is required");
+        if preset == &crate::security_types::SecurityLevel::High {
+            warn!("Using 'High' security level - key derivation will be very slow");
+            warn!("Consider using 'Low' level unless high security is required");
         }
     } else {
         debug!("Using custom key derivation parameters");
@@ -217,26 +217,26 @@ fn validate_security_requirements(crypto_config: &CryptoConfig) -> CryptoInitRes
 /// Validate consistency between passphrase and security level
 fn validate_passphrase_security_level_consistency(
     passphrase: &str,
-    security_level: &crate::config::crypto::SecurityLevel,
+    security_level: &crate::security_types::SecurityLevel,
 ) -> CryptoInitResult<()> {
-    use crate::config::crypto::SecurityLevel;
+    use crate::security_types::SecurityLevel;
 
     match security_level {
-        SecurityLevel::Balanced => {
+        SecurityLevel::Standard => {
             if passphrase.len() < 8 {
-                warn!("Short passphrase with Balanced security level may be vulnerable");
+                warn!("Short passphrase with Standard security level may be vulnerable");
             }
         }
 
-        SecurityLevel::Interactive => {
+        SecurityLevel::Low => {
             if passphrase.len() < 12 {
-                warn!("Consider using a longer passphrase with Interactive security level");
+                warn!("Consider using a longer passphrase with Low security level");
             }
         }
 
-        SecurityLevel::Sensitive => {
+        SecurityLevel::High => {
             if passphrase.len() < 16 {
-                warn!("Sensitive security level recommended with passphrases of 16+ characters");
+                warn!("High security level recommended with passphrases of 16+ characters");
             }
         }
     }
@@ -351,7 +351,8 @@ pub fn validate_crypto_config_quick(crypto_config: &CryptoConfig) -> CryptoInitR
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::crypto::{KeyDerivationConfig, SecurityLevel};
+    use crate::config::crypto::KeyDerivationConfig;
+    use crate::security_types::SecurityLevel;
 
     fn create_valid_random_config() -> CryptoConfig {
         CryptoConfig {
@@ -367,7 +368,7 @@ mod tests {
             master_key: MasterKeyConfig::Passphrase {
                 passphrase: "secure_test_passphrase_123".to_string(),
             },
-            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Interactive),
+            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Low),
         }
     }
 

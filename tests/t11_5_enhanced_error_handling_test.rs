@@ -1,8 +1,9 @@
 //! Tests for T11.5: Enhanced Error Handling & User Experience for PBI-11
 
 use datafold::datafold_node::signature_auth::{
-    AuthenticationError, SecurityEventSeverity, SignatureAuthConfig, SignatureVerificationState,
+    AuthenticationError, SignatureAuthConfig, SignatureVerificationState,
 };
+use datafold::security_types::Severity;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[tokio::test]
@@ -203,21 +204,21 @@ async fn test_error_severity_mapping() {
         reason: "Nonce replay detected".to_string(),
         correlation_id: correlation_id.clone(),
     };
-    assert_eq!(critical_error.severity(), SecurityEventSeverity::Critical);
+    assert_eq!(critical_error.severity(), Severity::Critical);
 
     // Test warning severity errors
     let warn_error = AuthenticationError::SignatureVerificationFailed {
         key_id: "test-key".to_string(),
         correlation_id: correlation_id.clone(),
     };
-    assert_eq!(warn_error.severity(), SecurityEventSeverity::Warn);
+    assert_eq!(warn_error.severity(), Severity::Warning);
 
     // Test info severity errors
     let info_error = AuthenticationError::MissingHeaders {
         missing: vec!["Signature".to_string()],
         correlation_id: correlation_id.clone(),
     };
-    assert_eq!(info_error.severity(), SecurityEventSeverity::Info);
+    assert_eq!(info_error.severity(), Severity::Info);
 }
 
 #[tokio::test]
@@ -304,7 +305,7 @@ async fn test_nonce_error_details() {
     assert!(guidance.contains("unique nonce"));
     assert!(guidance.contains("UUID4"));
     assert!(guidance.contains("length restrictions"));
-    assert!(guidance.contains(&invalid_nonce));
+    assert!(guidance.contains(invalid_nonce));
 
     let actions = error.get_suggested_actions();
     assert!(actions

@@ -601,8 +601,9 @@ impl Drop for KeyPropagationManager {
 mod tests {
     use super::*;
     use crate::events::event_types::{
-        EventSeverity, OperationResult, PlatformSource, SecurityEventCategory, VerificationEvent,
+        OperationResult, PlatformSource, SecurityEventCategory, VerificationEvent,
     };
+    use crate::security_types::Severity;
     use crate::events::KeyRotationEventType;
     use crate::events::transport::{InMemoryTransport, TransportConfig};
     use crate::network::NetworkConfig;
@@ -613,7 +614,7 @@ mod tests {
             event_id: Uuid::new_v4(),
             timestamp: Utc::now(),
             category: SecurityEventCategory::KeyRotation,
-            severity: EventSeverity::Info,
+            severity: Severity::Info,
             platform: PlatformSource::DataFoldNode,
             component: "key_rotation".to_string(),
             operation: "rotate_key".to_string(),

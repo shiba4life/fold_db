@@ -4,10 +4,10 @@
 //! ensuring that all crypto integration points work correctly from NodeConfig to database setup.
 
 use datafold::{
-    config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel},
+    config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig},
     datafold_node::{DataFoldNode, NodeConfig},
+    security_types::SecurityLevel,
 };
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Test fixture for node crypto workflow testing
@@ -66,9 +66,9 @@ async fn test_complete_node_creation_workflow_with_random_crypto() {
 
     // Test with different security levels
     for (i, security_level) in [
-        SecurityLevel::Interactive,
-        SecurityLevel::Balanced,
-        SecurityLevel::Sensitive,
+        SecurityLevel::Low,
+        SecurityLevel::Standard,
+        SecurityLevel::High,
     ]
     .iter()
     .enumerate()
@@ -101,14 +101,14 @@ async fn test_complete_node_creation_workflow_with_passphrase_crypto() {
 
     // Test with different passphrases and security levels
     let test_cases = [
-        ("short_secure_pass", SecurityLevel::Interactive),
+        ("short_secure_pass", SecurityLevel::Low),
         (
             "medium_length_secure_passphrase_123",
-            SecurityLevel::Balanced,
+            SecurityLevel::Standard,
         ),
         (
             "very_long_extremely_secure_passphrase_with_numbers_123_and_symbols_!@#",
-            SecurityLevel::Sensitive,
+            SecurityLevel::High,
         ),
     ];
 
@@ -163,7 +163,7 @@ async fn test_database_crypto_persistence_workflow() {
     config.crypto = Some(CryptoConfig {
         enabled: true,
         master_key: MasterKeyConfig::Random,
-        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Interactive),
+        key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Low),
     });
 
     // Create node with crypto - this should initialize crypto metadata
@@ -186,16 +186,16 @@ async fn test_multiple_node_creation_with_different_crypto_configs() {
     let configs = vec![
         (
             "random_interactive",
-            fixture.config_with_random_crypto(SecurityLevel::Interactive),
+            fixture.config_with_random_crypto(SecurityLevel::Low),
         ),
         (
             "random_balanced",
-            fixture.config_with_random_crypto(SecurityLevel::Balanced),
+            fixture.config_with_random_crypto(SecurityLevel::Standard),
         ),
         (
             "passphrase_sensitive",
             fixture
-                .config_with_passphrase_crypto("secure_test_passphrase", SecurityLevel::Sensitive),
+                .config_with_passphrase_crypto("secure_test_passphrase", SecurityLevel::High),
         ),
         ("no_crypto", fixture.config_without_crypto()),
     ];
@@ -206,7 +206,7 @@ async fn test_multiple_node_creation_with_different_crypto_configs() {
         // Use different storage paths for each node
         config.storage_path = fixture.temp_dir.path().join(format!("db_{}", name));
 
-        let node = DataFoldNode::new(config).expect(&format!("Failed to create node: {}", name));
+        let node = DataFoldNode::new(config).unwrap_or_else(|_| panic!("Failed to create node: {}", name));
 
         nodes.push((name, node));
         println!("✅ Created node: {}", name);
@@ -225,7 +225,7 @@ async fn test_crypto_initialization_error_handling() {
     let fixture = NodeCryptoWorkflowFixture::new();
 
     // Test with invalid passphrase (too short)
-    let invalid_config = fixture.config_with_passphrase_crypto("", SecurityLevel::Interactive);
+    let invalid_config = fixture.config_with_passphrase_crypto("", SecurityLevel::Low);
 
     // This should fail due to validation
     let result = DataFoldNode::new(invalid_config);
@@ -265,7 +265,7 @@ async fn test_crypto_workflow_performance_baseline() {
         config.crypto = Some(CryptoConfig {
             enabled: true,
             master_key: MasterKeyConfig::Random,
-            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Interactive),
+            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Low),
         });
         let _node_random_crypto =
             DataFoldNode::new(config).expect("Failed to create node with random crypto");
@@ -283,7 +283,7 @@ async fn test_crypto_workflow_performance_baseline() {
             master_key: MasterKeyConfig::Passphrase {
                 passphrase: passphrase.to_string(),
             },
-            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Interactive),
+            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Low),
         });
         let _node_passphrase_crypto =
             DataFoldNode::new(config).expect("Failed to create node with passphrase crypto");

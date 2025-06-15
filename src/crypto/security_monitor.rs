@@ -5,6 +5,7 @@
 
 use super::audit_logger::{CryptoAuditLogger, OperationResult, SecurityEventDetails};
 use super::enhanced_error::EnhancedCryptoError;
+use crate::security_types::ThreatLevel;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -12,19 +13,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use uuid::Uuid;
-
-/// Security threat levels
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ThreatLevel {
-    /// Low threat - informational
-    Low,
-    /// Medium threat - suspicious activity
-    Medium,
-    /// High threat - probable attack
-    High,
-    /// Critical threat - active attack detected
-    Critical,
-}
 
 /// Types of security patterns to monitor
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Copy)]
@@ -470,7 +458,7 @@ impl CryptoSecurityMonitor {
             for detection in &detections {
                 *stats
                     .threats_by_level
-                    .entry(detection.threat_level.clone())
+                    .entry(detection.threat_level)
                     .or_insert(0) += 1;
                 *stats
                     .patterns_detected

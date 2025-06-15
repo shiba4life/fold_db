@@ -124,7 +124,7 @@ fn test_encrypted_atom_ref_operations() {
     assert_eq!(atom_ref.get_atom_uuid(), atom.uuid());
 
     // Verify that the atom ref is stored encrypted
-    let ref_key = format!("ref:test_ref_uuid");
+    let ref_key = "ref:test_ref_uuid".to_string();
     let raw_ref_data = folddb
         .db_ops()
         .db()
@@ -160,7 +160,7 @@ fn test_encrypted_atom_ref_range_operations() {
         .unwrap();
 
     // Verify that the atom ref range is stored encrypted
-    let range_key = format!("ref:test_range_uuid");
+    let range_key = "ref:test_range_uuid".to_string();
     let raw_range_data = folddb
         .db_ops()
         .db()

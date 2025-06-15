@@ -5,7 +5,8 @@
 //! validation gate ensuring complete functionality across all interfaces.
 
 use datafold::{
-    config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel},
+    config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig},
+    security_types::SecurityLevel,
     datafold_node::crypto_init::{
         get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed,
         validate_crypto_config_for_init,
@@ -778,7 +779,7 @@ async fn test_ac4_api_integration(fixture: &mut PBI8E2ETestFixture) {
 
     // AC 4.3: Error handling for initialization failures
     let duplicate_result = node.initialize_crypto(&crypto_config);
-    if !duplicate_result.is_err() {
+    if duplicate_result.is_ok() {
         fixture.log_result("AC4.3 Error Handling", false, "Error handling not working");
         return;
     }
@@ -855,9 +856,9 @@ async fn test_ac5_security_requirements(fixture: &mut PBI8E2ETestFixture) {
 
 async fn test_crypto_initialization_performance(fixture: &mut PBI8E2ETestFixture) {
     let security_levels = [
-        SecurityLevel::Interactive,
-        SecurityLevel::Balanced,
-        SecurityLevel::Sensitive,
+        SecurityLevel::Low,
+        SecurityLevel::Standard,
+        SecurityLevel::High,
     ];
 
     for security_level in &security_levels {
@@ -877,9 +878,9 @@ async fn test_crypto_initialization_performance(fixture: &mut PBI8E2ETestFixture
 
         // Define performance thresholds
         let max_duration = match security_level {
-            SecurityLevel::Interactive => Duration::from_secs(5),
-            SecurityLevel::Balanced => Duration::from_secs(10),
-            SecurityLevel::Sensitive => Duration::from_secs(30),
+            SecurityLevel::Low => Duration::from_secs(5),
+            SecurityLevel::Standard => Duration::from_secs(10),
+            SecurityLevel::High => Duration::from_secs(30),
         };
 
         if duration > max_duration {

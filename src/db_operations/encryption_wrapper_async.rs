@@ -386,10 +386,9 @@ impl AsyncEncryptionWrapper {
                     metrics.cache_hits += 1;
 
                     return Ok(Some(result));
-                } else {
-                    // Remove expired entry
-                    cache.pop(key);
                 }
+                // Remove expired entry
+                cache.pop(key);
             }
 
             // Cache miss

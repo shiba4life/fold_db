@@ -364,7 +364,7 @@ fn test_json_schema_serialization_and_validation() {
         let field = deserialized
             .fields
             .get(field_name)
-            .expect(&format!("Field {} should exist", field_name));
+            .unwrap_or_else(|| panic!("Field {} should exist", field_name));
         assert!(matches!(field.field_type, FieldType::Single));
     }
 
@@ -531,7 +531,7 @@ fn test_database_storage_and_retrieval_operations() {
         fixture
             .db_ops
             .store_item(&format!("atom:{}", atom_uuid), &atom)
-            .expect(&format!("Failed to store atom with {}", description));
+            .unwrap_or_else(|_| panic!("Failed to store atom with {}", description));
 
         stored_atom_uuids.push((atom_uuid, content.clone()));
     }

@@ -1,12 +1,8 @@
 //! Integration tests for CLI server integration functionality
 
-use reqwest;
 use serde_json::json;
-use std::fs;
-use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
-use tokio;
 
 /// Test CLI server integration end-to-end workflow
 #[tokio::test]
@@ -22,7 +18,7 @@ async fn test_cli_server_integration_workflow() {
 
     // Test key generation
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--bin",
             "datafold_cli",
@@ -41,7 +37,7 @@ async fn test_cli_server_integration_workflow() {
 
     // Test key storage
     let store_output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--bin",
             "datafold_cli",
@@ -65,7 +61,7 @@ async fn test_cli_server_integration_workflow() {
 fn test_cli_server_commands_help() {
     // Test register-key help
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--bin",
             "datafold_cli",
@@ -83,7 +79,7 @@ fn test_cli_server_commands_help() {
 
     // Test check-registration help
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--bin",
             "datafold_cli",
@@ -100,7 +96,7 @@ fn test_cli_server_commands_help() {
 
     // Test sign-and-verify help
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--bin",
             "datafold_cli",
@@ -117,7 +113,7 @@ fn test_cli_server_commands_help() {
 
     // Test test-server-integration help
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--bin",
             "datafold_cli",
@@ -138,7 +134,7 @@ fn test_cli_server_commands_help() {
 fn test_cli_server_command_validation() {
     // Test register-key without required parameters
     let output = Command::new("cargo")
-        .args(&["run", "--bin", "datafold_cli", "--", "register-key"])
+        .args(["run", "--bin", "datafold_cli", "--", "register-key"])
         .output()
         .expect("Failed to execute register-key command");
 
@@ -149,7 +145,7 @@ fn test_cli_server_command_validation() {
 
     // Test check-registration without required parameters
     let output = Command::new("cargo")
-        .args(&["run", "--bin", "datafold_cli", "--", "check-registration"])
+        .args(["run", "--bin", "datafold_cli", "--", "check-registration"])
         .output()
         .expect("Failed to execute check-registration command");
 

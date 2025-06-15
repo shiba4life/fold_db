@@ -163,9 +163,9 @@ datafold_cli restore-key \
 
 All derivation and rotation operations support three security levels:
 
-- **Interactive**: 32 MB memory, 2 iterations (fast for development)
-- **Balanced**: 64 MB memory, 3 iterations (default for production)
-- **Sensitive**: 128 MB memory, 4 iterations (high security for critical keys)
+- **Low**: 32 MB memory, 2 iterations (fast for development, formerly "Interactive")
+- **Standard**: 64 MB memory, 3 iterations (default for production, formerly "Balanced")
+- **High**: 128 MB memory, 4 iterations (high security for critical keys, formerly "Sensitive")
 
 ### File Security
 

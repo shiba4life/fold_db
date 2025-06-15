@@ -7,19 +7,19 @@
 
 use datafold::crypto::{
     audit_logger::{
-        AuditConfig, AuditEventType, AuditSeverity, CryptoAuditLogger, OperationResult,
+        AuditConfig, AuditEventType, CryptoAuditLogger, OperationResult,
         SecurityEventDetails,
     },
-    enhanced_error::{EnhancedCryptoError, ErrorContext, ErrorSeverity, RecoveryAction},
+    enhanced_error::{EnhancedCryptoError, ErrorContext, RecoveryAction},
     generate_master_keypair,
     security_monitor::{
-        CryptoSecurityMonitor, SecurityMonitorConfig, SecurityPattern, ThreatLevel,
+        CryptoSecurityMonitor, SecurityMonitorConfig, SecurityPattern,
     },
     MasterKeyPair,
 };
+use datafold::security_types::{Severity, ThreatLevel};
 use datafold::db_operations::{DbOperations, EncryptionWrapper};
 use std::time::Duration;
-use tokio;
 use uuid::Uuid;
 
 /// Test configuration for crypto operations
@@ -54,7 +54,7 @@ async fn test_enhanced_crypto_error_creation() {
 
     let error = EnhancedCryptoError::Encryption {
         message: "Test encryption failure".to_string(),
-        severity: ErrorSeverity::High,
+        severity: Severity::Error,
         recovery_actions: vec![
             RecoveryAction::Retry,
             RecoveryAction::RegenerateCryptoMaterial,
@@ -65,7 +65,7 @@ async fn test_enhanced_crypto_error_creation() {
         underlying_cause: None,
     };
 
-    assert_eq!(*error.severity(), ErrorSeverity::High);
+    assert_eq!(*error.severity(), Severity::Error);
     assert_eq!(error.recovery_actions().len(), 2);
     assert!(error.is_recoverable());
     assert!(error.should_alert());
@@ -94,7 +94,7 @@ async fn test_error_structured_logging() {
 
     let error = EnhancedCryptoError::KeyGeneration {
         message: "Test key generation failure".to_string(),
-        severity: ErrorSeverity::Critical,
+        severity: Severity::Critical,
         recovery_actions: vec![RecoveryAction::ContactAdministrator],
         context,
         underlying_cause: Some("RNG failure".to_string()),
@@ -268,7 +268,7 @@ async fn test_audit_logger_event_filtering() {
 
     // Test filtering by severity
     let info_events = logger
-        .filter_events(None, Some(AuditSeverity::Info), None, None, None)
+        .filter_events(None, Some(Severity::Info), None, None, None)
         .await;
     assert_eq!(info_events.len(), 3); // All successful operations are Info level
 
@@ -434,7 +434,7 @@ async fn test_security_monitor_error_integration() {
 
     let error = EnhancedCryptoError::Decryption {
         message: "Decryption failed due to invalid key".to_string(),
-        severity: ErrorSeverity::High,
+        severity: Severity::Error,
         recovery_actions: vec![RecoveryAction::CheckConfiguration],
         context,
         data_size: Some(1024),
@@ -539,7 +539,7 @@ async fn test_integrated_error_and_audit_workflow() {
 
     let error = EnhancedCryptoError::Encryption {
         message: "Integration test encryption failure".to_string(),
-        severity: ErrorSeverity::High,
+        severity: Severity::Error,
         recovery_actions: vec![RecoveryAction::Retry, RecoveryAction::CheckConfiguration],
         context,
         data_size: Some(2048),
@@ -576,7 +576,7 @@ fn test_error_recovery_action_logic() {
     // Test recoverable error
     let recoverable_error = EnhancedCryptoError::KeyGeneration {
         message: "Temporary failure".to_string(),
-        severity: ErrorSeverity::Medium,
+        severity: Severity::Warning,
         recovery_actions: vec![RecoveryAction::Retry],
         context: context.clone(),
         underlying_cause: None,
@@ -586,7 +586,7 @@ fn test_error_recovery_action_logic() {
     // Test non-recoverable error
     let non_recoverable_error = EnhancedCryptoError::Security {
         message: "Critical security violation".to_string(),
-        severity: ErrorSeverity::Critical,
+        severity: Severity::Critical,
         recovery_actions: vec![RecoveryAction::NoRecovery],
         context,
         security_event: "data_corruption".to_string(),
@@ -607,7 +607,7 @@ fn test_error_conversion_from_legacy() {
     let enhanced_error = EnhancedCryptoError::from(legacy_error);
     assert_eq!(enhanced_error.error_type_name(), "key_generation");
     assert!(enhanced_error.is_recoverable());
-    assert_eq!(*enhanced_error.severity(), ErrorSeverity::High);
+    assert_eq!(*enhanced_error.severity(), Severity::Error);
 }
 
 #[tokio::test]

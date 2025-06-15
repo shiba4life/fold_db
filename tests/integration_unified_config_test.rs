@@ -64,11 +64,11 @@ fn test_environment_configuration_differences() -> UnifiedConfigResult<()> {
     // Verify they have different configurations
     // Production should be more strict than development
     assert!(prod_config.signing.timeout_ms <= dev_config.signing.timeout_ms);
-    assert_eq!(prod_config.verification.strict_timing, true);
+    assert!(prod_config.verification.strict_timing);
 
     // Development should have debug enabled
-    assert_eq!(dev_config.signing.debug.enabled, true);
-    assert_eq!(prod_config.signing.debug.enabled, false);
+    assert!(dev_config.signing.debug.enabled);
+    assert!(!prod_config.signing.debug.enabled);
 
     Ok(())
 }

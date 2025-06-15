@@ -43,26 +43,24 @@
 //! - Error handling and audit logging
 
 use datafold::{
-    config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel},
-    crypto::{generate_master_keypair, CryptoError, CryptoResult, MasterKeyPair},
+    config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig},
+    security_types::SecurityLevel,
+    crypto::{generate_master_keypair, MasterKeyPair},
     datafold_node::encryption_at_rest::{
-        key_derivation::KeyDerivationManager, EncryptedData, EncryptionAtRest, AES_KEY_SIZE,
+        key_derivation::KeyDerivationManager, EncryptionAtRest, AES_KEY_SIZE,
     },
     datafold_node::{DataFoldNode, NodeConfig},
     db_operations::{
         encrypted_backup::{BackupMode, BackupOptions, EncryptedBackupManager, RestoreOptions},
-        encryption_wrapper::{contexts, EncryptionWrapper, MigrationConfig, MigrationMode},
+        encryption_wrapper::{contexts, EncryptionWrapper, MigrationMode},
         DbOperations,
     },
-    schema::SchemaError,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tempfile::TempDir;
-use uuid::Uuid;
 
 /// Test data structure for comprehensive testing
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -115,7 +113,7 @@ impl E2ETestFixture {
         let crypto_config = CryptoConfig {
             enabled: true,
             master_key: MasterKeyConfig::Random,
-            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Interactive),
+            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Low),
         };
 
         Ok(Self {
@@ -226,7 +224,7 @@ fn test_e2e_complete_system_initialization() -> Result<(), Box<dyn std::error::E
     let mut unique_keys = std::collections::HashSet::new();
     for key in derived_keys.values() {
         assert!(
-            unique_keys.insert(key.clone()),
+            unique_keys.insert(*key),
             "All derived keys should be unique"
         );
     }
@@ -314,7 +312,7 @@ fn test_e2e_multi_context_encryption_operations() -> Result<(), Box<dyn std::err
     let stats = encryption_wrapper
         .get_encryption_stats()
         .map_err(|e| format!("Failed to get encryption stats: {}", e))?;
-    assert!(stats.len() > 0, "Should have encryption statistics");
+    assert!(!stats.is_empty(), "Should have encryption statistics");
 
     println!("✅ Multi-context encryption operations test passed");
     Ok(())
@@ -755,9 +753,9 @@ fn test_e2e_configuration_and_flexibility() -> Result<(), Box<dyn std::error::Er
 
     // Test 7.1: Different security levels
     let security_levels = [
-        SecurityLevel::Interactive,
-        SecurityLevel::Balanced,
-        SecurityLevel::Sensitive,
+        SecurityLevel::Low,
+        SecurityLevel::Standard,
+        SecurityLevel::High,
     ];
 
     for security_level in &security_levels {

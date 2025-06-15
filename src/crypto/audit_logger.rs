@@ -4,7 +4,8 @@
 //! operations including encryption/decryption, key derivation, backup/restore,
 //! and security events.
 
-use super::enhanced_error::{EnhancedCryptoError, ErrorSeverity};
+use super::enhanced_error::{EnhancedCryptoError};
+use crate::security_types::Severity;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -34,18 +35,6 @@ pub enum AuditEventType {
     System,
 }
 
-/// Audit event severity levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum AuditSeverity {
-    /// Informational events for normal operations
-    Info,
-    /// Warning events for potential issues
-    Warning,
-    /// Error events for failed operations
-    Error,
-    /// Critical events requiring immediate attention
-    Critical,
-}
 
 /// Detailed audit event metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,7 +46,7 @@ pub struct AuditEvent {
     /// Type of audit event
     pub event_type: AuditEventType,
     /// Severity level
-    pub severity: AuditSeverity,
+    pub severity: Severity,
     /// Component that generated the event
     pub component: String,
     /// Operation being performed
@@ -186,7 +175,7 @@ pub struct AuditStatistics {
     /// Events by type
     pub events_by_type: HashMap<AuditEventType, u64>,
     /// Events by severity
-    pub events_by_severity: HashMap<AuditSeverity, u64>,
+    pub events_by_severity: HashMap<Severity, u64>,
     /// Number of failed operations
     pub failed_operations: u64,
     /// Number of security events
@@ -261,9 +250,9 @@ impl CryptoAuditLogger {
             timestamp: Utc::now(),
             event_type: AuditEventType::Encryption,
             severity: if matches!(result, OperationResult::Success) {
-                AuditSeverity::Info
+                Severity::Info
             } else {
-                AuditSeverity::Error
+                Severity::Error
             },
             component: "crypto_encryption".to_string(),
             operation: operation.to_string(),
@@ -303,9 +292,9 @@ impl CryptoAuditLogger {
             timestamp: Utc::now(),
             event_type: AuditEventType::Decryption,
             severity: if matches!(result, OperationResult::Success) {
-                AuditSeverity::Info
+                Severity::Info
             } else {
-                AuditSeverity::Error
+                Severity::Error
             },
             component: "crypto_decryption".to_string(),
             operation: operation.to_string(),
@@ -340,9 +329,9 @@ impl CryptoAuditLogger {
             timestamp: Utc::now(),
             event_type: AuditEventType::KeyOperation,
             severity: if matches!(result, OperationResult::Success) {
-                AuditSeverity::Info
+                Severity::Info
             } else {
-                AuditSeverity::Error
+                Severity::Error
             },
             component: "crypto_key_ops".to_string(),
             operation: operation.to_string(),
@@ -388,9 +377,9 @@ impl CryptoAuditLogger {
             timestamp: Utc::now(),
             event_type: AuditEventType::BackupRestore,
             severity: if matches!(result, OperationResult::Success) {
-                AuditSeverity::Info
+                Severity::Info
             } else {
-                AuditSeverity::Error
+                Severity::Error
             },
             component: "crypto_backup".to_string(),
             operation: operation.to_string(),
@@ -437,9 +426,9 @@ impl CryptoAuditLogger {
         }
 
         let severity = match result {
-            OperationResult::Success => AuditSeverity::Warning,
-            OperationResult::Failure { .. } => AuditSeverity::Critical,
-            _ => AuditSeverity::Error,
+            OperationResult::Success => Severity::Warning,
+            OperationResult::Failure { .. } => Severity::Critical,
+            _ => Severity::Error,
         };
 
         let event = AuditEvent {
@@ -503,7 +492,7 @@ impl CryptoAuditLogger {
             event_id: Uuid::new_v4(),
             timestamp: Utc::now(),
             event_type: AuditEventType::Performance,
-            severity: AuditSeverity::Info,
+            severity: Severity::Info,
             component: "crypto_performance".to_string(),
             operation: operation.to_string(),
             actor: None,
@@ -535,12 +524,7 @@ impl CryptoAuditLogger {
             metadata.insert(key.clone(), serde_json::Value::String(value.clone()));
         }
 
-        let audit_severity = match error.severity() {
-            ErrorSeverity::Low => AuditSeverity::Info,
-            ErrorSeverity::Medium => AuditSeverity::Warning,
-            ErrorSeverity::High => AuditSeverity::Error,
-            ErrorSeverity::Critical => AuditSeverity::Critical,
-        };
+        let audit_severity = error.severity();
 
         let result = OperationResult::Failure {
             error_type: error.error_type_name().to_string(),
@@ -552,7 +536,7 @@ impl CryptoAuditLogger {
             event_id: Uuid::new_v4(),
             timestamp: Utc::now(),
             event_type: AuditEventType::Security, // Errors are treated as security events
-            severity: audit_severity,
+            severity: *audit_severity,
             component: error.context().component.clone(),
             operation: error.context().operation.clone(),
             actor: None,
@@ -582,7 +566,7 @@ impl CryptoAuditLogger {
     pub async fn filter_events(
         &self,
         event_type: Option<AuditEventType>,
-        severity: Option<AuditSeverity>,
+        severity: Option<Severity>,
         component: Option<String>,
         start_time: Option<DateTime<Utc>>,
         end_time: Option<DateTime<Utc>>,
@@ -738,7 +722,7 @@ impl CryptoAuditLogger {
     fn should_alert(&self, event: &AuditEvent) -> bool {
         matches!(
             event.severity,
-            AuditSeverity::Critical | AuditSeverity::Error
+            Severity::Critical | Severity::Error
         ) || event.event_type == AuditEventType::Security
     }
 

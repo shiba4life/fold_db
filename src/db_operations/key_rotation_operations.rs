@@ -13,6 +13,7 @@ use crate::crypto::key_rotation::{
     KeyRotationError, KeyRotationRequest, KeyRotationResponse, RotationContext, RotationReason,
 };
 use crate::schema::SchemaError;
+use crate::security_types::RotationStatus;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -48,19 +49,6 @@ pub struct KeyRotationRecord {
     pub associations_updated: u64,
     /// Additional metadata
     pub metadata: HashMap<String, String>,
-}
-
-/// Key rotation operation status
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RotationStatus {
-    /// Operation is in progress
-    InProgress,
-    /// Operation completed successfully
-    Completed,
-    /// Operation failed
-    Failed,
-    /// Operation was rolled back
-    RolledBack,
 }
 
 /// Key association record for tracking what data is associated with each key

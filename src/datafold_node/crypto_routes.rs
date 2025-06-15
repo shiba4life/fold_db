@@ -4,7 +4,8 @@
 //! initialization, including both random key generation and passphrase-based
 //! key derivation workflows.
 
-use crate::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig, SecurityLevel};
+use crate::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
+use crate::security_types::SecurityLevel;
 use crate::datafold_node::crypto_init::{
     get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed,
     validate_crypto_config_for_init, CryptoInitError,
@@ -106,7 +107,7 @@ pub struct PassphraseInitRequest {
 }
 
 fn default_security_level() -> SecurityLevel {
-    SecurityLevel::Interactive
+    SecurityLevel::Low
 }
 
 /// Custom Argon2 parameters for advanced users
@@ -516,14 +517,14 @@ pub async fn validate_crypto_config(
 
         // Check security level warnings
         match request.security_level {
-            SecurityLevel::Interactive => {
-                warnings.push("Interactive security level is optimized for user experience - consider Balanced or Sensitive for higher security".to_string());
+            SecurityLevel::Low => {
+                warnings.push("Low security level is optimized for user experience - consider Standard or High for higher security".to_string());
             }
-            SecurityLevel::Balanced => {
+            SecurityLevel::Standard => {
                 // Good balance, no warning needed
             }
-            SecurityLevel::Sensitive => {
-                warnings.push("Sensitive security level provides maximum security but may take longer to initialize".to_string());
+            SecurityLevel::High => {
+                warnings.push("High security level provides maximum security but may take longer to initialize".to_string());
             }
         }
 

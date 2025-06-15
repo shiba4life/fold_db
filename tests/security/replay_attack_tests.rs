@@ -12,14 +12,12 @@
 //!
 //! Validates across all security profiles (Strict, Standard, Lenient)
 
-use actix_web::{test, web, App, HttpResponse};
 use datafold::datafold_node::signature_auth::{
-    AuthenticationError, NonceStoreStats, SecurityEventSeverity, SecurityProfile,
+    SecurityProfile,
     SignatureAuthConfig, SignatureVerificationState,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
 use uuid::Uuid;
@@ -634,7 +632,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_attack_scenario_runner() {
-        let mut runner = ReplayAttackTestRunner::new().unwrap();
+        let runner = ReplayAttackTestRunner::new().unwrap();
 
         // Create a simple test scenario
         let test_scenario = AttackScenario {
