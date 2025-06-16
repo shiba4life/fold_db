@@ -2,12 +2,18 @@
 //!
 //! This module handles loading and managing logging configuration from TOML files,
 //! environment variables, and runtime updates. Now integrates with the cross-platform
-//! configuration system for consistent path handling.
+//! configuration system for consistent path handling and implements shared traits.
 
+use crate::config::traits::{
+    BaseConfig, ConfigLifecycle, ConfigValidation, LogLevelTrait, LoggingConfig, OutputConfigTrait,
+    PlatformLogSettingsTrait, StandardLogLevel, TraitConfigError, TraitConfigResult,
+    ValidationContext,
+};
+use crate::config::{create_platform_resolver, PlatformConfigPaths};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::Path;
-use crate::config::{create_platform_resolver, PlatformConfigPaths};
+use std::path::{Path, PathBuf};
 
 /// Main logging configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,6 +69,29 @@ pub struct ConsoleConfig {
     pub include_thread: bool,
 }
 
+impl OutputConfigTrait for ConsoleConfig {
+    fn output_type(&self) -> &str {
+        "console"
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn log_level(&self) -> &str {
+        &self.level
+    }
+
+    fn validate(&self) -> TraitConfigResult<()> {
+        StandardLogLevel::from_str(&self.level).map_err(|e| TraitConfigError::ValidationError {
+            field: "level".to_string(),
+            message: e,
+            context: ValidationContext::default(),
+        })?;
+        Ok(())
+    }
+}
+
 /// File output configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileConfig {
@@ -84,6 +113,79 @@ pub struct FileConfig {
     pub include_thread: bool,
 }
 
+impl OutputConfigTrait for FileConfig {
+    fn output_type(&self) -> &str {
+        "file"
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn log_level(&self) -> &str {
+        &self.level
+    }
+
+    fn validate(&self) -> TraitConfigResult<()> {
+        StandardLogLevel::from_str(&self.level).map_err(|e| TraitConfigError::ValidationError {
+            field: "level".to_string(),
+            message: e,
+            context: ValidationContext::default(),
+        })?;
+
+        // Validate file size format
+        self.parse_file_size(&self.max_size)
+            .map_err(|e| TraitConfigError::ValidationError {
+                field: "max_size".to_string(),
+                message: format!("Invalid file size format: {}", e),
+                context: ValidationContext::default(),
+            })?;
+
+        if self.max_files == 0 {
+            return Err(TraitConfigError::ValidationError {
+                field: "max_files".to_string(),
+                message: "Maximum files must be at least 1".to_string(),
+                context: ValidationContext::default(),
+            });
+        }
+
+        Ok(())
+    }
+}
+
+impl FileConfig {
+    /// Parse file size string to bytes
+    fn parse_file_size(&self, size_str: &str) -> Result<u64, String> {
+        let size_str = size_str.to_uppercase();
+
+        if let Some(num_str) = size_str.strip_suffix("GB") {
+            let num: u64 = num_str
+                .parse()
+                .map_err(|_| format!("Invalid file size format: {}", size_str))?;
+            Ok(num * 1024 * 1024 * 1024)
+        } else if let Some(num_str) = size_str.strip_suffix("MB") {
+            let num: u64 = num_str
+                .parse()
+                .map_err(|_| format!("Invalid file size format: {}", size_str))?;
+            Ok(num * 1024 * 1024)
+        } else if let Some(num_str) = size_str.strip_suffix("KB") {
+            let num: u64 = num_str
+                .parse()
+                .map_err(|_| format!("Invalid file size format: {}", size_str))?;
+            Ok(num * 1024)
+        } else if let Some(num_str) = size_str.strip_suffix("B") {
+            num_str
+                .parse()
+                .map_err(|_| format!("Invalid file size format: {}", size_str))
+        } else {
+            // Default to bytes if no suffix
+            size_str
+                .parse()
+                .map_err(|_| format!("Invalid file size format: {}", size_str))
+        }
+    }
+}
+
 /// Web streaming output configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebConfig {
@@ -99,6 +201,46 @@ pub struct WebConfig {
     pub max_logs: usize,
 }
 
+impl OutputConfigTrait for WebConfig {
+    fn output_type(&self) -> &str {
+        "web"
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn log_level(&self) -> &str {
+        &self.level
+    }
+
+    fn validate(&self) -> TraitConfigResult<()> {
+        StandardLogLevel::from_str(&self.level).map_err(|e| TraitConfigError::ValidationError {
+            field: "level".to_string(),
+            message: e,
+            context: ValidationContext::default(),
+        })?;
+
+        if self.buffer_size == 0 {
+            return Err(TraitConfigError::ValidationError {
+                field: "buffer_size".to_string(),
+                message: "Buffer size must be greater than 0".to_string(),
+                context: ValidationContext::default(),
+            });
+        }
+
+        if self.max_logs == 0 {
+            return Err(TraitConfigError::ValidationError {
+                field: "max_logs".to_string(),
+                message: "Maximum logs must be greater than 0".to_string(),
+                context: ValidationContext::default(),
+            });
+        }
+
+        Ok(())
+    }
+}
+
 /// Structured JSON output configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructuredConfig {
@@ -112,6 +254,29 @@ pub struct StructuredConfig {
     pub include_context: bool,
     /// Include performance metrics
     pub include_metrics: bool,
+}
+
+impl OutputConfigTrait for StructuredConfig {
+    fn output_type(&self) -> &str {
+        "structured"
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn log_level(&self) -> &str {
+        &self.level
+    }
+
+    fn validate(&self) -> TraitConfigResult<()> {
+        StandardLogLevel::from_str(&self.level).map_err(|e| TraitConfigError::ValidationError {
+            field: "level".to_string(),
+            message: e,
+            context: ValidationContext::default(),
+        })?;
+        Ok(())
+    }
 }
 
 impl Default for LogConfig {
@@ -152,7 +317,8 @@ impl Default for FileConfig {
     fn default() -> Self {
         // Use platform-specific logs directory
         let platform_paths = create_platform_resolver();
-        let default_path = platform_paths.logs_dir()
+        let default_path = platform_paths
+            .logs_dir()
             .map(|dir| dir.join("datafold.log").to_string_lossy().to_string())
             .unwrap_or_else(|_| "logs/datafold.log".to_string());
 
@@ -185,8 +351,13 @@ impl Default for StructuredConfig {
     fn default() -> Self {
         // Use platform-specific logs directory
         let platform_paths = create_platform_resolver();
-        let default_path = platform_paths.logs_dir()
-            .map(|dir| dir.join("datafold-structured.json").to_string_lossy().to_string())
+        let default_path = platform_paths
+            .logs_dir()
+            .map(|dir| {
+                dir.join("datafold-structured.json")
+                    .to_string_lossy()
+                    .to_string()
+            })
             .unwrap_or_else(|_| "logs/datafold-structured.json".to_string());
 
         Self {
@@ -385,10 +556,10 @@ pub struct EnhancedLogConfig {
     /// Base logging configuration
     #[serde(flatten)]
     pub base: LogConfig,
-    
+
     /// Platform-specific settings
     pub platform: PlatformLogSettings,
-    
+
     /// Cross-platform path settings
     pub paths: LogPathSettings,
 }
@@ -398,12 +569,42 @@ pub struct EnhancedLogConfig {
 pub struct PlatformLogSettings {
     /// Use platform-specific log directory
     pub use_platform_paths: bool,
-    
+
     /// Enable platform-specific optimizations
     pub enable_optimizations: bool,
-    
+
     /// Platform-specific rotation settings
     pub rotation: PlatformRotationSettings,
+}
+
+impl PlatformLogSettingsTrait for PlatformLogSettings {
+    fn use_platform_paths(&self) -> bool {
+        self.use_platform_paths
+    }
+
+    fn optimizations_enabled(&self) -> bool {
+        self.enable_optimizations
+    }
+
+    fn apply_platform_defaults(&mut self) -> TraitConfigResult<()> {
+        // Apply platform-specific defaults if needed
+        #[cfg(target_os = "windows")]
+        {
+            self.rotation.use_platform_compression = true;
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            self.rotation.auto_cleanup = true;
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            self.enable_optimizations = true;
+        }
+
+        Ok(())
+    }
 }
 
 /// Cross-platform log path settings
@@ -411,13 +612,13 @@ pub struct PlatformLogSettings {
 pub struct LogPathSettings {
     /// Base logs directory (uses platform default if not specified)
     pub logs_dir: Option<String>,
-    
+
     /// Main log file name
     pub main_log_file: String,
-    
+
     /// Structured log file name
     pub structured_log_file: String,
-    
+
     /// Error log file name
     pub error_log_file: String,
 }
@@ -427,10 +628,10 @@ pub struct LogPathSettings {
 pub struct PlatformRotationSettings {
     /// Use platform-specific compression
     pub use_platform_compression: bool,
-    
+
     /// Cleanup old logs automatically
     pub auto_cleanup: bool,
-    
+
     /// Maximum total log directory size
     pub max_total_size: String,
 }
@@ -480,19 +681,24 @@ impl EnhancedLogConfig {
     /// Create enhanced log configuration with platform-specific paths
     pub fn with_platform_paths() -> Result<Self, ConfigError> {
         let platform_paths = create_platform_resolver();
-        let logs_dir = platform_paths.logs_dir()
-            .map_err(|e| ConfigError::Parse(format!("Failed to get platform logs directory: {}", e)))?;
+        let logs_dir = platform_paths.logs_dir().map_err(|e| {
+            ConfigError::Parse(format!("Failed to get platform logs directory: {}", e))
+        })?;
 
         let mut config = Self::default();
-        
+
         // Update file paths to use platform-specific directory
-        config.base.outputs.file.path = logs_dir.join(&config.paths.main_log_file)
-            .to_string_lossy().to_string();
-        
+        config.base.outputs.file.path = logs_dir
+            .join(&config.paths.main_log_file)
+            .to_string_lossy()
+            .to_string();
+
         if let Some(ref structured_path) = config.base.outputs.structured.path {
             config.base.outputs.structured.path = Some(
-                logs_dir.join(&config.paths.structured_log_file)
-                    .to_string_lossy().to_string()
+                logs_dir
+                    .join(&config.paths.structured_log_file)
+                    .to_string_lossy()
+                    .to_string(),
             );
         }
 
@@ -509,15 +715,16 @@ impl EnhancedLogConfig {
         // Update paths to use platform-specific directories if enabled
         if enhanced.platform.use_platform_paths {
             let platform_paths = create_platform_resolver();
-            let logs_dir = platform_paths.logs_dir()
-                .map_err(|e| ConfigError::Parse(format!("Failed to get platform logs directory: {}", e)))?;
+            let logs_dir = platform_paths.logs_dir().map_err(|e| {
+                ConfigError::Parse(format!("Failed to get platform logs directory: {}", e))
+            })?;
 
             // Update file output path
             let file_name = std::path::Path::new(&enhanced.base.outputs.file.path)
                 .file_name()
                 .unwrap_or(std::ffi::OsStr::new("datafold.log"));
-            enhanced.base.outputs.file.path = logs_dir.join(file_name)
-                .to_string_lossy().to_string();
+            enhanced.base.outputs.file.path =
+                logs_dir.join(file_name).to_string_lossy().to_string();
 
             // Update structured output path
             if let Some(ref structured_path) = enhanced.base.outputs.structured.path {
@@ -525,8 +732,10 @@ impl EnhancedLogConfig {
                     .file_name()
                     .unwrap_or(std::ffi::OsStr::new("datafold-structured.json"));
                 enhanced.base.outputs.structured.path = Some(
-                    logs_dir.join(structured_file_name)
-                        .to_string_lossy().to_string()
+                    logs_dir
+                        .join(structured_file_name)
+                        .to_string_lossy()
+                        .to_string(),
                 );
             }
 
@@ -542,17 +751,17 @@ impl EnhancedLogConfig {
             Ok(std::path::PathBuf::from(logs_dir))
         } else {
             let platform_paths = create_platform_resolver();
-            platform_paths.logs_dir()
-                .map_err(|e| ConfigError::Parse(format!("Failed to get platform logs directory: {}", e)))
+            platform_paths.logs_dir().map_err(|e| {
+                ConfigError::Parse(format!("Failed to get platform logs directory: {}", e))
+            })
         }
     }
 
     /// Ensure all log directories exist
     pub fn ensure_log_directories(&self) -> Result<(), ConfigError> {
         let logs_dir = self.get_logs_dir()?;
-        
-        std::fs::create_dir_all(&logs_dir)
-            .map_err(|e| ConfigError::Io(e))?;
+
+        std::fs::create_dir_all(&logs_dir).map_err(|e| ConfigError::Io(e))?;
 
         Ok(())
     }
@@ -573,4 +782,330 @@ pub enum ConfigError {
     InvalidFeatureLevel(String, String),
     #[error("Invalid file size format: {0}")]
     InvalidFileSize(String),
+}
+
+// Implement shared traits for LogConfig
+#[async_trait]
+impl BaseConfig for LogConfig {
+    type Error = ConfigError;
+    type Event = ();
+    type TransformTarget = ();
+
+    async fn load(path: &Path) -> Result<Self, Self::Error> {
+        Self::from_file(path)
+    }
+
+    fn validate(&self) -> Result<(), Self::Error> {
+        // Validate general configuration
+        let valid_levels = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"];
+        if !valid_levels.contains(&self.general.default_level.as_str()) {
+            return Err(ConfigError::InvalidLevel(
+                self.general.default_level.clone(),
+            ));
+        }
+
+        // Validate feature flags
+        for (feature, _enabled) in &self.features {
+            if feature.is_empty() {
+                return Err(ConfigError::Parse(
+                    "Feature name cannot be empty".to_string(),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn save(&self, path: &Path) -> Result<(), Self::Error> {
+        self.save_to_file(path)
+    }
+
+    fn metadata(&self) -> std::collections::HashMap<String, String> {
+        let mut metadata = std::collections::HashMap::new();
+        metadata.insert(
+            "default_level".to_string(),
+            self.general.default_level.clone(),
+        );
+        metadata.insert("outputs_count".to_string(), "4".to_string()); // console, file, web, structured
+        metadata.insert(
+            "features_count".to_string(),
+            self.features.len().to_string(),
+        );
+        metadata
+    }
+
+    fn merge(&self, other: &Self) -> Self {
+        let mut result = self.clone();
+
+        // Merge general settings
+        if other.general.default_level != "INFO" {
+            result.general.default_level = other.general.default_level.clone();
+        }
+
+        // Merge features
+        for (key, value) in &other.features {
+            result.features.insert(key.clone(), value.clone());
+        }
+
+        // Merge outputs with preference for enabled configurations
+        if other.outputs.console.enabled {
+            result.outputs.console = other.outputs.console.clone();
+        }
+        if other.outputs.file.enabled {
+            result.outputs.file = other.outputs.file.clone();
+        }
+        if other.outputs.web.enabled {
+            result.outputs.web = other.outputs.web.clone();
+        }
+        if other.outputs.structured.enabled {
+            result.outputs.structured = other.outputs.structured.clone();
+        }
+
+        result
+    }
+
+    fn report_event(&self, _event: Self::Event) {
+        // Implementation for event reporting
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+#[async_trait]
+impl ConfigLifecycle for LogConfig {
+    async fn save(&self, path: &Path) -> Result<(), Self::Error> {
+        self.save_to_file(path)
+    }
+
+    async fn reload(&mut self, path: &Path) -> Result<(), Self::Error> {
+        let new_config = Self::from_file(path)?;
+        *self = new_config;
+        Ok(())
+    }
+
+    async fn backup(&self, backup_path: &Path) -> Result<(), Self::Error> {
+        self.save_to_file(backup_path)
+    }
+
+    async fn merge(&mut self, other: Self) -> Result<(), Self::Error> {
+        // Merge logic: prefer non-default values from other
+        if other.general.default_level != "INFO" {
+            self.general.default_level = other.general.default_level;
+        }
+
+        // Merge features, preferring other's values
+        for (key, value) in other.features {
+            self.features.insert(key, value);
+        }
+
+        // Merge outputs with preference for enabled configurations
+        if other.outputs.console.enabled {
+            self.outputs.console = other.outputs.console;
+        }
+        if other.outputs.file.enabled {
+            self.outputs.file = other.outputs.file;
+        }
+        if other.outputs.web.enabled {
+            self.outputs.web = other.outputs.web;
+        }
+        if other.outputs.structured.enabled {
+            self.outputs.structured = other.outputs.structured;
+        }
+
+        Ok(())
+    }
+
+    async fn has_changed(&self, _path: &Path) -> Result<bool, Self::Error> {
+        // Simple implementation - in a real scenario you'd check file timestamps
+        Ok(false)
+    }
+
+    fn get_metadata(&self) -> crate::config::traits::ConfigMetadata {
+        let now = chrono::Utc::now();
+        crate::config::traits::ConfigMetadata {
+            version: "1.0.0".to_string(),
+            created_at: now,
+            updated_at: now,
+            accessed_at: now,
+            source: None,
+            format: Some("toml".to_string()),
+            size_bytes: None,
+            checksum: None,
+            additional: std::collections::HashMap::new(),
+        }
+    }
+
+    fn set_metadata(&mut self, _metadata: crate::config::traits::ConfigMetadata) {
+        // Implementation would store metadata
+    }
+}
+
+impl ConfigValidation for LogConfig {
+    fn validate_with_context(&self) -> Result<(), crate::config::traits::ValidationContext> {
+        self.validate()
+            .map_err(|_e| crate::config::traits::ValidationContext::default())
+    }
+
+    fn validate_field(&self, field_name: &str) -> Result<(), Self::Error> {
+        match field_name {
+            "default_level" => {
+                let valid_levels = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"];
+                if !valid_levels.contains(&self.general.default_level.as_str()) {
+                    return Err(ConfigError::InvalidLevel(
+                        self.general.default_level.clone(),
+                    ));
+                }
+            }
+            "console" => {
+                if self.outputs.console.enabled && self.outputs.console.format.is_empty() {
+                    return Err(ConfigError::Parse(
+                        "Console format cannot be empty when enabled".to_string(),
+                    ));
+                }
+            }
+            "file" => {
+                if self.outputs.file.enabled && self.outputs.file.path.is_empty() {
+                    return Err(ConfigError::Parse(
+                        "File path cannot be empty when enabled".to_string(),
+                    ));
+                }
+            }
+            "web" => {
+                if self.outputs.web.enabled && self.outputs.web.port == 0 {
+                    return Err(ConfigError::Parse(
+                        "Web port must be specified when enabled".to_string(),
+                    ));
+                }
+            }
+            "structured" => {
+                if self.outputs.structured.enabled && self.outputs.structured.format.is_empty() {
+                    return Err(ConfigError::Parse(
+                        "Structured format cannot be empty when enabled".to_string(),
+                    ));
+                }
+            }
+            _ => return Err(ConfigError::Parse(format!("Unknown field: {}", field_name))),
+        }
+        Ok(())
+    }
+
+    fn validation_rules(&self) -> Vec<crate::config::traits::ValidationRule> {
+        vec![
+            crate::config::traits::ValidationRule::required("default_level"),
+            crate::config::traits::ValidationRule::string_length("console.format", Some(1), None),
+            crate::config::traits::ValidationRule::string_length("file.path", Some(1), None),
+        ]
+    }
+
+    fn add_validation_rule(&mut self, _rule: crate::config::traits::ValidationRule) {
+        // Implementation would store custom validation rules
+    }
+
+    fn get_validation_rules(&self) -> std::collections::HashMap<String, String> {
+        let mut rules = std::collections::HashMap::new();
+        rules.insert(
+            "default_level".to_string(),
+            "Must be one of: TRACE, DEBUG, INFO, WARN, ERROR".to_string(),
+        );
+        rules.insert(
+            "console.level".to_string(),
+            "Must be valid log level".to_string(),
+        );
+        rules.insert(
+            "file.level".to_string(),
+            "Must be valid log level".to_string(),
+        );
+        rules.insert(
+            "file.max_size".to_string(),
+            "Must be valid size format (e.g., 10MB)".to_string(),
+        );
+        rules.insert(
+            "web.level".to_string(),
+            "Must be valid log level".to_string(),
+        );
+        rules.insert(
+            "structured.level".to_string(),
+            "Must be valid log level".to_string(),
+        );
+        rules
+    }
+}
+
+#[async_trait]
+impl LoggingConfig for LogConfig {
+    type LogLevel = StandardLogLevel;
+    type OutputConfig = Box<dyn OutputConfigTrait>;
+    type PlatformSettings = PlatformLogSettings;
+
+    fn default_log_level(&self) -> Self::LogLevel {
+        StandardLogLevel::from_str(&self.general.default_level).unwrap_or(StandardLogLevel::Info)
+    }
+
+    fn output_configs(&self) -> Vec<Self::OutputConfig> {
+        vec![
+            Box::new(self.outputs.console.clone()),
+            Box::new(self.outputs.file.clone()),
+            Box::new(self.outputs.web.clone()),
+            Box::new(self.outputs.structured.clone()),
+        ]
+    }
+
+    fn platform_settings(&self) -> &Self::PlatformSettings {
+        // Return a static reference to avoid lifetime issues
+        use once_cell::sync::Lazy;
+        static DEFAULT_PLATFORM_SETTINGS: Lazy<PlatformLogSettings> =
+            Lazy::new(|| PlatformLogSettings::default());
+        &*DEFAULT_PLATFORM_SETTINGS
+    }
+
+    fn parse_log_level(&self, level: &str) -> TraitConfigResult<Self::LogLevel> {
+        StandardLogLevel::from_str(level).map_err(|e| TraitConfigError::ValidationError {
+            field: "log_level".to_string(),
+            message: e,
+            context: ValidationContext::default(),
+        })
+    }
+
+    async fn apply_env_overrides(&mut self) -> TraitConfigResult<()> {
+        self.apply_env_overrides()
+            .map_err(|e| TraitConfigError::ValidationError {
+                field: "environment_overrides".to_string(),
+                message: format!("Failed to apply environment overrides: {}", e),
+                context: crate::config::traits::ValidationContext::default(),
+            })
+    }
+
+    fn validate_log_levels(&self) -> TraitConfigResult<()> {
+        // Validate all log levels
+        self.parse_log_level(&self.general.default_level)?;
+        self.parse_log_level(&self.outputs.console.level)?;
+        self.parse_log_level(&self.outputs.file.level)?;
+        self.parse_log_level(&self.outputs.web.level)?;
+        self.parse_log_level(&self.outputs.structured.level)?;
+
+        // Validate feature log levels
+        for (feature, level) in &self.features {
+            self.parse_log_level(level)
+                .map_err(|e| TraitConfigError::ValidationError {
+                    field: format!("features.{}", feature),
+                    message: format!("Invalid log level for feature '{}': {}", feature, e),
+                    context: ValidationContext::new(
+                        "LoggingConfig",
+                        "console_output_validation".to_string(),
+                    ),
+                })?;
+        }
+
+        Ok(())
+    }
+
+    fn validate_outputs(&self) -> TraitConfigResult<()> {
+        self.outputs.console.validate()?;
+        self.outputs.file.validate()?;
+        self.outputs.web.validate()?;
+        self.outputs.structured.validate()?;
+        Ok(())
+    }
 }

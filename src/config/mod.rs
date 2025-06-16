@@ -50,11 +50,14 @@
 
 // Core configuration management
 pub mod cross_platform;
-pub mod error;
-pub mod value;
-pub mod platform;
 pub mod enhanced;
+pub mod error;
 pub mod migration;
+pub mod platform;
+pub mod value;
+
+// Shared configuration traits (PBI 28)
+pub mod traits;
 
 // Legacy modules (maintained for backward compatibility)
 pub mod crypto;
@@ -66,51 +69,51 @@ mod tests;
 
 // Re-export main types for convenience
 pub use cross_platform::{
-    Config,
-    ConfigurationManager,
-    ConfigurationProvider,
+    Config, ConfigurationManager, ConfigurationProvider, PlatformRequirements, SecurityConfig,
     TomlConfigProvider,
-    PlatformRequirements,
-    SecurityConfig,
-};
-pub use error::{ConfigError, ConfigResult};
-pub use value::{ConfigValue, ConfigValueSchema};
-pub use platform::{
-    PlatformConfigPaths,
-    PlatformInfo,
-    EnhancedPlatformInfo,
-    create_platform_resolver,
-    get_platform_info,
-    keystore::{PlatformKeystore, create_platform_keystore, KeystoreConfig},
 };
 pub use enhanced::{
-    EnhancedConfig,
-    EnhancedConfigurationManager,
-    PlatformSettings,
-    PerformanceSettings,
-    EnhancedSecurityConfig,
-    ConfigChangeEvent,
-    ConfigChangeType,
-    ConfigChangeSource,
+    ConfigChangeEvent, ConfigChangeSource, ConfigChangeType, EnhancedConfig,
+    EnhancedConfigurationManager, EnhancedSecurityConfig, PerformanceSettings, PlatformSettings,
 };
-pub use migration::{
-    ConfigMigrationManager,
-    MigrationResult,
-    MigrationStrategy,
+pub use error::{ConfigError, ConfigResult};
+pub use migration::{ConfigMigrationManager, MigrationResult, MigrationStrategy};
+pub use platform::{
+    create_platform_resolver, get_platform_info,
+    keystore::{create_platform_keystore, KeystoreConfig, PlatformKeystore},
+    EnhancedPlatformInfo, PlatformConfigPaths, PlatformInfo,
+};
+pub use value::{ConfigValue, ConfigValueSchema};
+
+// Re-export shared configuration traits (PBI 28)
+pub use traits::{
+    // Base traits
+    BaseConfig,
+    ConfigEvents,
+    ConfigLifecycle,
+    // Core utility traits
+    ConfigMerge,
+    ConfigMetadataTrait,
+    ConfigReporting,
+    ConfigSerialization,
+    ConfigValidation,
+    // Integration traits
+    CrossPlatformConfig,
+    ErrorContext,
+    // Note: Dynamic trait objects for BaseConfig are not object-safe due to generic methods
+    // Users should use concrete types or define their own trait objects as needed
+    ObservableConfig,
+    ReportableConfig,
+    // Error types
+    TraitConfigError,
+    TraitConfigResult,
+    ValidatableConfig,
+    ValidationContext,
 };
 
 // Re-export legacy types for backward compatibility
 pub use unified_config::{
-    UnifiedConfig,
-    UnifiedConfigManager,
-    UnifiedConfigError,
-    UnifiedConfigResult,
-    EnvironmentConfig,
-    SigningConfig,
-    VerificationConfig,
-    LoggingConfig,
-    AuthenticationConfig,
-    PerformanceConfig,
-    SecurityProfile,
-    DefaultConfig,
+    AuthenticationConfig, DefaultConfig, EnvironmentConfig, LoggingConfig, PerformanceConfig,
+    SecurityProfile, SigningConfig, UnifiedConfig, UnifiedConfigError, UnifiedConfigManager,
+    UnifiedConfigResult, VerificationConfig,
 };

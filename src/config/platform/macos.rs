@@ -3,10 +3,13 @@
 //! This module implements platform-specific path resolution for macOS systems,
 //! following Apple's File System Programming Guide.
 
-use std::path::PathBuf;
-use async_trait::async_trait;
+use super::{
+    keystore::{utils, PlatformKeystore},
+    PlatformConfigPaths,
+};
 use crate::config::error::{ConfigError, ConfigResult};
-use super::{PlatformConfigPaths, keystore::{PlatformKeystore, utils}};
+use async_trait::async_trait;
+use std::path::PathBuf;
 
 /// macOS-specific configuration paths following Apple guidelines
 pub struct MacOSConfigPaths {
@@ -16,9 +19,8 @@ pub struct MacOSConfigPaths {
 impl MacOSConfigPaths {
     /// Create new macOS configuration paths resolver
     pub fn new() -> Self {
-        let home_dir = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("/tmp"));
-        
+        let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
+
         Self { home_dir }
     }
 
@@ -110,42 +112,44 @@ mod tests {
     #[test]
     fn test_macos_config_paths() {
         let paths = MacOSConfigPaths::new();
-        
+
         let config_dir = paths.config_dir().unwrap();
         let data_dir = paths.data_dir().unwrap();
         let cache_dir = paths.cache_dir().unwrap();
         let logs_dir = paths.logs_dir().unwrap();
         let runtime_dir = paths.runtime_dir().unwrap();
-        
+
         // Should contain Application Support for config and data
         assert!(config_dir.to_string_lossy().contains("Application Support"));
         assert!(config_dir.to_string_lossy().contains("DataFold"));
         assert!(data_dir.to_string_lossy().contains("Application Support"));
         assert!(data_dir.to_string_lossy().contains("DataFold"));
-        
+
         // Should contain Caches for cache and runtime
         assert!(cache_dir.to_string_lossy().contains("Caches"));
         assert!(cache_dir.to_string_lossy().contains("DataFold"));
         assert!(runtime_dir.to_string_lossy().contains("Caches"));
-        
+
         // Should contain Logs for logs
         assert!(logs_dir.to_string_lossy().contains("Logs"));
         assert!(logs_dir.to_string_lossy().contains("DataFold"));
-        
+
         assert_eq!(paths.platform_name(), "macos");
     }
 
     #[test]
     fn test_macos_library_structure() {
         let paths = MacOSConfigPaths::new();
-        
+
         let library = paths.library_dir();
         let app_support = paths.application_support_dir();
         let caches = paths.caches_dir();
         let logs = paths.logs_dir_base();
-        
+
         assert!(library.to_string_lossy().ends_with("Library"));
-        assert!(app_support.to_string_lossy().ends_with("Application Support"));
+        assert!(app_support
+            .to_string_lossy()
+            .ends_with("Application Support"));
         assert!(caches.to_string_lossy().ends_with("Caches"));
         assert!(logs.to_string_lossy().ends_with("Logs"));
     }
@@ -155,7 +159,7 @@ mod tests {
         let paths = MacOSConfigPaths::new();
         let config_file = paths.config_file().unwrap();
         let legacy_file = paths.legacy_config_file().unwrap();
-        
+
         assert!(config_file.to_string_lossy().ends_with("config.toml"));
         assert!(legacy_file.to_string_lossy().ends_with("config.json"));
         assert!(config_file.to_string_lossy().contains("DataFold"));
@@ -164,10 +168,10 @@ mod tests {
     #[test]
     fn test_directory_hierarchy() {
         let paths = MacOSConfigPaths::new();
-        
+
         let config_dir = paths.config_dir().unwrap();
         let data_dir = paths.data_dir().unwrap();
-        
+
         // Config and data should be in the same parent directory on macOS
         assert_eq!(config_dir.parent(), data_dir.parent());
     }
@@ -196,7 +200,10 @@ impl MacOSKeystore {
         let mut attributes = std::collections::HashMap::new();
         attributes.insert("service".to_string(), self.service_name.clone());
         attributes.insert("account".to_string(), key.to_string());
-        attributes.insert("description".to_string(), "DataFold Configuration".to_string());
+        attributes.insert(
+            "description".to_string(),
+            "DataFold Configuration".to_string(),
+        );
         attributes
     }
 }
@@ -212,11 +219,12 @@ impl PlatformKeystore for MacOSKeystore {
         // For now, implement a file-based fallback with encryption in Application Support
         let config_dir = MacOSConfigPaths::new().config_dir()?;
         let keystore_dir = config_dir.join("Keystore");
-        std::fs::create_dir_all(&keystore_dir)
-            .map_err(|e| ConfigError::platform(format!("Failed to create keystore directory: {}", e)))?;
+        std::fs::create_dir_all(&keystore_dir).map_err(|e| {
+            ConfigError::platform(format!("Failed to create keystore directory: {}", e))
+        })?;
 
         let storage_key = utils::create_storage_key(&self.service_name, key);
-        
+
         // Derive encryption key from system and user info
         let username = std::env::var("USER").unwrap_or_default();
         let password = format!("{}:{}:{}", username, self.service_name, storage_key);
@@ -228,8 +236,10 @@ impl PlatformKeystore for MacOSKeystore {
         let mut final_data = salt;
         final_data.extend_from_slice(&encrypted_data);
 
-        let key_file = keystore_dir.join(format!("{}.keychain", hex::encode(storage_key.as_bytes())));
-        tokio::fs::write(&key_file, final_data).await
+        let key_file =
+            keystore_dir.join(format!("{}.keychain", hex::encode(storage_key.as_bytes())));
+        tokio::fs::write(&key_file, final_data)
+            .await
             .map_err(|e| ConfigError::platform(format!("Failed to store secret: {}", e)))?;
 
         // Set restrictive permissions (600)
@@ -237,8 +247,9 @@ impl PlatformKeystore for MacOSKeystore {
         {
             use std::os::unix::fs::PermissionsExt;
             let perms = std::fs::Permissions::from_mode(0o600);
-            std::fs::set_permissions(&key_file, perms)
-                .map_err(|e| ConfigError::platform(format!("Failed to set file permissions: {}", e)))?;
+            std::fs::set_permissions(&key_file, perms).map_err(|e| {
+                ConfigError::platform(format!("Failed to set file permissions: {}", e))
+            })?;
         }
 
         Ok(())
@@ -250,17 +261,19 @@ impl PlatformKeystore for MacOSKeystore {
         }
 
         let storage_key = utils::create_storage_key(&self.service_name, key);
-        
+
         // Check file-based fallback
         let config_dir = MacOSConfigPaths::new().config_dir()?;
         let keystore_dir = config_dir.join("Keystore");
-        let key_file = keystore_dir.join(format!("{}.keychain", hex::encode(storage_key.as_bytes())));
+        let key_file =
+            keystore_dir.join(format!("{}.keychain", hex::encode(storage_key.as_bytes())));
 
         if !key_file.exists() {
             return Ok(None);
         }
 
-        let file_data = tokio::fs::read(&key_file).await
+        let file_data = tokio::fs::read(&key_file)
+            .await
             .map_err(|e| ConfigError::platform(format!("Failed to read secret: {}", e)))?;
 
         if file_data.len() < 32 {
@@ -287,14 +300,16 @@ impl PlatformKeystore for MacOSKeystore {
         }
 
         let storage_key = utils::create_storage_key(&self.service_name, key);
-        
+
         // Delete file-based fallback
         let config_dir = MacOSConfigPaths::new().config_dir()?;
         let keystore_dir = config_dir.join("Keystore");
-        let key_file = keystore_dir.join(format!("{}.keychain", hex::encode(storage_key.as_bytes())));
+        let key_file =
+            keystore_dir.join(format!("{}.keychain", hex::encode(storage_key.as_bytes())));
 
         if key_file.exists() {
-            tokio::fs::remove_file(&key_file).await
+            tokio::fs::remove_file(&key_file)
+                .await
                 .map_err(|e| ConfigError::platform(format!("Failed to delete secret: {}", e)))?;
         }
 
@@ -314,12 +329,15 @@ impl PlatformKeystore for MacOSKeystore {
         }
 
         let mut keys = Vec::new();
-        let mut dir_entries = tokio::fs::read_dir(&keystore_dir).await
-            .map_err(|e| ConfigError::platform(format!("Failed to read keystore directory: {}", e)))?;
+        let mut dir_entries = tokio::fs::read_dir(&keystore_dir).await.map_err(|e| {
+            ConfigError::platform(format!("Failed to read keystore directory: {}", e))
+        })?;
 
-        while let Some(entry) = dir_entries.next_entry().await
-            .map_err(|e| ConfigError::platform(format!("Failed to read directory entry: {}", e)))? {
-            
+        while let Some(entry) = dir_entries
+            .next_entry()
+            .await
+            .map_err(|e| ConfigError::platform(format!("Failed to read directory entry: {}", e)))?
+        {
             if let Some(file_name) = entry.file_name().to_str() {
                 if file_name.ends_with(".keychain") {
                     let key_name = &file_name[..file_name.len() - 9]; // Remove .keychain extension
@@ -368,7 +386,7 @@ impl super::PlatformFileWatcher for MacOSFileWatcher {
 
             loop {
                 std::thread::sleep(std::time::Duration::from_secs(1));
-                
+
                 if let Ok(metadata) = std::fs::metadata(&path) {
                     if let Ok(modified) = metadata.modified() {
                         if modified > last_modified {
@@ -390,7 +408,7 @@ pub struct MacOSAtomicOps;
 impl super::PlatformAtomicOps for MacOSAtomicOps {
     fn atomic_write(&self, path: &std::path::Path, content: &[u8]) -> ConfigResult<()> {
         let temp_path = path.with_extension("tmp");
-        
+
         // Write to temporary file
         std::fs::write(&temp_path, content)
             .map_err(|e| ConfigError::platform(format!("Failed to write temporary file: {}", e)))?;

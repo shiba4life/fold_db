@@ -3,7 +3,26 @@
 //! This module handles cross-platform event transport, serialization protocols,
 //! and communication between different DataFold SDK implementations.
 
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use std::any::Any;
+use std::path::Path;
+
 use super::event_types::SecurityEvent;
+use crate::config::error::ConfigError;
+use crate::config::traits::base::{
+    ConfigChangeType, ConfigMetadata, ReportingConfig, ValidationRule, ValidationRuleType,
+    ValidationSeverity,
+};
+use crate::config::traits::network::{
+    ConnectivityTestResult, NetworkConfig as NetworkConfigTrait, NetworkHealthMetrics,
+    NetworkPlatformSettings,
+};
+use crate::config::traits::{
+    BaseConfig, ConfigLifecycle, ConfigValidation, TraitConfigError, TraitConfigResult,
+    ValidationContext,
+};
+use crate::config::value::ConfigValue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::broadcast;
@@ -31,7 +50,7 @@ pub enum TransportProtocol {
     },
 }
 
-/// Configuration for event transport
+/// Configuration for event transport with enhanced trait support
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransportConfig {
     /// Transport protocol to use
@@ -50,6 +69,20 @@ pub struct TransportConfig {
     pub buffer_size: usize,
     /// Batch timeout for sending events
     pub batch_timeout_ms: u64,
+
+    // Enhanced trait support fields
+    /// Configuration metadata
+    #[serde(default)]
+    pub metadata: ConfigMetadata,
+    /// Reporting configuration
+    #[serde(default)]
+    pub reporting_config: ReportingConfig,
+    /// Validation rules
+    #[serde(skip)]
+    pub validation_rules: Vec<ValidationRule>,
+    /// Platform-specific settings
+    #[serde(default)]
+    pub platform_settings: NetworkPlatformSettings,
 }
 
 /// Serialization formats supported
@@ -112,7 +145,505 @@ impl Default for TransportConfig {
             encryption: false,
             buffer_size: 100,
             batch_timeout_ms: 5000,
+            metadata: ConfigMetadata::default(),
+            reporting_config: ReportingConfig::default(),
+            validation_rules: Self::default_validation_rules(),
+            platform_settings: NetworkPlatformSettings::default(),
         }
+    }
+}
+
+#[async_trait]
+impl BaseConfig for TransportConfig {
+    type Error = ConfigError;
+    type Event = ConfigChangeType;
+    type TransformTarget = TransportConfig;
+
+    async fn load(path: &Path) -> Result<Self, Self::Error> {
+        let content = tokio::fs::read_to_string(path)
+            .await
+            .map_err(|e| ConfigError::io(format!("Failed to read transport config file: {}", e)))?;
+
+        let mut config: TransportConfig = toml::from_str(&content).map_err(|e| {
+            ConfigError::parsing(format!("Failed to parse transport config: {}", e))
+        })?;
+
+        // Set metadata
+        config.metadata.source = Some(path.to_string_lossy().to_string());
+        config.metadata.accessed_at = Utc::now();
+
+        // Validate after loading
+        config.validate()?;
+
+        Ok(config)
+    }
+
+    fn validate(&self) -> Result<(), Self::Error> {
+        // Validate transport parameters
+        self.validate_transport_parameters()
+            .map_err(|e| ConfigError::validation(e.to_string()))?;
+
+        // Validate timeout settings
+        self.validate_timeout_settings()
+            .map_err(|e| ConfigError::validation(e.to_string()))?;
+
+        // Validate buffer settings
+        self.validate_buffer_settings()
+            .map_err(|e| ConfigError::validation(e.to_string()))?;
+
+        Ok(())
+    }
+
+    fn report_event(&self, event: Self::Event) {
+        if self.reporting_config.report_changes {
+            // Integration with unified reporting system would go here
+            log::info!("Transport config event: {:?}", event);
+        }
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+#[async_trait]
+impl ConfigLifecycle for TransportConfig {
+    async fn save(&self, path: &Path) -> Result<(), Self::Error> {
+        let content = toml::to_string_pretty(self).map_err(|e| {
+            ConfigError::serialization(format!("Failed to serialize transport config: {}", e))
+        })?;
+
+        tokio::fs::write(path, content).await.map_err(|e| {
+            ConfigError::io(format!("Failed to write transport config file: {}", e))
+        })?;
+
+        Ok(())
+    }
+
+    async fn reload(&mut self, path: &Path) -> Result<(), Self::Error> {
+        let new_config = Self::load(path).await?;
+        *self = new_config;
+        Ok(())
+    }
+
+    async fn has_changed(&self, path: &Path) -> Result<bool, Self::Error> {
+        let metadata = tokio::fs::metadata(path)
+            .await
+            .map_err(|e| ConfigError::io(format!("Failed to read file metadata: {}", e)))?;
+
+        let modified = metadata
+            .modified()
+            .map_err(|e| ConfigError::io(format!("Failed to get modification time: {}", e)))?;
+
+        let modified_utc = DateTime::<Utc>::from(modified);
+        Ok(modified_utc > self.metadata.updated_at)
+    }
+
+    fn get_metadata(&self) -> ConfigMetadata {
+        self.metadata.clone()
+    }
+
+    fn set_metadata(&mut self, metadata: ConfigMetadata) {
+        self.metadata = metadata;
+    }
+}
+
+impl ConfigValidation for TransportConfig {
+    fn validate_with_context(&self) -> Result<(), ValidationContext> {
+        let context = ValidationContext::new("TransportConfig", "transport_validation".to_string());
+
+        self.validate().map_err(|_e| context)?;
+        Ok(())
+    }
+
+    fn validate_field(&self, field_path: &str) -> Result<(), Self::Error> {
+        match field_path {
+            "connection_timeout_ms" => {
+                if self.connection_timeout_ms == 0 {
+                    return Err(ConfigError::validation(
+                        "Connection timeout must be greater than 0",
+                    ));
+                }
+            }
+            "buffer_size" => {
+                if self.buffer_size == 0 {
+                    return Err(ConfigError::validation(
+                        "Buffer size must be greater than 0",
+                    ));
+                }
+            }
+            "batch_timeout_ms" => {
+                if self.batch_timeout_ms == 0 {
+                    return Err(ConfigError::validation(
+                        "Batch timeout must be greater than 0",
+                    ));
+                }
+            }
+            _ => {
+                return Err(ConfigError::validation(format!(
+                    "Unknown field: {}",
+                    field_path
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn validation_rules(&self) -> Vec<ValidationRule> {
+        self.validation_rules.clone()
+    }
+
+    fn add_validation_rule(&mut self, rule: ValidationRule) {
+        self.validation_rules.push(rule);
+    }
+}
+
+#[async_trait]
+impl NetworkConfigTrait for TransportConfig {
+    fn validate_network_parameters(&self) -> TraitConfigResult<()> {
+        // Validate protocol-specific parameters
+        match &self.protocol {
+            TransportProtocol::Http {
+                endpoint,
+                headers: _,
+            } => {
+                if endpoint.is_empty() {
+                    return Err(TraitConfigError::trait_validation(
+                        "HTTP endpoint cannot be empty",
+                        Some(
+                            ValidationContext::new(
+                                "TransportConfig",
+                                "http_endpoint_required".to_string(),
+                            )
+                            .with_path("protocol.endpoint"),
+                        ),
+                    ));
+                }
+
+                // Basic URL validation
+                if !endpoint.starts_with("http://") && !endpoint.starts_with("https://") {
+                    return Err(TraitConfigError::trait_validation(
+                        "HTTP endpoint must start with http:// or https://",
+                        Some(
+                            ValidationContext::new(
+                                "TransportConfig",
+                                "http_endpoint_format".to_string(),
+                            )
+                            .with_path("protocol.endpoint"),
+                        ),
+                    ));
+                }
+            }
+            TransportProtocol::WebSocket { url } => {
+                if url.is_empty() {
+                    return Err(TraitConfigError::trait_validation(
+                        "WebSocket URL cannot be empty",
+                        Some(
+                            ValidationContext::new(
+                                "TransportConfig",
+                                "websocket_url_required".to_string(),
+                            )
+                            .with_path("protocol.url"),
+                        ),
+                    ));
+                }
+            }
+            TransportProtocol::Tcp { host, port } => {
+                if host.is_empty() {
+                    return Err(TraitConfigError::trait_validation(
+                        "TCP host cannot be empty",
+                        Some(
+                            ValidationContext::new(
+                                "TransportConfig",
+                                "tcp_host_required".to_string(),
+                            )
+                            .with_path("protocol.host"),
+                        ),
+                    ));
+                }
+
+                if *port == 0 {
+                    return Err(TraitConfigError::trait_validation(
+                        "TCP port must be greater than 0",
+                        Some(
+                            ValidationContext::new(
+                                "TransportConfig",
+                                "tcp_port_positive".to_string(),
+                            )
+                            .with_path("protocol.port"),
+                        ),
+                    ));
+                }
+            }
+            TransportProtocol::UnixSocket { path } => {
+                if path.is_empty() {
+                    return Err(TraitConfigError::trait_validation(
+                        "Unix socket path cannot be empty",
+                        Some(
+                            ValidationContext::new(
+                                "TransportConfig",
+                                "unix_socket_path_required".to_string(),
+                            )
+                            .with_path("protocol.path"),
+                        ),
+                    ));
+                }
+            }
+            TransportProtocol::MessageQueue {
+                broker_url,
+                queue_name,
+            } => {
+                if broker_url.is_empty() {
+                    return Err(TraitConfigError::trait_validation(
+                        "Message queue broker URL cannot be empty",
+                        Some(
+                            ValidationContext::new(
+                                "TransportConfig",
+                                "mq_broker_url_required".to_string(),
+                            )
+                            .with_path("protocol.broker_url"),
+                        ),
+                    ));
+                }
+
+                if queue_name.is_empty() {
+                    return Err(TraitConfigError::trait_validation(
+                        "Message queue name cannot be empty",
+                        Some(
+                            ValidationContext::new(
+                                "TransportConfig",
+                                "mq_queue_name_required".to_string(),
+                            )
+                            .with_path("protocol.queue_name"),
+                        ),
+                    ));
+                }
+            }
+            TransportProtocol::InMemory => {
+                // In-memory transport doesn't need network validation
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_port_configuration(&self) -> TraitConfigResult<()> {
+        if let TransportProtocol::Tcp { host: _, port } = &self.protocol {
+            // Validate port range
+            if *port < 1024 {
+                log::warn!("Using privileged port {} - ensure proper permissions", port);
+            }
+
+            if *port > 65535 {
+                return Err(TraitConfigError::trait_validation(
+                    "Port number exceeds maximum value (65535)",
+                    Some(
+                        ValidationContext::new(
+                            "TransportConfig",
+                            "port_range_exceeded".to_string(),
+                        )
+                        .with_path("protocol.port"),
+                    ),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_connection_settings(&self) -> TraitConfigResult<()> {
+        // Validate timeout values
+        if self.connection_timeout_ms == 0 {
+            return Err(TraitConfigError::trait_validation(
+                "Connection timeout must be greater than 0",
+                Some(
+                    ValidationContext::new("TransportConfig", "timeout_positive".to_string())
+                        .with_path("connection_timeout_ms"),
+                ),
+            ));
+        }
+
+        // Warn about very high timeouts
+        if self.connection_timeout_ms > 300000 {
+            // 5 minutes
+            log::warn!(
+                "Very high connection timeout: {}ms",
+                self.connection_timeout_ms
+            );
+        }
+
+        // Validate retry configuration
+        if self.retry_config.max_retries > 10 {
+            log::warn!(
+                "High retry count: {} - consider if this is appropriate",
+                self.retry_config.max_retries
+            );
+        }
+
+        Ok(())
+    }
+
+    async fn get_network_health(&self) -> TraitConfigResult<NetworkHealthMetrics> {
+        // In a real implementation, this would collect actual transport metrics
+        let mut metrics = NetworkHealthMetrics::new();
+
+        // Simulate transport health metrics
+        metrics.connection_success_rate = 0.95;
+        metrics.avg_latency_ms = 50.0;
+        metrics.throughput_bps = 1_000_000; // 1 Mbps
+
+        Ok(metrics)
+    }
+
+    async fn test_connectivity(&self) -> TraitConfigResult<ConnectivityTestResult> {
+        let mut result = ConnectivityTestResult::new();
+
+        // Protocol-specific connectivity tests would go here
+        match &self.protocol {
+            TransportProtocol::InMemory => {
+                // In-memory always works
+                result.status = crate::config::traits::ConnectivityStatus::Healthy;
+            }
+            _ => {
+                // For other protocols, we'd implement actual connectivity tests
+                result.status = crate::config::traits::ConnectivityStatus::Healthy;
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn get_platform_network_settings(&self) -> NetworkPlatformSettings {
+        self.platform_settings.clone()
+    }
+
+    fn validate_network_security(&self) -> TraitConfigResult<()> {
+        // Check encryption settings
+        if !self.encryption {
+            match &self.protocol {
+                TransportProtocol::Http {
+                    endpoint,
+                    headers: _,
+                } => {
+                    if endpoint.starts_with("https://") {
+                        log::info!("Using HTTPS with additional encryption layer");
+                    } else {
+                        log::warn!(
+                            "HTTP transport without encryption - consider enabling encryption"
+                        );
+                    }
+                }
+                TransportProtocol::Tcp { .. } => {
+                    log::warn!("TCP transport without encryption - data will be sent in plaintext");
+                }
+                _ => {
+                    log::info!("Consider enabling transport encryption for additional security");
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl TransportConfig {
+    /// Validate transport-specific parameters
+    fn validate_transport_parameters(&self) -> TraitConfigResult<()> {
+        self.validate_network_parameters()
+    }
+
+    /// Validate timeout settings
+    fn validate_timeout_settings(&self) -> TraitConfigResult<()> {
+        if self.connection_timeout_ms == 0 {
+            return Err(TraitConfigError::trait_validation(
+                "Connection timeout must be greater than 0",
+                Some(ValidationContext::new(
+                    "TransportConfig",
+                    "timeout_positive".to_string(),
+                )),
+            ));
+        }
+
+        if self.batch_timeout_ms == 0 {
+            return Err(TraitConfigError::trait_validation(
+                "Batch timeout must be greater than 0",
+                Some(ValidationContext::new(
+                    "TransportConfig",
+                    "batch_timeout_positive".to_string(),
+                )),
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Validate buffer settings
+    fn validate_buffer_settings(&self) -> TraitConfigResult<()> {
+        if self.buffer_size == 0 {
+            return Err(TraitConfigError::trait_validation(
+                "Buffer size must be greater than 0",
+                Some(ValidationContext::new(
+                    "TransportConfig",
+                    "buffer_size_positive".to_string(),
+                )),
+            ));
+        }
+
+        // Warn about very large buffers
+        if self.buffer_size > 10000 {
+            log::warn!(
+                "Very large buffer size: {} - consider memory usage",
+                self.buffer_size
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Default validation rules for transport configuration
+    fn default_validation_rules() -> Vec<ValidationRule> {
+        vec![
+            ValidationRule {
+                name: "connection_timeout_positive".to_string(),
+                description: "Connection timeout must be greater than 0".to_string(),
+                field_path: "connection_timeout_ms".to_string(),
+                rule_type: ValidationRuleType::NumericRange {
+                    min: Some(1.0),
+                    max: Some(300000.0),
+                },
+                severity: ValidationSeverity::Error,
+            },
+            ValidationRule {
+                name: "buffer_size_positive".to_string(),
+                description: "Buffer size must be greater than 0".to_string(),
+                field_path: "buffer_size".to_string(),
+                rule_type: ValidationRuleType::NumericRange {
+                    min: Some(1.0),
+                    max: Some(100000.0),
+                },
+                severity: ValidationSeverity::Error,
+            },
+            ValidationRule {
+                name: "batch_timeout_positive".to_string(),
+                description: "Batch timeout must be greater than 0".to_string(),
+                field_path: "batch_timeout_ms".to_string(),
+                rule_type: ValidationRuleType::NumericRange {
+                    min: Some(1.0),
+                    max: Some(60000.0),
+                },
+                severity: ValidationSeverity::Error,
+            },
+            ValidationRule {
+                name: "retry_count_reasonable".to_string(),
+                description: "Retry count should be reasonable".to_string(),
+                field_path: "retry_config.max_retries".to_string(),
+                rule_type: ValidationRuleType::NumericRange {
+                    min: Some(0.0),
+                    max: Some(10.0),
+                },
+                severity: ValidationSeverity::Warning,
+            },
+        ]
     }
 }
 

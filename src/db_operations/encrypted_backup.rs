@@ -6,14 +6,20 @@
 
 use super::core::DbOperations;
 use super::encryption_wrapper::EncryptionWrapper;
+use crate::config::traits::{
+    BackupConfigTrait, BackupMode as TraitBackupMode, BaseConfig, ConfigLifecycle,
+    ConfigValidation, DatabaseConfig, StandardBackupConfig, TraitConfigError, TraitConfigResult,
+    ValidationContext,
+};
 use crate::crypto::{CryptoError, MasterKeyPair};
 use crate::schema::SchemaError;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 /// Version identifier for backup format
@@ -37,6 +43,25 @@ impl Default for BackupMode {
     }
 }
 
+impl From<BackupMode> for TraitBackupMode {
+    fn from(mode: BackupMode) -> Self {
+        match mode {
+            BackupMode::Full => TraitBackupMode::Full,
+            BackupMode::Incremental => TraitBackupMode::Incremental,
+        }
+    }
+}
+
+impl From<TraitBackupMode> for BackupMode {
+    fn from(mode: TraitBackupMode) -> Self {
+        match mode {
+            TraitBackupMode::Full => BackupMode::Full,
+            TraitBackupMode::Incremental => BackupMode::Incremental,
+            TraitBackupMode::Differential => BackupMode::Incremental, // Map to closest equivalent
+        }
+    }
+}
+
 /// Backup creation options
 #[derive(Debug, Clone)]
 pub struct BackupOptions {
@@ -52,6 +77,66 @@ pub struct BackupOptions {
     pub compression_level: u8,
     /// Verify integrity during backup creation
     pub verify_during_creation: bool,
+    /// Backup destination directory
+    pub backup_directory: PathBuf,
+    /// Number of backups to retain
+    pub retention_count: u32,
+}
+
+impl BackupConfigTrait for BackupOptions {
+    type BackupMode = BackupMode;
+
+    fn backup_mode(&self) -> Self::BackupMode {
+        self.mode
+    }
+
+    fn backup_path(&self) -> &Path {
+        &self.backup_directory
+    }
+
+    fn compression_level(&self) -> u8 {
+        self.compression_level
+    }
+
+    fn verify_during_creation(&self) -> bool {
+        self.verify_during_creation
+    }
+
+    fn include_metadata(&self) -> bool {
+        self.include_metadata
+    }
+
+    fn retention_count(&self) -> u32 {
+        self.retention_count
+    }
+
+    fn validate(&self) -> TraitConfigResult<()> {
+        if self.compression_level > 9 {
+            return Err(TraitConfigError::ValidationError {
+                field: "compression_level".to_string(),
+                message: "Compression level must be between 0 and 9".to_string(),
+                context: ValidationContext::default(),
+            });
+        }
+
+        if self.retention_count == 0 {
+            return Err(TraitConfigError::ValidationError {
+                field: "retention_count".to_string(),
+                message: "Retention count must be at least 1".to_string(),
+                context: ValidationContext::default(),
+            });
+        }
+
+        if self.retention_count > 1000 {
+            return Err(TraitConfigError::ValidationError {
+                field: "retention_count".to_string(),
+                message: "Retention count should not exceed 1000".to_string(),
+                context: ValidationContext::default(),
+            });
+        }
+
+        Ok(())
+    }
 }
 
 impl Default for BackupOptions {
@@ -63,6 +148,8 @@ impl Default for BackupOptions {
             include_metadata: true,
             compression_level: 6,
             verify_during_creation: true,
+            backup_directory: PathBuf::from("./backups"),
+            retention_count: 10,
         }
     }
 }

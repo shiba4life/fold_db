@@ -1,13 +1,32 @@
-use crate::config::crypto::{ConfigError, CryptoConfig};
+use crate::config::crypto::CryptoConfig;
+use crate::config::error::ConfigError;
 use crate::config::{
-    EnhancedConfigurationManager, EnhancedConfig, ConfigValue, ConfigResult as NewConfigResult,
-    create_platform_resolver, PlatformConfigPaths, create_platform_keystore, PlatformKeystore,
+    create_platform_keystore, create_platform_resolver, ConfigResult as NewConfigResult,
+    ConfigValue, EnhancedConfig, EnhancedConfigurationManager, PlatformConfigPaths,
+    PlatformKeystore,
 };
 use crate::datafold_node::signature_auth::SignatureAuthConfig;
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::any::Any;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+// Import shared traits
+use crate::config::platform::EnhancedPlatformInfo;
+use crate::config::traits::base::{
+    ConfigChangeType as TraitConfigChangeType, ConfigMetadata, ReportingConfig, ValidationRule,
+    ValidationSeverity,
+};
+use crate::config::traits::integration::{
+    ConfigMetrics, ConfigSchema, HealthStatus, PlatformPerformanceSettings, UnifiedReport,
+    ValidationResult,
+};
+use crate::config::traits::{
+    BaseConfig, ConfigLifecycle, ConfigReporting, ConfigValidation, CrossPlatformConfig,
+    ReportableConfig, TraitConfigError, TraitConfigResult, ValidatableConfig, ValidationContext,
+};
 
 /// Configuration for a DataFoldNode instance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,13 +50,13 @@ pub struct EnhancedNodeConfig {
     /// Base node configuration
     #[serde(flatten)]
     pub base: NodeConfig,
-    
+
     /// Platform-specific settings
     pub platform: NodePlatformSettings,
-    
+
     /// Cross-platform path settings
     pub paths: NodePathSettings,
-    
+
     /// Performance and optimization settings
     pub performance: NodePerformanceSettings,
 }
@@ -47,13 +66,13 @@ pub struct EnhancedNodeConfig {
 pub struct NodePlatformSettings {
     /// Use platform-specific data directories
     pub use_platform_paths: bool,
-    
+
     /// Enable platform-specific optimizations
     pub enable_optimizations: bool,
-    
+
     /// Use keystore for sensitive configuration
     pub use_keystore: bool,
-    
+
     /// Platform-specific networking settings
     pub networking: PlatformNetworkingSettings,
 }
@@ -63,16 +82,16 @@ pub struct NodePlatformSettings {
 pub struct NodePathSettings {
     /// Base data directory (uses platform default if not specified)
     pub data_dir: Option<PathBuf>,
-    
+
     /// Configuration directory
     pub config_dir: Option<PathBuf>,
-    
+
     /// Cache directory
     pub cache_dir: Option<PathBuf>,
-    
+
     /// Logs directory
     pub logs_dir: Option<PathBuf>,
-    
+
     /// Runtime/temporary directory
     pub runtime_dir: Option<PathBuf>,
 }
@@ -82,10 +101,10 @@ pub struct NodePathSettings {
 pub struct PlatformNetworkingSettings {
     /// Use platform-specific socket options
     pub use_platform_socket_opts: bool,
-    
+
     /// Preferred network interface
     pub preferred_interface: Option<String>,
-    
+
     /// Enable IPv6 support
     pub enable_ipv6: bool,
 }
@@ -95,13 +114,13 @@ pub struct PlatformNetworkingSettings {
 pub struct NodePerformanceSettings {
     /// Enable memory mapping for large files
     pub enable_memory_mapping: bool,
-    
+
     /// Database cache size in MB
     pub db_cache_size_mb: u64,
-    
+
     /// Network buffer sizes
     pub network_buffer_size: usize,
-    
+
     /// Enable background compaction
     pub enable_background_compaction: bool,
 }
@@ -114,7 +133,8 @@ impl Default for NodeConfig {
     fn default() -> Self {
         // Use platform-specific data directory by default
         let platform_paths = create_platform_resolver();
-        let default_storage = platform_paths.data_dir()
+        let default_storage = platform_paths
+            .data_dir()
             .unwrap_or_else(|_| PathBuf::from("data"));
 
         Self {
@@ -151,10 +171,10 @@ impl Default for NodePlatformSettings {
 impl Default for NodePathSettings {
     fn default() -> Self {
         Self {
-            data_dir: None, // Will use platform default
-            config_dir: None, // Will use platform default
-            cache_dir: None, // Will use platform default
-            logs_dir: None, // Will use platform default
+            data_dir: None,    // Will use platform default
+            config_dir: None,  // Will use platform default
+            cache_dir: None,   // Will use platform default
+            logs_dir: None,    // Will use platform default
             runtime_dir: None, // Will use platform default
         }
     }
@@ -280,7 +300,7 @@ impl NodeConfig {
     /// Convert to enhanced configuration
     pub fn to_enhanced(self) -> Result<EnhancedNodeConfig, ConfigError> {
         let platform_paths = create_platform_resolver();
-        
+
         let mut enhanced = EnhancedNodeConfig {
             base: self,
             platform: NodePlatformSettings::default(),
@@ -290,35 +310,50 @@ impl NodeConfig {
 
         // Set platform-specific paths
         if enhanced.platform.use_platform_paths {
-            enhanced.paths.data_dir = Some(platform_paths.data_dir().map_err(|e| {
-                ConfigError::InvalidParameter {
-                    message: format!("Failed to get platform data directory: {}", e),
-                }
-            })?);
-            
-            enhanced.paths.config_dir = Some(platform_paths.config_dir().map_err(|e| {
-                ConfigError::InvalidParameter {
-                    message: format!("Failed to get platform config directory: {}", e),
-                }
-            })?);
-            
-            enhanced.paths.cache_dir = Some(platform_paths.cache_dir().map_err(|e| {
-                ConfigError::InvalidParameter {
-                    message: format!("Failed to get platform cache directory: {}", e),
-                }
-            })?);
-            
-            enhanced.paths.logs_dir = Some(platform_paths.logs_dir().map_err(|e| {
-                ConfigError::InvalidParameter {
-                    message: format!("Failed to get platform logs directory: {}", e),
-                }
-            })?);
-            
-            enhanced.paths.runtime_dir = Some(platform_paths.runtime_dir().map_err(|e| {
-                ConfigError::InvalidParameter {
-                    message: format!("Failed to get platform runtime directory: {}", e),
-                }
-            })?);
+            enhanced.paths.data_dir =
+                Some(
+                    platform_paths
+                        .data_dir()
+                        .map_err(|e| ConfigError::InvalidParameter {
+                            message: format!("Failed to get platform data directory: {}", e),
+                        })?,
+                );
+
+            enhanced.paths.config_dir =
+                Some(
+                    platform_paths
+                        .config_dir()
+                        .map_err(|e| ConfigError::InvalidParameter {
+                            message: format!("Failed to get platform config directory: {}", e),
+                        })?,
+                );
+
+            enhanced.paths.cache_dir =
+                Some(
+                    platform_paths
+                        .cache_dir()
+                        .map_err(|e| ConfigError::InvalidParameter {
+                            message: format!("Failed to get platform cache directory: {}", e),
+                        })?,
+                );
+
+            enhanced.paths.logs_dir =
+                Some(
+                    platform_paths
+                        .logs_dir()
+                        .map_err(|e| ConfigError::InvalidParameter {
+                            message: format!("Failed to get platform logs directory: {}", e),
+                        })?,
+                );
+
+            enhanced.paths.runtime_dir =
+                Some(
+                    platform_paths
+                        .runtime_dir()
+                        .map_err(|e| ConfigError::InvalidParameter {
+                            message: format!("Failed to get platform runtime directory: {}", e),
+                        })?,
+                );
 
             // Update storage path to use platform data directory
             enhanced.base.storage_path = enhanced.paths.data_dir.as_ref().unwrap().clone();
@@ -355,11 +390,11 @@ impl EnhancedNodeConfig {
             Ok(config_dir.clone())
         } else {
             let platform_paths = create_platform_resolver();
-            platform_paths.config_dir().map_err(|e| {
-                ConfigError::InvalidParameter {
+            platform_paths
+                .config_dir()
+                .map_err(|e| ConfigError::InvalidParameter {
                     message: format!("Failed to get config directory: {}", e),
-                }
-            })
+                })
         }
     }
 
@@ -369,11 +404,11 @@ impl EnhancedNodeConfig {
             Ok(cache_dir.clone())
         } else {
             let platform_paths = create_platform_resolver();
-            platform_paths.cache_dir().map_err(|e| {
-                ConfigError::InvalidParameter {
+            platform_paths
+                .cache_dir()
+                .map_err(|e| ConfigError::InvalidParameter {
                     message: format!("Failed to get cache directory: {}", e),
-                }
-            })
+                })
         }
     }
 
@@ -383,11 +418,11 @@ impl EnhancedNodeConfig {
             Ok(logs_dir.clone())
         } else {
             let platform_paths = create_platform_resolver();
-            platform_paths.logs_dir().map_err(|e| {
-                ConfigError::InvalidParameter {
+            platform_paths
+                .logs_dir()
+                .map_err(|e| ConfigError::InvalidParameter {
                     message: format!("Failed to get logs directory: {}", e),
-                }
-            })
+                })
         }
     }
 
@@ -401,10 +436,13 @@ impl EnhancedNodeConfig {
         ];
 
         for (name, dir) in dirs {
-            std::fs::create_dir_all(&dir).map_err(|e| {
-                ConfigError::InvalidParameter {
-                    message: format!("Failed to create {} directory '{}': {}", name, dir.display(), e),
-                }
+            std::fs::create_dir_all(&dir).map_err(|e| ConfigError::InvalidParameter {
+                message: format!(
+                    "Failed to create {} directory '{}': {}",
+                    name,
+                    dir.display(),
+                    e
+                ),
             })?;
         }
 
@@ -420,11 +458,11 @@ impl EnhancedNodeConfig {
         if self.platform.use_platform_paths {
             // Ensure platform paths are accessible
             let platform_paths = create_platform_resolver();
-            platform_paths.validate_paths().map_err(|e| {
-                ConfigError::InvalidParameter {
+            platform_paths
+                .validate_paths()
+                .map_err(|e| ConfigError::InvalidParameter {
                     message: format!("Platform path validation failed: {}", e),
-                }
-            })?;
+                })?;
         }
 
         // Validate performance settings
@@ -453,14 +491,13 @@ pub struct EnhancedNodeConfigManager {
 impl EnhancedNodeConfigManager {
     /// Create new enhanced node configuration manager
     pub async fn new() -> Result<Self, ConfigError> {
-        let enhanced_manager = Arc::new(
-            EnhancedConfigurationManager::new().await.map_err(|e| {
+        let enhanced_manager =
+            Arc::new(EnhancedConfigurationManager::new().await.map_err(|e| {
                 ConfigError::InvalidParameter {
                     message: format!("Failed to create enhanced manager: {}", e),
                 }
-            })?
-        );
-        
+            })?);
+
         let keystore = Arc::new(create_platform_keystore());
 
         Ok(Self {
@@ -487,7 +524,10 @@ impl EnhancedNodeConfigManager {
     }
 
     /// Store enhanced node configuration
-    pub async fn save_enhanced_config(&self, node_config: EnhancedNodeConfig) -> Result<(), ConfigError> {
+    pub async fn save_enhanced_config(
+        &self,
+        node_config: EnhancedNodeConfig,
+    ) -> Result<(), ConfigError> {
         // Get current enhanced configuration
         let mut enhanced_config = self.enhanced_manager.get_enhanced().await.map_err(|e| {
             ConfigError::InvalidParameter {
@@ -497,10 +537,12 @@ impl EnhancedNodeConfigManager {
 
         // Convert node config to ConfigValue
         let node_section = self.node_config_to_config_value(&node_config)?;
-        
+
         // Update enhanced configuration
         let mut new_enhanced = (*enhanced_config).clone();
-        new_enhanced.base.set_section("node".to_string(), node_section);
+        new_enhanced
+            .base
+            .set_section("node".to_string(), node_section);
 
         // Store sensitive crypto configuration in keystore if enabled
         if node_config.platform.use_keystore {
@@ -510,85 +552,704 @@ impl EnhancedNodeConfigManager {
                         message: format!("Failed to serialize crypto config: {}", e),
                     }
                 })?;
-                
-                self.keystore.store_secret("node_crypto_config", &crypto_data).await.map_err(|e| {
-                    ConfigError::InvalidParameter {
+
+                self.keystore
+                    .store_secret("node_crypto_config", &crypto_data)
+                    .await
+                    .map_err(|e| ConfigError::InvalidParameter {
                         message: format!("Failed to store crypto config in keystore: {}", e),
-                    }
-                })?;
+                    })?;
             }
         }
 
         // Store enhanced configuration
-        self.enhanced_manager.set_enhanced(new_enhanced).await.map_err(|e| {
-            ConfigError::InvalidParameter {
+        self.enhanced_manager
+            .set_enhanced(new_enhanced)
+            .await
+            .map_err(|e| ConfigError::InvalidParameter {
                 message: format!("Failed to set enhanced config: {}", e),
-            }
-        })?;
+            })?;
 
         Ok(())
     }
 
     /// Extract node configuration from ConfigValue section
-    fn extract_node_config_from_section(&self, _node_section: &ConfigValue) -> Result<EnhancedNodeConfig, ConfigError> {
+    fn extract_node_config_from_section(
+        &self,
+        _node_section: &ConfigValue,
+    ) -> Result<EnhancedNodeConfig, ConfigError> {
         // For now, return default configuration
         // In a full implementation, this would parse the ConfigValue structure
         EnhancedNodeConfig::with_platform_paths()
     }
 
     /// Convert node configuration to ConfigValue
-    fn node_config_to_config_value(&self, node_config: &EnhancedNodeConfig) -> Result<ConfigValue, ConfigError> {
+    fn node_config_to_config_value(
+        &self,
+        node_config: &EnhancedNodeConfig,
+    ) -> Result<ConfigValue, ConfigError> {
         let mut node_obj = HashMap::new();
 
         // Add storage path
-        node_obj.insert("storage_path".to_string(),
-            ConfigValue::string(node_config.base.storage_path.to_string_lossy()));
+        node_obj.insert(
+            "storage_path".to_string(),
+            ConfigValue::string(node_config.base.storage_path.to_string_lossy()),
+        );
 
         // Add network settings
-        node_obj.insert("network_listen_address".to_string(),
-            ConfigValue::string(node_config.base.network_listen_address.clone()));
+        node_obj.insert(
+            "network_listen_address".to_string(),
+            ConfigValue::string(node_config.base.network_listen_address.clone()),
+        );
 
         // Add platform settings (crypto stored in keystore)
         let mut platform_obj = HashMap::new();
-        platform_obj.insert("use_platform_paths".to_string(),
-            ConfigValue::boolean(node_config.platform.use_platform_paths));
-        platform_obj.insert("enable_optimizations".to_string(),
-            ConfigValue::boolean(node_config.platform.enable_optimizations));
-        platform_obj.insert("use_keystore".to_string(),
-            ConfigValue::boolean(node_config.platform.use_keystore));
-        
+        platform_obj.insert(
+            "use_platform_paths".to_string(),
+            ConfigValue::boolean(node_config.platform.use_platform_paths),
+        );
+        platform_obj.insert(
+            "enable_optimizations".to_string(),
+            ConfigValue::boolean(node_config.platform.enable_optimizations),
+        );
+        platform_obj.insert(
+            "use_keystore".to_string(),
+            ConfigValue::boolean(node_config.platform.use_keystore),
+        );
+
         node_obj.insert("platform".to_string(), ConfigValue::object(platform_obj));
 
         // Add performance settings
         let mut performance_obj = HashMap::new();
-        performance_obj.insert("enable_memory_mapping".to_string(),
-            ConfigValue::boolean(node_config.performance.enable_memory_mapping));
-        performance_obj.insert("db_cache_size_mb".to_string(),
-            ConfigValue::integer(node_config.performance.db_cache_size_mb as i64));
-        performance_obj.insert("network_buffer_size".to_string(),
-            ConfigValue::integer(node_config.performance.network_buffer_size as i64));
-        
-        node_obj.insert("performance".to_string(), ConfigValue::object(performance_obj));
+        performance_obj.insert(
+            "enable_memory_mapping".to_string(),
+            ConfigValue::boolean(node_config.performance.enable_memory_mapping),
+        );
+        performance_obj.insert(
+            "db_cache_size_mb".to_string(),
+            ConfigValue::integer(node_config.performance.db_cache_size_mb as i64),
+        );
+        performance_obj.insert(
+            "network_buffer_size".to_string(),
+            ConfigValue::integer(node_config.performance.network_buffer_size as i64),
+        );
+
+        node_obj.insert(
+            "performance".to_string(),
+            ConfigValue::object(performance_obj),
+        );
 
         Ok(ConfigValue::object(node_obj))
     }
 
     /// Load crypto configuration from keystore
     pub async fn load_crypto_from_keystore(&self) -> Result<Option<CryptoConfig>, ConfigError> {
-        if let Some(crypto_data) = self.keystore.get_secret("node_crypto_config").await.map_err(|e| {
-            ConfigError::InvalidParameter {
+        if let Some(crypto_data) = self
+            .keystore
+            .get_secret("node_crypto_config")
+            .await
+            .map_err(|e| ConfigError::InvalidParameter {
                 message: format!("Failed to load crypto config from keystore: {}", e),
-            }
-        })? {
-            let crypto_config: CryptoConfig = serde_json::from_slice(&crypto_data).map_err(|e| {
-                ConfigError::InvalidParameter {
-                    message: format!("Failed to deserialize crypto config: {}", e),
-                }
-            })?;
+            })?
+        {
+            let crypto_config: CryptoConfig =
+                serde_json::from_slice(&crypto_data).map_err(|e| {
+                    ConfigError::InvalidParameter {
+                        message: format!("Failed to deserialize crypto config: {}", e),
+                    }
+                })?;
             Ok(Some(crypto_config))
         } else {
             Ok(None)
         }
+    }
+}
+
+// Implement shared traits for NodeConfig
+#[async_trait]
+impl BaseConfig for NodeConfig {
+    type Error = ConfigError;
+    type Event = String; // Use simple string events for now
+    type TransformTarget = EnhancedNodeConfig;
+
+    /// Load node configuration from the specified path
+    async fn load(path: &Path) -> Result<Self, Self::Error> {
+        let content = tokio::fs::read_to_string(path).await?;
+        let config: NodeConfig = toml::from_str(&content)?;
+        config.validate()?;
+        Ok(config)
+    }
+
+    /// Validate the node configuration
+    fn validate(&self) -> Result<(), Self::Error> {
+        // Validate crypto configuration if enabled
+        if let Some(crypto) = &self.crypto {
+            crypto.validate().map_err(ConfigError::CryptoValidation)?;
+        }
+
+        // Validate signature authentication configuration (mandatory)
+        self.signature_auth
+            .validate()
+            .map_err(|e| ConfigError::InvalidParameter {
+                message: format!("Signature auth validation failed: {}", e),
+            })?;
+
+        // Validate storage path exists or can be created
+        if let Some(parent) = self.storage_path.parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent).map_err(|e| ConfigError::InvalidParameter {
+                    message: format!("Cannot create storage directory: {}", e),
+                })?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Report configuration event
+    fn report_event(&self, event: Self::Event) {
+        log::info!("NodeConfig event: {}", event);
+    }
+
+    /// Get runtime type information
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+#[async_trait]
+impl ConfigLifecycle for NodeConfig {
+    /// Save node configuration to the specified path
+    async fn save(&self, path: &Path) -> Result<(), Self::Error> {
+        let content = toml::to_string_pretty(self)?;
+        tokio::fs::write(path, content).await?;
+        Ok(())
+    }
+
+    /// Reload node configuration from its source
+    async fn reload(&mut self, path: &Path) -> Result<(), Self::Error> {
+        let reloaded = Self::load(path).await?;
+        *self = reloaded;
+        Ok(())
+    }
+
+    /// Check if configuration has changed since last load/save
+    async fn has_changed(&self, path: &Path) -> Result<bool, Self::Error> {
+        let metadata = tokio::fs::metadata(path).await?;
+        let file_modified = metadata.modified()?;
+        let file_modified_chrono = chrono::DateTime::<chrono::Utc>::from(file_modified);
+
+        // Simple check - assume changed if modified in last 60 seconds
+        Ok(file_modified_chrono > chrono::Utc::now() - chrono::Duration::seconds(60))
+    }
+
+    /// Get configuration metadata
+    fn get_metadata(&self) -> ConfigMetadata {
+        ConfigMetadata {
+            version: "1.0.0".to_string(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            accessed_at: chrono::Utc::now(),
+            source: None,
+            format: Some("toml".to_string()),
+            size_bytes: None,
+            checksum: None,
+            additional: HashMap::new(),
+        }
+    }
+
+    /// Set configuration metadata
+    fn set_metadata(&mut self, _metadata: ConfigMetadata) {
+        // Node config doesn't store metadata directly
+    }
+}
+
+impl ConfigValidation for NodeConfig {
+    /// Validate with detailed context
+    fn validate_with_context(&self) -> Result<(), ValidationContext> {
+        let context = ValidationContext::new("NodeConfig", "comprehensive_validation".to_string());
+
+        match self.validate() {
+            Ok(()) => Ok(()),
+            Err(_) => Err(context.with_path("node_config")),
+        }
+    }
+
+    /// Validate specific field or section
+    fn validate_field(&self, field_path: &str) -> Result<(), Self::Error> {
+        match field_path {
+            "storage_path" => {
+                if !self.storage_path.is_absolute() {
+                    return Err(ConfigError::InvalidParameter {
+                        message: "Storage path must be absolute".to_string(),
+                    });
+                }
+                Ok(())
+            }
+            "network_listen_address" => {
+                if self.network_listen_address.is_empty() {
+                    return Err(ConfigError::InvalidParameter {
+                        message: "Network listen address cannot be empty".to_string(),
+                    });
+                }
+                Ok(())
+            }
+            "crypto" => {
+                if let Some(crypto) = &self.crypto {
+                    crypto.validate().map_err(ConfigError::CryptoValidation)?;
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Get validation rules
+    fn validation_rules(&self) -> Vec<ValidationRule> {
+        vec![
+            ValidationRule::required("storage_path"),
+            ValidationRule::required("network_listen_address"),
+            ValidationRule::required("signature_auth"),
+            ValidationRule {
+                name: "storage_path_absolute".to_string(),
+                description: "Storage path must be absolute".to_string(),
+                field_path: "storage_path".to_string(),
+                rule_type: crate::config::traits::ValidationRuleType::Custom(
+                    "path_absolute".to_string(),
+                ),
+                severity: ValidationSeverity::Error,
+            },
+            ValidationRule::string_length("network_listen_address", Some(1), None),
+        ]
+    }
+
+    /// Add custom validation rule
+    fn add_validation_rule(&mut self, _rule: ValidationRule) {
+        // Not implemented for node config
+    }
+}
+
+impl ConfigReporting for NodeConfig {
+    /// Report configuration change event
+    fn report_change(&self, change_type: TraitConfigChangeType, context: Option<String>) {
+        log::info!(
+            "Node config change: {:?}, context: {:?}",
+            change_type,
+            context
+        );
+    }
+
+    /// Report configuration error
+    fn report_error(&self, error: &Self::Error, context: Option<String>) {
+        log::error!("Node config error: {}, context: {:?}", error, context);
+    }
+
+    /// Report configuration metric
+    fn report_metric(&self, metric_name: &str, value: f64, tags: Option<HashMap<String, String>>) {
+        log::debug!(
+            "Node config metric: {} = {}, tags: {:?}",
+            metric_name,
+            value,
+            tags
+        );
+    }
+
+    /// Get reporting configuration
+    fn reporting_config(&self) -> ReportingConfig {
+        ReportingConfig {
+            report_changes: true,
+            report_errors: true,
+            report_metrics: true,
+            target: None,
+            throttle_ms: Some(5000), // Less frequent reporting for node config
+            include_sensitive: false,
+        }
+    }
+
+    /// Set reporting configuration
+    fn set_reporting_config(&mut self, _config: ReportingConfig) {
+        // Not implemented for node config
+    }
+}
+
+// Implement shared traits for EnhancedNodeConfig
+#[async_trait]
+impl BaseConfig for EnhancedNodeConfig {
+    type Error = ConfigError;
+    type Event = String; // Use simple string events for now
+    type TransformTarget = EnhancedNodeConfig;
+
+    /// Load enhanced node configuration from the specified path
+    async fn load(path: &Path) -> Result<Self, Self::Error> {
+        let content = tokio::fs::read_to_string(path).await?;
+        let config: EnhancedNodeConfig = toml::from_str(&content)?;
+        config.validate()?;
+        Ok(config)
+    }
+
+    /// Validate the enhanced node configuration
+    fn validate(&self) -> Result<(), Self::Error> {
+        // Validate base configuration
+        self.base.validate()?;
+
+        // Validate platform-specific settings
+        if self.platform.use_platform_paths {
+            // Ensure platform paths are accessible
+            let platform_paths = create_platform_resolver();
+            platform_paths
+                .validate_paths()
+                .map_err(|e| ConfigError::InvalidParameter {
+                    message: format!("Platform path validation failed: {}", e),
+                })?;
+        }
+
+        // Validate performance settings
+        if self.performance.db_cache_size_mb == 0 {
+            return Err(ConfigError::InvalidParameter {
+                message: "Database cache size must be greater than 0".to_string(),
+            });
+        }
+
+        if self.performance.network_buffer_size == 0 {
+            return Err(ConfigError::InvalidParameter {
+                message: "Network buffer size must be greater than 0".to_string(),
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Report configuration event
+    fn report_event(&self, event: Self::Event) {
+        log::info!("EnhancedNodeConfig event: {}", event);
+    }
+
+    /// Get runtime type information
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+#[async_trait]
+impl ConfigLifecycle for EnhancedNodeConfig {
+    /// Save enhanced node configuration to the specified path
+    async fn save(&self, path: &Path) -> Result<(), Self::Error> {
+        let content = toml::to_string_pretty(self)?;
+        tokio::fs::write(path, content).await?;
+        Ok(())
+    }
+
+    /// Reload enhanced node configuration from its source
+    async fn reload(&mut self, path: &Path) -> Result<(), Self::Error> {
+        let reloaded = Self::load(path).await?;
+        *self = reloaded;
+        Ok(())
+    }
+
+    /// Check if configuration has changed since last load/save
+    async fn has_changed(&self, path: &Path) -> Result<bool, Self::Error> {
+        let metadata = tokio::fs::metadata(path).await?;
+        let file_modified = metadata.modified()?;
+        let file_modified_chrono = chrono::DateTime::<chrono::Utc>::from(file_modified);
+
+        // Simple check - assume changed if modified in last 60 seconds
+        Ok(file_modified_chrono > chrono::Utc::now() - chrono::Duration::seconds(60))
+    }
+
+    /// Get configuration metadata
+    fn get_metadata(&self) -> ConfigMetadata {
+        ConfigMetadata {
+            version: "1.0.0".to_string(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            accessed_at: chrono::Utc::now(),
+            source: None,
+            format: Some("enhanced_toml".to_string()),
+            size_bytes: None,
+            checksum: None,
+            additional: HashMap::new(),
+        }
+    }
+
+    /// Set configuration metadata
+    fn set_metadata(&mut self, _metadata: ConfigMetadata) {
+        // Enhanced node config doesn't store metadata directly
+    }
+}
+
+#[async_trait]
+impl CrossPlatformConfig for EnhancedNodeConfig {
+    /// Get platform-specific configuration paths
+    fn platform_paths(&self) -> &dyn PlatformConfigPaths {
+        // Return a static reference to avoid lifetime issues
+        use once_cell::sync::Lazy;
+        static PLATFORM_RESOLVER: Lazy<Box<dyn PlatformConfigPaths + Sync + Send>> =
+            Lazy::new(|| create_platform_resolver());
+        &**PLATFORM_RESOLVER
+    }
+
+    /// Get enhanced platform information
+    fn platform_info(&self) -> EnhancedPlatformInfo {
+        EnhancedPlatformInfo::detect()
+    }
+
+    /// Load configuration using platform-specific optimizations
+    async fn load_platform_optimized(&self, path: &Path) -> TraitConfigResult<Self> {
+        let enhanced = if self.platform.enable_optimizations {
+            // Use optimized loading with platform-specific features
+            Self::load(path).await.map_err(|e| {
+                TraitConfigError::cross_platform(format!("Optimized load failed: {}", e))
+            })?
+        } else {
+            Self::load(path).await.map_err(|e| {
+                TraitConfigError::cross_platform(format!("Standard load failed: {}", e))
+            })?
+        };
+
+        Ok(enhanced)
+    }
+
+    /// Save configuration using platform-specific optimizations
+    async fn save_platform_optimized(&self, path: &Path) -> TraitConfigResult<()> {
+        if self.platform.enable_optimizations {
+            // Use atomic writes and platform-specific optimizations
+            self.save(path).await.map_err(|e| {
+                TraitConfigError::cross_platform(format!("Optimized save failed: {}", e))
+            })?;
+        } else {
+            self.save(path).await.map_err(|e| {
+                TraitConfigError::cross_platform(format!("Standard save failed: {}", e))
+            })?;
+        }
+
+        Ok(())
+    }
+
+    /// Get platform-specific configuration defaults
+    fn platform_defaults(&self) -> HashMap<String, ConfigValue> {
+        let mut defaults = HashMap::new();
+        let platform_info = self.platform_info();
+
+        defaults.insert("use_platform_paths".to_string(), ConfigValue::Boolean(true));
+        defaults.insert(
+            "enable_optimizations".to_string(),
+            ConfigValue::Boolean(true),
+        );
+        defaults.insert(
+            "use_keystore".to_string(),
+            ConfigValue::Boolean(platform_info.keychain_available),
+        );
+        defaults.insert(
+            "enable_memory_mapping".to_string(),
+            ConfigValue::Boolean(platform_info.memory_mapping_available),
+        );
+
+        defaults
+    }
+
+    /// Migrate configuration for current platform
+    async fn migrate_for_platform(&mut self) -> TraitConfigResult<()> {
+        let platform_info = self.platform_info();
+
+        // Adjust settings based on platform capabilities
+        if !platform_info.memory_mapping_available {
+            self.performance.enable_memory_mapping = false;
+        }
+
+        if !platform_info.keychain_available {
+            self.platform.use_keystore = false;
+        }
+
+        // Update paths to use platform-specific directories
+        if self.platform.use_platform_paths {
+            let platform_paths = create_platform_resolver();
+
+            if self.paths.data_dir.is_none() {
+                self.paths.data_dir = Some(platform_paths.data_dir().map_err(|e| {
+                    TraitConfigError::cross_platform(format!("Failed to get data dir: {}", e))
+                })?);
+            }
+
+            if self.paths.config_dir.is_none() {
+                self.paths.config_dir = Some(platform_paths.config_dir().map_err(|e| {
+                    TraitConfigError::cross_platform(format!("Failed to get config dir: {}", e))
+                })?);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Validate platform compatibility
+    fn validate_platform_compatibility(&self) -> TraitConfigResult<()> {
+        let platform_info = self.platform_info();
+
+        if self.performance.enable_memory_mapping && !platform_info.memory_mapping_available {
+            return Err(TraitConfigError::cross_platform(
+                "Memory mapping not available on this platform",
+            ));
+        }
+
+        if self.platform.use_keystore && !platform_info.keychain_available {
+            return Err(TraitConfigError::cross_platform(
+                "Keystore not available on this platform",
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Get platform-specific performance settings
+    fn platform_performance_settings(&self) -> PlatformPerformanceSettings {
+        let platform_info = self.platform_info();
+
+        PlatformPerformanceSettings {
+            enable_memory_mapping: platform_info.memory_mapping_available
+                && self.performance.enable_memory_mapping,
+            use_atomic_operations: platform_info.atomic_operations_available,
+            enable_fs_caching: true,
+            optimal_buffer_size: self.performance.network_buffer_size,
+            max_concurrent_operations: 8, // Node can handle more concurrent operations
+            optimization_flags: HashMap::new(),
+        }
+    }
+}
+
+#[async_trait]
+impl ReportableConfig for EnhancedNodeConfig {
+    /// Report configuration to unified reporting system
+    async fn report_to_unified_system(&self) -> TraitConfigResult<()> {
+        // This would integrate with PBI 26 unified reporting system
+        log::info!("Reporting enhanced node config to unified system");
+        Ok(())
+    }
+
+    /// Report configuration metrics
+    async fn report_metrics(&self, metrics: ConfigMetrics) -> TraitConfigResult<()> {
+        log::info!("Enhanced node config metrics: {:?}", metrics);
+        Ok(())
+    }
+
+    /// Report configuration health status
+    async fn report_health_status(&self) -> TraitConfigResult<HealthStatus> {
+        let mut score = 100u8;
+        let mut indicators = Vec::new();
+
+        // Check if directories exist
+        if let Err(_) = self.get_data_dir().try_exists() {
+            score -= 20;
+            indicators.push(crate::config::traits::HealthIndicator {
+                name: "data_directory".to_string(),
+                status: crate::config::traits::HealthLevel::Warning,
+                description: "Data directory not accessible".to_string(),
+                value: None,
+                threshold: None,
+            });
+        }
+
+        // Check platform compatibility
+        if let Err(_) = self.validate_platform_compatibility() {
+            score -= 30;
+            indicators.push(crate::config::traits::HealthIndicator {
+                name: "platform_compatibility".to_string(),
+                status: crate::config::traits::HealthLevel::Critical,
+                description: "Platform compatibility issues detected".to_string(),
+                value: None,
+                threshold: None,
+            });
+        }
+
+        let status = if score >= 90 {
+            crate::config::traits::HealthLevel::Healthy
+        } else if score >= 70 {
+            crate::config::traits::HealthLevel::Warning
+        } else {
+            crate::config::traits::HealthLevel::Critical
+        };
+
+        Ok(HealthStatus {
+            status,
+            score,
+            indicators,
+            recommendations: vec![],
+            last_checked: chrono::Utc::now(),
+        })
+    }
+
+    /// Register with unified reporting system
+    async fn register_for_reporting(
+        &self,
+        config: crate::config::traits::ReportingRegistration,
+    ) -> TraitConfigResult<String> {
+        log::info!(
+            "Registering enhanced node config for reporting: {:?}",
+            config
+        );
+        Ok("enhanced_node_config_instance".to_string())
+    }
+
+    /// Unregister from unified reporting system
+    async fn unregister_from_reporting(&self, registration_id: &str) -> TraitConfigResult<()> {
+        log::info!("Unregistering enhanced node config: {}", registration_id);
+        Ok(())
+    }
+
+    /// Get reporting capabilities
+    fn reporting_capabilities(&self) -> crate::config::traits::ReportingCapabilities {
+        crate::config::traits::ReportingCapabilities {
+            report_types: vec![
+                "health".to_string(),
+                "metrics".to_string(),
+                "config_dump".to_string(),
+            ],
+            metrics: vec![
+                "cache_size".to_string(),
+                "load_time".to_string(),
+                "error_count".to_string(),
+            ],
+            event_types: vec![
+                "config_changed".to_string(),
+                "validation_failed".to_string(),
+            ],
+            real_time_support: true,
+            batch_support: true,
+            custom_support: false,
+        }
+    }
+
+    /// Create unified report
+    async fn create_unified_report(&self) -> TraitConfigResult<UnifiedReport> {
+        let health = self.report_health_status().await?;
+
+        Ok(UnifiedReport {
+            timestamp: chrono::Utc::now(),
+            report_type: "enhanced_node_config".to_string(),
+            config_summary: crate::config::traits::ConfigSummary {
+                config_type: "EnhancedNodeConfig".to_string(),
+                version: "1.0.0".to_string(),
+                size_bytes: 0,    // Would be calculated during serialization
+                section_count: 4, // base, platform, paths, performance
+                field_count: 20,  // Approximate count
+                last_modified: chrono::Utc::now(),
+                platform: format!("{:?}", std::env::consts::OS),
+                tags: HashMap::new(),
+            },
+            metrics: ConfigMetrics {
+                load_time_ms: 0.0,
+                save_time_ms: 0.0,
+                validation_time_ms: 0.0,
+                size_bytes: 0,
+                field_count: 20,
+                section_count: 4,
+                cache_hit_rate: 0.0,
+                error_rate: 0.0,
+                custom_metrics: HashMap::new(),
+            },
+            health,
+            events: vec![],   // Would be populated from event history
+            validation: None, // Would include validation results
+            custom_sections: HashMap::new(),
+        })
     }
 }
 
@@ -605,7 +1266,8 @@ pub fn load_node_config(
     use std::fs;
 
     let platform_paths = create_platform_resolver();
-    let default_config_path = platform_paths.config_dir()
+    let default_config_path = platform_paths
+        .config_dir()
         .map(|dir| dir.join("node_config.toml").to_string_lossy().to_string())
         .unwrap_or_else(|_| "config/node_config.json".to_string());
 
@@ -665,7 +1327,7 @@ pub async fn load_enhanced_node_config(
 ) -> Result<EnhancedNodeConfig, ConfigError> {
     // First try to load via enhanced manager
     let enhanced_manager = EnhancedNodeConfigManager::new().await?;
-    
+
     match enhanced_manager.load_enhanced_config().await {
         Ok(mut config) => {
             if let Some(p) = port {
@@ -675,12 +1337,11 @@ pub async fn load_enhanced_node_config(
         }
         Err(_) => {
             // Fall back to legacy loading and convert
-            let legacy_config = load_node_config(path, port).map_err(|e| {
-                ConfigError::InvalidParameter {
+            let legacy_config =
+                load_node_config(path, port).map_err(|e| ConfigError::InvalidParameter {
                     message: format!("Failed to load legacy config: {}", e),
-                }
-            })?;
-            
+                })?;
+
             legacy_config.to_enhanced()
         }
     }

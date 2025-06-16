@@ -5,29 +5,29 @@
 //! - macOS: Keychain Services
 //! - Windows: Credential Manager
 
-use std::collections::HashMap;
-use async_trait::async_trait;
-use serde::{Serialize, Deserialize};
 use crate::config::error::{ConfigError, ConfigResult};
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Trait for platform-specific keystore operations
 #[async_trait]
 pub trait PlatformKeystore: Send + Sync {
     /// Store a secret in the platform keystore
     async fn store_secret(&self, key: &str, value: &[u8]) -> ConfigResult<()>;
-    
+
     /// Retrieve a secret from the platform keystore
     async fn get_secret(&self, key: &str) -> ConfigResult<Option<Vec<u8>>>;
-    
+
     /// Delete a secret from the platform keystore
     async fn delete_secret(&self, key: &str) -> ConfigResult<()>;
-    
+
     /// List all keys stored by this application
     async fn list_keys(&self) -> ConfigResult<Vec<String>>;
-    
+
     /// Check if keystore is available on this platform
     fn is_available(&self) -> bool;
-    
+
     /// Get platform-specific keystore identifier
     fn keystore_type(&self) -> &'static str;
 }
@@ -118,6 +118,11 @@ pub fn create_platform_keystore() -> Box<dyn PlatformKeystore> {
     }
 }
 
+/// Create platform-specific keystore implementation wrapped in Arc
+pub fn create_platform_keystore_arc() -> std::sync::Arc<dyn PlatformKeystore> {
+    std::sync::Arc::from(create_platform_keystore())
+}
+
 /// Fallback keystore implementation for unsupported platforms
 pub struct FallbackKeystore {
     storage: tokio::sync::RwLock<HashMap<String, Vec<u8>>>,
@@ -138,27 +143,27 @@ impl PlatformKeystore for FallbackKeystore {
         storage.insert(key.to_string(), value.to_vec());
         Ok(())
     }
-    
+
     async fn get_secret(&self, key: &str) -> ConfigResult<Option<Vec<u8>>> {
         let storage = self.storage.read().await;
         Ok(storage.get(key).cloned())
     }
-    
+
     async fn delete_secret(&self, key: &str) -> ConfigResult<()> {
         let mut storage = self.storage.write().await;
         storage.remove(key);
         Ok(())
     }
-    
+
     async fn list_keys(&self) -> ConfigResult<Vec<String>> {
         let storage = self.storage.read().await;
         Ok(storage.keys().cloned().collect())
     }
-    
+
     fn is_available(&self) -> bool {
         true
     }
-    
+
     fn keystore_type(&self) -> &'static str {
         "fallback"
     }
@@ -167,26 +172,34 @@ impl PlatformKeystore for FallbackKeystore {
 /// Utility functions for keystore operations
 pub mod utils {
     use super::*;
+    use argon2::password_hash::{rand_core::OsRng, SaltString};
+    use argon2::{
+        Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version,
+    };
     use blake3::Hasher;
-    use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier, Algorithm, Version, Params};
-    use argon2::password_hash::{SaltString, rand_core::OsRng};
 
     /// Generate a secure key from password using Argon2
-    pub fn derive_key(password: &str, salt: &[u8], config: &KeyDerivationConfig) -> ConfigResult<Vec<u8>> {
+    pub fn derive_key(
+        password: &str,
+        salt: &[u8],
+        config: &KeyDerivationConfig,
+    ) -> ConfigResult<Vec<u8>> {
         let params = Params::new(
             Params::DEFAULT_M_COST,
             config.iterations,
             Params::DEFAULT_P_COST,
             Some(config.key_length),
-        ).map_err(|e| ConfigError::encryption(format!("Invalid Argon2 params: {}", e)))?;
+        )
+        .map_err(|e| ConfigError::encryption(format!("Invalid Argon2 params: {}", e)))?;
 
         let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
         let salt_string = SaltString::encode_b64(salt)
             .map_err(|e| ConfigError::encryption(format!("Salt encoding failed: {}", e)))?;
-        
-        let hash = argon2.hash_password(password.as_bytes(), &salt_string)
+
+        let hash = argon2
+            .hash_password(password.as_bytes(), &salt_string)
             .map_err(|e| ConfigError::encryption(format!("Key derivation failed: {}", e)))?;
-        
+
         Ok(hash.hash.unwrap().as_bytes().to_vec())
     }
 
@@ -209,18 +222,19 @@ pub mod utils {
 
     /// Encrypt data using AES-GCM
     pub fn encrypt_data(data: &[u8], key: &[u8]) -> ConfigResult<Vec<u8>> {
-        use aes_gcm::{Aes256Gcm, KeyInit, Nonce, AeadInPlace};
+        use aes_gcm::{AeadInPlace, Aes256Gcm, KeyInit, Nonce};
         use rand::RngCore;
 
         let cipher = Aes256Gcm::new_from_slice(key)
             .map_err(|e| ConfigError::encryption(format!("Invalid encryption key: {}", e)))?;
-        
+
         let mut nonce_bytes = [0u8; 12];
         OsRng.fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         let mut buffer = data.to_vec();
-        let tag = cipher.encrypt_in_place_detached(nonce, b"", &mut buffer)
+        let tag = cipher
+            .encrypt_in_place_detached(nonce, b"", &mut buffer)
             .map_err(|e| ConfigError::encryption(format!("Encryption failed: {}", e)))?;
 
         // Prepend nonce and append tag
@@ -233,9 +247,10 @@ pub mod utils {
 
     /// Decrypt data using AES-GCM
     pub fn decrypt_data(encrypted_data: &[u8], key: &[u8]) -> ConfigResult<Vec<u8>> {
-        use aes_gcm::{Aes256Gcm, KeyInit, Nonce, AeadInPlace, Tag};
+        use aes_gcm::{AeadInPlace, Aes256Gcm, KeyInit, Nonce, Tag};
 
-        if encrypted_data.len() < 28 { // 12 (nonce) + 16 (tag) = minimum
+        if encrypted_data.len() < 28 {
+            // 12 (nonce) + 16 (tag) = minimum
             return Err(ConfigError::encryption("Invalid encrypted data length"));
         }
 
@@ -243,10 +258,11 @@ pub mod utils {
             .map_err(|e| ConfigError::encryption(format!("Invalid decryption key: {}", e)))?;
 
         let nonce = Nonce::from_slice(&encrypted_data[0..12]);
-        let tag = Tag::from_slice(&encrypted_data[encrypted_data.len()-16..]);
-        let mut ciphertext = encrypted_data[12..encrypted_data.len()-16].to_vec();
+        let tag = Tag::from_slice(&encrypted_data[encrypted_data.len() - 16..]);
+        let mut ciphertext = encrypted_data[12..encrypted_data.len() - 16].to_vec();
 
-        cipher.decrypt_in_place_detached(nonce, b"", &mut ciphertext, tag)
+        cipher
+            .decrypt_in_place_detached(nonce, b"", &mut ciphertext, tag)
             .map_err(|e| ConfigError::encryption(format!("Decryption failed: {}", e)))?;
 
         Ok(ciphertext)

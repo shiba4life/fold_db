@@ -3,11 +3,14 @@
 //! This module implements platform-specific path resolution for Linux systems,
 //! following the XDG Base Directory Specification.
 
-use std::path::PathBuf;
-use std::env;
-use async_trait::async_trait;
+use super::{
+    keystore::{utils, PlatformKeystore},
+    PlatformConfigPaths,
+};
 use crate::config::error::{ConfigError, ConfigResult};
-use super::{PlatformConfigPaths, keystore::{PlatformKeystore, utils}};
+use async_trait::async_trait;
+use std::env;
+use std::path::PathBuf;
 
 /// Linux-specific configuration paths following XDG specification
 pub struct LinuxConfigPaths {
@@ -17,9 +20,8 @@ pub struct LinuxConfigPaths {
 impl LinuxConfigPaths {
     /// Create new Linux configuration paths resolver
     pub fn new() -> Self {
-        let home_dir = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("/tmp"));
-        
+        let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
+
         Self { home_dir }
     }
 
@@ -90,7 +92,7 @@ impl PlatformConfigPaths for LinuxConfigPaths {
 
     fn runtime_dir(&self) -> ConfigResult<PathBuf> {
         let dir = self.xdg_runtime_dir();
-        
+
         // Ensure runtime dir exists and has correct permissions (700)
         if !dir.exists() {
             std::fs::create_dir_all(&dir).map_err(|e| {
@@ -100,7 +102,7 @@ impl PlatformConfigPaths for LinuxConfigPaths {
                     e
                 ))
             })?;
-            
+
             // Set permissions to 700 (user read/write/execute only)
             #[cfg(unix)]
             {
@@ -115,7 +117,7 @@ impl PlatformConfigPaths for LinuxConfigPaths {
                 })?;
             }
         }
-        
+
         Ok(dir)
     }
 
@@ -138,29 +140,29 @@ mod tests {
     #[test]
     fn test_linux_config_paths() {
         let paths = LinuxConfigPaths::new();
-        
+
         let config_dir = paths.config_dir().unwrap();
         let data_dir = paths.data_dir().unwrap();
         let cache_dir = paths.cache_dir().unwrap();
         let logs_dir = paths.logs_dir().unwrap();
-        
+
         assert!(config_dir.to_string_lossy().contains("datafold"));
         assert!(data_dir.to_string_lossy().contains("datafold"));
         assert!(cache_dir.to_string_lossy().contains("datafold"));
         assert!(logs_dir.to_string_lossy().contains("datafold"));
-        
+
         assert_eq!(paths.platform_name(), "linux");
     }
 
     #[test]
     fn test_xdg_environment_variables() {
         let paths = LinuxConfigPaths::new();
-        
+
         // Test with XDG_CONFIG_HOME set
         env::set_var("XDG_CONFIG_HOME", "/tmp/test-config");
         let config_dir = paths.config_dir().unwrap();
         assert!(config_dir.starts_with("/tmp/test-config"));
-        
+
         // Clean up
         env::remove_var("XDG_CONFIG_HOME");
     }
@@ -169,7 +171,7 @@ mod tests {
     fn test_runtime_directory_permissions() {
         let paths = LinuxConfigPaths::new();
         let runtime_dir = paths.runtime_dir().unwrap();
-        
+
         // Runtime dir should be created
         assert!(runtime_dir.exists() || runtime_dir.to_string_lossy().starts_with("/tmp"));
     }
@@ -179,7 +181,7 @@ mod tests {
         let paths = LinuxConfigPaths::new();
         let config_file = paths.config_file().unwrap();
         let legacy_file = paths.legacy_config_file().unwrap();
-        
+
         assert!(config_file.to_string_lossy().ends_with("config.toml"));
         assert!(legacy_file.to_string_lossy().ends_with("config.json"));
     }
@@ -220,13 +222,14 @@ impl PlatformKeystore for LinuxKeystore {
         }
 
         let storage_key = utils::create_storage_key("DataFold", key);
-        
+
         // In a real implementation, this would use libsecret or D-Bus
         // For now, implement a file-based fallback with encryption
         let config_dir = LinuxConfigPaths::new().config_dir()?;
         let keystore_dir = config_dir.join("keystore");
-        std::fs::create_dir_all(&keystore_dir)
-            .map_err(|e| ConfigError::platform(format!("Failed to create keystore directory: {}", e)))?;
+        std::fs::create_dir_all(&keystore_dir).map_err(|e| {
+            ConfigError::platform(format!("Failed to create keystore directory: {}", e))
+        })?;
 
         // Derive encryption key from system entropy
         let password = format!("{}:{}", env::var("USER").unwrap_or_default(), storage_key);
@@ -239,7 +242,8 @@ impl PlatformKeystore for LinuxKeystore {
         final_data.extend_from_slice(&encrypted_data);
 
         let key_file = keystore_dir.join(format!("{}.key", hex::encode(storage_key.as_bytes())));
-        tokio::fs::write(&key_file, final_data).await
+        tokio::fs::write(&key_file, final_data)
+            .await
             .map_err(|e| ConfigError::platform(format!("Failed to store secret: {}", e)))?;
 
         // Set restrictive permissions (600)
@@ -247,8 +251,9 @@ impl PlatformKeystore for LinuxKeystore {
         {
             use std::os::unix::fs::PermissionsExt;
             let perms = std::fs::Permissions::from_mode(0o600);
-            std::fs::set_permissions(&key_file, perms)
-                .map_err(|e| ConfigError::platform(format!("Failed to set file permissions: {}", e)))?;
+            std::fs::set_permissions(&key_file, perms).map_err(|e| {
+                ConfigError::platform(format!("Failed to set file permissions: {}", e))
+            })?;
         }
 
         Ok(())
@@ -260,7 +265,7 @@ impl PlatformKeystore for LinuxKeystore {
         }
 
         let storage_key = utils::create_storage_key("DataFold", key);
-        
+
         // Check file-based fallback
         let config_dir = LinuxConfigPaths::new().config_dir()?;
         let keystore_dir = config_dir.join("keystore");
@@ -270,7 +275,8 @@ impl PlatformKeystore for LinuxKeystore {
             return Ok(None);
         }
 
-        let file_data = tokio::fs::read(&key_file).await
+        let file_data = tokio::fs::read(&key_file)
+            .await
             .map_err(|e| ConfigError::platform(format!("Failed to read secret: {}", e)))?;
 
         if file_data.len() < 32 {
@@ -296,14 +302,15 @@ impl PlatformKeystore for LinuxKeystore {
         }
 
         let storage_key = utils::create_storage_key("DataFold", key);
-        
+
         // Delete file-based fallback
         let config_dir = LinuxConfigPaths::new().config_dir()?;
         let keystore_dir = config_dir.join("keystore");
         let key_file = keystore_dir.join(format!("{}.key", hex::encode(storage_key.as_bytes())));
 
         if key_file.exists() {
-            tokio::fs::remove_file(&key_file).await
+            tokio::fs::remove_file(&key_file)
+                .await
                 .map_err(|e| ConfigError::platform(format!("Failed to delete secret: {}", e)))?;
         }
 
@@ -323,12 +330,15 @@ impl PlatformKeystore for LinuxKeystore {
         }
 
         let mut keys = Vec::new();
-        let mut dir_entries = tokio::fs::read_dir(&keystore_dir).await
-            .map_err(|e| ConfigError::platform(format!("Failed to read keystore directory: {}", e)))?;
+        let mut dir_entries = tokio::fs::read_dir(&keystore_dir).await.map_err(|e| {
+            ConfigError::platform(format!("Failed to read keystore directory: {}", e))
+        })?;
 
-        while let Some(entry) = dir_entries.next_entry().await
-            .map_err(|e| ConfigError::platform(format!("Failed to read directory entry: {}", e)))? {
-            
+        while let Some(entry) = dir_entries
+            .next_entry()
+            .await
+            .map_err(|e| ConfigError::platform(format!("Failed to read directory entry: {}", e)))?
+        {
             if let Some(file_name) = entry.file_name().to_str() {
                 if file_name.ends_with(".key") {
                     let key_name = &file_name[..file_name.len() - 4]; // Remove .key extension
@@ -377,7 +387,7 @@ impl super::PlatformFileWatcher for LinuxFileWatcher {
 
             loop {
                 std::thread::sleep(std::time::Duration::from_secs(1));
-                
+
                 if let Ok(metadata) = std::fs::metadata(&path) {
                     if let Ok(modified) = metadata.modified() {
                         if modified > last_modified {
@@ -399,7 +409,7 @@ pub struct LinuxAtomicOps;
 impl super::PlatformAtomicOps for LinuxAtomicOps {
     fn atomic_write(&self, path: &std::path::Path, content: &[u8]) -> ConfigResult<()> {
         let temp_path = path.with_extension("tmp");
-        
+
         // Write to temporary file
         std::fs::write(&temp_path, content)
             .map_err(|e| ConfigError::platform(format!("Failed to write temporary file: {}", e)))?;
@@ -419,7 +429,7 @@ impl super::PlatformAtomicOps for LinuxAtomicOps {
 
         Ok(())
     }
-    
+
     fn create_with_lock(&self, path: &std::path::Path, content: &[u8]) -> ConfigResult<()> {
         // In a real implementation, this would use flock()
         // For now, use atomic write

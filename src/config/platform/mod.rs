@@ -3,13 +3,13 @@
 //! This module provides platform-aware configuration path resolution following
 //! OS-specific conventions and best practices.
 
-use std::path::PathBuf;
 use crate::config::error::{ConfigError, ConfigResult};
+use std::path::PathBuf;
 
+pub mod keystore;
 pub mod linux;
 pub mod macos;
 pub mod windows;
-pub mod keystore;
 
 /// Core trait for platform-specific path resolution
 pub trait PlatformConfigPaths: Send + Sync {
@@ -144,7 +144,7 @@ impl EnhancedPlatformInfo {
     /// Detect enhanced platform capabilities
     pub fn detect() -> Self {
         let basic_info = PlatformInfo::detect();
-        
+
         Self {
             keystore_available: basic_info.supports_keyring,
             file_watching_available: basic_info.supports_file_watching,
@@ -178,9 +178,11 @@ pub fn create_platform_file_watcher() -> ConfigResult<Box<dyn PlatformFileWatche
 /// Trait for platform-specific file watching
 pub trait PlatformFileWatcher: Send + Sync {
     /// Watch a file for changes and call callback when changed
-    fn watch_file<F>(&self, path: &std::path::Path, callback: F) -> ConfigResult<()>
-    where
-        F: Fn() + Send + 'static;
+    fn watch_file(
+        &self,
+        path: &std::path::Path,
+        callback: Box<dyn Fn() + Send + 'static>,
+    ) -> ConfigResult<()>;
 }
 
 /// Fallback file watcher for unsupported platforms
@@ -226,7 +228,7 @@ pub fn create_platform_atomic_ops() -> Box<dyn PlatformAtomicOps> {
 pub trait PlatformAtomicOps: Send + Sync {
     /// Perform atomic write operation
     fn atomic_write(&self, path: &std::path::Path, content: &[u8]) -> ConfigResult<()>;
-    
+
     /// Create file with lock
     fn create_with_lock(&self, path: &std::path::Path, content: &[u8]) -> ConfigResult<()>;
 }
@@ -239,7 +241,7 @@ impl PlatformAtomicOps for FallbackAtomicOps {
         std::fs::write(path, content)
             .map_err(|e| ConfigError::platform(format!("Failed to write file: {}", e)))
     }
-    
+
     fn create_with_lock(&self, path: &std::path::Path, content: &[u8]) -> ConfigResult<()> {
         self.atomic_write(path, content)
     }
@@ -273,7 +275,11 @@ impl PlatformInfo {
         let version = "unknown".to_string(); // Could be enhanced with OS version detection
 
         let supports_xdg = cfg!(target_os = "linux");
-        let supports_keyring = cfg!(any(target_os = "linux", target_os = "macos", target_os = "windows"));
+        let supports_keyring = cfg!(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "windows"
+        ));
         let supports_file_watching = true; // Most platforms support this
 
         Self {
@@ -331,8 +337,10 @@ mod tests {
     fn test_platform_resolver_creation() {
         let resolver = create_platform_resolver();
         let config_dir = resolver.config_dir().unwrap();
-        assert!(config_dir.to_string_lossy().contains("datafold") || 
-                config_dir.to_string_lossy().contains("DataFold"));
+        assert!(
+            config_dir.to_string_lossy().contains("datafold")
+                || config_dir.to_string_lossy().contains("DataFold")
+        );
     }
 
     #[test]
@@ -340,7 +348,7 @@ mod tests {
         let resolver = create_platform_resolver();
         let config_file = resolver.config_file().unwrap();
         let legacy_file = resolver.legacy_config_file().unwrap();
-        
+
         assert!(config_file.to_string_lossy().ends_with("config.toml"));
         assert!(legacy_file.to_string_lossy().ends_with("config.json"));
     }

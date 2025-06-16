@@ -102,6 +102,11 @@ impl ConfigError {
         Self::Runtime(msg.into())
     }
 
+    /// Create an IO error with context
+    pub fn io<S: Into<String>>(msg: S) -> Self {
+        Self::Io(std::io::Error::new(std::io::ErrorKind::Other, msg.into()))
+    }
+
     /// Check if this error is recoverable
     pub fn is_recoverable(&self) -> bool {
         match self {
@@ -130,11 +135,16 @@ impl ConfigError {
             ConfigError::Json(e) => format!("Legacy configuration format error: {}", e),
             ConfigError::Validation(msg) => format!("Configuration validation failed: {}", msg),
             ConfigError::Platform(msg) => format!("Platform detection failed: {}", msg),
-            ConfigError::PathResolution(msg) => format!("Could not resolve configuration path: {}", msg),
+            ConfigError::PathResolution(msg) => {
+                format!("Could not resolve configuration path: {}", msg)
+            }
             ConfigError::NotFound(msg) => format!("Configuration not found: {}", msg),
             ConfigError::AccessDenied(msg) => format!("Access denied: {}", msg),
             ConfigError::VersionMismatch { expected, found } => {
-                format!("Configuration version mismatch: expected {}, found {}", expected, found)
+                format!(
+                    "Configuration version mismatch: expected {}, found {}",
+                    expected, found
+                )
             }
             ConfigError::Encryption(msg) => format!("Encryption error: {}", msg),
             ConfigError::MergeConflict(msg) => format!("Configuration merge conflict: {}", msg),
@@ -181,16 +191,20 @@ impl ConfigErrorContext {
 
 impl fmt::Display for ConfigErrorContext {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Configuration error during '{}': {}", self.operation, self.error)?;
-        
+        write!(
+            f,
+            "Configuration error during '{}': {}",
+            self.operation, self.error
+        )?;
+
         if let Some(path) = &self.path {
             write!(f, " (path: {})", path)?;
         }
-        
+
         if let Some(component) = &self.component {
             write!(f, " (component: {})", component)?;
         }
-        
+
         Ok(())
     }
 }
@@ -218,7 +232,7 @@ mod tests {
         let ctx = ConfigErrorContext::new(err, "load_config".to_string())
             .with_path("/home/user/.config/datafold/config.toml")
             .with_component("ConfigManager");
-        
+
         let msg = format!("{}", ctx);
         assert!(msg.contains("load_config"));
         assert!(msg.contains("Configuration not found"));

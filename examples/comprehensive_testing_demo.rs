@@ -86,7 +86,9 @@ impl ConfigurationManager {
     }
 
     async fn get(&self) -> Result<&Config, String> {
-        self.config.as_ref().ok_or("No configuration set".to_string())
+        self.config
+            .as_ref()
+            .ok_or("No configuration set".to_string())
     }
 
     async fn clear_cache(&self) {
@@ -114,14 +116,58 @@ impl PBI27TestResults {
         println!("\n" + &"=".repeat(80));
         println!("📋 PBI 27 COMPREHENSIVE TEST RESULTS");
         println!("=".repeat(80));
-        println!("Cross-Platform Tests: {}", if self.cross_platform_tests_passed { "✅ PASS" } else { "❌ FAIL" });
-        println!("Performance Requirements: {}", if self.performance_requirements_met { "✅ PASS" } else { "❌ FAIL" });
-        println!("  - Load Time: {:.2}ms (req: <10ms)", self.average_load_time_ms);
-        println!("  - Memory Usage: {:.2}MB (req: <1MB)", self.peak_memory_usage_mb);
-        println!("  - Hot Reload: {:.2}ms (req: <1000ms)", self.hot_reload_time_ms);
-        println!("Security Validation: {}", if self.security_validation_passed { "✅ PASS" } else { "❌ FAIL" });
-        println!("Integration Tests: {}", if self.integration_tests_passed { "✅ PASS" } else { "❌ FAIL" });
-        println!("Error Handling: {}", if self.error_handling_verified { "✅ PASS" } else { "❌ FAIL" });
+        println!(
+            "Cross-Platform Tests: {}",
+            if self.cross_platform_tests_passed {
+                "✅ PASS"
+            } else {
+                "❌ FAIL"
+            }
+        );
+        println!(
+            "Performance Requirements: {}",
+            if self.performance_requirements_met {
+                "✅ PASS"
+            } else {
+                "❌ FAIL"
+            }
+        );
+        println!(
+            "  - Load Time: {:.2}ms (req: <10ms)",
+            self.average_load_time_ms
+        );
+        println!(
+            "  - Memory Usage: {:.2}MB (req: <1MB)",
+            self.peak_memory_usage_mb
+        );
+        println!(
+            "  - Hot Reload: {:.2}ms (req: <1000ms)",
+            self.hot_reload_time_ms
+        );
+        println!(
+            "Security Validation: {}",
+            if self.security_validation_passed {
+                "✅ PASS"
+            } else {
+                "❌ FAIL"
+            }
+        );
+        println!(
+            "Integration Tests: {}",
+            if self.integration_tests_passed {
+                "✅ PASS"
+            } else {
+                "❌ FAIL"
+            }
+        );
+        println!(
+            "Error Handling: {}",
+            if self.error_handling_verified {
+                "✅ PASS"
+            } else {
+                "❌ FAIL"
+            }
+        );
         println!("=".repeat(80));
         if self.all_requirements_satisfied {
             println!("🎉 ALL PBI 27 REQUIREMENTS SATISFIED - READY FOR PRODUCTION");
@@ -136,12 +182,12 @@ impl PBI27TestResults {
 fn create_test_config() -> Config {
     let mut config = Config::new();
     config.version = "1.0.0".to_string();
-    
+
     let mut app_section = HashMap::new();
     app_section.insert("name".to_string(), ConfigValue::string("test_app"));
     app_section.insert("debug".to_string(), ConfigValue::boolean(false));
     config.set_section("app".to_string(), ConfigValue::object(app_section));
-    
+
     config
 }
 
@@ -149,7 +195,7 @@ fn create_test_config() -> Config {
 pub async fn run_pbi27_comprehensive_tests() -> PBI27TestResults {
     println!("🚀 Starting PBI 27 Comprehensive Test Suite");
     println!("Cross-Platform Configuration Management System");
-    
+
     let mut results = PBI27TestResults {
         cross_platform_tests_passed: false,
         performance_requirements_met: false,
@@ -161,45 +207,46 @@ pub async fn run_pbi27_comprehensive_tests() -> PBI27TestResults {
         hot_reload_time_ms: 0.0,
         all_requirements_satisfied: false,
     };
-    
+
     // 1. Cross-platform tests
     println!("\n📋 Phase 1: Cross-Platform Compatibility Tests");
     results.cross_platform_tests_passed = test_cross_platform_functionality().await;
-    
+
     // 2. Performance tests
     println!("\n📋 Phase 2: Performance Requirements Verification");
-    let (perf_passed, load_time, memory_usage, hot_reload_time) = test_performance_requirements().await;
+    let (perf_passed, load_time, memory_usage, hot_reload_time) =
+        test_performance_requirements().await;
     results.performance_requirements_met = perf_passed;
     results.average_load_time_ms = load_time;
     results.peak_memory_usage_mb = memory_usage;
     results.hot_reload_time_ms = hot_reload_time;
-    
+
     // 3. Security validation
     println!("\n📋 Phase 3: Security Validation");
     results.security_validation_passed = test_security_features().await;
-    
+
     // 4. Integration tests
     println!("\n📋 Phase 4: System Integration");
     results.integration_tests_passed = test_system_integration().await;
-    
+
     // 5. Error handling tests
     println!("\n📋 Phase 5: Error Handling and Recovery");
     results.error_handling_verified = test_error_handling().await;
-    
+
     // Determine overall success
     results.all_requirements_satisfied = results.cross_platform_tests_passed
         && results.performance_requirements_met
         && results.security_validation_passed
         && results.integration_tests_passed
         && results.error_handling_verified;
-    
+
     results
 }
 
 /// Test cross-platform functionality
 async fn test_cross_platform_functionality() -> bool {
     println!("   Testing platform compatibility...");
-    
+
     // Simulate cross-platform tests
     let platform_tests = vec![
         ("Path Resolution", true),
@@ -207,30 +254,30 @@ async fn test_cross_platform_functionality() -> bool {
         ("Format Compatibility", true),
         ("Platform-Specific Features", true),
     ];
-    
+
     let mut all_passed = true;
     for (test_name, passed) in platform_tests {
         println!("     {} {}", test_name, if passed { "✅" } else { "❌" });
         all_passed = all_passed && passed;
     }
-    
+
     if all_passed {
         println!("   ✅ Cross-platform tests passed");
     } else {
         println!("   ❌ Cross-platform tests failed");
     }
-    
+
     all_passed
 }
 
 /// Test performance requirements
 async fn test_performance_requirements() -> (bool, f64, f64, f64) {
     println!("   Testing performance requirements...");
-    
+
     let mut manager = ConfigurationManager::new();
     let config = create_test_config();
     manager.set(config).await.unwrap();
-    
+
     // Test load time (requirement: < 10ms)
     let mut load_times = Vec::new();
     for _ in 0..10 {
@@ -240,101 +287,123 @@ async fn test_performance_requirements() -> (bool, f64, f64, f64) {
         let load_time = start_time.elapsed();
         load_times.push(load_time.as_secs_f64() * 1000.0); // Convert to ms
     }
-    
+
     let avg_load_time = load_times.iter().sum::<f64>() / load_times.len() as f64;
     let load_requirement_met = avg_load_time < 10.0;
-    
+
     // Simulate memory usage (requirement: < 1MB)
     let memory_usage = 0.65; // Simulated 0.65MB
     let memory_requirement_met = memory_usage < 1.0;
-    
+
     // Test hot reload time (requirement: < 1s)
     let start_time = Instant::now();
     manager.clear_cache().await;
     let _ = manager.get().await.unwrap();
     let hot_reload_time = start_time.elapsed().as_secs_f64() * 1000.0;
     let hot_reload_requirement_met = hot_reload_time < 1000.0;
-    
+
     let all_perf_ok = load_requirement_met && memory_requirement_met && hot_reload_requirement_met;
-    
-    println!("     Load Time: {:.2}ms ({})", avg_load_time, if load_requirement_met { "✅" } else { "❌" });
-    println!("     Memory Usage: {:.2}MB ({})", memory_usage, if memory_requirement_met { "✅" } else { "❌" });
-    println!("     Hot Reload: {:.2}ms ({})", hot_reload_time, if hot_reload_requirement_met { "✅" } else { "❌" });
-    
+
+    println!(
+        "     Load Time: {:.2}ms ({})",
+        avg_load_time,
+        if load_requirement_met { "✅" } else { "❌" }
+    );
+    println!(
+        "     Memory Usage: {:.2}MB ({})",
+        memory_usage,
+        if memory_requirement_met { "✅" } else { "❌" }
+    );
+    println!(
+        "     Hot Reload: {:.2}ms ({})",
+        hot_reload_time,
+        if hot_reload_requirement_met {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+
     (all_perf_ok, avg_load_time, memory_usage, hot_reload_time)
 }
 
 /// Test security features
 async fn test_security_features() -> bool {
     println!("   Testing security features...");
-    
+
     let security_tests = vec![
         ("Keystore Integration", true),
         ("Encrypted Storage", true),
         ("Access Control", true),
         ("Configuration Signing", true),
     ];
-    
+
     let mut all_passed = true;
     for (test_name, passed) in security_tests {
         println!("     {} {}", test_name, if passed { "✅" } else { "❌" });
         all_passed = all_passed && passed;
     }
-    
+
     if all_passed {
         println!("   ✅ Security features validated");
     } else {
         println!("   ❌ Security validation failed");
     }
-    
+
     all_passed
 }
 
 /// Test system integration
 async fn test_system_integration() -> bool {
     println!("   Testing system integration...");
-    
+
     let mut manager = ConfigurationManager::new();
-    
+
     // Test CLI-style configuration
     let mut cli_config = Config::new();
     cli_config.version = "1.0.0".to_string();
-    
+
     let mut cli_section = HashMap::new();
     cli_section.insert("profile".to_string(), ConfigValue::string("default"));
     cli_section.insert("timeout".to_string(), ConfigValue::integer(30));
     cli_config.set_section("cli".to_string(), ConfigValue::object(cli_section));
-    
+
     // Test node-style configuration
     let mut node_section = HashMap::new();
     node_section.insert("host".to_string(), ConfigValue::string("localhost"));
     node_section.insert("port".to_string(), ConfigValue::integer(8080));
     cli_config.set_section("node".to_string(), ConfigValue::object(node_section));
-    
+
     // Test logging-style configuration
     let mut logging_section = HashMap::new();
     logging_section.insert("level".to_string(), ConfigValue::string("info"));
     logging_section.insert("format".to_string(), ConfigValue::string("json"));
     cli_config.set_section("logging".to_string(), ConfigValue::object(logging_section));
-    
+
     let integration_ok = manager.set(cli_config).await.is_ok();
-    
+
     if integration_ok {
         let loaded = manager.get().await.unwrap();
         let cli_ok = loaded.get_value("cli.profile").is_ok();
         let node_ok = loaded.get_value("node.host").is_ok();
         let logging_ok = loaded.get_value("logging.level").is_ok();
-        
+
         println!("     CLI Integration: {}", if cli_ok { "✅" } else { "❌" });
-        println!("     Node Integration: {}", if node_ok { "✅" } else { "❌" });
-        println!("     Logging Integration: {}", if logging_ok { "✅" } else { "❌" });
-        
+        println!(
+            "     Node Integration: {}",
+            if node_ok { "✅" } else { "❌" }
+        );
+        println!(
+            "     Logging Integration: {}",
+            if logging_ok { "✅" } else { "❌" }
+        );
+
         if cli_ok && node_ok && logging_ok {
             println!("   ✅ System integration tests passed");
             return true;
         }
     }
-    
+
     println!("   ❌ System integration tests failed");
     false
 }
@@ -342,32 +411,35 @@ async fn test_system_integration() -> bool {
 /// Test error handling
 async fn test_error_handling() -> bool {
     println!("   Testing error handling...");
-    
+
     let mut manager = ConfigurationManager::new();
-    
+
     // Test that invalid configurations are rejected
     let mut invalid_config = Config::new();
     invalid_config.version = "".to_string(); // Invalid empty version
-    
+
     let rejection_ok = manager.set(invalid_config).await.is_err();
-    
+
     // Test graceful degradation
     let temp_config = create_test_config();
     let save_ok = manager.set(temp_config).await.is_ok();
     let load_ok = manager.get().await.is_ok();
-    
-    println!("     Invalid Config Rejection: {}", if rejection_ok { "✅" } else { "❌" });
+
+    println!(
+        "     Invalid Config Rejection: {}",
+        if rejection_ok { "✅" } else { "❌" }
+    );
     println!("     Save Operation: {}", if save_ok { "✅" } else { "❌" });
     println!("     Load Operation: {}", if load_ok { "✅" } else { "❌" });
-    
+
     let error_handling_ok = rejection_ok && save_ok && load_ok;
-    
+
     if error_handling_ok {
         println!("   ✅ Error handling tests passed");
     } else {
         println!("   ❌ Error handling tests failed");
     }
-    
+
     error_handling_ok
 }
 
@@ -375,16 +447,16 @@ async fn test_error_handling() -> bool {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("DataFold PBI 27 - Comprehensive Testing Framework Demo");
     println!("=====================================================");
-    
+
     let results = run_pbi27_comprehensive_tests().await;
     results.print_summary();
-    
+
     if results.all_requirements_satisfied {
         println!("\n🎯 DEMONSTRATION COMPLETE: All PBI 27 requirements verified!");
         println!("The cross-platform configuration management system is ready for production use.");
     } else {
         println!("\n🔧 Some requirements need attention - see results above for details.");
     }
-    
+
     Ok(())
 }

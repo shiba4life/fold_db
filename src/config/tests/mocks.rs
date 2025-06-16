@@ -3,16 +3,15 @@
 //! This module provides mock implementations of platform-specific components
 //! to enable comprehensive testing in CI/CD environments and across platforms.
 
-use std::path::PathBuf;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use crate::config::error::{ConfigError, ConfigResult};
 use crate::config::platform::{
-    PlatformConfigPaths, PlatformFileWatcher, PlatformAtomicOps,
-    keystore::PlatformKeystore,
+    keystore::PlatformKeystore, PlatformAtomicOps, PlatformConfigPaths, PlatformFileWatcher,
 };
 
 /// Mock platform configuration paths for testing
@@ -56,7 +55,7 @@ impl PlatformConfigPaths for MockPlatformPaths {
         // Need to return static str, so we'll use a match
         match self.platform_name.as_str() {
             "linux" => "linux",
-            "macos" => "macos", 
+            "macos" => "macos",
             "windows" => "windows",
             _ => "mock",
         }
@@ -103,8 +102,11 @@ impl PlatformKeystore for MockKeystore {
         if *self.should_fail.lock().unwrap() {
             return Err(ConfigError::access_denied("Mock keystore failure"));
         }
-        
-        self.storage.lock().unwrap().insert(key.to_string(), value.to_vec());
+
+        self.storage
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), value.to_vec());
         Ok(())
     }
 
@@ -112,7 +114,7 @@ impl PlatformKeystore for MockKeystore {
         if *self.should_fail.lock().unwrap() {
             return Err(ConfigError::access_denied("Mock keystore failure"));
         }
-        
+
         Ok(self.storage.lock().unwrap().get(key).cloned())
     }
 
@@ -120,7 +122,7 @@ impl PlatformKeystore for MockKeystore {
         if *self.should_fail.lock().unwrap() {
             return Err(ConfigError::access_denied("Mock keystore failure"));
         }
-        
+
         self.storage.lock().unwrap().remove(key);
         Ok(())
     }
@@ -129,7 +131,7 @@ impl PlatformKeystore for MockKeystore {
         if *self.should_fail.lock().unwrap() {
             return Err(ConfigError::access_denied("Mock keystore failure"));
         }
-        
+
         Ok(self.storage.lock().unwrap().keys().cloned().collect())
     }
 
@@ -212,8 +214,8 @@ impl PlatformAtomicOps for MockAtomicOps {
         }
 
         self.operations_log.lock().unwrap().push(format!(
-            "atomic_write: {} ({} bytes)", 
-            path.display(), 
+            "atomic_write: {} ({} bytes)",
+            path.display(),
             content.len()
         ));
 
@@ -227,8 +229,8 @@ impl PlatformAtomicOps for MockAtomicOps {
         }
 
         self.operations_log.lock().unwrap().push(format!(
-            "create_with_lock: {} ({} bytes)", 
-            path.display(), 
+            "create_with_lock: {} ({} bytes)",
+            path.display(),
             content.len()
         ));
 
@@ -244,9 +246,9 @@ pub struct MockPerformanceMonitor {
 
 #[derive(Debug, Clone, Default)]
 pub struct PerformanceMetrics {
-    pub load_times: Vec<u64>,      // in microseconds
-    pub save_times: Vec<u64>,      // in microseconds
-    pub memory_usage: Vec<usize>,  // in bytes
+    pub load_times: Vec<u64>,     // in microseconds
+    pub save_times: Vec<u64>,     // in microseconds
+    pub memory_usage: Vec<usize>, // in bytes
     pub cache_hits: usize,
     pub cache_misses: usize,
 }
@@ -315,11 +317,19 @@ impl TestConditionSimulator {
     }
 
     pub fn set_condition(&self, name: &str, active: bool) {
-        self.conditions.lock().unwrap().insert(name.to_string(), active);
+        self.conditions
+            .lock()
+            .unwrap()
+            .insert(name.to_string(), active);
     }
 
     pub fn is_condition_active(&self, name: &str) -> bool {
-        self.conditions.lock().unwrap().get(name).copied().unwrap_or(false)
+        self.conditions
+            .lock()
+            .unwrap()
+            .get(name)
+            .copied()
+            .unwrap_or(false)
     }
 
     pub fn simulate_disk_full(&self) -> bool {
@@ -361,29 +371,34 @@ pub fn create_large_test_config() -> crate::config::cross_platform::Config {
     use std::collections::HashMap;
 
     let mut config = crate::config::cross_platform::Config::new();
-    
+
     // Add multiple large sections to test memory usage
     for i in 0..super::constants::LARGE_CONFIG_SECTIONS {
         let mut section = HashMap::new();
-        
+
         // Add various types of data
-        section.insert("string_value".to_string(), 
-            ConfigValue::string(&format!("test_string_value_{}", i)));
-        section.insert("integer_value".to_string(), 
-            ConfigValue::integer(i as i64));
-        section.insert("boolean_value".to_string(), 
-            ConfigValue::boolean(i % 2 == 0));
-        section.insert("float_value".to_string(), 
-            ConfigValue::float(i as f64 * 3.14159));
-        
+        section.insert(
+            "string_value".to_string(),
+            ConfigValue::string(&format!("test_string_value_{}", i)),
+        );
+        section.insert("integer_value".to_string(), ConfigValue::integer(i as i64));
+        section.insert(
+            "boolean_value".to_string(),
+            ConfigValue::boolean(i % 2 == 0),
+        );
+        section.insert(
+            "float_value".to_string(),
+            ConfigValue::float(i as f64 * 3.14159),
+        );
+
         // Add nested arrays
-        let array_data = (0..10).map(|j| 
-            ConfigValue::string(&format!("array_item_{}_{}", i, j))
-        ).collect();
+        let array_data = (0..10)
+            .map(|j| ConfigValue::string(&format!("array_item_{}_{}", i, j)))
+            .collect();
         section.insert("array_value".to_string(), ConfigValue::array(array_data));
-        
+
         config.set_section(format!("section_{}", i), ConfigValue::object(section));
     }
-    
+
     config
 }

@@ -3,11 +3,14 @@
 //! This module implements platform-specific path resolution for Windows systems,
 //! using the Windows Known Folders API and standard Windows conventions.
 
-use std::path::PathBuf;
-use std::env;
-use async_trait::async_trait;
+use super::{
+    keystore::{utils, PlatformKeystore},
+    PlatformConfigPaths,
+};
 use crate::config::error::{ConfigError, ConfigResult};
-use super::{PlatformConfigPaths, keystore::{PlatformKeystore, utils}};
+use async_trait::async_trait;
+use std::env;
+use std::path::PathBuf;
 
 /// Windows-specific configuration paths using Known Folders
 pub struct WindowsConfigPaths {
@@ -17,9 +20,8 @@ pub struct WindowsConfigPaths {
 impl WindowsConfigPaths {
     /// Create new Windows configuration paths resolver
     pub fn new() -> Self {
-        let home_dir = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("C:\\temp"));
-        
+        let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("C:\\temp"));
+
         Self { home_dir }
     }
 
@@ -36,7 +38,9 @@ impl WindowsConfigPaths {
                 // Fallback to default APPDATA location
                 Ok(self.home_dir().join("AppData\\Roaming"))
             })
-            .map_err(|e: std::io::Error| ConfigError::platform(format!("Failed to get APPDATA directory: {}", e)))
+            .map_err(|e: std::io::Error| {
+                ConfigError::platform(format!("Failed to get APPDATA directory: {}", e))
+            })
     }
 
     /// Get LOCALAPPDATA directory (%LOCALAPPDATA%)
@@ -47,7 +51,9 @@ impl WindowsConfigPaths {
                 // Fallback to default LOCALAPPDATA location
                 Ok(self.home_dir().join("AppData\\Local"))
             })
-            .map_err(|e: std::io::Error| ConfigError::platform(format!("Failed to get LOCALAPPDATA directory: {}", e)))
+            .map_err(|e: std::io::Error| {
+                ConfigError::platform(format!("Failed to get LOCALAPPDATA directory: {}", e))
+            })
     }
 
     /// Get TEMP directory (%TEMP%)
@@ -59,7 +65,9 @@ impl WindowsConfigPaths {
                 // Fallback to Windows temp directory
                 Ok(PathBuf::from("C:\\Windows\\Temp"))
             })
-            .map_err(|e: std::io::Error| ConfigError::platform(format!("Failed to get TEMP directory: {}", e)))
+            .map_err(|e: std::io::Error| {
+                ConfigError::platform(format!("Failed to get TEMP directory: {}", e))
+            })
     }
 }
 
@@ -112,52 +120,52 @@ mod tests {
     #[test]
     fn test_windows_config_paths() {
         let paths = WindowsConfigPaths::new();
-        
+
         let config_dir = paths.config_dir().unwrap();
         let data_dir = paths.data_dir().unwrap();
         let cache_dir = paths.cache_dir().unwrap();
         let logs_dir = paths.logs_dir().unwrap();
         let runtime_dir = paths.runtime_dir().unwrap();
-        
+
         // All should contain DataFold
         assert!(config_dir.to_string_lossy().contains("DataFold"));
         assert!(data_dir.to_string_lossy().contains("DataFold"));
         assert!(cache_dir.to_string_lossy().contains("DataFold"));
         assert!(logs_dir.to_string_lossy().contains("DataFold"));
         assert!(runtime_dir.to_string_lossy().contains("DataFold"));
-        
+
         // Config and data should be in APPDATA (Roaming)
         let config_str = config_dir.to_string_lossy();
         let data_str = data_dir.to_string_lossy();
         assert!(config_str.contains("Roaming") || config_str.contains("AppData"));
         assert!(data_str.contains("Roaming") || data_str.contains("AppData"));
-        
+
         // Cache and logs should be in LOCALAPPDATA (Local)
         let cache_str = cache_dir.to_string_lossy();
         let logs_str = logs_dir.to_string_lossy();
         assert!(cache_str.contains("Local") || cache_str.contains("Cache"));
         assert!(logs_str.contains("Local") || logs_str.contains("Logs"));
-        
+
         // Runtime should be in temp
         let runtime_str = runtime_dir.to_string_lossy();
         assert!(runtime_str.contains("Temp") || runtime_str.contains("temp"));
-        
+
         assert_eq!(paths.platform_name(), "windows");
     }
 
     #[test]
     fn test_windows_environment_variables() {
         let paths = WindowsConfigPaths::new();
-        
+
         // Test that environment variables are used when available
         env::set_var("APPDATA", "C:\\TestAppData");
         let config_dir = paths.config_dir().unwrap();
         assert!(config_dir.starts_with("C:\\TestAppData"));
-        
+
         env::set_var("LOCALAPPDATA", "C:\\TestLocalAppData");
         let cache_dir = paths.cache_dir().unwrap();
         assert!(cache_dir.starts_with("C:\\TestLocalAppData"));
-        
+
         // Clean up
         env::remove_var("APPDATA");
         env::remove_var("LOCALAPPDATA");
@@ -168,7 +176,7 @@ mod tests {
         let paths = WindowsConfigPaths::new();
         let config_file = paths.config_file().unwrap();
         let legacy_file = paths.legacy_config_file().unwrap();
-        
+
         assert!(config_file.to_string_lossy().ends_with("config.toml"));
         assert!(legacy_file.to_string_lossy().ends_with("config.json"));
         assert!(config_file.to_string_lossy().contains("DataFold"));
@@ -177,19 +185,19 @@ mod tests {
     #[test]
     fn test_directory_separation() {
         let paths = WindowsConfigPaths::new();
-        
+
         let config_dir = paths.config_dir().unwrap();
         let cache_dir = paths.cache_dir().unwrap();
         let runtime_dir = paths.runtime_dir().unwrap();
-        
+
         // Config should be in AppData\Roaming
-        // Cache should be in AppData\Local  
+        // Cache should be in AppData\Local
         // Runtime should be in Temp
         // These should be in different base directories
         let config_str = config_dir.to_string_lossy();
         let cache_str = cache_dir.to_string_lossy();
         let runtime_str = runtime_dir.to_string_lossy();
-        
+
         // They should all be different base paths
         assert_ne!(config_dir.parent(), cache_dir.parent());
         assert_ne!(config_dir.parent(), runtime_dir.parent());
@@ -232,15 +240,21 @@ impl PlatformKeystore for WindowsKeystore {
         // For now, implement a file-based fallback with encryption in LOCALAPPDATA
         let config_dir = WindowsConfigPaths::new().config_dir()?;
         let keystore_dir = config_dir.join("Keystore");
-        std::fs::create_dir_all(&keystore_dir)
-            .map_err(|e| ConfigError::platform(format!("Failed to create keystore directory: {}", e)))?;
+        std::fs::create_dir_all(&keystore_dir).map_err(|e| {
+            ConfigError::platform(format!("Failed to create keystore directory: {}", e))
+        })?;
 
         let storage_key = utils::create_storage_key(&self.service_name, key);
-        
+
         // Derive encryption key from system and user info
-        let username = env::var("USERNAME").or_else(|_| env::var("USER")).unwrap_or_default();
+        let username = env::var("USERNAME")
+            .or_else(|_| env::var("USER"))
+            .unwrap_or_default();
         let computer_name = env::var("COMPUTERNAME").unwrap_or_default();
-        let password = format!("{}:{}:{}:{}", username, computer_name, self.service_name, storage_key);
+        let password = format!(
+            "{}:{}:{}:{}",
+            username, computer_name, self.service_name, storage_key
+        );
         let salt = utils::generate_salt(32);
         let encryption_key = utils::derive_key(&password, &salt, &Default::default())?;
 
@@ -250,7 +264,8 @@ impl PlatformKeystore for WindowsKeystore {
         final_data.extend_from_slice(&encrypted_data);
 
         let key_file = keystore_dir.join(format!("{}.cred", hex::encode(storage_key.as_bytes())));
-        tokio::fs::write(&key_file, final_data).await
+        tokio::fs::write(&key_file, final_data)
+            .await
             .map_err(|e| ConfigError::platform(format!("Failed to store secret: {}", e)))?;
 
         Ok(())
@@ -262,7 +277,7 @@ impl PlatformKeystore for WindowsKeystore {
         }
 
         let storage_key = utils::create_storage_key(&self.service_name, key);
-        
+
         // Check file-based fallback
         let config_dir = WindowsConfigPaths::new().config_dir()?;
         let keystore_dir = config_dir.join("Keystore");
@@ -272,7 +287,8 @@ impl PlatformKeystore for WindowsKeystore {
             return Ok(None);
         }
 
-        let file_data = tokio::fs::read(&key_file).await
+        let file_data = tokio::fs::read(&key_file)
+            .await
             .map_err(|e| ConfigError::platform(format!("Failed to read secret: {}", e)))?;
 
         if file_data.len() < 32 {
@@ -284,9 +300,14 @@ impl PlatformKeystore for WindowsKeystore {
         let encrypted_data = &file_data[32..];
 
         // Derive decryption key
-        let username = env::var("USERNAME").or_else(|_| env::var("USER")).unwrap_or_default();
+        let username = env::var("USERNAME")
+            .or_else(|_| env::var("USER"))
+            .unwrap_or_default();
         let computer_name = env::var("COMPUTERNAME").unwrap_or_default();
-        let password = format!("{}:{}:{}:{}", username, computer_name, self.service_name, storage_key);
+        let password = format!(
+            "{}:{}:{}:{}",
+            username, computer_name, self.service_name, storage_key
+        );
         let decryption_key = utils::derive_key(&password, salt, &Default::default())?;
 
         // Decrypt
@@ -300,14 +321,15 @@ impl PlatformKeystore for WindowsKeystore {
         }
 
         let storage_key = utils::create_storage_key(&self.service_name, key);
-        
+
         // Delete file-based fallback
         let config_dir = WindowsConfigPaths::new().config_dir()?;
         let keystore_dir = config_dir.join("Keystore");
         let key_file = keystore_dir.join(format!("{}.cred", hex::encode(storage_key.as_bytes())));
 
         if key_file.exists() {
-            tokio::fs::remove_file(&key_file).await
+            tokio::fs::remove_file(&key_file)
+                .await
                 .map_err(|e| ConfigError::platform(format!("Failed to delete secret: {}", e)))?;
         }
 
@@ -327,12 +349,15 @@ impl PlatformKeystore for WindowsKeystore {
         }
 
         let mut keys = Vec::new();
-        let mut dir_entries = tokio::fs::read_dir(&keystore_dir).await
-            .map_err(|e| ConfigError::platform(format!("Failed to read keystore directory: {}", e)))?;
+        let mut dir_entries = tokio::fs::read_dir(&keystore_dir).await.map_err(|e| {
+            ConfigError::platform(format!("Failed to read keystore directory: {}", e))
+        })?;
 
-        while let Some(entry) = dir_entries.next_entry().await
-            .map_err(|e| ConfigError::platform(format!("Failed to read directory entry: {}", e)))? {
-            
+        while let Some(entry) = dir_entries
+            .next_entry()
+            .await
+            .map_err(|e| ConfigError::platform(format!("Failed to read directory entry: {}", e)))?
+        {
             if let Some(file_name) = entry.file_name().to_str() {
                 if file_name.ends_with(".cred") {
                     let key_name = &file_name[..file_name.len() - 5]; // Remove .cred extension
@@ -381,7 +406,7 @@ impl super::PlatformFileWatcher for WindowsFileWatcher {
 
             loop {
                 std::thread::sleep(std::time::Duration::from_secs(1));
-                
+
                 if let Ok(metadata) = std::fs::metadata(&path) {
                     if let Ok(modified) = metadata.modified() {
                         if modified > last_modified {
@@ -403,7 +428,7 @@ pub struct WindowsAtomicOps;
 impl super::PlatformAtomicOps for WindowsAtomicOps {
     fn atomic_write(&self, path: &std::path::Path, content: &[u8]) -> ConfigResult<()> {
         let temp_path = path.with_extension("tmp");
-        
+
         // Write to temporary file
         std::fs::write(&temp_path, content)
             .map_err(|e| ConfigError::platform(format!("Failed to write temporary file: {}", e)))?;

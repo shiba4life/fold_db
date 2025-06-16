@@ -84,7 +84,8 @@ impl ConfigValue {
         match self {
             ConfigValue::Bool(b) => Ok(*b),
             _ => Err(ConfigError::validation(format!(
-                "Expected boolean, found {}", self.type_name()
+                "Expected boolean, found {}",
+                self.type_name()
             ))),
         }
     }
@@ -95,7 +96,8 @@ impl ConfigValue {
             ConfigValue::Integer(i) => Ok(*i),
             ConfigValue::Float(f) if f.fract() == 0.0 => Ok(*f as i64),
             _ => Err(ConfigError::validation(format!(
-                "Expected integer, found {}", self.type_name()
+                "Expected integer, found {}",
+                self.type_name()
             ))),
         }
     }
@@ -106,7 +108,8 @@ impl ConfigValue {
             ConfigValue::Float(f) => Ok(*f),
             ConfigValue::Integer(i) => Ok(*i as f64),
             _ => Err(ConfigError::validation(format!(
-                "Expected float, found {}", self.type_name()
+                "Expected float, found {}",
+                self.type_name()
             ))),
         }
     }
@@ -116,7 +119,8 @@ impl ConfigValue {
         match self {
             ConfigValue::String(s) => Ok(s),
             _ => Err(ConfigError::validation(format!(
-                "Expected string, found {}", self.type_name()
+                "Expected string, found {}",
+                self.type_name()
             ))),
         }
     }
@@ -126,7 +130,8 @@ impl ConfigValue {
         match self {
             ConfigValue::Array(arr) => Ok(arr),
             _ => Err(ConfigError::validation(format!(
-                "Expected array, found {}", self.type_name()
+                "Expected array, found {}",
+                self.type_name()
             ))),
         }
     }
@@ -136,7 +141,8 @@ impl ConfigValue {
         match self {
             ConfigValue::Object(obj) => Ok(obj),
             _ => Err(ConfigError::validation(format!(
-                "Expected object, found {}", self.type_name()
+                "Expected object, found {}",
+                self.type_name()
             ))),
         }
     }
@@ -146,7 +152,8 @@ impl ConfigValue {
         match self {
             ConfigValue::Array(arr) => Ok(arr),
             _ => Err(ConfigError::validation(format!(
-                "Expected array, found {}", self.type_name()
+                "Expected array, found {}",
+                self.type_name()
             ))),
         }
     }
@@ -156,7 +163,8 @@ impl ConfigValue {
         match self {
             ConfigValue::Object(obj) => Ok(obj),
             _ => Err(ConfigError::validation(format!(
-                "Expected object, found {}", self.type_name()
+                "Expected object, found {}",
+                self.type_name()
             ))),
         }
     }
@@ -164,13 +172,15 @@ impl ConfigValue {
     /// Get value at object key
     pub fn get(&self, key: &str) -> ConfigResult<&ConfigValue> {
         let obj = self.as_object()?;
-        obj.get(key).ok_or_else(|| ConfigError::not_found(format!("Key '{}'", key)))
+        obj.get(key)
+            .ok_or_else(|| ConfigError::not_found(format!("Key '{}'", key)))
     }
 
     /// Get mutable value at object key
     pub fn get_mut(&mut self, key: &str) -> ConfigResult<&mut ConfigValue> {
         let obj = self.as_object_mut()?;
-        obj.get_mut(key).ok_or_else(|| ConfigError::not_found(format!("Key '{}'", key)))
+        obj.get_mut(key)
+            .ok_or_else(|| ConfigError::not_found(format!("Key '{}'", key)))
     }
 
     /// Set value at object key
@@ -183,7 +193,8 @@ impl ConfigValue {
     /// Get value at array index
     pub fn get_index(&self, index: usize) -> ConfigResult<&ConfigValue> {
         let arr = self.as_array()?;
-        arr.get(index).ok_or_else(|| ConfigError::not_found(format!("Index {}", index)))
+        arr.get(index)
+            .ok_or_else(|| ConfigError::not_found(format!("Index {}", index)))
     }
 
     /// Merge this value with another value
@@ -236,15 +247,15 @@ impl ConfigValue {
     /// Convert to toml::Value
     fn to_toml_value(&self) -> ConfigResult<toml::Value> {
         let value = match self {
-            ConfigValue::Null => return Err(ConfigError::validation("TOML does not support null values")),
+            ConfigValue::Null => {
+                return Err(ConfigError::validation("TOML does not support null values"))
+            }
             ConfigValue::Bool(b) => toml::Value::Boolean(*b),
             ConfigValue::Integer(i) => toml::Value::Integer(*i),
             ConfigValue::Float(f) => toml::Value::Float(*f),
             ConfigValue::String(s) => toml::Value::String(s.clone()),
             ConfigValue::Array(arr) => {
-                let toml_arr: Result<Vec<_>, _> = arr.iter()
-                    .map(|v| v.to_toml_value())
-                    .collect();
+                let toml_arr: Result<Vec<_>, _> = arr.iter().map(|v| v.to_toml_value()).collect();
                 toml::Value::Array(toml_arr?)
             }
             ConfigValue::Object(obj) => {
@@ -266,9 +277,8 @@ impl ConfigValue {
             toml::Value::Float(f) => ConfigValue::Float(f),
             toml::Value::String(s) => ConfigValue::String(s),
             toml::Value::Array(arr) => {
-                let config_arr: Result<Vec<_>, _> = arr.into_iter()
-                    .map(Self::from_toml_value)
-                    .collect();
+                let config_arr: Result<Vec<_>, _> =
+                    arr.into_iter().map(Self::from_toml_value).collect();
                 ConfigValue::Array(config_arr?)
             }
             toml::Value::Table(table) => {
@@ -279,7 +289,9 @@ impl ConfigValue {
                 ConfigValue::Object(config_obj)
             }
             toml::Value::Datetime(_) => {
-                return Err(ConfigError::validation("TOML datetime values are not supported"));
+                return Err(ConfigError::validation(
+                    "TOML datetime values are not supported",
+                ));
             }
         };
         Ok(config_value)
@@ -297,7 +309,9 @@ impl fmt::Display for ConfigValue {
             ConfigValue::Array(arr) => {
                 write!(f, "[")?;
                 for (i, item) in arr.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", item)?;
                 }
                 write!(f, "]")
@@ -305,7 +319,9 @@ impl fmt::Display for ConfigValue {
             ConfigValue::Object(obj) => {
                 write!(f, "{{")?;
                 for (i, (key, value)) in obj.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "\"{}\": {}", key, value)?;
                 }
                 write!(f, "}}")
@@ -406,7 +422,7 @@ mod tests {
 
         let val = ConfigValue::object(obj);
         let toml_str = val.to_toml_string().unwrap();
-        
+
         assert!(toml_str.contains("name = \"test\""));
         assert!(toml_str.contains("count = 42"));
         assert!(toml_str.contains("enabled = true"));

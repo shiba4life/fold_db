@@ -12,9 +12,9 @@ use tokio::time::timeout;
 use crate::config::{
     cross_platform::{Config, ConfigurationManager},
     enhanced::{EnhancedConfig, EnhancedConfigurationManager},
-    value::ConfigValue,
     error::{ConfigError, ConfigResult},
     platform::{get_platform_info, PlatformInfo},
+    value::ConfigValue,
 };
 
 use super::constants::*;
@@ -85,35 +85,40 @@ impl ConfigTestBuilder {
     }
 
     pub fn add_string(mut self, section: &str, key: &str, value: &str) -> Self {
-        self.sections.entry(section.to_string())
+        self.sections
+            .entry(section.to_string())
             .or_insert_with(HashMap::new)
             .insert(key.to_string(), ConfigValue::string(value));
         self
     }
 
     pub fn add_integer(mut self, section: &str, key: &str, value: i64) -> Self {
-        self.sections.entry(section.to_string())
+        self.sections
+            .entry(section.to_string())
             .or_insert_with(HashMap::new)
             .insert(key.to_string(), ConfigValue::integer(value));
         self
     }
 
     pub fn add_boolean(mut self, section: &str, key: &str, value: bool) -> Self {
-        self.sections.entry(section.to_string())
+        self.sections
+            .entry(section.to_string())
             .or_insert_with(HashMap::new)
             .insert(key.to_string(), ConfigValue::boolean(value));
         self
     }
 
     pub fn add_float(mut self, section: &str, key: &str, value: f64) -> Self {
-        self.sections.entry(section.to_string())
+        self.sections
+            .entry(section.to_string())
             .or_insert_with(HashMap::new)
             .insert(key.to_string(), ConfigValue::float(value));
         self
     }
 
     pub fn add_array(mut self, section: &str, key: &str, values: Vec<ConfigValue>) -> Self {
-        self.sections.entry(section.to_string())
+        self.sections
+            .entry(section.to_string())
             .or_insert_with(HashMap::new)
             .insert(key.to_string(), ConfigValue::array(values));
         self
@@ -122,7 +127,8 @@ impl ConfigTestBuilder {
     pub fn build(mut self) -> Config {
         // Add all sections to the config
         for (section_name, section_data) in self.sections {
-            self.config.set_section(section_name, ConfigValue::object(section_data));
+            self.config
+                .set_section(section_name, ConfigValue::object(section_data));
         }
         self.config
     }
@@ -145,37 +151,45 @@ impl SectionBuilder {
     }
 
     pub fn string(mut self, key: &str, value: &str) -> Self {
-        self.section_data.insert(key.to_string(), ConfigValue::string(value));
+        self.section_data
+            .insert(key.to_string(), ConfigValue::string(value));
         self
     }
 
     pub fn integer(mut self, key: &str, value: i64) -> Self {
-        self.section_data.insert(key.to_string(), ConfigValue::integer(value));
+        self.section_data
+            .insert(key.to_string(), ConfigValue::integer(value));
         self
     }
 
     pub fn boolean(mut self, key: &str, value: bool) -> Self {
-        self.section_data.insert(key.to_string(), ConfigValue::boolean(value));
+        self.section_data
+            .insert(key.to_string(), ConfigValue::boolean(value));
         self
     }
 
     pub fn float(mut self, key: &str, value: f64) -> Self {
-        self.section_data.insert(key.to_string(), ConfigValue::float(value));
+        self.section_data
+            .insert(key.to_string(), ConfigValue::float(value));
         self
     }
 
     pub fn array(mut self, key: &str, values: Vec<ConfigValue>) -> Self {
-        self.section_data.insert(key.to_string(), ConfigValue::array(values));
+        self.section_data
+            .insert(key.to_string(), ConfigValue::array(values));
         self
     }
 
     pub fn nested_object(mut self, key: &str, object: HashMap<String, ConfigValue>) -> Self {
-        self.section_data.insert(key.to_string(), ConfigValue::object(object));
+        self.section_data
+            .insert(key.to_string(), ConfigValue::object(object));
         self
     }
 
     pub fn finish_section(mut self) -> ConfigTestBuilder {
-        self.builder.sections.insert(self.section_name, self.section_data);
+        self.builder
+            .sections
+            .insert(self.section_name, self.section_data);
         self.builder
     }
 }
@@ -275,87 +289,103 @@ impl TestResults {
     }
 
     pub fn all_performance_requirements_met(&self) -> bool {
-        self.performance_measurements.iter()
+        self.performance_measurements
+            .iter()
             .all(|m| m.meets_performance_requirements() && m.meets_memory_requirements())
     }
 
     pub fn print_summary(&self) {
         println!("📊 Test Results Summary:");
         println!("   Total Tests: {}", self.total_tests);
-        println!("   Passed: {} ({:.1}%)", self.passed_tests, self.success_rate() * 100.0);
+        println!(
+            "   Passed: {} ({:.1}%)",
+            self.passed_tests,
+            self.success_rate() * 100.0
+        );
         println!("   Failed: {}", self.failed_tests);
         println!("   Test Duration: {:?}", self.test_duration);
-        
+
         if !self.performance_measurements.is_empty() {
-            println!("   Performance Tests: {}", self.performance_measurements.len());
-            let perf_passed = self.performance_measurements.iter()
+            println!(
+                "   Performance Tests: {}",
+                self.performance_measurements.len()
+            );
+            let perf_passed = self
+                .performance_measurements
+                .iter()
                 .filter(|m| m.meets_performance_requirements() && m.meets_memory_requirements())
                 .count();
-            println!("   Performance Passed: {} ({:.1}%)", 
-                    perf_passed, 
-                    perf_passed as f64 / self.performance_measurements.len() as f64 * 100.0);
+            println!(
+                "   Performance Passed: {} ({:.1}%)",
+                perf_passed,
+                perf_passed as f64 / self.performance_measurements.len() as f64 * 100.0
+            );
         }
     }
 }
 
 /// Assertion utilities with better error messages
-pub fn assert_config_value_eq(config: &Config, path: &str, expected: &ConfigValue) -> ConfigResult<()> {
+pub fn assert_config_value_eq(
+    config: &Config,
+    path: &str,
+    expected: &ConfigValue,
+) -> ConfigResult<()> {
     let actual = config.get_value(path)?;
-    
+
     if actual != *expected {
         return Err(ConfigError::validation(format!(
             "Configuration value mismatch at '{}': expected {:?}, got {:?}",
             path, expected, actual
         )));
     }
-    
+
     Ok(())
 }
 
 pub fn assert_config_string_eq(config: &Config, path: &str, expected: &str) -> ConfigResult<()> {
     let value = config.get_value(path)?;
     let actual = value.as_string()?;
-    
+
     if actual != expected {
         return Err(ConfigError::validation(format!(
             "String value mismatch at '{}': expected '{}', got '{}'",
             path, expected, actual
         )));
     }
-    
+
     Ok(())
 }
 
 pub fn assert_config_integer_eq(config: &Config, path: &str, expected: i64) -> ConfigResult<()> {
     let value = config.get_value(path)?;
     let actual = value.as_integer()?;
-    
+
     if actual != expected {
         return Err(ConfigError::validation(format!(
             "Integer value mismatch at '{}': expected {}, got {}",
             path, expected, actual
         )));
     }
-    
+
     Ok(())
 }
 
 pub fn assert_config_boolean_eq(config: &Config, path: &str, expected: bool) -> ConfigResult<()> {
     let value = config.get_value(path)?;
     let actual = value.as_bool()?;
-    
+
     if actual != expected {
         return Err(ConfigError::validation(format!(
             "Boolean value mismatch at '{}': expected {}, got {}",
             path, expected, actual
         )));
     }
-    
+
     Ok(())
 }
 
 /// Async test utilities
-pub async fn run_with_timeout<F, R>(test_fn: F, timeout_duration: Duration) -> Result<R, String> 
+pub async fn run_with_timeout<F, R>(test_fn: F, timeout_duration: Duration) -> Result<R, String>
 where
     F: std::future::Future<Output = R>,
 {
@@ -365,24 +395,27 @@ where
     }
 }
 
-pub async fn measure_async_operation<F, R>(operation_name: &str, operation: F) -> (R, PerformanceMeasurement)
+pub async fn measure_async_operation<F, R>(
+    operation_name: &str,
+    operation: F,
+) -> (R, PerformanceMeasurement)
 where
     F: std::future::Future<Output = ConfigResult<R>>,
 {
     let start_time = std::time::Instant::now();
     let memory_before = get_current_memory_usage();
-    
+
     let result = operation.await;
-    
+
     let duration = start_time.elapsed();
     let memory_after = get_current_memory_usage();
     let memory_delta = memory_after.saturating_sub(memory_before);
-    
+
     let measurement = PerformanceMeasurement::new(operation_name)
         .with_duration(duration)
         .with_memory_usage(memory_delta)
         .with_success(result.is_ok());
-    
+
     match result {
         Ok(value) => (value, measurement),
         Err(e) => panic!("Operation '{}' failed: {}", operation_name, e),
@@ -413,7 +446,7 @@ pub fn get_current_memory_usage() -> usize {
 #[cfg(target_os = "linux")]
 fn get_linux_memory_usage() -> Option<usize> {
     use std::fs;
-    
+
     let status = fs::read_to_string("/proc/self/status").ok()?;
     for line in status.lines() {
         if line.starts_with("VmRSS:") {
@@ -447,11 +480,11 @@ pub fn configs_equal(config1: &Config, config2: &Config) -> bool {
     if config1.version != config2.version {
         return false;
     }
-    
+
     if config1.sections.len() != config2.sections.len() {
         return false;
     }
-    
+
     for (key, value1) in &config1.sections {
         match config2.sections.get(key) {
             Some(value2) => {
@@ -462,31 +495,34 @@ pub fn configs_equal(config1: &Config, config2: &Config) -> bool {
             None => return false,
         }
     }
-    
+
     true
 }
 
 pub fn find_config_differences(config1: &Config, config2: &Config) -> Vec<String> {
     let mut differences = Vec::new();
-    
+
     if config1.version != config2.version {
-        differences.push(format!("Version: '{}' vs '{}'", config1.version, config2.version));
+        differences.push(format!(
+            "Version: '{}' vs '{}'",
+            config1.version, config2.version
+        ));
     }
-    
+
     // Check for sections in config1 but not in config2
     for key in config1.sections.keys() {
         if !config2.sections.contains_key(key) {
             differences.push(format!("Section '{}' only in first config", key));
         }
     }
-    
+
     // Check for sections in config2 but not in config1
     for key in config2.sections.keys() {
         if !config1.sections.contains_key(key) {
             differences.push(format!("Section '{}' only in second config", key));
         }
     }
-    
+
     // Check for value differences in common sections
     for (key, value1) in &config1.sections {
         if let Some(value2) = config2.sections.get(key) {
@@ -495,39 +531,38 @@ pub fn find_config_differences(config1: &Config, config2: &Config) -> Vec<String
             }
         }
     }
-    
+
     differences
 }
 
 /// Test data generators
 pub fn generate_test_configurations(count: usize) -> Vec<Config> {
     let mut configs = Vec::new();
-    
+
     for i in 0..count {
         let config = ConfigTestBuilder::new()
             .version(&format!("1.0.{}", i))
             .add_section("app")
-                .string("name", &format!("test_app_{}", i))
-                .integer("instance_id", i as i64)
-                .boolean("debug", i % 2 == 0)
-                .finish_section()
+            .string("name", &format!("test_app_{}", i))
+            .integer("instance_id", i as i64)
+            .boolean("debug", i % 2 == 0)
+            .finish_section()
             .add_section("database")
-                .string("host", "localhost")
-                .integer("port", 5432 + (i as i64 % 10))
-                .boolean("ssl", true)
-                .finish_section()
+            .string("host", "localhost")
+            .integer("port", 5432 + (i as i64 % 10))
+            .boolean("ssl", true)
+            .finish_section()
             .build();
-        
+
         configs.push(config);
     }
-    
+
     configs
 }
 
 pub fn generate_large_configuration() -> Config {
-    let mut builder = ConfigTestBuilder::new()
-        .version("1.0.0");
-    
+    let mut builder = ConfigTestBuilder::new().version("1.0.0");
+
     // Generate many sections with various data types
     for i in 0..LARGE_CONFIG_SECTIONS {
         let section_builder = builder
@@ -536,17 +571,17 @@ pub fn generate_large_configuration() -> Config {
             .integer("integer_field", i as i64)
             .boolean("boolean_field", i % 2 == 0)
             .float("float_field", i as f64 * 3.14159);
-        
+
         // Add arrays
-        let array_values = (0..10).map(|j| 
-            ConfigValue::string(&format!("array_item_{}_{}", i, j))
-        ).collect();
-        
+        let array_values = (0..10)
+            .map(|j| ConfigValue::string(&format!("array_item_{}_{}", i, j)))
+            .collect();
+
         builder = section_builder
             .array("array_field", array_values)
             .finish_section();
     }
-    
+
     builder.build()
 }
 
@@ -555,22 +590,29 @@ pub fn validate_configuration_structure(config: &Config) -> Result<(), String> {
     if config.version.is_empty() {
         return Err("Configuration version cannot be empty".to_string());
     }
-    
-    if !config.version.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-') {
+
+    if !config
+        .version
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+    {
         return Err("Configuration version contains invalid characters".to_string());
     }
-    
+
     // Validate section names
     for section_name in config.sections.keys() {
         if section_name.is_empty() {
             return Err("Section name cannot be empty".to_string());
         }
-        
+
         if section_name.contains(' ') {
-            return Err(format!("Section name '{}' cannot contain spaces", section_name));
+            return Err(format!(
+                "Section name '{}' cannot contain spaces",
+                section_name
+            ));
         }
     }
-    
+
     Ok(())
 }
 
@@ -589,15 +631,26 @@ pub fn print_performance_summary(measurements: &[PerformanceMeasurement]) {
     if measurements.is_empty() {
         return;
     }
-    
+
     println!("\n📊 Performance Summary:");
     for measurement in measurements {
-        let status = if measurement.meets_performance_requirements() { "✅" } else { "❌" };
-        println!("   {} {}: {:?}", status, measurement.operation, measurement.duration);
-        
+        let status = if measurement.meets_performance_requirements() {
+            "✅"
+        } else {
+            "❌"
+        };
+        println!(
+            "   {} {}: {:?}",
+            status, measurement.operation, measurement.duration
+        );
+
         if let Some(memory) = measurement.memory_usage_bytes {
             let memory_mb = memory as f64 / (1024.0 * 1024.0);
-            let memory_status = if measurement.meets_memory_requirements() { "✅" } else { "❌" };
+            let memory_status = if measurement.meets_memory_requirements() {
+                "✅"
+            } else {
+                "❌"
+            };
             println!("      {} Memory: {:.2} MB", memory_status, memory_mb);
         }
     }

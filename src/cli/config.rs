@@ -8,17 +8,17 @@
 use crate::cli::auth::{CliAuthProfile, CliAuthStatus};
 use crate::cli::signing_config::{EnhancedSigningConfig, SigningMode};
 use crate::config::{
-    EnhancedConfigurationManager, EnhancedConfig, ConfigValue, ConfigError as NewConfigError,
-    ConfigResult as NewConfigResult, ConfigMigrationManager, MigrationStrategy,
-    create_platform_keystore, PlatformKeystore,
+    create_platform_keystore, ConfigError as NewConfigError, ConfigMigrationManager,
+    ConfigResult as NewConfigResult, ConfigValue, EnhancedConfig, EnhancedConfigurationManager,
+    MigrationStrategy, PlatformKeystore,
 };
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use async_trait::async_trait;
 
 /// Errors that can occur during CLI configuration operations
 #[derive(Debug, thiserror::Error)]
@@ -223,9 +223,10 @@ impl CliConfigManager {
 
     /// Create with enhanced configuration management
     pub async fn new_enhanced() -> CliConfigResult<Self> {
-        let enhanced_manager = EnhancedConfigurationManager::new().await
-            .map_err(|e| CliConfigError::Validation(format!("Failed to create enhanced manager: {}", e)))?;
-        
+        let enhanced_manager = EnhancedConfigurationManager::new().await.map_err(|e| {
+            CliConfigError::Validation(format!("Failed to create enhanced manager: {}", e))
+        })?;
+
         let config_path = Self::default_config_path()?;
         let config = if config_path.exists() {
             Self::load_config(&config_path)?
@@ -254,21 +255,30 @@ impl CliConfigManager {
         }
 
         let migration_manager = ConfigMigrationManager::new();
-        let migration_result = migration_manager.migrate_cli_config().await
+        let migration_result = migration_manager
+            .migrate_cli_config()
+            .await
             .map_err(|e| CliConfigError::Validation(format!("Migration failed: {}", e)))?;
 
         if migration_result.success {
             self.migration_performed = true;
-            
+
             // Store sensitive data in keystore
             if self.keystore.is_available() {
                 for (profile_name, profile) in &self.config.profiles {
                     let key = format!("cli_profile:{}", profile_name);
-                    let profile_data = serde_json::to_vec(profile)
-                        .map_err(|e| CliConfigError::Json(e))?;
-                    
-                    self.keystore.store_secret(&key, &profile_data).await
-                        .map_err(|e| CliConfigError::Validation(format!("Failed to store profile in keystore: {}", e)))?;
+                    let profile_data =
+                        serde_json::to_vec(profile).map_err(|e| CliConfigError::Json(e))?;
+
+                    self.keystore
+                        .store_secret(&key, &profile_data)
+                        .await
+                        .map_err(|e| {
+                            CliConfigError::Validation(format!(
+                                "Failed to store profile in keystore: {}",
+                                e
+                            ))
+                        })?;
                 }
             }
         }
@@ -279,8 +289,9 @@ impl CliConfigManager {
     /// Get configuration from enhanced system if available
     pub async fn get_enhanced_config(&self) -> CliConfigResult<Option<Arc<EnhancedConfig>>> {
         if let Some(ref enhanced_manager) = self.enhanced_manager {
-            let config = enhanced_manager.get_enhanced().await
-                .map_err(|e| CliConfigError::Validation(format!("Failed to get enhanced config: {}", e)))?;
+            let config = enhanced_manager.get_enhanced().await.map_err(|e| {
+                CliConfigError::Validation(format!("Failed to get enhanced config: {}", e))
+            })?;
             Ok(Some(config))
         } else {
             Ok(None)
@@ -288,31 +299,45 @@ impl CliConfigManager {
     }
 
     /// Store authentication profiles in keystore
-    pub async fn store_profile_in_keystore(&self, name: &str, profile: &CliAuthProfile) -> CliConfigResult<()> {
+    pub async fn store_profile_in_keystore(
+        &self,
+        name: &str,
+        profile: &CliAuthProfile,
+    ) -> CliConfigResult<()> {
         if !self.keystore.is_available() {
-            return Err(CliConfigError::Validation("Keystore not available".to_string()));
+            return Err(CliConfigError::Validation(
+                "Keystore not available".to_string(),
+            ));
         }
 
         let key = format!("cli_profile:{}", name);
         let profile_data = serde_json::to_vec(profile)?;
-        
-        self.keystore.store_secret(&key, &profile_data).await
+
+        self.keystore
+            .store_secret(&key, &profile_data)
+            .await
             .map_err(|e| CliConfigError::Validation(format!("Failed to store profile: {}", e)))?;
 
         Ok(())
     }
 
     /// Load authentication profile from keystore
-    pub async fn load_profile_from_keystore(&self, name: &str) -> CliConfigResult<Option<CliAuthProfile>> {
+    pub async fn load_profile_from_keystore(
+        &self,
+        name: &str,
+    ) -> CliConfigResult<Option<CliAuthProfile>> {
         if !self.keystore.is_available() {
             return Ok(None);
         }
 
         let key = format!("cli_profile:{}", name);
-        
-        if let Some(profile_data) = self.keystore.get_secret(&key).await
-            .map_err(|e| CliConfigError::Validation(format!("Failed to load profile: {}", e)))? {
-            
+
+        if let Some(profile_data) = self
+            .keystore
+            .get_secret(&key)
+            .await
+            .map_err(|e| CliConfigError::Validation(format!("Failed to load profile: {}", e)))?
+        {
             let profile: CliAuthProfile = serde_json::from_slice(&profile_data)?;
             Ok(Some(profile))
         } else {
@@ -327,7 +352,9 @@ impl CliConfigManager {
         }
 
         let key = format!("cli_profile:{}", name);
-        self.keystore.delete_secret(&key).await
+        self.keystore
+            .delete_secret(&key)
+            .await
             .map_err(|e| CliConfigError::Validation(format!("Failed to remove profile: {}", e)))?;
 
         Ok(())
@@ -666,8 +693,9 @@ impl CliConfigManager {
     pub async fn sync_with_enhanced(&mut self) -> CliConfigResult<()> {
         if let Some(ref enhanced_manager) = self.enhanced_manager {
             // Load enhanced configuration
-            let enhanced_config = enhanced_manager.get_enhanced().await
-                .map_err(|e| CliConfigError::Validation(format!("Failed to get enhanced config: {}", e)))?;
+            let enhanced_config = enhanced_manager.get_enhanced().await.map_err(|e| {
+                CliConfigError::Validation(format!("Failed to get enhanced config: {}", e))
+            })?;
 
             // Extract CLI-specific sections
             if let Ok(cli_section) = enhanced_config.base.get_section("cli") {
@@ -693,7 +721,7 @@ impl CliConfigManager {
                             self.config.settings.output_format = format_str.clone();
                         }
                     }
-                    
+
                     if let Some(colored_output) = settings_obj.get("colored_output") {
                         if let Some(colored) = colored_output.as_boolean() {
                             self.config.settings.colored_output = *colored;
@@ -711,11 +739,11 @@ impl CliConfigManager {
 impl EnhancedCliConfigManager {
     /// Create new enhanced CLI configuration manager
     pub async fn new() -> CliConfigResult<Self> {
-        let enhanced_manager = Arc::new(
-            EnhancedConfigurationManager::new().await
-                .map_err(|e| CliConfigError::Validation(format!("Failed to create enhanced manager: {}", e)))?
-        );
-        
+        let enhanced_manager =
+            Arc::new(EnhancedConfigurationManager::new().await.map_err(|e| {
+                CliConfigError::Validation(format!("Failed to create enhanced manager: {}", e))
+            })?);
+
         let legacy_manager = CliConfigManager::new_enhanced().await?;
 
         Ok(Self {
@@ -727,8 +755,9 @@ impl EnhancedCliConfigManager {
     /// Get CLI configuration from enhanced system
     pub async fn get_cli_config(&self) -> CliConfigResult<CliConfig> {
         // Try enhanced configuration first
-        let enhanced_config = self.enhanced_manager.get_enhanced().await
-            .map_err(|e| CliConfigError::Validation(format!("Failed to get enhanced config: {}", e)))?;
+        let enhanced_config = self.enhanced_manager.get_enhanced().await.map_err(|e| {
+            CliConfigError::Validation(format!("Failed to get enhanced config: {}", e))
+        })?;
 
         // Extract CLI configuration from enhanced config
         if let Ok(cli_section) = enhanced_config.base.get_section("cli") {
@@ -743,32 +772,44 @@ impl EnhancedCliConfigManager {
     pub async fn set_cli_config(&mut self, cli_config: CliConfig) -> CliConfigResult<()> {
         // Update legacy manager
         self.legacy_manager.config = cli_config.clone();
-        
+
         // Convert to enhanced configuration
-        let mut enhanced_config = self.enhanced_manager.get_enhanced().await
-            .map_err(|e| CliConfigError::Validation(format!("Failed to get enhanced config: {}", e)))?;
+        let mut enhanced_config = self.enhanced_manager.get_enhanced().await.map_err(|e| {
+            CliConfigError::Validation(format!("Failed to get enhanced config: {}", e))
+        })?;
 
         // Convert CLI config to ConfigValue
         let cli_section = self.cli_config_to_config_value(&cli_config)?;
-        
+
         // Update enhanced configuration
         let mut new_enhanced = (*enhanced_config).clone();
-        new_enhanced.base.set_section("cli".to_string(), cli_section);
+        new_enhanced
+            .base
+            .set_section("cli".to_string(), cli_section);
 
         // Store enhanced configuration
-        self.enhanced_manager.set_enhanced(new_enhanced).await
-            .map_err(|e| CliConfigError::Validation(format!("Failed to set enhanced config: {}", e)))?;
+        self.enhanced_manager
+            .set_enhanced(new_enhanced)
+            .await
+            .map_err(|e| {
+                CliConfigError::Validation(format!("Failed to set enhanced config: {}", e))
+            })?;
 
         // Store profiles in keystore
         for (profile_name, profile) in &cli_config.profiles {
-            self.legacy_manager.store_profile_in_keystore(profile_name, profile).await?;
+            self.legacy_manager
+                .store_profile_in_keystore(profile_name, profile)
+                .await?;
         }
 
         Ok(())
     }
 
     /// Extract CLI configuration from ConfigValue section
-    fn extract_cli_config_from_section(&self, cli_section: &ConfigValue) -> CliConfigResult<CliConfig> {
+    fn extract_cli_config_from_section(
+        &self,
+        cli_section: &ConfigValue,
+    ) -> CliConfigResult<CliConfig> {
         // For now, return the legacy configuration
         // In a full implementation, this would parse the ConfigValue structure
         Ok(self.legacy_manager.config.clone())
@@ -779,33 +820,63 @@ impl EnhancedCliConfigManager {
         let mut cli_obj = HashMap::new();
 
         // Add version
-        cli_obj.insert("version".to_string(), ConfigValue::string(cli_config.version.clone()));
+        cli_obj.insert(
+            "version".to_string(),
+            ConfigValue::string(cli_config.version.clone()),
+        );
 
         // Add default profile
         if let Some(ref default_profile) = cli_config.default_profile {
-            cli_obj.insert("default_profile".to_string(), ConfigValue::string(default_profile.clone()));
+            cli_obj.insert(
+                "default_profile".to_string(),
+                ConfigValue::string(default_profile.clone()),
+            );
         }
 
         // Add servers (profiles are stored in keystore)
         let mut servers_obj = HashMap::new();
         for (server_name, server_config) in &cli_config.servers {
             let mut server_obj = HashMap::new();
-            server_obj.insert("url".to_string(), ConfigValue::string(server_config.url.clone()));
-            server_obj.insert("name".to_string(), ConfigValue::string(server_config.name.clone()));
-            server_obj.insert("timeout_secs".to_string(), ConfigValue::integer(server_config.timeout_secs as i64));
-            server_obj.insert("verify_ssl".to_string(), ConfigValue::boolean(server_config.verify_ssl));
-            
+            server_obj.insert(
+                "url".to_string(),
+                ConfigValue::string(server_config.url.clone()),
+            );
+            server_obj.insert(
+                "name".to_string(),
+                ConfigValue::string(server_config.name.clone()),
+            );
+            server_obj.insert(
+                "timeout_secs".to_string(),
+                ConfigValue::integer(server_config.timeout_secs as i64),
+            );
+            server_obj.insert(
+                "verify_ssl".to_string(),
+                ConfigValue::boolean(server_config.verify_ssl),
+            );
+
             servers_obj.insert(server_name.clone(), ConfigValue::object(server_obj));
         }
         cli_obj.insert("servers".to_string(), ConfigValue::object(servers_obj));
 
         // Add settings
         let mut settings_obj = HashMap::new();
-        settings_obj.insert("output_format".to_string(), ConfigValue::string(cli_config.settings.output_format.clone()));
-        settings_obj.insert("colored_output".to_string(), ConfigValue::boolean(cli_config.settings.colored_output));
-        settings_obj.insert("verbosity".to_string(), ConfigValue::integer(cli_config.settings.verbosity as i64));
-        settings_obj.insert("auto_update_check".to_string(), ConfigValue::boolean(cli_config.settings.auto_update_check));
-        
+        settings_obj.insert(
+            "output_format".to_string(),
+            ConfigValue::string(cli_config.settings.output_format.clone()),
+        );
+        settings_obj.insert(
+            "colored_output".to_string(),
+            ConfigValue::boolean(cli_config.settings.colored_output),
+        );
+        settings_obj.insert(
+            "verbosity".to_string(),
+            ConfigValue::integer(cli_config.settings.verbosity as i64),
+        );
+        settings_obj.insert(
+            "auto_update_check".to_string(),
+            ConfigValue::boolean(cli_config.settings.auto_update_check),
+        );
+
         cli_obj.insert("settings".to_string(), ConfigValue::object(settings_obj));
 
         Ok(ConfigValue::object(cli_obj))
