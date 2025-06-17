@@ -211,7 +211,7 @@ impl DiagnosticHelper {
         field_to_transforms: &HashMap<String, HashSet<String>>,
         transform_to_fields: &HashMap<String, HashSet<String>>,
         aref_to_transforms: &HashMap<String, HashSet<String>>,
-        transform_to_arefs: &HashMap<String, HashSet<String>>,
+        _transform_to_arefs: &HashMap<String, HashSet<String>>,
     ) -> HealthCheckResult {
         let mut result = HealthCheckResult::new();
 
@@ -301,6 +301,12 @@ pub struct HealthCheckResult {
     pub warnings: Vec<String>,
 }
 
+impl Default for HealthCheckResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HealthCheckResult {
     pub fn new() -> Self {
         Self {
@@ -342,6 +348,12 @@ impl HealthCheckResult {
 pub struct ConsistencyCheckResult {
     pub successes: Vec<String>,
     pub errors: Vec<String>,
+}
+
+impl Default for ConsistencyCheckResult {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ConsistencyCheckResult {

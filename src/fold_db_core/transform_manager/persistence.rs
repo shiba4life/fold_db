@@ -3,7 +3,6 @@
 //! This module is kept for backward compatibility but delegates
 //! all functionality to the new state module.
 
-use super::config::*;
 use super::state::TransformManagerState;
 use crate::db_operations::DbOperations;
 use crate::schema::types::SchemaError;
@@ -27,7 +26,8 @@ impl TransformPersistence {
         self.state.persist_mappings(&self.db_ops)
     }
 
-    /// Load persisted mappings - delegates to state module  
+    /// Load persisted mappings - delegates to state module
+    #[allow(clippy::type_complexity)]
     pub fn load_persisted_mappings_direct(
         db_ops: &Arc<DbOperations>,
     ) -> Result<(

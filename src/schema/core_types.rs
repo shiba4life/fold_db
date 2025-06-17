@@ -5,9 +5,7 @@
 //! core SchemaCore struct.
 
 use crate::fold_db_core::infrastructure::message_bus::MessageBus;
-use crate::schema::types::{
-    Field, FieldVariant, JsonSchemaDefinition, JsonSchemaField, Schema, SchemaError, SingleField,
-};
+use crate::schema::types::{Field, Schema, SchemaError};
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

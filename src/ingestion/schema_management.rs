@@ -1,6 +1,5 @@
 //! Schema preparation, creation, parsing, and field management
 
-use crate::fold_db_core::FoldDB;
 use crate::ingestion::{
     openrouter_service::AISchemaResponse,
     schema_stripper::SchemaStripper,

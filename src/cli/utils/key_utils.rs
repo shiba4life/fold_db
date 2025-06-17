@@ -3,7 +3,7 @@
 //! This module contains utility functions for key management including
 //! storage, retrieval, encryption, decryption, and directory management.
 
-use crate::cli::args::{CliSecurityLevel, KeyFormat};
+use crate::cli::args::KeyFormat;
 use crate::crypto::{derive_key, generate_salt, Argon2Params, MasterKeyPair};
 use base64::{engine::general_purpose, Engine as _};
 use log::{error, info};
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, Write};
 use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Secure key storage configuration
 #[derive(Debug, Serialize, Deserialize)]
@@ -266,7 +266,7 @@ pub fn output_key(
 }
 
 /// Parse key input from string (supports hex, base64, and PEM formats)
-pub fn parse_key_input(input: &str, is_private: bool) -> Result<[u8; 32], Box<dyn std::error::Error>> {
+pub fn parse_key_input(input: &str, _is_private: bool) -> Result<[u8; 32], Box<dyn std::error::Error>> {
     let trimmed = input.trim();
 
     // Try to parse as PEM first
@@ -306,7 +306,7 @@ pub fn parse_key_input(input: &str, is_private: bool) -> Result<[u8; 32], Box<dy
         }
     }
 
-    let expected_size = if is_private { 32 } else { 32 }; // Both are 32 for Ed25519
+    let expected_size = 32; // Ed25519 keys are always 32 bytes
     Err(format!(
         "Unable to parse key: expected {} bytes in hex, base64, or PEM format",
         expected_size
@@ -318,7 +318,7 @@ pub fn parse_key_input(input: &str, is_private: bool) -> Result<[u8; 32], Box<dy
 #[allow(dead_code)]
 pub fn handle_retrieve_key_internal(
     key_id: &str,
-    storage_dir: &PathBuf,
+    storage_dir: &Path,
     public_only: bool,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let key_file = storage_dir.join(format!("{}.json", key_id));

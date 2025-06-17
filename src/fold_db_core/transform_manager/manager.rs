@@ -18,7 +18,6 @@
 //! - TransformOrchestrator determines which transforms to execute
 //! - TransformOrchestrator calls TransformManager for actual execution
 
-use super::config::*;
 use super::execution::TransformExecutionManager;
 use super::orchestration::{TransformOrchestrationManager, OrchestrationUtils};
 use super::registration::TransformRegistrationManager;
@@ -43,6 +42,7 @@ pub struct TransformManager {
     /// Transform execution manager
     execution_manager: TransformExecutionManager,
     /// Orchestration manager
+    #[allow(dead_code)]
     orchestration_manager: TransformOrchestrationManager,
     /// Message bus for event-driven communication
     pub(super) _message_bus: Arc<MessageBus>,
@@ -199,6 +199,7 @@ impl TransformManager {
     }
 
     /// Load persisted mappings from database (static method for backward compatibility)
+    #[allow(clippy::type_complexity)]
     pub fn load_persisted_mappings_direct(
         db_ops: &Arc<DbOperations>,
     ) -> Result<(

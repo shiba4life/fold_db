@@ -5,9 +5,7 @@
 
 use crate::cli::args::{HttpMethod, VerificationConfigAction, VerificationOutputFormat};
 use crate::cli::utils::key_utils::parse_key_input;
-use log::info;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;

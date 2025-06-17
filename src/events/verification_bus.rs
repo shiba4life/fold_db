@@ -7,7 +7,7 @@ use super::correlation::CorrelationManager;
 use super::event_types::SecurityEvent;
 use super::handlers::EventHandler;
 use super::verification_bus_config::VerificationBusConfig;
-use super::verification_bus_types::{EventBusStatistics, EventProcessingResult};
+use super::verification_bus_types::EventBusStatistics;
 use super::verification_processing;
 use super::verification_statistics;
 use crate::config::unified_config::UnifiedConfig;

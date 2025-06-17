@@ -11,7 +11,7 @@ use crate::schema::types::{Field, Schema, SchemaError};
 use log::info;
 
 /// Ensure any transforms on fields have the correct output schema
-pub fn fix_transform_outputs(schema_core: &SchemaCore, schema: &mut Schema) {
+pub fn fix_transform_outputs(_schema_core: &SchemaCore, schema: &mut Schema) {
     for (field_name, field) in schema.fields.iter_mut() {
         if let Some(transform) = field.transform() {
             let out_schema = transform.get_output();
@@ -137,16 +137,19 @@ pub fn store_field_to_transform_mapping(
 
 impl SchemaCore {
     /// Ensure any transforms on fields have the correct output schema
+    #[allow(dead_code)]
     pub(crate) fn fix_transform_outputs(&self, schema: &mut Schema) {
         fix_transform_outputs(self, schema)
     }
 
     /// Auto-register field transforms with TransformManager during schema loading
+    #[allow(dead_code)]
     pub(crate) fn register_schema_transforms(&self, schema: &Schema) -> Result<(), SchemaError> {
         register_schema_transforms(self, schema)
     }
 
     /// Store field-to-transform mapping in database for TransformManager to load
+    #[allow(dead_code)]
     pub(crate) fn store_field_to_transform_mapping(
         &self,
         field_key: &str,

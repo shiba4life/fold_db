@@ -12,7 +12,6 @@ use std::time::Duration;
 use tokio::sync::{broadcast, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
-use uuid::Uuid;
 
 /// Start the background event processor
 pub async fn start_event_processor(

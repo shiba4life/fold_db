@@ -10,12 +10,10 @@ use crate::cli::utils::key_utils::{
 };
 use crate::crypto::ed25519::{generate_master_keypair, generate_master_keypair_from_seed};
 use crate::crypto::{derive_key, generate_salt, Argon2Params};
-use base64::{engine::general_purpose, Engine as _};
-use log::{info, warn};
+use log::info;
 use rand::{rngs::OsRng, RngCore};
 use rpassword::read_password;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Write};
 use std::os::unix::fs::PermissionsExt;

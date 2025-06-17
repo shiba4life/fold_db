@@ -156,13 +156,27 @@ impl TransformRegistrationManager {
             field_name
         );
 
-        // Validate transform before registration
-        TransformUtils::validate_transform_registration(&transform_id, &transform)?;
-        TransformExecutor::validate_transform(&transform)?;
+        // Set inputs on transform BEFORE validation
+        if !input_names.is_empty() {
+            transform.set_inputs(input_names.clone());
+        } else if !input_arefs.is_empty() {
+            // If no input names, use atom refs as fallback
+            transform.set_inputs(input_arefs.clone());
+        } else {
+            // Try to analyze dependencies from transform logic if no explicit inputs
+            let dependencies: Vec<String> = transform.analyze_dependencies().into_iter().collect();
+            if !dependencies.is_empty() {
+                transform.set_inputs(dependencies);
+            }
+        }
 
         // Prepare transform
         let output_field = format!("{}.{}", schema_name, field_name);
         transform.set_output(output_field.clone());
+
+        // Validate transform after setting inputs and output
+        TransformUtils::validate_transform_registration(&transform_id, &transform)?;
+        TransformExecutor::validate_transform(&transform)?;
 
         // Store transform in database
         self.db_ops.store_transform(&transform_id, &transform)?;
@@ -291,7 +305,8 @@ impl TransformRegistrationManager {
         self.state.load_persisted_mappings(&self.db_ops)
     }
 
-    /// Create a registration from static mapping data  
+    /// Create a registration from static mapping data
+    #[allow(clippy::type_complexity)]
     pub fn load_persisted_mappings_static(
         db_ops: &Arc<DbOperations>,
     ) -> Result<(

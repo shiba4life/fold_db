@@ -5,13 +5,11 @@
 //! - State management (schema states, status retrieval)
 //! - Loading and unloading operations (schema discovery, disk operations)
 
-use crate::atom::{AtomRef, AtomRefRange};
 use crate::schema::core_types::{SchemaCore, SchemaLoadingReport, SchemaSource, SchemaState};
 use crate::schema::types::{Field, Schema, SchemaError};
 use log::info;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use uuid::Uuid;
 
 impl SchemaCore {
     /// Load a schema into memory and persist it to disk.

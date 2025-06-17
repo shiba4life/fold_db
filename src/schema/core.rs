@@ -12,7 +12,6 @@
 //! - `utils` - Utility functions for file operations
 
 // Re-export all core types and functionality for backward compatibility
-pub use super::core_types::*;
 
 // Make sure these types are available at the schema::core path for backward compatibility
 pub use super::core_types::{SchemaCore, SchemaLoadingReport, SchemaSource, SchemaState};

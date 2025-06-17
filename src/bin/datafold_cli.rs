@@ -3,21 +3,12 @@ use clap::Parser;
 use datafold::cli::args::{
     Cli, Commands,
 };
-use datafold::cli::auth::{CliAuthProfile, CliSigningConfig};
-use datafold::cli::config::{CliConfigManager, ServerConfig};
-use datafold::cli::http_client::{AuthenticatedHttpClient, HttpClientBuilder, RetryConfig};
-use datafold::cli::signing_config::SigningMode;
 use datafold::{load_node_config, DataFoldNode};
 // Import command modules
 use datafold::cli::commands::{
     auth_commands, crypto, environment, keys, query, schemas, verification,
 };
-use log::{info};
-use serde_json::json;
-use std::collections::HashMap;
-use std::io::{self, Write};
-use std::path::PathBuf;
-use std::time::Duration;
+use log::info;
 
 // All CLI argument types have been moved to src/cli/args.rs
 // The function implementations continue below

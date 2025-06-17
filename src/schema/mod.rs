@@ -49,10 +49,8 @@ pub mod types;
 
 // Public re-exports from refactored modules
 pub use core_types::{SchemaCore, SchemaLoadingReport, SchemaSource, SchemaState};
-pub use operations::*;
 pub use parsing::*;
 pub use transforms::*;
-pub use validation::*;
 pub use utils::*;
 
 // Public re-exports from existing modules

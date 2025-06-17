@@ -2,7 +2,7 @@
 
 use crate::ingestion::{
     openrouter_service::{AISchemaResponse, OpenRouterService},
-    IngestionConfig, IngestionError, IngestionResult,
+    IngestionConfig, IngestionResult,
 };
 use log::info;
 use serde_json::Value;

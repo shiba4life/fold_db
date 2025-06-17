@@ -5,19 +5,15 @@
 
 use crate::cli::args::{CliSecurityLevel, HttpMethod, MessageEncoding, ProfileAction};
 use crate::cli::auth::{CliAuthProfile, CliSigningConfig};
-use crate::cli::config::{CliConfigManager, ServerConfig};
-use crate::cli::http_client::{HttpClientBuilder, RetryConfig};
-use crate::cli::signing_config::SigningMode;
+use crate::cli::config::CliConfigManager;
+use crate::cli::http_client::HttpClientBuilder;
 use crate::cli::utils::key_utils::{
     decrypt_key, encrypt_key, ensure_storage_dir, get_default_storage_dir, get_secure_passphrase,
-    handle_retrieve_key_internal, KeyStorageConfig,
+    KeyStorageConfig,
 };
 use crate::crypto::ed25519::generate_master_keypair;
 use crate::crypto::{Argon2Params, MasterKeyPair};
-use base64::{engine::general_purpose, Engine as _};
-use log::info;
 use reqwest::Client;
-use rpassword::read_password;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
