@@ -1,3 +1,7 @@
+//! Built-in function registry and definitions.
+//!
+//! This module contains the built-in function implementations for the transform interpreter.
+
 use std::collections::HashMap;
 
 use super::super::ast::Value;

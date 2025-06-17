@@ -296,7 +296,7 @@ impl KeyRotationNetworkIntegration {
     /// Get network statistics
     pub async fn get_network_statistics(
         &self,
-    ) -> crate::events::verification_bus::EventBusStatistics {
+    ) -> crate::events::EventBusStatistics {
         let event_bus = self.event_bus.read().await;
         event_bus.get_statistics().await
     }

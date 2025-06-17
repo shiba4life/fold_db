@@ -1,7 +1,7 @@
 //! Simplified ingestion service that works with DataFoldNode's existing interface
 
 use crate::datafold_node::DataFoldNode;
-use crate::ingestion::core::IngestionRequest;
+use crate::ingestion::IngestionRequest;
 use crate::ingestion::mutation_generator::MutationGenerator;
 use crate::ingestion::openrouter_service::{AISchemaResponse, OpenRouterService};
 use crate::ingestion::schema_stripper::SchemaStripper;
@@ -90,7 +90,7 @@ impl SimpleIngestionService {
             .auto_execute
             .unwrap_or(self.config.auto_execute_mutations)
         {
-            self.execute_mutations_with_node(&mutations, node)?
+            self.execute_mutations_with_node(&mutations[..], node)?
         } else {
             0
         };

@@ -5,7 +5,13 @@
 //!
 //! ## Components
 //!
-//! * `core` - Core schema functionality including loading, validation, and field mapping
+//! * `core` - Unified core schema functionality (refactored into modular components)
+//! * `core_types` - Core schema types including SchemaCore struct and related enums
+//! * `operations` - CRUD operations, state management, loading/unloading operations
+//! * `parsing` - JSON parsing, field conversion, schema loading from files
+//! * `transforms` - Transform registration, mapping, field transformation
+//! * `validation` - Schema validation logic and validator interface
+//! * `utils` - File/directory helpers and utility functions
 //! * `types` - Schema-related data structures and type definitions
 //! * `hasher` - Schema hashing and integrity verification with configurable directory paths
 //! * `file_operations` - File-based operations for reading and writing schemas
@@ -25,7 +31,15 @@
 //! Schemas are loaded from JSON definitions, validated, and then used to process
 //! queries and mutations against the database.
 
-// Internal modules
+// Internal modules - refactored modular components
+pub mod core_types;
+pub mod operations;
+pub mod parsing;
+pub mod transforms;
+pub mod validation;
+pub mod utils;
+
+// Internal modules - existing components
 pub mod core;
 pub mod duplicate_detection;
 pub mod field_factory;
@@ -33,8 +47,15 @@ pub mod file_operations;
 pub mod hasher;
 pub mod types;
 
-// Public re-exports
-pub use core::{SchemaCore, SchemaState};
+// Public re-exports from refactored modules
+pub use core_types::{SchemaCore, SchemaLoadingReport, SchemaSource, SchemaState};
+pub use operations::*;
+pub use parsing::*;
+pub use transforms::*;
+pub use validation::*;
+pub use utils::*;
+
+// Public re-exports from existing modules
 pub use field_factory::{
     DatabaseInitHelper, FieldBuilder, FieldFactory, TestEnvironment, TransformSetupHelper,
 };

@@ -7,12 +7,18 @@
 //! ## Components
 //!
 //! * `core` - Main ingestion orchestrator
+//! * `request` - Input struct and validation logic
+//! * `schema_management` - Schema preparation, creation, parsing, and field management
+//! * `ai_recommendation` - AI-based schema/data recommendation logic
+//! * `mutation` - Mutation generation and execution logic
+//! * `logging` - Logging and status reporting
 //! * `openrouter_service` - OpenRouter API integration for AI-powered schema analysis
 //! * `schema_stripper` - Removes payment and permission data from schemas for AI analysis
 //! * `mutation_generator` - Creates mutations from AI responses and JSON data
 //! * `error` - Custom error types for ingestion operations
 //! * `config` - Configuration structures for ingestion settings
 //! * `routes` - HTTP route handlers for ingestion API endpoints
+//! * `tests` - Test code for ingestion functionality
 //!
 //! ## Architecture
 //!
@@ -25,19 +31,28 @@
 //! 6. Generate mutations to store the JSON data
 //! 7. Execute mutations to persist the data
 
+pub mod ai_recommendation;
 pub mod config;
 pub mod core;
 pub mod error;
+pub mod logging;
+pub mod mutation;
 pub mod mutation_generator;
 pub mod openrouter_service;
+pub mod request;
 pub mod routes;
+pub mod schema_management;
 pub mod schema_stripper;
 pub mod simple_service;
 
-// Public re-exports
+#[cfg(test)]
+pub mod tests;
+
+// Public re-exports for backward compatibility
 pub use config::IngestionConfig;
 pub use core::IngestionCore;
 pub use error::IngestionError;
+pub use request::IngestionRequest;
 
 /// Result type for ingestion operations
 pub type IngestionResult<T> = Result<T, IngestionError>;

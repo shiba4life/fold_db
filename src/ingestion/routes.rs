@@ -1,7 +1,7 @@
 //! HTTP route handlers for the ingestion API
 
 use crate::datafold_node::routes::http_server::AppState;
-use crate::ingestion::core::IngestionRequest;
+use crate::ingestion::IngestionRequest;
 use crate::ingestion::simple_service::SimpleIngestionService;
 use crate::ingestion::{IngestionConfig, IngestionResponse};
 use actix_web::{web, HttpResponse, Responder};
