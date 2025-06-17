@@ -422,7 +422,7 @@ mod tests {
             Arc::new(crate::fold_db_core::infrastructure::message_bus::MessageBus::new());
         let manager = Arc::new(MockTransformRunner::new(true));
         let (db_ops, _message_bus) =
-            crate::testing_utils::TestDatabaseFactory::create_test_environment().unwrap();
+            crate::utils::test::TestDatabaseFactory::create_test_environment().unwrap();
         let coordinator = ExecutionCoordinator::new(manager, message_bus, db_ops);
 
         let item = QueueItem {
@@ -444,7 +444,7 @@ mod tests {
             Arc::new(crate::fold_db_core::infrastructure::message_bus::MessageBus::new());
         let manager = Arc::new(MockTransformRunner::new(true));
         let (db_ops, _message_bus) =
-            crate::testing_utils::TestDatabaseFactory::create_test_environment().unwrap();
+            crate::utils::test::TestDatabaseFactory::create_test_environment().unwrap();
         let coordinator = ExecutionCoordinator::new(manager, message_bus, db_ops);
 
         let item = QueueItem {
@@ -465,7 +465,7 @@ mod tests {
             Arc::new(crate::fold_db_core::infrastructure::message_bus::MessageBus::new());
         let manager = Arc::new(MockTransformRunner::new(false));
         let (db_ops, _message_bus) =
-            crate::testing_utils::TestDatabaseFactory::create_test_environment().unwrap();
+            crate::utils::test::TestDatabaseFactory::create_test_environment().unwrap();
         let coordinator = ExecutionCoordinator::new(manager, message_bus, db_ops);
 
         let item = QueueItem {
@@ -483,7 +483,7 @@ mod tests {
             Arc::new(crate::fold_db_core::infrastructure::message_bus::MessageBus::new());
         let manager = Arc::new(MockTransformRunner::new(true));
         let (db_ops, _message_bus) =
-            crate::testing_utils::TestDatabaseFactory::create_test_environment().unwrap();
+            crate::utils::test::TestDatabaseFactory::create_test_environment().unwrap();
         let coordinator = ExecutionCoordinator::new(manager, message_bus, db_ops);
 
         let items = vec![
@@ -525,7 +525,7 @@ mod tests {
             Arc::new(crate::fold_db_core::infrastructure::message_bus::MessageBus::new());
         let manager = Arc::new(MockTransformRunner::new(false)); // Always fails
         let (db_ops, _message_bus) =
-            crate::testing_utils::TestDatabaseFactory::create_test_environment().unwrap();
+            crate::utils::test::TestDatabaseFactory::create_test_environment().unwrap();
         let coordinator = ExecutionCoordinator::new(manager, message_bus, db_ops);
 
         let item = QueueItem {

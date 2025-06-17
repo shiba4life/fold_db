@@ -4677,6 +4677,8 @@ fn handle_verify_key(
     let derived_public_key_bytes = keypair.public_key_bytes();
 
     if derived_public_key_bytes == public_key_bytes {
+        println!("✅ Keypair verification successful: private and public keys match");
+        println!("Public key: {}", hex::encode(public_key_bytes));
         info!("✅ Keypair verification successful: private and public keys match");
         info!("Public key: {}", hex::encode(public_key_bytes));
     } else {
@@ -4699,6 +4701,7 @@ fn handle_verify_key(
         .verify_data(test_message, &signature)
         .map_err(|e| format!("Failed to verify test signature: {}", e))?;
 
+    println!("✅ Functional verification successful: keypair can sign and verify");
     info!("✅ Functional verification successful: keypair can sign and verify");
 
     Ok(())
@@ -5295,7 +5298,7 @@ fn handle_environment_command(action: EnvironmentAction) -> Result<(), Box<dyn s
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    datafold::web_logger::init().ok();
+    datafold::logging::init().ok();
     let cli = Cli::parse();
 
     // Handle commands that don't need the node first

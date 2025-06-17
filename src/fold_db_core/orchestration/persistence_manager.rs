@@ -145,7 +145,7 @@ mod tests {
     use crate::fold_db_core::orchestration::queue_manager::QueueItem;
 
     fn create_test_tree() -> Tree {
-        crate::testing_utils::TestDatabaseFactory::create_named_test_tree("test_persistence")
+        crate::utils::test::TestDatabaseFactory::create_named_test_tree("test_persistence")
     }
 
     #[test]

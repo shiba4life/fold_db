@@ -4,7 +4,7 @@ use super::{
 };
 use crate::schema::types::field::FieldType;
 use crate::transform::TransformExecutor;
-use crate::validation_utils::ValidationUtils;
+use crate::utils::validation::ValidationUtils;
 
 /// Validates a [`Schema`] before it is loaded into the database.
 ///

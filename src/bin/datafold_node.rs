@@ -47,7 +47,7 @@ struct Cli {
 /// * The TCP server cannot be started
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    datafold::web_logger::init().ok();
+    datafold::logging::init().ok();
     info!("Starting DataFold Node...");
 
     // Parse command-line arguments using clap

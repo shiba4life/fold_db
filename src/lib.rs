@@ -29,12 +29,10 @@
 pub mod atom;
 pub mod cli;
 pub mod config;
-pub mod config_utils;
 pub mod crypto;
 pub mod datafold_node;
 pub mod db_operations;
 pub mod error;
-pub mod error_handling;
 pub mod events;
 pub mod fees;
 pub mod fold_db_core;
@@ -45,10 +43,8 @@ pub mod permissions;
 pub mod reporting;
 pub mod schema;
 pub mod security_types;
-pub mod testing_utils;
 pub mod transform;
-pub mod validation_utils;
-pub mod web_logger;
+pub mod utils;
 
 pub mod tests;
 

@@ -2,7 +2,7 @@
 use super::*;
 
 fn create_test_config() -> NodeConfig {
-    crate::testing_utils::TestDatabaseFactory::create_test_node_config()
+    crate::utils::test::TestDatabaseFactory::create_test_node_config()
 }
 
 #[test]

@@ -1,9 +1,8 @@
 use crate::logging::LoggingSystem;
-use crate::web_logger;
 use actix_web::{web, HttpResponse, Responder, Result};
 use futures_util::stream::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio_stream::wrappers::BroadcastStream; // Keep for backward compatibility
+use tokio_stream::wrappers::BroadcastStream;
 
 #[derive(Serialize, Deserialize)]
 pub struct LogLevelUpdate {
@@ -19,26 +18,31 @@ pub struct LogConfigResponse {
 
 /// List current logs (backward compatibility)
 pub async fn list_logs() -> impl Responder {
-    HttpResponse::Ok().json(web_logger::get_logs())
+    // Use the logging system's get_logs function
+    let logs = crate::logging::get_logs();
+    HttpResponse::Ok().json(logs)
 }
 
 /// Stream logs via Server-Sent Events (backward compatibility)
 pub async fn stream_logs() -> impl Responder {
-    let rx = match web_logger::subscribe() {
-        Some(r) => r,
-        None => return HttpResponse::InternalServerError().finish(),
-    };
-    let stream = BroadcastStream::new(rx).filter_map(|msg| async move {
-        match msg {
-            Ok(line) => Some(Ok::<web::Bytes, actix_web::Error>(web::Bytes::from(
-                format!("data: {}\n\n", line),
-            ))),
-            Err(_) => None,
+    // Try to get log stream from the logging system
+    match crate::logging::subscribe() {
+        Some(rx) => {
+            let stream = BroadcastStream::new(rx).filter_map(|msg| async move {
+                match msg {
+                    Ok(line) => Some(Ok::<web::Bytes, actix_web::Error>(web::Bytes::from(
+                        format!("data: {}\n\n", line),
+                    ))),
+                    Err(_) => None,
+                }
+            });
+            HttpResponse::Ok()
+                .insert_header(("Content-Type", "text/event-stream"))
+                .streaming(stream)
         }
-    });
-    HttpResponse::Ok()
-        .insert_header(("Content-Type", "text/event-stream"))
-        .streaming(stream)
+        None => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "Log streaming not available"})),
+    }
 }
 
 /// Get current logging configuration

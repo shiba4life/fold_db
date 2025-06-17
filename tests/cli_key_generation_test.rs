@@ -198,9 +198,12 @@ fn test_cli_generate_key_batch() {
     let batch_stdout = String::from_utf8(batch_output.stdout).unwrap();
 
     // Should contain indicators for 3 keypairs
-    assert!(batch_stdout.contains("keypair 1 of 3"));
-    assert!(batch_stdout.contains("keypair 2 of 3"));
-    assert!(batch_stdout.contains("keypair 3 of 3"));
+    assert!(batch_stdout.contains("# private key 1 of 3"));
+    assert!(batch_stdout.contains("# private key 2 of 3"));
+    assert!(batch_stdout.contains("# private key 3 of 3"));
+    assert!(batch_stdout.contains("# public key 1 of 3"));
+    assert!(batch_stdout.contains("# public key 2 of 3"));
+    assert!(batch_stdout.contains("# public key 3 of 3"));
 
     // Should contain 6 keys total (3 private + 3 public)
     let hex_lines: Vec<&str> = batch_stdout

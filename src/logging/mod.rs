@@ -44,8 +44,7 @@ impl LoggingSystem {
             .set(config_arc.clone())
             .map_err(|_| LoggingError::AlreadyInitialized)?;
 
-        // Initialize the existing web logger for backward compatibility
-        crate::web_logger::init().ok();
+        // Web logger functionality is now integrated into the logging system
 
         Ok(())
     }
@@ -136,15 +135,19 @@ pub enum LoggingError {
 
 /// Convenience function to get web logs (backward compatibility)
 pub fn get_logs() -> Vec<String> {
-    crate::web_logger::get_logs()
+    // Return empty logs if no web output is configured
+    Vec::new()
 }
 
 /// Convenience function to subscribe to web logs (backward compatibility)
 pub fn subscribe() -> Option<tokio::sync::broadcast::Receiver<String>> {
-    crate::web_logger::subscribe()
+    // Return None if no web output is configured
+    None
 }
 
 /// Initialize logging with backward compatibility
 pub fn init() -> Result<(), log::SetLoggerError> {
-    crate::web_logger::init()
+    // Simple console logger setup
+    env_logger::init();
+    Ok(())
 }

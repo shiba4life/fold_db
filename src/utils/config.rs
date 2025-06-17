@@ -285,7 +285,7 @@ impl EnvironmentConfiguration {
         if self.test_mode {
             // Use the new consolidated testing utilities
             let (db_ops, message_bus) =
-                crate::testing_utils::TestDatabaseFactory::create_test_environment()?;
+                crate::utils::test::TestDatabaseFactory::create_test_environment()?;
             let temp_dir = tempfile::tempdir()?;
             Ok(crate::schema::field_factory::TestEnvironment {
                 db_ops,
@@ -367,7 +367,7 @@ macro_rules! hashmap {
 macro_rules! test_metadata {
     ($($key:expr => $value:expr),* $(,)?) => {
         {
-            let mut metadata = $crate::config_utils::ConfigFactory::test_metadata();
+            let mut metadata = $crate::utils::config::ConfigFactory::test_metadata();
             $(
                 metadata.insert($key.to_string(), $value.to_string());
             )*
@@ -381,7 +381,7 @@ macro_rules! test_metadata {
 macro_rules! field_map {
     ($($field_name:expr => $field_value:expr),* $(,)?) => {
         {
-            let mut fields = $crate::config_utils::ConfigFactory::empty_json_map();
+            let mut fields = $crate::utils::config::ConfigFactory::empty_json_map();
             $(
                 fields.insert($field_name.to_string(), $field_value);
             )*

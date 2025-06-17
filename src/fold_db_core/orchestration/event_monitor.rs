@@ -367,7 +367,7 @@ mod tests {
     }
 
     fn create_test_tree() -> sled::Tree {
-        crate::testing_utils::TestDatabaseFactory::create_named_test_tree("test_event_monitor")
+        crate::utils::test::TestDatabaseFactory::create_named_test_tree("test_event_monitor")
     }
 
     #[test]

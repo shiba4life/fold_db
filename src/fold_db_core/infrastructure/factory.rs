@@ -37,7 +37,7 @@ impl InfrastructureFactory {
     /// Consolidates all the test setup duplication across test files
     pub fn create_test_infrastructure() -> Result<TestInfrastructure, SchemaError> {
         let message_bus = Self::create_message_bus();
-        let (db_ops, _) = crate::testing_utils::TestDatabaseFactory::create_test_environment()
+        let (db_ops, _) = crate::utils::test::TestDatabaseFactory::create_test_environment()
             .map_err(|e| SchemaError::InvalidData(e.to_string()))?;
 
         Ok(TestInfrastructure {
