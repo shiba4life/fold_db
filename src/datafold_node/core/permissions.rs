@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::error::{FoldDbError, FoldDbResult};
 
-use super::config::NodeInfo;
+use crate::datafold_node::config::NodeInfo;
 use super::DataFoldNode;
 
 impl DataFoldNode {

@@ -1,110 +1,146 @@
-# Architectural Simplification Plan
+# Modular Reorganization Plan for `src/datafold_node/` (Revised)
 
-## Executive Summary
+## Current Situation
 
-This plan outlines a set of architectural simplifications for the DataFold project, focusing on merging utility modules, unifying error handling, consolidating logging, clarifying security boundaries, flattening redundant layers, and documenting module responsibilities. The goal is to reduce complexity, improve maintainability, and clarify module boundaries.
+The `src/datafold_node/` directory contains a large number of files covering diverse concerns:
+- Core node logic
+- Cryptography and key management
+- Networking (TCP, HTTP)
+- API routes (HTTP)
+- Signature authentication
+- Monitoring and performance
+- Permissions
+- Tests and documentation
 
----
-
-## 1. Current State Analysis
-
-### Key Observations
-
-- **Utility Modules:** Multiple utility files (`config_utils.rs`, `testing_utils.rs`, `validation_utils.rs`) can be merged or better organized.
-- **Error Handling:** Both `error.rs` and `error_handling/` exist, potentially duplicating responsibilities.
-- **Logging:** `web_logger.rs` and the `logging/` directory may overlap.
-- **Security:** `security_types.rs` and `crypto/` may have unclear boundaries.
-- **Redundant Layers:** Some modules may act as thin wrappers or unnecessary re-exports.
+This makes the directory difficult to navigate and maintain.
 
 ---
 
-## 2. Proposed New Structure
+## Revised Proposed Modular Structure
+
+**Note:** To avoid confusion with the existing `src/network/` folder, network-related files in `src/datafold_node/` will be grouped under a new `transport/` submodule, which will contain TCP and node-specific networking logic.
+
+```
+src/datafold_node/
+├── core/
+│   ├── node.rs
+│   ├── db.rs
+│   ├── permissions.rs
+│   ├── transform_queue.rs
+│   └── mod.rs
+├── crypto/
+│   ├── crypto_init.rs
+│   ├── crypto_routes.rs
+│   ├── crypto_validation.rs
+│   ├── key_cache_manager.rs
+│   ├── key_rotation_compliance.rs
+│   ├── key_rotation_routes.rs
+│   └── mod.rs
+├── transport/
+│   ├── network_routes.rs
+│   ├── tcp_command_router.rs
+│   ├── tcp_connections.rs
+│   ├── tcp_protocol.rs
+│   ├── tcp_server.rs
+│   └── mod.rs
+├── routes/
+│   ├── http_server.rs
+│   ├── log_routes.rs
+│   ├── query_routes.rs
+│   ├── schema_routes.rs
+│   ├── system_routes.rs
+│   └── mod.rs
+├── auth/
+│   ├── signature_auth.rs
+│   ├── signature_auth_tests.rs
+│   └── mod.rs
+├── monitoring/
+│   ├── performance_monitoring.rs
+│   └── mod.rs
+├── config.rs
+├── tests.rs
+├── node.md
+├── README_TCP_SERVER.md
+├── mod.rs
+```
+
+### Details
+
+- **core/**: Core node logic and state management.
+- **crypto/**: All cryptography, key management, and compliance.
+- **transport/**: Node-specific networking, TCP, and network route logic (distinct from shared networking code in `src/network/`).
+- **routes/**: HTTP server and all API route handlers.
+- **auth/**: Signature authentication and related tests.
+- **monitoring/**: Performance and system monitoring.
+- **config.rs**: Remains at the top level if used across submodules.
+- **tests.rs**: Remains at the top level for integration/unit tests.
+- **Documentation**: `node.md`, `README_TCP_SERVER.md` remain at the top level.
+
+---
+
+## Benefits
+
+- **Avoids confusion** with the existing `src/network/` folder.
+- **Improved discoverability**: Related files are grouped together.
+- **Easier maintenance**: Clear boundaries for each concern.
+- **Scalability**: New features can be added in the appropriate submodule.
+- **Testability**: Tests can be grouped with their modules or in a dedicated `tests/` subdir.
+
+---
+
+## Mermaid Diagram
 
 ```mermaid
 graph TD
-    A[Current State]
-    A --> B[config_utils.rs]
-    A --> C[testing_utils.rs]
-    A --> D[validation_utils.rs]
-    A --> E[error.rs]
-    A --> F[error_handling/]
-    A --> G[web_logger.rs]
-    A --> H[logging/]
-    A --> I[security_types.rs]
-    A --> J[crypto/]
-    A --> K[Other modules...]
-
-    B & C & D --> L[utils/]
-    E & F --> M[error/]
-    G & H --> N[logging/]
-    I & J --> O[security/]
+    A[datafold_node]
+    subgraph core
+        B[node.rs]
+        C[db.rs]
+        D[permissions.rs]
+        E[transform_queue.rs]
+    end
+    subgraph crypto
+        F[crypto_init.rs]
+        G[crypto_routes.rs]
+        H[crypto_validation.rs]
+        I[key_cache_manager.rs]
+        J[key_rotation_compliance.rs]
+        K[key_rotation_routes.rs]
+    end
+    subgraph transport
+        L[network_routes.rs]
+        M[tcp_command_router.rs]
+        N[tcp_connections.rs]
+        O[tcp_protocol.rs]
+        P[tcp_server.rs]
+    end
+    subgraph routes
+        Q[http_server.rs]
+        R[log_routes.rs]
+        S[query_routes.rs]
+        T[schema_routes.rs]
+        U[system_routes.rs]
+    end
+    subgraph auth
+        V[signature_auth.rs]
+        W[signature_auth_tests.rs]
+    end
+    subgraph monitoring
+        X[performance_monitoring.rs]
+    end
+    A --> core
+    A --> crypto
+    A --> transport
+    A --> routes
+    A --> auth
+    A --> monitoring
 ```
 
-### Directory Layout
-
-- `utils/`
-  - `config.rs`
-  - `test.rs`
-  - `validation.rs`
-- `error/`
-  - `mod.rs` (centralized error types, conversions, utilities)
-- `logging/`
-  - `outputs/`
-    - `web.rs` (move `web_logger.rs` here)
-  - `mod.rs`
-- `security/`
-  - `types.rs` (from `security_types.rs`)
-  - `crypto/` (existing)
-- Remove or flatten thin wrapper modules.
-
 ---
 
-## 3. Migration Checklist
+## Questions for Review
 
-1. **Merge Utility Modules**
-   - Create `utils/` directory.
-   - Move and rename:
-     - `config_utils.rs` → `utils/config.rs`
-     - `testing_utils.rs` → `utils/test.rs`
-     - `validation_utils.rs` → `utils/validation.rs`
-   - Update all imports accordingly.
-
-2. **Unify Error Handling**
-   - Create `error/` directory.
-   - Move `error.rs` and contents of `error_handling/` into `error/`.
-   - Refactor to centralize error types and utilities.
-   - Update imports.
-
-3. **Consolidate Logging**
-   - Move `web_logger.rs` into `logging/outputs/web.rs`.
-   - Ensure all logging logic is under `logging/`.
-   - Update imports.
-
-4. **Clarify Security Boundaries**
-   - Create `security/` directory.
-   - Move `security_types.rs` to `security/types.rs`.
-   - Review and clarify boundaries with `crypto/`.
-
-5. **Flatten Redundant Layers**
-   - Identify and remove thin wrapper modules.
-   - Prefer direct imports over unnecessary re-exports.
-
-6. **Document Module Responsibilities**
-   - Add module-level doc comments to clarify each module’s purpose and boundaries.
-
----
-
-## 4. Notes
-
-- After migration, run all tests and update documentation as needed.
-- Communicate changes to the team to ensure smooth adoption.
-
----
-
-## 5. Rationale
-
-This restructuring will:
-- Reduce cognitive load for new contributors.
-- Make module responsibilities explicit.
-- Eliminate duplication and unnecessary indirection.
-- Lay the groundwork for future scalability and maintainability.
+- Is the use of `transport/` for node-specific networking and TCP logic acceptable?
+- Are there any files you would group differently?
+- Should tests be grouped with modules or kept at the top level?
+- Would you like to further split any of the proposed submodules?

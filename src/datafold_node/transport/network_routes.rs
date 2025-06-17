@@ -1,4 +1,4 @@
-use super::http_server::AppState;
+use crate::datafold_node::routes::http_server::AppState;
 use crate::network::NetworkConfig;
 use actix_web::{web, HttpResponse, Responder};
 use serde::Deserialize;
@@ -115,7 +115,7 @@ pub async fn list_nodes(state: web::Data<AppState>) -> impl Responder {
 mod tests {
     use super::*;
     use crate::datafold_node::signature_auth::{SignatureAuthConfig, SignatureVerificationState};
-    use crate::datafold_node::{config::NodeConfig, DataFoldNode};
+    use crate::datafold_node::{config::NodeConfig, DataFoldNode, AppState};
     use actix_web::web;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -130,7 +130,7 @@ mod tests {
         let signature_auth = SignatureVerificationState::new(sig_config)
             .expect("Failed to create signature verification state for test");
 
-        let state = web::Data::new(super::super::http_server::AppState {
+        let state = web::Data::new(AppState {
             signature_auth: Arc::new(signature_auth),
             node: Arc::new(tokio::sync::Mutex::new(node)),
         });
@@ -140,7 +140,7 @@ mod tests {
         assert_eq!(resp.status(), 500);
     }
 
-    fn create_state() -> web::Data<super::super::http_server::AppState> {
+    fn create_state() -> web::Data<AppState> {
         let dir = tempdir().unwrap();
         let config = NodeConfig::new(dir.path().to_path_buf());
         let node = DataFoldNode::new(config).unwrap();
@@ -149,7 +149,7 @@ mod tests {
         let signature_auth = SignatureVerificationState::new(sig_config)
             .expect("Failed to create signature verification state for test");
 
-        web::Data::new(super::super::http_server::AppState {
+        web::Data::new(AppState {
             signature_auth: Arc::new(signature_auth),
             node: Arc::new(tokio::sync::Mutex::new(node)),
         })
@@ -173,7 +173,7 @@ mod tests {
             .respond_to(&req);
         assert_eq!(resp.status(), 200);
         let node = state.node.lock().await;
-        assert!(node.network.is_some());
+        assert!(node.get_network().is_some());
     }
 
     #[tokio::test]
@@ -258,7 +258,7 @@ mod tests {
         .respond_to(&req);
         assert_eq!(resp.status(), 200);
         let node = state.node.lock().await;
-        assert!(node.trusted_nodes.contains_key("peer1"));
+        assert!(node.get_trusted_nodes().contains_key("peer1"));
         drop(node);
         let resp = discover_nodes(state.clone()).await.respond_to(&req);
         assert_eq!(resp.status(), 200);

@@ -49,10 +49,10 @@ use super::core::DbOperations;
 use super::encryption_wrapper::{contexts, EncryptionWrapper, MigrationConfig, MigrationMode};
 use crate::config::crypto::CryptoConfig;
 use crate::crypto::{CryptoError, CryptoResult, MasterKeyPair};
-use crate::datafold_node::encryption_at_rest::{
+use crate::datafold_node::crypto::encryption_at_rest::{
     key_derivation::KeyDerivationManager, EncryptedData,
 };
-use crate::datafold_node::encryption_at_rest_async::{AsyncEncryptionAtRest, PerformanceConfig};
+use crate::datafold_node::crypto::encryption_at_rest_async::{AsyncEncryptionAtRest, PerformanceConfig};
 use crate::schema::SchemaError;
 use futures::future::join_all;
 use lru::LruCache;

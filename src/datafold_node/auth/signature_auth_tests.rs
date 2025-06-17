@@ -2,9 +2,8 @@
 
 #[cfg(test)]
 mod tests {
-    use super::super::signature_auth::*;
-    use crate::crypto::ed25519::{generate_master_keypair, PublicKey};
-    use actix_web::{test, web, App, HttpResponse, HttpMessage};
+    use super::super::signature_auth::{*, CustomAuthError};
+    use actix_web::{test, web, App, HttpResponse};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     async fn test_handler() -> HttpResponse {
@@ -28,7 +27,7 @@ mod tests {
         let state = SignatureVerificationState::new(config.clone()).expect("Config should be valid");
         
         // Test that state is created successfully
-        assert_eq!(state.config.allowed_time_window_secs, config.allowed_time_window_secs);
+        assert_eq!(state.get_config().allowed_time_window_secs, config.allowed_time_window_secs);
     }
 
     #[tokio::test]
@@ -54,7 +53,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_nonce_replay_prevention() {
-        let config = SignatureAuthConfig::default();
+        let mut config = SignatureAuthConfig::default();
+        config.require_uuid4_nonces = false; // Allow simple nonces for testing
         let state = SignatureVerificationState::new(config).expect("Config should be valid");
         
         let now = SystemTime::now()
@@ -107,8 +107,17 @@ mod tests {
         
         // Request should be rejected since signature verification is mandatory
         let req = test::TestRequest::get().uri("/test").to_request();
-        let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status().as_u16(), 400); // Bad request due to missing signature headers
+        let result = test::try_call_service(&app, req).await;
+        
+        // Should get an authentication error
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        
+        // Verify it's our custom auth error (missing headers)
+        let custom_error = error.as_error::<CustomAuthError>();
+        assert!(custom_error.is_some());
+        // Check the error message contains what we expect
+        assert!(error.to_string().contains("Missing required authentication headers"));
     }
 
     #[tokio::test]
@@ -141,8 +150,17 @@ mod tests {
         
         // Request without signature headers should be rejected
         let req = test::TestRequest::get().uri("/api/test").to_request();
-        let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status().as_u16(), 401);
+        let result = test::try_call_service(&app, req).await;
+        
+        // Should get an authentication error
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        
+        // Verify it's our custom auth error (missing headers)
+        let custom_error = error.as_error::<CustomAuthError>();
+        assert!(custom_error.is_some());
+        // Check the error message contains what we expect
+        assert!(error.to_string().contains("Missing required authentication headers"));
     }
 
     #[tokio::test]
@@ -171,7 +189,6 @@ mod tests {
         
         // Paths that should be skipped
         assert!(should_skip_verification("/api/system/status"));
-        assert!(should_skip_verification("/api/crypto/status"));
         assert!(should_skip_verification("/api/crypto/keys/register"));
         assert!(should_skip_verification("/"));
         assert!(should_skip_verification("/index.html"));

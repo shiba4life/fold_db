@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use super::http_server::AppState;
-use super::signature_auth::{AuthenticationError, SignatureComponents};
+use crate::datafold_node::auth::signature_auth::{AuthenticationError, SignatureComponents};
 
 /// Get system status information
 pub async fn get_system_status(_state: web::Data<AppState>) -> impl Responder {
@@ -371,8 +371,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_reset_database_without_confirmation() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
+        
+        // Create unique temporary directory for this test
+        let test_id = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
         let temp_dir = tempdir().unwrap();
-        let config = NodeConfig::new(temp_dir.path().to_path_buf());
+        let unique_path = temp_dir.path().join(format!("test_db_{}", test_id));
+        let config = NodeConfig::new(unique_path);
         let node = DataFoldNode::new(config).unwrap();
 
         // Create default signature auth for testing
@@ -398,8 +404,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_reset_database_with_confirmation() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static TEST_COUNTER: AtomicU64 = AtomicU64::new(1000); // Different starting point
+        
+        // Create unique temporary directory for this test
+        let test_id = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
         let temp_dir = tempdir().unwrap();
-        let config = NodeConfig::new(temp_dir.path().to_path_buf());
+        let unique_path = temp_dir.path().join(format!("test_db_{}", test_id));
+        let config = NodeConfig::new(unique_path);
         let node = DataFoldNode::new(config).unwrap();
 
         // Create default signature auth for testing

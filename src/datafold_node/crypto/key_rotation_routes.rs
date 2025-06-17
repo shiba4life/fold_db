@@ -10,8 +10,8 @@ use crate::crypto::audit_logger::{CryptoAuditLogger, OperationResult, SecurityEv
 use crate::crypto::key_rotation::{
     KeyRotationRequest, KeyRotationValidator, RotationContext, RotationReason,
 };
-use crate::datafold_node::crypto_routes::{ApiError, ApiResponse};
-use crate::datafold_node::http_server::AppState;
+use crate::datafold_node::crypto::crypto_routes::{ApiError, ApiResponse};
+use crate::datafold_node::routes::http_server::AppState;
 use crate::db_operations::key_rotation_operations::KeyRotationRecord;
 use actix_web::{web, HttpRequest, HttpResponse, Result as ActixResult};
 use chrono::{DateTime, Utc};
@@ -146,8 +146,7 @@ pub async fn rotate_key(
         // Get database operations
         let node = app_state.node.lock().await;
         let db = node
-            .db
-            .lock()
+            .get_db()
             .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
         let db_ops = db.db_ops();
         drop(db);
@@ -335,8 +334,7 @@ pub async fn get_rotation_status(
         // Get database operations
         let node = app_state.node.lock().await;
         let db = node
-            .db
-            .lock()
+            .get_db()
             .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
         let db_ops = db.db_ops();
         drop(db);
@@ -415,8 +413,7 @@ pub async fn get_rotation_history(
         // Get database operations
         let node = app_state.node.lock().await;
         let db = node
-            .db
-            .lock()
+            .get_db()
             .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
         let db_ops = db.db_ops();
         drop(db);
@@ -479,8 +476,7 @@ pub async fn get_rotation_statistics(app_state: web::Data<AppState>) -> ActixRes
         // Get database operations
         let node = app_state.node.lock().await;
         let db = node
-            .db
-            .lock()
+            .get_db()
             .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
         let db_ops = db.db_ops();
         drop(db);

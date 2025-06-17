@@ -4,7 +4,7 @@
 //! is valid and consistent before proceeding with crypto initialization.
 
 use crate::config::crypto::{CryptoConfig, MasterKeyConfig};
-use crate::datafold_node::crypto_init::{CryptoInitError, CryptoInitResult};
+use crate::datafold_node::crypto::crypto_init::{CryptoInitError, CryptoInitResult};
 use log::{debug, warn};
 
 /// Comprehensive validation of crypto configuration for database initialization

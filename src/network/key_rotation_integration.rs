@@ -4,7 +4,7 @@
 //! cache invalidation, and consistency guarantees across a distributed DataFold network.
 
 use crate::crypto::key_rotation::{KeyRotationRequest, RotationContext, RotationValidationResult};
-use crate::datafold_node::key_cache_manager::{KeyCacheConfig, KeyCacheManager};
+use crate::datafold_node::crypto::key_cache_manager::{KeyCacheConfig, KeyCacheManager};
 use crate::events::transport::{EventTransport, InMemoryTransport, PlatformInfo, TransportConfig};
 use crate::events::{
     KeyPropagationStatus, KeyRotationEvent, KeyRotationEventType, KeyRotationHandlerConfig,
@@ -288,7 +288,7 @@ impl KeyRotationNetworkIntegration {
     }
 
     /// Get cache metrics
-    pub async fn get_cache_metrics(&self) -> crate::datafold_node::key_cache_manager::CacheMetrics {
+    pub async fn get_cache_metrics(&self) -> crate::datafold_node::crypto::key_cache_manager::CacheMetrics {
         let cache_manager = self.cache_manager.lock().await;
         cache_manager.get_metrics().await
     }

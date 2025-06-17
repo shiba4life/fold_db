@@ -1685,14 +1685,14 @@ impl SignatureVerificationState {
         &self,
         components: &SignatureComponents,
         req: &actix_web::dev::ServiceRequest,
-        app_state: &crate::datafold_node::http_server::AppState,
+        app_state: &crate::datafold_node::routes::http_server::AppState,
     ) -> Result<(), AuthenticationError> {
         let correlation_id = self.generate_correlation_id();
 
         // Get database access and extract db_ops in a scoped block
         let db_ops = {
             let node = app_state.node.lock().await;
-            let db_guard = match node.db.lock() {
+            let db_guard = match node.get_db() {
                 Ok(guard) => guard,
                 Err(_) => {
                     return Err(AuthenticationError::ConfigurationError {
@@ -1789,7 +1789,7 @@ impl SignatureVerificationState {
         db_ops: std::sync::Arc<crate::db_operations::core::DbOperations>,
         correlation_id: &str,
     ) -> Result<[u8; 32], AuthenticationError> {
-        use crate::datafold_node::crypto_routes::{
+        use crate::datafold_node::crypto::crypto_routes::{
             CLIENT_KEY_INDEX_TREE, PUBLIC_KEY_REGISTRATIONS_TREE,
         };
 
@@ -1816,7 +1816,7 @@ impl SignatureVerificationState {
         // Get registration record using the same pattern as crypto_routes
         let registration_key =
             format!("{}:{}", PUBLIC_KEY_REGISTRATIONS_TREE, &registration_id_str);
-        let registration: crate::datafold_node::crypto_routes::PublicKeyRegistration =
+        let registration: crate::datafold_node::crypto::crypto_routes::PublicKeyRegistration =
             match db_ops.get_item(&registration_key) {
                 Ok(Some(reg)) => reg,
                 Ok(None) => {
@@ -2859,23 +2859,29 @@ pub struct NonceStoreStats {
 
 /// In-memory nonce store for replay prevention with advanced features
 #[derive(Debug)]
-struct NonceStore {
+pub struct NonceStore {
     /// Map of nonce to creation timestamp
     nonces: HashMap<String, u64>,
 }
 
+impl Default for NonceStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NonceStore {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             nonces: HashMap::new(),
         }
     }
 
-    fn contains_nonce(&self, nonce: &str) -> bool {
+    pub fn contains_nonce(&self, nonce: &str) -> bool {
         self.nonces.contains_key(nonce)
     }
 
-    fn add_nonce(&mut self, nonce: String, created: u64) {
+    pub fn add_nonce(&mut self, nonce: String, created: u64) {
         self.nonces.insert(nonce, created);
     }
 
@@ -2883,7 +2889,7 @@ impl NonceStore {
         self.nonces.len()
     }
 
-    fn cleanup_expired(&mut self, ttl_secs: u64) {
+    pub fn cleanup_expired(&mut self, ttl_secs: u64) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -3096,7 +3102,7 @@ impl SignatureComponents {
     }
 
     /// Parse the signature-input header to extract covered components and parameters
-    fn parse_signature_input(input: &str) -> NodeResult<(Vec<String>, HashMap<String, String>)> {
+    pub fn parse_signature_input(input: &str) -> NodeResult<(Vec<String>, HashMap<String, String>)> {
         // Find the signature name and its definition
         // Format: sig1=("@method" "@target-uri" "content-type");created=1618884473;keyid="test-key-ed25519";alg="ed25519";nonce="abc123"
 
@@ -3371,7 +3377,7 @@ pub struct AuthenticatedClient {
 async fn verify_request_signature(
     req: &ServiceRequest,
     state: &SignatureVerificationState,
-    app_state: &crate::datafold_node::http_server::AppState,
+    app_state: &crate::datafold_node::routes::http_server::AppState,
 ) -> NodeResult<String> {
     // Parse signature components from headers
     let components = SignatureComponents::parse_from_headers(req)?;
@@ -3418,7 +3424,7 @@ async fn verify_request_signature(
 }
 
 /// Check if signature verification should be skipped for this path
-fn should_skip_verification(path: &str) -> bool {
+pub fn should_skip_verification(path: &str) -> bool {
     // Only allow these specific paths to skip verification (minimal set for system operation)
     const SKIP_PATHS: &[&str] = &[
         "/api/system/status",        // Health checks

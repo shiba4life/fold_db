@@ -1,6 +1,7 @@
-use super::signature_auth::SignatureVerificationState;
-use super::{crypto_routes, key_rotation_routes, log_routes};
-use super::{network_routes, query_routes, schema_routes, system_routes};
+use crate::datafold_node::auth::signature_auth::SignatureVerificationState;
+use crate::datafold_node::crypto::{crypto_routes, key_rotation_routes};
+use super::{log_routes, query_routes, schema_routes, system_routes};
+use crate::datafold_node::transport::network_routes;
 use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
 use crate::ingestion::routes as ingestion_routes;
@@ -97,7 +98,7 @@ impl DataFoldHttpServer {
         // Initialize signature verification (always enabled)
         let signature_auth = {
             let node = self.node.lock().await;
-            let sig_config = node.config.signature_auth_config();
+            let sig_config = node.get_config().signature_auth_config();
             info!(
                 "Initializing signature verification middleware with {:?} security profile",
                 sig_config.security_profile
@@ -137,7 +138,7 @@ impl DataFoldHttpServer {
             app.service(
                 web::scope("/api")
                     // Apply signature verification middleware at main API scope level
-                    .wrap(super::signature_auth::SignatureVerificationMiddleware::new(
+                    .wrap(crate::datafold_node::auth::signature_auth::SignatureVerificationMiddleware::new(
                         (*app_state.signature_auth).clone(),
                     ))
                     // Schema endpoints - all protected except where exempted by should_skip_verification

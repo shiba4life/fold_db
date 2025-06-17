@@ -5,11 +5,11 @@
 //! key derivation workflows.
 
 use crate::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
-use crate::datafold_node::crypto_init::{
+use crate::datafold_node::crypto::crypto_init::{
     get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed,
     validate_crypto_config_for_init, CryptoInitError,
 };
-use crate::datafold_node::http_server::AppState;
+use crate::datafold_node::routes::http_server::AppState;
 use crate::security_types::SecurityLevel;
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use base64;
@@ -70,6 +70,12 @@ impl ApiError {
 }
 
 /// Convert CryptoInitError to ApiError
+impl From<crate::error::FoldDbError> for ApiError {
+    fn from(error: crate::error::FoldDbError) -> Self {
+        ApiError::new("DATABASE_ERROR", &format!("Database error: {}", error))
+    }
+}
+
 impl From<CryptoInitError> for ApiError {
     fn from(error: CryptoInitError) -> Self {
         match error {
@@ -234,10 +240,7 @@ pub async fn init_random_key(app_state: web::Data<AppState>) -> ActixResult<Http
     let response = async {
         // Get database operations
         let node = app_state.node.lock().await;
-        let db = node
-            .db
-            .lock()
-            .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
+        let db = node.get_db().map_err(|e| ApiError::new("INTERNAL_ERROR", &format!("Cannot access database: {}", e)))?;
         let db_ops = db.db_ops();
         drop(db);
         drop(node);
@@ -314,10 +317,7 @@ pub async fn init_passphrase_key(
 
         // Get database operations
         let node = app_state.node.lock().await;
-        let db = node
-            .db
-            .lock()
-            .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
+        let db = node.get_db()?;
         let db_ops = db.db_ops();
         drop(db);
         drop(node);
@@ -408,10 +408,7 @@ pub async fn get_crypto_status(app_state: web::Data<AppState>) -> ActixResult<Ht
     let response: Result<CryptoStatusResponse, ApiError> = async {
         // Get database operations
         let node = app_state.node.lock().await;
-        let db = node
-            .db
-            .lock()
-            .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
+        let db = node.get_db()?;
         let db_ops = db.db_ops();
         drop(db);
         drop(node);
@@ -595,10 +592,7 @@ pub async fn register_public_key(
 
         // Check if client already has a registered key
         let node = app_state.node.lock().await;
-        let db = node
-            .db
-            .lock()
-            .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
+        let db = node.get_db()?;
         let db_ops = db.db_ops();
         drop(db);
         drop(node);
@@ -729,10 +723,7 @@ pub async fn get_public_key_status(
 
     let response: Result<PublicKeyStatusResponse, ApiError> = async {
         let node = app_state.node.lock().await;
-        let db = node
-            .db
-            .lock()
-            .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
+        let db = node.get_db()?;
         let db_ops = db.db_ops();
         drop(db);
         drop(node);
@@ -869,10 +860,7 @@ pub async fn verify_signature(
 
         // Get database operations
         let node = app_state.node.lock().await;
-        let db = node
-            .db
-            .lock()
-            .map_err(|_| ApiError::new("INTERNAL_ERROR", "Cannot lock database mutex"))?;
+        let db = node.get_db()?;
         let db_ops = db.db_ops();
         drop(db);
         drop(node);

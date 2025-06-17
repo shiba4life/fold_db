@@ -39,7 +39,7 @@
 //! ```
 
 use crate::crypto::error::{CryptoError, CryptoResult};
-use crate::datafold_node::encryption_at_rest::{EncryptedData, EncryptionAtRest, AES_KEY_SIZE};
+use crate::datafold_node::crypto::encryption_at_rest::{EncryptedData, EncryptionAtRest, AES_KEY_SIZE};
 use bytes::BytesMut;
 use futures::future::join_all;
 use lru::LruCache;

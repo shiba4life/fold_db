@@ -9,44 +9,44 @@
 //! Nodes can operate independently or as part of a network, with trust
 //! relationships defining how they share and access data.
 
+// Configuration and top-level modules
 pub mod config;
-pub mod crypto_init;
-pub mod crypto_routes;
-pub mod crypto_validation;
-mod db;
-pub mod encryption_at_rest;
-pub mod encryption_at_rest_async;
 pub mod error;
-pub mod http_server;
-pub mod key_cache_manager;
-pub mod key_rotation_compliance;
-pub mod key_rotation_routes;
-pub mod log_routes;
-pub mod network_routes;
-pub mod node;
-mod permissions;
-pub mod query_routes;
-pub mod schema_routes;
-pub mod signature_auth;
-pub mod system_routes;
-pub mod tcp_command_router;
-pub mod tcp_connections;
-pub mod tcp_protocol;
-pub mod tcp_server;
 pub mod tests;
-mod transform_queue;
 
-// Re-export the DataFoldNode struct for easier imports
-pub use config::load_node_config;
-pub use config::NodeConfig;
-pub use crypto_init::{
-    get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed, CryptoInitContext,
-    CryptoInitError, CryptoInitResult, CryptoInitStatus,
-};
-pub use crypto_validation::{
+// Modular submodules
+pub mod core;
+pub mod crypto;
+pub mod transport;
+pub mod routes;
+pub mod auth;
+pub mod monitoring;
+
+// Re-export key types for easier imports
+pub use config::{load_node_config, NodeConfig};
+pub use core::DataFoldNode;
+pub use crypto::{
+    get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed, 
+    CryptoInitContext, CryptoInitError, CryptoInitStatus,
     validate_crypto_config_comprehensive, validate_crypto_config_quick,
     validate_for_database_creation,
 };
-pub use http_server::DataFoldHttpServer;
-pub use node::DataFoldNode;
-pub use tcp_server::TcpServer;
+pub use routes::{DataFoldHttpServer, AppState};
+pub use transport::TcpServer;
+pub use auth::{SignatureAuthConfig, SignatureVerificationState, SignatureVerificationMiddleware};
+pub use monitoring::{PerformanceMetrics, SystemHealthStatus};
+
+// Re-export crypto modules for backward compatibility
+pub use crypto::{encryption_at_rest, encryption_at_rest_async, key_cache_manager, crypto_init, crypto_routes};
+
+// Re-export auth module for backward compatibility
+pub use auth::signature_auth;
+
+// Re-export routes for backward compatibility
+pub use routes::{http_server, system_routes};
+
+// Re-export transport modules for backward compatibility
+pub use transport::tcp_protocol;
+
+// Add missing CryptoInitResult re-export
+pub use crypto::crypto_init::CryptoInitResult;

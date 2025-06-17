@@ -7,8 +7,7 @@ use std::sync::{Arc, Mutex};
 use crate::config::crypto::CryptoConfig;
 use crate::datafold_node::config::NodeConfig;
 use crate::datafold_node::config::NodeInfo;
-use crate::datafold_node::crypto_init::{initialize_database_crypto, is_crypto_init_needed};
-use crate::datafold_node::crypto_validation::validate_for_database_creation;
+use crate::datafold_node::crypto::{initialize_database_crypto, is_crypto_init_needed, validate_for_database_creation};
 use crate::error::{FoldDbError, FoldDbResult, NetworkErrorKind};
 use crate::fold_db_core::FoldDB;
 use crate::network::{NetworkConfig, NetworkCore, PeerId};
@@ -814,6 +813,19 @@ impl DataFoldNode {
     }
 
     /// Check if crypto initialization is needed for this database
+    // Public accessor methods for private fields
+    pub fn get_db(&self) -> FoldDbResult<std::sync::MutexGuard<'_, FoldDB>> {
+        self.db.lock().map_err(|_| FoldDbError::DatabaseError("Failed to acquire database lock".to_string()))
+    }
+
+    pub fn get_config(&self) -> &NodeConfig {
+        &self.config
+    }
+
+    pub fn get_network(&self) -> &Option<Arc<tokio::sync::Mutex<NetworkCore>>> {
+        &self.network
+    }
+
     pub fn is_crypto_init_needed(
         &self,
         crypto_config: Option<&CryptoConfig>,

@@ -5,7 +5,6 @@
 
 use crate::datafold_node::signature_auth::{SecurityMetrics, PerformanceBreakdown, NonceStorePerformanceStats};
 use crate::security_types::Severity;
-use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -276,6 +275,12 @@ pub struct PerformanceMonitor {
     last_update: Instant,
 }
 
+impl Default for PerformanceMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PerformanceMonitor {
     pub fn new() -> Self {
         Self {
@@ -296,6 +301,9 @@ impl PerformanceMonitor {
         }
         
         self.last_update = Instant::now();
+        
+        // Update current RPS calculation
+        self.update_rps();
     }
     
     pub fn check_performance_thresholds(&mut self, _config: &crate::datafold_node::signature_auth::SignatureAuthConfig) {
@@ -324,6 +332,24 @@ impl PerformanceMonitor {
     
     pub fn get_recent_alerts(&self, limit: usize) -> Vec<PerformanceAlert> {
         self.alerts.iter().rev().take(limit).cloned().collect()
+    }
+
+    /// Update requests per second calculation
+    fn update_rps(&mut self) {
+        let elapsed = self.start_time.elapsed().as_secs_f64();
+        if elapsed > 0.0 {
+            self.current_rps = self.recent_latencies.len() as f64 / elapsed;
+        }
+    }
+
+    /// Get current requests per second
+    pub fn get_current_rps(&self) -> f64 {
+        self.current_rps
+    }
+
+    /// Get monitoring uptime in seconds
+    pub fn get_uptime(&self) -> f64 {
+        self.start_time.elapsed().as_secs_f64()
     }
     
     fn create_alert(

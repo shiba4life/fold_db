@@ -6,7 +6,7 @@ use datafold::cli::http_client::{AuthenticatedHttpClient, HttpClientBuilder, Ret
 use datafold::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
 use datafold::crypto::ed25519::{generate_master_keypair, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH};
 use datafold::crypto::MasterKeyPair;
-use datafold::datafold_node::crypto_init::{
+use datafold::datafold_node::crypto::{
     get_crypto_init_status, initialize_database_crypto, validate_crypto_config_for_init,
 };
 use datafold::schema::SchemaHasher;

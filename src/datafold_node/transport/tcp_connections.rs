@@ -4,8 +4,8 @@ use log::{error, info};
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
-use super::{DataFoldNode, TcpServer};
-use crate::datafold_node::tcp_protocol::{read_request, send_response};
+use crate::datafold_node::core::DataFoldNode;
+use super::{TcpServer, tcp_protocol::{read_request, send_response}};
 use crate::error::{FoldDbError, FoldDbResult};
 use serde_json::json;
 
