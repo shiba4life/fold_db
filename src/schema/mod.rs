@@ -33,11 +33,17 @@
 
 // Internal modules - refactored modular components
 pub mod core_types;
-pub mod operations;
 pub mod parsing;
 pub mod transforms;
 pub mod validation;
 pub mod utils;
+
+// Schema operations modules (split from operations.rs)
+pub mod schema_crud;
+pub mod schema_discovery;
+pub mod schema_field_mapping;
+pub mod schema_state_management;
+pub mod schema_operations_tests;
 
 // Internal modules - existing components
 pub mod core;

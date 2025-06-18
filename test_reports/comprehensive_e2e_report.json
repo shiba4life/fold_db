@@ -1,5 +1,5 @@
 {
-  "timestamp": 1750262640,
+  "timestamp": 1750263166,
   "execution_metrics": {
     "total_tests": 3,
     "tests_passed": 2,
@@ -48,19 +48,19 @@
       "compatibility_score": 100.0,
       "platform_specific_issues": []
     },
-    "python": {
-      "platform_name": "python",
+    "cli": {
+      "platform_name": "cli",
       "tests_run": 1,
-      "success_rate": 100.0,
+      "success_rate": 0.0,
       "average_execution_time_ms": 0,
       "memory_usage_mb": 0,
       "compatibility_score": 100.0,
       "platform_specific_issues": []
     },
-    "cli": {
-      "platform_name": "cli",
+    "python": {
+      "platform_name": "python",
       "tests_run": 1,
-      "success_rate": 0.0,
+      "success_rate": 100.0,
       "average_execution_time_ms": 0,
       "memory_usage_mb": 0,
       "compatibility_score": 100.0,
