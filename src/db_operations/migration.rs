@@ -5,7 +5,6 @@
 //! validation during the migration process.
 
 use crate::schema::SchemaError;
-use serde::{de::DeserializeOwned, Serialize};
 
 /// Migration modes for backward compatibility
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

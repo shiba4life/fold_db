@@ -27,7 +27,7 @@ pub use rotation::{handle_list_key_versions, handle_rotate_key};
 pub use storage::{handle_delete_key, handle_list_keys, handle_retrieve_key, handle_store_key};
 
 // Re-export utility functions that might be needed externally
-pub use utils::validate_key_id;
+pub use utils::{validate_key_id, format_and_output_key_with_index};
 
 // Re-export types used in function signatures
 pub use backup::KeyBackupFormat;

@@ -7,8 +7,7 @@
 use crate::datafold_node::error::NodeResult;
 use crate::error::FoldDbError;
 use log::{debug, info, warn};
-use std::collections::HashMap;
-use std::sync::{atomic::Ordering, Arc, RwLock};
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use super::auth_types::{CacheStats, CacheWarmupResult, CachedPublicKey, PublicKeyCache};
@@ -38,7 +37,7 @@ impl LatencyHistogram {
         let mut sorted: Vec<u64> = self.measurements.iter().copied().collect();
         sorted.sort_unstable();
 
-        let index = ((sorted.len() as f64 * p / 100.0) as usize).saturating_sub(1);
+        let index = ((sorted.len() as f64 * p / 100.0).ceil() as usize).saturating_sub(1);
         sorted.get(index).copied()
     }
 
@@ -265,13 +264,13 @@ impl KeyManager {
     /// Load active keys from database for cache warmup
     async fn load_active_keys_from_database(
         &self,
-        db_ops: Arc<crate::db_operations::core::DbOperations>,
+        _db_ops: Arc<crate::db_operations::core::DbOperations>,
     ) -> NodeResult<Vec<(String, [u8; 32])>> {
         use crate::datafold_node::crypto::crypto_routes::{
             CLIENT_KEY_INDEX_TREE, PUBLIC_KEY_REGISTRATIONS_TREE,
         };
 
-        let mut keys = Vec::new();
+        let keys = Vec::new();
 
         // This is a simplified version - in a real implementation, you might want to
         // scan the database for active registrations or maintain a separate index
@@ -583,7 +582,7 @@ fn calculate_cache_health_score(stats: &DetailedCacheStats, issues: &[String]) -
     score -= issues.len() as f64 * 10.0;
 
     // Ensure score is between 0 and 100
-    score.max(0.0).min(100.0)
+    score.clamp(0.0, 100.0)
 }
 
 /// Import the LatencyHistogram implementation

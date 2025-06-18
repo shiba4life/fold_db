@@ -7,7 +7,7 @@ use crate::cli::args::CliSecurityLevel;
 use crate::cli::commands::keys::error::{KeyError, KeyResult};
 use crate::cli::utils::key_utils::{ensure_storage_dir, get_default_storage_dir};
 use crate::crypto::Argon2Params;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Configuration for key management operations
 #[derive(Debug, Clone)]
@@ -89,14 +89,14 @@ impl KeyManagementConfig {
     }
 
     /// Load configuration from file (simplified implementation)
-    pub fn load_from_file(_config_path: &PathBuf) -> KeyResult<Self> {
+    pub fn load_from_file(_config_path: &Path) -> KeyResult<Self> {
         // For now, just return default config
         // TODO: Implement proper serialization when CliSecurityLevel supports serde
         Ok(Self::default())
     }
 
     /// Save configuration to file (simplified implementation)
-    pub fn save_to_file(&self, _config_path: &PathBuf) -> KeyResult<()> {
+    pub fn save_to_file(&self, _config_path: &Path) -> KeyResult<()> {
         self.validate()?;
         // TODO: Implement proper serialization when CliSecurityLevel supports serde
         Ok(())

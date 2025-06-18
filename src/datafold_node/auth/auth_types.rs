@@ -10,7 +10,7 @@ use std::sync::{
     atomic::{AtomicU64, AtomicUsize},
     Arc, RwLock,
 };
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 use super::auth_errors::AuthenticationError;
@@ -315,11 +315,23 @@ pub struct CachedPublicKey {
 }
 
 /// Statistics about the nonce store
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct NonceStoreStats {
     pub total_nonces: usize,
     pub max_capacity: usize,
     pub oldest_nonce_age: Option<u64>,
+    pub utilization_percent: f64,
+}
+
+impl Default for NonceStoreStats {
+    fn default() -> Self {
+        Self {
+            total_nonces: 0,
+            max_capacity: 0,
+            oldest_nonce_age: None,
+            utilization_percent: 0.0,
+        }
+    }
 }
 
 /// In-memory nonce store for replay prevention with advanced features

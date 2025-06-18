@@ -5,17 +5,16 @@
 
 use crate::cli::args::{CliSecurityLevel, KeyFormat};
 use crate::cli::utils::key_utils::{
-    format_key, get_secure_passphrase, output_key, parse_key_input, 
-    StoredArgon2Params, KeyStorageConfig
+    format_key, get_secure_passphrase, output_key, parse_key_input
 };
-use crate::crypto::{generate_salt, Argon2Params};
+use crate::crypto::Argon2Params;
 use crate::cli::commands::keys::error::{KeyError, KeyResult};
 use rand::{rngs::OsRng, RngCore};
 use rpassword::read_password;
 use std::fs;
 use std::io::{self, Write};
 use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Convert CLI security level to Argon2 parameters
 pub fn security_level_to_argon2(security_level: &CliSecurityLevel) -> Argon2Params {
@@ -35,7 +34,7 @@ pub fn get_passphrase_with_retry(prompt: &str) -> KeyResult<String> {
 }
 
 /// Get default passphrase for a given operation
-pub fn get_operation_passphrase(operation: &str, passphrase: Option<String>) -> KeyResult<String> {
+pub fn get_operation_passphrase(_operation: &str, passphrase: Option<String>) -> KeyResult<String> {
     match passphrase {
         Some(p) => Ok(p),
         None => get_secure_passphrase().map_err(|e| KeyError::AuthenticationError(format!("Failed to get passphrase: {}", e))),
@@ -116,6 +115,33 @@ pub fn format_and_output_key(
     Ok(())
 }
 
+/// Format and output a key with specific index and total for batch operations
+#[allow(clippy::too_many_arguments)]
+pub fn format_and_output_key_with_index(
+    key_bytes: &[u8; 32],
+    format: &KeyFormat,
+    output_file: Option<&PathBuf>,
+    key_type: &str,
+    is_private: bool,
+    show_info: bool,
+    index: usize,
+    total: usize,
+) -> KeyResult<()> {
+    let formatted_key = format_key(key_bytes, format, is_private)
+        .map_err(|e| KeyError::InvalidKey(format!("Failed to format key: {}", e)))?;
+    
+    output_key(
+        &formatted_key,
+        output_file,
+        key_type,
+        index as u32,
+        total as u32,
+        show_info,
+    ).map_err(|e| KeyError::StorageError(format!("Failed to output key: {}", e)))?;
+
+    Ok(())
+}
+
 /// Set secure file permissions (600 - owner read/write only)
 pub fn set_secure_file_permissions(file_path: &PathBuf) -> KeyResult<()> {
     let mut perms = fs::metadata(file_path)
@@ -153,7 +179,7 @@ pub fn confirm_operation(message: &str, force: bool) -> KeyResult<bool> {
 }
 
 /// Check if a key file exists in storage
-pub fn key_exists_in_storage(key_id: &str, storage_path: &PathBuf) -> bool {
+pub fn key_exists_in_storage(key_id: &str, storage_path: &Path) -> bool {
     storage_path.join(format!("{}.json", key_id)).exists()
 }
 

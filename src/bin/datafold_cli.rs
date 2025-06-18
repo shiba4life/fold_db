@@ -113,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 *count,
                 *public_only,
                 *private_only,
-            );
+            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::DeriveKey {
             format,
@@ -132,7 +132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 *public_only,
                 *private_only,
                 passphrase.clone(),
-            );
+            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::ExtractPublicKey {
             private_key,
@@ -145,7 +145,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 private_key_file.clone(),
                 format.clone(),
                 output_file.clone(),
-            );
+            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::VerifyKey {
             private_key,
@@ -158,7 +158,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 private_key_file.clone(),
                 public_key.clone(),
                 public_key_file.clone(),
-            );
+            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::StoreKey {
             key_id,
@@ -177,7 +177,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 *force,
                 security_level.clone(),
                 passphrase.clone(),
-            );
+            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::RetrieveKey {
             key_id,
@@ -192,20 +192,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 format.clone(),
                 output_file.clone(),
                 *public_only,
-            );
+            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::DeleteKey {
             key_id,
             storage_dir,
             force,
         } => {
-            return keys::handle_delete_key(key_id.clone(), storage_dir.clone(), *force);
+            return keys::handle_delete_key(key_id.clone(), storage_dir.clone(), *force).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::ListKeys {
             storage_dir,
             verbose,
         } => {
-            return keys::handle_list_keys(storage_dir.clone(), *verbose);
+            return keys::handle_list_keys(storage_dir.clone(), *verbose).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::DeriveFromMaster {
             master_key_id,
@@ -226,7 +226,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 format.clone(),
                 *output_only,
                 *force,
-            );
+            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::RotateKey {
             key_id,
@@ -243,14 +243,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 method.clone(),
                 *keep_backup,
                 *force,
-            );
+            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::ListKeyVersions {
             key_id,
             storage_dir,
             verbose,
         } => {
-            return keys::handle_list_key_versions(key_id.clone(), storage_dir.clone(), *verbose);
+            return keys::handle_list_key_versions(key_id.clone(), storage_dir.clone(), *verbose).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::BackupKey {
             key_id,
@@ -263,7 +263,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 storage_dir.clone(),
                 backup_file.clone(),
                 *backup_passphrase,
-            );
+            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::RestoreKey {
             backup_file,
@@ -276,7 +276,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 key_id.clone(),
                 storage_dir.clone(),
                 *force,
-            );
+            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::ExportKey {
             key_id,
@@ -293,7 +293,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 format.clone(),
                 *export_passphrase,
                 *include_metadata,
-            );
+            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::ImportKey {
             export_file,
@@ -308,7 +308,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 storage_dir.clone(),
                 *force,
                 *verify_integrity,
-            );
+            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
         Commands::RegisterKey {
             server_url,

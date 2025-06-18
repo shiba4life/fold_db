@@ -6,12 +6,11 @@
 use crate::cli::args::{CliSecurityLevel, KeyFormat};
 use crate::cli::commands::keys::error::{KeyError, KeyResult};
 use crate::cli::commands::keys::utils::{
-    format_and_output_key, get_operation_passphrase, security_level_to_argon2,
+    format_and_output_key, format_and_output_key_with_index, get_operation_passphrase, security_level_to_argon2,
 };
-use crate::crypto::ed25519::{generate_master_keypair, generate_master_keypair_from_seed};
-use crate::crypto::{derive_key, generate_salt, Argon2Params};
+use crate::crypto::ed25519::generate_master_keypair;
+use crate::crypto::{generate_salt, Argon2Params};
 use log::info;
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Enhanced KDF parameters for export compatibility
@@ -94,28 +93,57 @@ pub fn handle_generate_key(
             info!("Generating keypair {} of {}", i + 1, count);
         }
 
+        let index = i as usize;  // 0-based index
+        let total = count as usize;
+
         // Output private key if requested
         if !public_only {
-            format_and_output_key(
-                &private_key_bytes,
-                &format,
-                private_key_file.as_ref(),
-                "private",
-                true,
-                true,
-            )?;
+            if count > 1 {
+                format_and_output_key_with_index(
+                    &private_key_bytes,
+                    &format,
+                    private_key_file.as_ref(),
+                    "private",
+                    true,
+                    true,
+                    index,
+                    total,
+                )?;
+            } else {
+                format_and_output_key(
+                    &private_key_bytes,
+                    &format,
+                    private_key_file.as_ref(),
+                    "private",
+                    true,
+                    true,
+                )?;
+            }
         }
 
         // Output public key if requested
         if !private_only {
-            format_and_output_key(
-                &public_key_bytes,
-                &format,
-                public_key_file.as_ref(),
-                "public",
-                false,
-                true,
-            )?;
+            if count > 1 {
+                format_and_output_key_with_index(
+                    &public_key_bytes,
+                    &format,
+                    public_key_file.as_ref(),
+                    "public",
+                    false,
+                    true,
+                    index,
+                    total,
+                )?;
+            } else {
+                format_and_output_key(
+                    &public_key_bytes,
+                    &format,
+                    public_key_file.as_ref(),
+                    "public",
+                    false,
+                    true,
+                )?;
+            }
         }
 
         // Clear sensitive data
@@ -197,12 +225,10 @@ pub fn handle_derive_from_master(
 ) -> KeyResult<()> {
     use crate::cli::utils::key_utils::{decrypt_key, encrypt_key, get_default_storage_dir, KeyStorageConfig};
     use crate::cli::commands::keys::utils::{
-        confirm_operation, key_exists_in_storage, set_secure_file_permissions, validate_key_id,
+        key_exists_in_storage, set_secure_file_permissions, validate_key_id,
         get_passphrase_with_retry,
     };
-    use rpassword::read_password;
     use std::fs;
-    use std::io::{self, Write};
 
     // Validate child key ID
     validate_key_id(&child_key_id)?;

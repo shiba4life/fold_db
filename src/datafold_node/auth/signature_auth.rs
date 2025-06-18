@@ -28,10 +28,7 @@ pub use super::{
     signature_verification::{verify_request_signature, SignatureVerifier},
 };
 
-use crate::datafold_node::error::NodeResult;
-use crate::error::FoldDbError;
-use log::{debug, info, warn};
-use std::sync::{Arc, RwLock};
+use log::{debug, warn};
 use std::time::{Duration, Instant};
 
 

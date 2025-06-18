@@ -8,7 +8,7 @@ use crate::cli::commands::keys::error::{KeyError, KeyResult};
 use crate::cli::commands::keys::extraction::verify_key_integrity;
 use crate::cli::commands::keys::generation::EnhancedKdfParams;
 use crate::cli::commands::keys::utils::{
-    confirm_operation, get_passphrase_with_retry, key_exists_in_storage, 
+    get_passphrase_with_retry, key_exists_in_storage,
     set_secure_file_permissions, validate_key_id,
 };
 use crate::cli::utils::key_utils::{

@@ -169,7 +169,7 @@ impl SignatureComponents {
     }
 
     /// Build the signature parameters line
-    fn build_signature_params(&self) -> String {
+    pub fn build_signature_params(&self) -> String {
         let components_str = self
             .covered_components
             .iter()

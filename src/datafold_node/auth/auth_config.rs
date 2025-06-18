@@ -492,7 +492,7 @@ impl SignatureAuthConfig {
     }
 
     /// Update configuration for specific environment
-    pub fn for_environment(mut self, env: &str) -> Self {
+    pub fn for_environment(self, env: &str) -> Self {
         match env.to_lowercase().as_str() {
             "production" | "prod" => Self::production(),
             "development" | "dev" => Self::development(),
