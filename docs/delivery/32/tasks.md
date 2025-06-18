@@ -8,11 +8,11 @@ This document lists all tasks associated with PBI 32.
 
 | Task ID | Name | Status | Effort | Description |
 | :------ | :--- | :----- | :----- | :---------- |
-| 32-1    | [Analyze and Document Transform Module Overlap](./32-1.md) | Proposed | M | Review both transform modules to identify duplicated logic, integration points, and unique responsibilities |
-| 32-2    | [Design Unified Transform Module Architecture](./32-2.md) | Proposed | M | Propose unified architecture merging DSL execution and transform management with approved design document |
-| 32-3    | [Refactor and Merge Transform Execution Logic](./32-3.md) | Proposed | L | Refactor code to eliminate duplication and merge execution logic into unified module |
-| 32-4    | [Migrate Transform Management Features](./32-4.md) | Proposed | L | Integrate orchestration, registration, persistence, and metrics into unified module |
-| 32-5    | [Deprecate and Remove Legacy Transform Modules](./32-5.md) | Proposed | S | Remove old transform modules and update all references |
+| 32-1    | [Analyze and Document Transform Module Overlap](./32-1.md) | Agreed | M | Review both transform modules to identify duplicated logic, integration points, and unique responsibilities |
+| 32-2    | [Design Unified Transform Module Architecture](./32-2.md) | Agreed | M | Propose unified architecture merging DSL execution and transform management with approved design document |
+| 32-3    | [Refactor and Merge Transform Execution Logic](./32-3.md) | Agreed | L | Refactor code to eliminate duplication and merge execution logic into unified module |
+| 32-4    | [Migrate Transform Management Features](./32-4.md) | Agreed | L | Integrate orchestration, registration, persistence, and metrics into unified module |
+| 32-5    | [Deprecate and Remove Legacy Transform Modules](./32-5.md) | Agreed | S | Remove old transform modules and update all references |
 
 ## Task Details
 
