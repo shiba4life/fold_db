@@ -41,7 +41,7 @@ pub use auth_config::{
 pub use auth_errors::{CustomAuthError, ErrorDetails, ErrorResponse};
 pub use auth_middleware::{should_skip_verification, SecurityLogger};
 pub use auth_types::{
-    AuthenticatedClient, CacheStats, ClientInfo, RequestInfo, SecurityEvent,
+    AuthenticatedClient, CacheStats, ClientInfo, LatencyHistogram, RequestInfo, SecurityEvent,
     SecurityEventType, SecurityMetrics, SecurityProfile
 };
 pub use key_management::{KeyManager, DetailedCacheStats};

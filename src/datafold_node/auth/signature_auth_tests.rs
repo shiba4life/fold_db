@@ -129,9 +129,9 @@ mod tests {
             track_failures_separately: true,
         };
 
-        // Should allow requests within limit
-        for i in 0..5 {
-            assert!(limiter.check_rate_limit(&format!("client_{}", i % 2), &config, false));
+        // Should allow requests within limit (using same client)
+        for _i in 0..5 {
+            assert!(limiter.check_rate_limit("client_0", &config, false));
         }
 
         // Should rate limit when exceeded for the same client

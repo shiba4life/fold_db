@@ -447,6 +447,59 @@ impl LatencyHistogram {
             max_measurements,
         }
     }
+
+    pub fn record(&mut self, latency_ms: u64) {
+        // Add to measurements
+        self.measurements.push_back(latency_ms);
+        
+        // Keep only the most recent measurements
+        while self.measurements.len() > self.max_measurements {
+            self.measurements.pop_front();
+        }
+
+        // Update histogram buckets
+        for &bucket in self.buckets.keys() {
+            if latency_ms <= bucket {
+                *self.buckets.get_mut(&bucket).unwrap() += 1;
+                break;
+            }
+        }
+    }
+
+    pub fn count(&self) -> usize {
+        self.measurements.len()
+    }
+
+    pub fn average(&self) -> f64 {
+        if self.measurements.is_empty() {
+            return 0.0;
+        }
+
+        let sum: u64 = self.measurements.iter().sum();
+        sum as f64 / self.measurements.len() as f64
+    }
+
+    pub fn percentile(&self, p: f64) -> Option<u64> {
+        if self.measurements.is_empty() {
+            return None;
+        }
+
+        let mut sorted: Vec<u64> = self.measurements.iter().cloned().collect();
+        sorted.sort_unstable();
+
+        let index = (p / 100.0 * (sorted.len() - 1) as f64).round() as usize;
+        sorted.get(index).copied()
+    }
+
+    pub fn min_max(&self) -> Option<(u64, u64)> {
+        if self.measurements.is_empty() {
+            return None;
+        }
+
+        let min = *self.measurements.iter().min().unwrap();
+        let max = *self.measurements.iter().max().unwrap();
+        Some((min, max))
+    }
 }
 
 impl PerformanceMonitor {

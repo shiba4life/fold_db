@@ -546,7 +546,7 @@ fn calculate_cache_health_score(stats: &DetailedCacheStats, issues: &[String]) -
 
 #[cfg(test)]
 mod tests {
-    use crate::datafold_node::monitoring::performance_monitoring::LatencyHistogram;
+    use crate::datafold_node::auth::auth_types::LatencyHistogram;
     use super::*;
 
     #[test]

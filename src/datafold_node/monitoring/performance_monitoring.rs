@@ -4,6 +4,7 @@
 //! features for the signature authentication system.
 
 use crate::datafold_node::signature_auth::{SecurityMetrics, PerformanceBreakdown, NonceStorePerformanceStats};
+use crate::datafold_node::auth::auth_types::LatencyHistogram;
 use crate::security_types::Severity;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -72,70 +73,7 @@ pub enum PerformanceAlertType {
 }
 
 
-/// Latency histogram for performance monitoring
-#[derive(Debug, Clone)]
-pub struct LatencyHistogram {
-    measurements: VecDeque<u64>,
-    buckets: HashMap<u64, u64>, // bucket_ms -> count
-    max_measurements: usize,
-}
-
-impl LatencyHistogram {
-    pub fn new(max_measurements: usize) -> Self {
-        let mut buckets = HashMap::new();
-        // Initialize buckets for latency ranges: <1ms, <5ms, <10ms, <50ms, <100ms, <500ms, <1s, >=1s
-        for &bucket in &[1, 5, 10, 50, 100, 500, 1000, u64::MAX] {
-            buckets.insert(bucket, 0);
-        }
-        
-        Self {
-            measurements: VecDeque::new(),
-            buckets,
-            max_measurements,
-        }
-    }
-    
-    pub fn record(&mut self, latency_ms: u64) {
-        // Add to measurements
-        self.measurements.push_back(latency_ms);
-        if self.measurements.len() > self.max_measurements {
-            self.measurements.pop_front();
-        }
-        
-        // Update histogram buckets
-        for &bucket in &[1, 5, 10, 50, 100, 500, 1000, u64::MAX] {
-            if latency_ms < bucket {
-                *self.buckets.entry(bucket).or_insert(0) += 1;
-                break;
-            }
-        }
-    }
-    
-    pub fn percentile(&self, p: f64) -> Option<u64> {
-        if self.measurements.is_empty() {
-            return None;
-        }
-        
-        let mut sorted: Vec<u64> = self.measurements.iter().copied().collect();
-        sorted.sort_unstable();
-        
-        let index = ((sorted.len() as f64 * p / 100.0) as usize).saturating_sub(1);
-        sorted.get(index).copied()
-    }
-    
-    pub fn average(&self) -> f64 {
-        if self.measurements.is_empty() {
-            return 0.0;
-        }
-        
-        let sum: u64 = self.measurements.iter().sum();
-        sum as f64 / self.measurements.len() as f64
-    }
-    
-    pub fn count(&self) -> usize {
-        self.measurements.len()
-    }
-}
+// LatencyHistogram moved to auth_types.rs to avoid duplication
 
 /// Public key cache for performance optimization
 #[derive(Debug)]

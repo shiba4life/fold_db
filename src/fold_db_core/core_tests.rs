@@ -218,8 +218,8 @@ mod tests {
         
         // Create range mutation
         let mut fields_and_values = HashMap::new();
-        fields_and_values.insert("id".to_string(), json!("test_id"));
-        fields_and_values.insert("value".to_string(), json!("test_value"));
+        fields_and_values.insert("id".to_string(), json!({"value": "test_id"}));
+        fields_and_values.insert("value".to_string(), json!({"value": "test_value"}));
         
         let range_mutation = Mutation {
             schema_name: range_schema.name.clone(),
@@ -236,7 +236,11 @@ mod tests {
             fold_db.message_bus(),
         );
         
-        assert!(mutation_ops.validate_mutation(&range_mutation).is_ok());
+        let validation_result = mutation_ops.validate_mutation(&range_mutation);
+        if let Err(e) = &validation_result {
+            eprintln!("Range mutation validation failed: {:?}", e);
+        }
+        assert!(validation_result.is_ok());
     }
 
     #[test]

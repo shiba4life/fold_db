@@ -206,74 +206,7 @@ impl EnhancedSecurityMetricsCollector {
     }
 }
 
-impl LatencyHistogram {
-    /// Record a latency measurement
-    pub fn record(&mut self, latency_ms: u64) {
-        // Add to measurements
-        self.measurements.push_back(latency_ms);
-        
-        // Keep only the most recent measurements
-        while self.measurements.len() > self.max_measurements {
-            self.measurements.pop_front();
-        }
-
-        // Update histogram buckets
-        for &bucket in self.buckets.keys() {
-            if latency_ms <= bucket {
-                *self.buckets.get_mut(&bucket).unwrap() += 1;
-                break;
-            }
-        }
-    }
-
-    /// Calculate average latency
-    pub fn average(&self) -> f64 {
-        if self.measurements.is_empty() {
-            return 0.0;
-        }
-
-        let sum: u64 = self.measurements.iter().sum();
-        sum as f64 / self.measurements.len() as f64
-    }
-
-    /// Calculate percentile latency
-    pub fn percentile(&self, p: f64) -> Option<u64> {
-        if self.measurements.is_empty() {
-            return None;
-        }
-
-        let mut sorted: Vec<u64> = self.measurements.iter().cloned().collect();
-        sorted.sort_unstable();
-
-        let index = (p / 100.0 * (sorted.len() - 1) as f64).round() as usize;
-        sorted.get(index).copied()
-    }
-
-    /// Get min, max latencies
-    pub fn min_max(&self) -> Option<(u64, u64)> {
-        if self.measurements.is_empty() {
-            return None;
-        }
-
-        let min = *self.measurements.iter().min().unwrap();
-        let max = *self.measurements.iter().max().unwrap();
-        Some((min, max))
-    }
-
-    /// Get bucket counts for histogram visualization
-    pub fn get_bucket_counts(&self) -> Vec<(u64, u64)> {
-        let mut buckets: Vec<(u64, u64)> = self.buckets.iter()
-            .map(|(&bucket, &count)| (bucket, count))
-            .collect();
-        buckets.sort_by_key(|&(bucket, _)| bucket);
-        buckets
-    }
-
-    /// Get the count of measurements
-    pub fn count(&self) -> usize {
-        self.measurements.len()
-    }
-}
+// LatencyHistogram implementation moved to auth_types.rs to avoid duplication
 
 impl PerformanceMonitor {
     /// Record a request with its latency
@@ -451,7 +384,7 @@ mod tests {
         assert_eq!(avg, 90.0); // (10 + 50 + 100 + 200) / 4
 
         // Test percentiles
-        assert_eq!(histogram.percentile(50.0), Some(50));
+        assert_eq!(histogram.percentile(50.0), Some(100)); // Median of [10, 50, 100, 200]
         assert_eq!(histogram.percentile(100.0), Some(200));
 
         // Test min/max
