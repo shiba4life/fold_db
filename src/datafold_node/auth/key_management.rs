@@ -12,48 +12,6 @@ use std::time::{Duration, Instant};
 
 use super::auth_types::{CacheStats, CacheWarmupResult, CachedPublicKey, PublicKeyCache};
 
-impl LatencyHistogram {
-    pub fn record(&mut self, latency_ms: u64) {
-        // Add to measurements
-        self.measurements.push_back(latency_ms);
-        if self.measurements.len() > self.max_measurements {
-            self.measurements.pop_front();
-        }
-
-        // Update histogram buckets
-        for &bucket in &[1, 5, 10, 50, 100, 500, 1000, u64::MAX] {
-            if latency_ms < bucket {
-                *self.buckets.entry(bucket).or_insert(0) += 1;
-                break;
-            }
-        }
-    }
-
-    pub fn percentile(&self, p: f64) -> Option<u64> {
-        if self.measurements.is_empty() {
-            return None;
-        }
-
-        let mut sorted: Vec<u64> = self.measurements.iter().copied().collect();
-        sorted.sort_unstable();
-
-        let index = ((sorted.len() as f64 * p / 100.0).ceil() as usize).saturating_sub(1);
-        sorted.get(index).copied()
-    }
-
-    pub fn average(&self) -> f64 {
-        if self.measurements.is_empty() {
-            return 0.0;
-        }
-
-        let sum: u64 = self.measurements.iter().sum();
-        sum as f64 / self.measurements.len() as f64
-    }
-
-    pub fn count(&self) -> usize {
-        self.measurements.len()
-    }
-}
 
 impl PublicKeyCache {
     pub fn get(&mut self, key_id: &str) -> Option<CachedPublicKey> {
@@ -585,11 +543,10 @@ fn calculate_cache_health_score(stats: &DetailedCacheStats, issues: &[String]) -
     score.clamp(0.0, 100.0)
 }
 
-/// Import the LatencyHistogram implementation
-use super::auth_types::LatencyHistogram;
 
 #[cfg(test)]
 mod tests {
+    use crate::datafold_node::monitoring::performance_monitoring::LatencyHistogram;
     use super::*;
 
     #[test]

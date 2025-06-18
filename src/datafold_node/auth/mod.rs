@@ -11,6 +11,12 @@ pub mod signature_verification;
 pub mod auth_middleware;
 pub mod key_management;
 
+// Specialized functionality modules
+pub mod nonce_operations;
+pub mod rate_limiting;
+pub mod attack_detection;
+pub mod security_metrics;
+
 // Main signature authentication coordinator (maintains backward compatibility)
 pub mod signature_auth;
 
