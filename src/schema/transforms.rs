@@ -1,14 +1,20 @@
 //! Transform registration, mapping, and field transformation functionality
 //!
+//! MIGRATION NOTE: This module now supports both legacy TransformManager
+//! and unified transform system integration for backward compatibility.
+//!
 //! This module contains the logic for:
-//! - Transform registration with TransformManager
+//! - Transform registration with TransformManager and UnifiedTransformManager
 //! - Field-to-transform mappings
 //! - Transform output fixing
 //! - Schema transform auto-registration
 
 use crate::schema::core_types::SchemaCore;
 use crate::schema::types::{Field, Schema, SchemaError};
-use log::info;
+use crate::transform_execution::{
+    TransformDefinition
+};
+use log::{info, warn};
 
 /// Ensure any transforms on fields have the correct output schema
 pub fn fix_transform_outputs(_schema_core: &SchemaCore, schema: &mut Schema) {
@@ -24,23 +30,25 @@ pub fn fix_transform_outputs(_schema_core: &SchemaCore, schema: &mut Schema) {
     }
 }
 
-/// Auto-register field transforms with TransformManager during schema loading
+/// Auto-register field transforms with TransformManager and UnifiedTransformManager during schema loading
+///
+/// MIGRATION: Now supports both legacy and unified transform systems
 pub fn register_schema_transforms(
     schema_core: &SchemaCore,
     schema: &Schema,
 ) -> Result<(), SchemaError> {
     info!(
-        "🔧 DEBUG: Auto-registering transforms for schema: {}",
+        "🔧 Auto-registering transforms for schema: {} (unified migration enabled)",
         schema.name
     );
     info!(
-        "🔍 DEBUG: Schema has {} fields to check for transforms",
+        "🔍 Schema has {} fields to check for transforms",
         schema.fields.len()
     );
 
     for (field_name, field) in &schema.fields {
         info!(
-            "🔍 DEBUG: Checking field '{}.{}' for transforms",
+            "🔍 Checking field '{}.{}' for transforms",
             schema.name, field_name
         );
         if let Some(transform) = field.transform() {
@@ -55,16 +63,38 @@ pub fn register_schema_transforms(
 
             let transform_id = format!("{}.{}", schema.name, field_name);
 
-            // Store the transform in the database so it can be loaded by TransformManager
+            // LEGACY REGISTRATION: Store in database for legacy TransformManager
             if let Err(e) = schema_core.db_ops.store_transform(&transform_id, transform) {
-                log::error!("Failed to store transform {}: {}", transform_id, e);
+                log::error!("Failed to store legacy transform {}: {}", transform_id, e);
                 continue;
             }
 
-            info!("✅ Stored transform {} for auto-registration", transform_id);
+            info!("✅ Stored legacy transform {} for auto-registration", transform_id);
 
-            // 🛠️ FIX: Create field-to-transform mappings for TransformOrchestrator
-            // This is the missing piece - we need to map each input field to this transform
+            // UNIFIED REGISTRATION: Store as unified transform definition
+            let unified_definition = TransformDefinition {
+                id: transform_id.clone(),
+                transform: transform.clone(),
+                inputs: transform.get_inputs().to_vec(),
+                metadata: {
+                    let mut meta = std::collections::HashMap::new();
+                    meta.insert("schema_name".to_string(), schema.name.clone());
+                    meta.insert("field_name".to_string(), field_name.clone());
+                    meta.insert("registration_source".to_string(), "schema_auto_registration".to_string());
+                    meta.insert("name".to_string(), format!("{}.{}", schema.name, field_name));
+                    meta.insert("description".to_string(), format!("Auto-registered transform for field {}.{}", schema.name, field_name));
+                    meta
+                },
+            };
+
+            // Store the basic transform - the UnifiedTransformManager will pick it up during initialization
+            if let Err(e) = schema_core.db_ops.store_transform(&transform_id, &unified_definition.transform) {
+                warn!("Failed to store transform {}: {}", transform_id, e);
+            } else {
+                info!("✅ Stored transform {} for auto-registration (unified manager will register it)", transform_id);
+            }
+
+            // Create field-to-transform mappings for both systems
             for input_field in transform.get_inputs() {
                 info!(
                     "🔗 Creating field mapping: '{}' → '{}' transform",

@@ -110,4 +110,8 @@ impl DbOperations {
             Ok(None)
         }
     }
+
+    // NOTE: Unified transform operations are now handled directly by UnifiedTransformManager
+    // The basic operations above (store_transform, get_transform, etc.) are still used
+    // by the unified system internally for database persistence.
 }

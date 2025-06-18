@@ -233,7 +233,8 @@ mod tests {
 
         // Test metrics retrieval
         let metrics = collector.get_enhanced_security_metrics(1000);
-        assert!(metrics.processing_time_ms >= 0);
+        // Processing time should be a reasonable value
+        assert!(metrics.processing_time_ms < 10000); // Less than 10 seconds
         assert!(metrics.cache_hit_rate >= 0.0);
     }
 
@@ -425,7 +426,8 @@ mod tests {
 
         // Verify metrics
         let metrics = metrics_collector.get_enhanced_security_metrics(1000);
-        assert!(metrics.processing_time_ms >= 0);
+        // Processing time should be a reasonable value
+        assert!(metrics.processing_time_ms < 10000); // Less than 10 seconds
 
         // Verify rate limiting
         let (requests, failures) = rate_limiter.get_client_stats(attacker_id);

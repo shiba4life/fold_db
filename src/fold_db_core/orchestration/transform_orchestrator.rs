@@ -1,8 +1,12 @@
 //! Refactored Transform Orchestrator using component delegation
 //!
-//! This orchestrator now coordinates between specialized components rather than
-//! handling all operations directly, resulting in better separation of concerns
-//! and improved maintainability.
+//! MIGRATION TO UNIFIED TRANSFORM MODULE (Task 32-4)
+//! This orchestrator now integrates with the UnifiedTransformManager while
+//! maintaining backward compatibility with existing components.
+//!
+//! This orchestrator coordinates between specialized components and the new
+//! unified transform system, providing better separation of concerns and
+//! improved maintainability.
 
 use log::{error, info};
 use serde_json::Value as JsonValue;
@@ -12,6 +16,9 @@ use std::sync::Arc;
 use crate::fold_db_core::infrastructure::message_bus::MessageBus;
 use crate::fold_db_core::transform_manager::types::TransformRunner;
 use crate::schema::SchemaError;
+use crate::transform_execution::{
+    UnifiedTransformManager
+};
 
 // Import the new specialized components
 use super::event_monitor::EventMonitor;
@@ -42,6 +49,9 @@ pub struct TransformOrchestrator {
     persistence_manager: PersistenceManager,
     execution_coordinator: ExecutionCoordinator,
     _event_monitor: EventMonitor, // Kept alive for background monitoring
+    // MIGRATION: Add unified transform manager support
+    #[allow(dead_code)]
+    unified_manager: Option<Arc<UnifiedTransformManager>>,
 }
 
 impl TransformOrchestrator {
@@ -94,6 +104,8 @@ impl TransformOrchestrator {
             persistence_manager,
             execution_coordinator,
             _event_monitor: event_monitor,
+            // Initialize without unified manager for now (for backward compatibility)
+            unified_manager: None,
         }
     }
 

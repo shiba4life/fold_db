@@ -122,7 +122,8 @@ mod tests {
         
         // Test that all components are properly initialized
         assert!(fold_db.db_ops().get_node_id().is_ok());
-        assert!(fold_db.event_monitor().get_statistics().total_events >= 0);
+        // Event statistics should be initialized (any non-negative value is valid)
+        let _stats = fold_db.event_monitor().get_statistics();
     }
 
     #[test]
@@ -249,7 +250,8 @@ mod tests {
         
         // Test event monitor functionality
         let stats = fold_db.get_event_statistics();
-        assert!(stats.total_events >= 0);
+        // Event statistics should be initialized (any non-negative value is valid)
+        let _total = stats.total_events;
         
         // Test event summary logging (should not panic)
         fold_db.log_event_summary();

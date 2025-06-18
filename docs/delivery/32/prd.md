@@ -1,68 +1,83 @@
-# PBI-32: Transform Engine Consolidation
+# PBI-32: Transform execution and management logic consolidation
+
+[View in Backlog](../backlog.md#user-content-32)
 
 ## Overview
-This PBI consolidates transform execution and management logic from separate modules (`src/transform/` and `src/fold_db_core/transform_manager/`) into a unified transform engine to eliminate duplication and improve maintainability.
+The DataFold codebase currently implements transform execution and management logic across multiple modules, including both schema and core layers. This has led to duplicated logic, fragmented responsibilities, and increased maintenance complexity. PBI-32 aims to consolidate all transform execution and management logic into a unified module with clear boundaries, reducing duplication and ensuring consistent behavior across the system.
 
 ## Problem Statement
-The current architecture has transform functionality split across two separate modules:
-- `src/transform/` handles AST and execution logic
-- `src/fold_db_core/transform_manager/` handles management, orchestration, and state
+Transform-related operations—such as registration, execution, orchestration, persistence, and mapping—are currently distributed across several modules:
+- `src/fold_db_core/transform_manager/` (execution.rs, manager.rs, orchestration.rs, registration.rs, etc.)
+- `src/schema/transforms.rs` and `src/schema/types/transform.rs`
+- `src/fold_db_core/orchestration/transform_orchestrator.rs`
 
-This split creates duplication, maintenance overhead, and integration complexity. A unified approach will provide better cohesion and reduce the cognitive load for developers working with transform functionality.
+This fragmentation results in:
+- Duplicated logic for registration, execution, orchestration, and mapping
+- Legacy modules with partially migrated functionality
+- Increased risk of inconsistent behavior and regressions
+- Higher maintenance burden and onboarding complexity
 
 ## User Stories
-- As a system architect, I want transform execution and management logic consolidated so that developers have a single, coherent interface for all transform operations.
-- As a developer, I want to work with transforms through a unified API rather than navigating between separate execution and management modules.
-- As a maintainer, I want to eliminate duplicated transform logic to reduce the maintenance burden and potential for inconsistencies.
+- **As a developer**, I want a single, well-defined module for all transform execution and management so that I can implement and maintain transform features efficiently.
+- **As a maintainer**, I want to eliminate duplicated logic and legacy code so that the codebase is easier to understand and less error-prone.
+- **As a system integrator**, I want consistent APIs and behavior for transform operations so that integrations are reliable and predictable.
 
 ## Technical Approach
-1. **Analysis Phase**: Map all transform-related functionality across both modules to identify overlap and unique responsibilities
-2. **Design Phase**: Create unified architecture that merges DSL execution with transform management
-3. **Implementation Phase**: Refactor code to eliminate duplication and merge into unified module
-4. **Integration Phase**: Migrate management features (orchestration, registration, persistence, metrics)
-5. **Cleanup Phase**: Remove legacy modules and update all references
+1. **Analysis & Mapping**: Catalog all transform-related logic in the codebase, identifying overlaps and points of duplication.
+2. **Unified Module Design**: Architect a single module (e.g., `transform_manager`) responsible for:
+   - Registration and deregistration of transforms
+   - Execution and orchestration of transform tasks
+   - State management, persistence, and metrics
+   - Mapping between schema fields and transforms
+   - Providing a clear API for other components
+3. **Migration Plan**:
+   - Incrementally refactor existing modules, moving logic into the unified module
+   - Ensure all existing functionality is preserved and covered by tests
+   - Remove legacy modules and update all call sites to use the new API
+4. **Boundaries & Interfaces**:
+   - The unified module should expose only necessary interfaces, encapsulating internal state and orchestration details
+   - Schema-level code should delegate transform operations to the unified module, not reimplement logic
+5. **Testing & Validation**:
+   - Comprehensive regression testing to ensure no loss of functionality
+   - Performance benchmarks to validate no degradation
 
-## Architecture
-
-### Current State
+### Proposed Architecture (Mermaid Diagram)
 ```mermaid
-flowchart LR
-    A[transform/ (AST, Executor)] -- DSL Execution --> B[fold_db_core/transform_manager/ (Manager, Orchestration, State)]
-    B -- Uses --> A
-```
-
-### Target State
-```mermaid
-flowchart LR
-    C[unified_transform/ (AST, Executor, Manager, Orchestration, State)]
+flowchart TD
+    subgraph Schema Layer
+        A[SchemaCore] -- Registers/Maps --> B(TransformManager API)
+    end
+    subgraph Core Layer
+        B -- Executes/Orchestrates --> C[Transform Execution Engine]
+        B -- State/Metrics --> D[Persistence & Monitoring]
+    end
 ```
 
 ## UX/UI Considerations
-This is a backend refactoring effort with no direct UI impact. However, the unified API will provide a better developer experience for those working with transform functionality.
+- No direct end-user UI impact is expected.
+- CLI or monitoring tools may need to be updated to reflect the new module boundaries and metrics endpoints.
 
 ## Acceptance Criteria
-- Transform execution logic unified from both source modules
-- Single coherent module containing AST, execution, management, orchestration, and state functionality
-- All transform flows use unified codebase with no duplicated logic
-- Legacy transform modules completely removed with all references updated
-- Comprehensive testing validates no functionality loss during consolidation
-- Performance characteristics maintained or improved
+- All transform execution and management logic is consolidated into a single module with a clear API.
+- No duplicated or legacy transform logic remains in schema or orchestration modules.
+- All existing transform-related functionality is preserved and passes regression tests.
+- Documentation is updated to reflect the new architecture and usage patterns.
+- All relevant stakeholders review and approve the migration.
 
 ## Dependencies
-- None anticipated - this is primarily an internal refactoring
-
-## Risk Assessment
-- **Medium Risk**: Potential for regression during code consolidation
-- **Mitigation**: Comprehensive test coverage and phased migration approach
-- **Medium Risk**: Complex integration points between execution and management layers
-- **Mitigation**: Thorough analysis phase and stakeholder review of unified design
+- Existing schema and core modules
+- Database and persistence layers
+- Orchestration and queue management components
+- Test infrastructure for regression and performance
 
 ## Open Questions
-- Should the unified module maintain separate sub-modules for different concerns (execution vs management)?
-- Are there performance considerations that require keeping certain components separate?
-- What is the migration strategy for external consumers of the current APIs?
+- Are there any edge cases or legacy integrations that require special handling during migration?
+- What is the best strategy for incremental migration to minimize disruption?
+- Are there performance optimizations in the current fragmented logic that must be preserved?
+- How will this consolidation impact ongoing or planned features?
 
 ## Related Tasks
-- [Task list for this PBI](./tasks.md)
-
-[View in Backlog](../backlog.md#user-content-32)
+- Refactor schema and orchestration modules to delegate to the unified transform manager
+- Remove legacy and duplicated code
+- Update documentation and developer onboarding materials
+- Comprehensive regression and performance testing

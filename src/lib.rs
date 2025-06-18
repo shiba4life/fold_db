@@ -44,6 +44,7 @@ pub mod reporting;
 pub mod schema;
 pub mod security_types;
 pub mod transform;
+pub mod transform_execution;
 pub mod utils;
 
 pub mod tests;
@@ -99,3 +100,9 @@ pub use cli::{
 
 // Re-export unified security types
 pub use security_types::{HealthStatus, RotationStatus, SecurityLevel, Severity};
+
+// Re-export unified transform execution types
+pub use transform_execution::{
+    TransformConfig, TransformConfigLoader, TransformEngine, TransformError, TransformResult,
+    TransformState, TransformStateStore, UnifiedTransformManager,
+};
