@@ -1,5 +1,5 @@
 {
-  "timestamp": 1750217599,
+  "timestamp": 1750218400,
   "execution_metrics": {
     "total_tests": 3,
     "tests_passed": 2,
@@ -20,8 +20,8 @@
     "derivation_time_ms": {},
     "backup_restore_time_ms": {},
     "memory_usage_mb": {
-      "javascript_key_generation": 50,
-      "python_storage_operation": 75
+      "python_storage_operation": 75,
+      "javascript_key_generation": 50
     },
     "cpu_usage_percent": {},
     "performance_regressions": []
@@ -34,8 +34,8 @@
     "side_channel_resistance_tests": 0,
     "security_vulnerabilities_found": [],
     "compliance_checks": {
-      "cryptographic_strength": true,
-      "key_storage_security": true
+      "key_storage_security": true,
+      "cryptographic_strength": true
     }
   },
   "platform_metrics": {
