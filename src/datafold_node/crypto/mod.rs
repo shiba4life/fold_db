@@ -4,11 +4,23 @@ pub mod crypto_init;
 pub mod crypto_routes;
 pub mod crypto_validation;
 pub mod key_cache_manager;
-pub mod key_rotation_compliance;
 pub mod key_rotation_routes;
 pub mod encryption_core;
 pub mod key_derivation;
 pub mod encryption_at_rest_async;
+
+// Compliance modules
+pub mod compliance_frameworks;
+pub mod compliance_reporting;
+pub mod compliance_data;
+pub mod compliance_manager;
+pub mod compliance_tests;
+
+// Re-export compliance types for convenience
+pub use compliance_frameworks::{ComplianceFramework, ComplianceControl};
+pub use compliance_reporting::{ComplianceReportConfig, ComplianceReportType, ReportSection};
+pub use compliance_data::{ComplianceReport, ComplianceStatus, RotationStatistics};
+pub use compliance_manager::KeyRotationComplianceManager;
 
 pub use crypto_init::{
     CryptoInitError, CryptoInitContext, initialize_database_crypto,
