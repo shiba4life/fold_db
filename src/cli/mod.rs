@@ -1,9 +1,11 @@
 //! CLI-specific modules for DataFold client authentication and utilities
 
+pub mod api_types;
 pub mod args;
 pub mod auth;
 pub mod auth_commands;
 pub mod cli_types;
+pub mod command_handlers;
 pub mod commands;
 pub mod config;
 pub mod crypto_commands;
