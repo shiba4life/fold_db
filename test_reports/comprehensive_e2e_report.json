@@ -1,5 +1,5 @@
 {
-  "timestamp": 1750263166,
+  "timestamp": 1750265200,
   "execution_metrics": {
     "total_tests": 3,
     "tests_passed": 2,
@@ -39,19 +39,19 @@
     }
   },
   "platform_metrics": {
-    "javascript": {
-      "platform_name": "javascript",
+    "cli": {
+      "platform_name": "cli",
       "tests_run": 1,
-      "success_rate": 100.0,
+      "success_rate": 0.0,
       "average_execution_time_ms": 0,
       "memory_usage_mb": 0,
       "compatibility_score": 100.0,
       "platform_specific_issues": []
     },
-    "cli": {
-      "platform_name": "cli",
+    "javascript": {
+      "platform_name": "javascript",
       "tests_run": 1,
-      "success_rate": 0.0,
+      "success_rate": 100.0,
       "average_execution_time_ms": 0,
       "memory_usage_mb": 0,
       "compatibility_score": 100.0,
