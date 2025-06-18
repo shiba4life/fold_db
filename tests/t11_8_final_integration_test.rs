@@ -16,6 +16,7 @@ use std::time::Instant;
 struct AuthConfig {
     mandatory_auth_enabled: bool,
     max_signature_verification_time_ms: u64,
+    #[allow(dead_code)]
     nonce_store_max_size: usize,
     protected_endpoints: Vec<String>,
     exempted_endpoints: Vec<String>,

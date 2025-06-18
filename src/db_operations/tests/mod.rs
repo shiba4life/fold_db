@@ -6,4 +6,4 @@
 pub mod encryption_wrapper_tests;
 
 // Re-export test utilities for use in other test modules
-pub use encryption_wrapper_tests::*;
+// Module exports - functions exported as needed

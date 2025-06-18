@@ -11,8 +11,7 @@ mod tests {
         compliance_manager::*,
         compliance_reporting::*,
     };
-    use crate::crypto::key_rotation_audit::KeyRotationAuditLogger;
-    use crate::crypto::key_rotation_security::KeyRotationSecurityManager;
+    // Removed unused imports after refactoring
     use crate::crypto::threat_monitor::RotationThreatMonitor;
     use crate::reporting::types::{TimeRange, UnifiedReportConfig, UnifiedReportFormat};
     use chrono::Datelike;

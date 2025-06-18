@@ -932,11 +932,11 @@ impl SignatureVerificationState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{test, web, App, HttpResponse};
+    use actix_web::HttpResponse;
 
     #[tokio::test]
     async fn test_signature_verification_state_creation() {
-        async fn test_handler() -> HttpResponse {
+        async fn _test_handler() -> HttpResponse {
             HttpResponse::Ok().json("success")
         }
         let config = SignatureAuthConfig::default();

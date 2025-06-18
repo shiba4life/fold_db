@@ -487,8 +487,6 @@ impl PerformanceMonitor {
 // Legacy test module for backward compatibility
 #[cfg(test)]
 mod tests {
-    use super::*;
-    
-    // Re-export common test utilities if needed
+    // Legacy test module for backward compatibility
     // Note: The actual tests are now in the auth_tests module
 }

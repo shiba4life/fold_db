@@ -11,7 +11,7 @@ mod tests {
         auth_errors::AuthenticationError,
         auth_middleware::{should_skip_verification, SignatureVerificationMiddleware, SignatureVerificationState},
         auth_types::*,
-        key_management::{DetailedCacheStats, KeyManager},
+        key_management::KeyManager,
         signature_verification::{SignatureComponents, SignatureVerifier},
     };
     use actix_web::{test, web, App, HttpResponse};

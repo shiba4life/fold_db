@@ -105,7 +105,7 @@ mod tests {
             ),
         );
 
-        let threat_monitor = RotationThreatMonitor::with_default_config(
+        let _threat_monitor = RotationThreatMonitor::with_default_config(
             base_monitor,
             audit_logger,
             security_manager,

@@ -6,10 +6,9 @@
 
 use crate::crypto::generate_master_keypair;
 use crate::db_operations::{
-    contexts, migration::{MigrationConfig, MigrationMode, MigrationStatus}, 
+    contexts, migration::{MigrationConfig, MigrationMode},
     EncryptionWrapper, DbOperations
 };
-use crate::schema::SchemaError;
 use tempfile::tempdir;
 
 /// Create a test encryption wrapper for testing purposes

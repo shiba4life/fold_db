@@ -36,7 +36,7 @@ async fn test_cli_server_integration_workflow() {
     assert!(stdout.len() > 60, "Public key should be 64 hex characters");
 
     // Test key storage
-    let store_output = Command::new("cargo")
+    let _store_output = Command::new("cargo")
         .args([
             "run",
             "--bin",

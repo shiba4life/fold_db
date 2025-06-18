@@ -330,8 +330,7 @@ impl Drop for EncryptionAtRest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datafold_node::crypto::key_derivation::{self, KeyDerivationManager, integration, legacy, contexts};
-    use crate::crypto::generate_master_keypair;
+    // Removed unused imports after refactoring
 
     fn create_test_key() -> [u8; AES_KEY_SIZE] {
         let mut key = [0u8; AES_KEY_SIZE];
