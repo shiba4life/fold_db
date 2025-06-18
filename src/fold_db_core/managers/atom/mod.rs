@@ -85,6 +85,11 @@ impl AtomManager {
         self.encryption_wrapper = Some(encryption_wrapper);
     }
 
+    /// Clear the encryption wrapper (disable encryption)
+    pub fn clear_encryption_wrapper(&mut self) {
+        self.encryption_wrapper = None;
+    }
+
     /// Check if encryption is enabled
     pub fn is_encryption_enabled(&self) -> bool {
         #[allow(clippy::unnecessary_map_or)]

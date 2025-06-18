@@ -100,7 +100,7 @@ impl FoldDB {
         &mut self,
         master_keypair: &crate::crypto::MasterKeyPair,
     ) -> Result<(), crate::schema::SchemaError> {
-        let mut encryption_ops = EncryptionOperations::new(self.db_ops());
+        let mut encryption_ops = self.encryption_operations.lock().unwrap();
         encryption_ops.enable_atom_encryption(master_keypair, &mut self.atom_manager)
     }
 
@@ -110,19 +110,21 @@ impl FoldDB {
         master_keypair: &crate::crypto::MasterKeyPair,
         crypto_config: &crate::config::crypto::CryptoConfig,
     ) -> Result<(), crate::schema::SchemaError> {
-        let mut encryption_ops = EncryptionOperations::new(self.db_ops());
+        let mut encryption_ops = self.encryption_operations.lock().unwrap();
         encryption_ops.enable_atom_encryption_with_config(master_keypair, crypto_config, &mut self.atom_manager)
     }
 
     /// Disable encryption for atom storage (fallback to unencrypted)
     pub fn disable_atom_encryption(&mut self) {
-        let mut encryption_ops = EncryptionOperations::new(self.db_ops());
+        let mut encryption_ops = self.encryption_operations.lock().unwrap();
         encryption_ops.disable_atom_encryption();
+        // Clear encryption wrapper from atom manager to ensure it falls back to unencrypted operations
+        self.atom_manager.clear_encryption_wrapper();
     }
 
     /// Check if atom encryption is enabled
     pub fn is_atom_encryption_enabled(&self) -> bool {
-        let encryption_ops = EncryptionOperations::new(self.db_ops());
+        let encryption_ops = self.encryption_operations.lock().unwrap();
         encryption_ops.is_atom_encryption_enabled()
     }
 
@@ -130,21 +132,19 @@ impl FoldDB {
     pub fn get_encryption_stats(
         &self,
     ) -> Result<std::collections::HashMap<String, u64>, crate::schema::SchemaError> {
-        let encryption_ops = EncryptionOperations::new(self.db_ops());
+        let encryption_ops = self.encryption_operations.lock().unwrap();
         encryption_ops.get_encryption_stats()
     }
 
     /// Migrate existing unencrypted atoms to encrypted format
     pub fn migrate_atoms_to_encrypted(&mut self) -> Result<u64, crate::schema::SchemaError> {
-        let mut encryption_ops = EncryptionOperations::new(self.db_ops());
+        let mut encryption_ops = self.encryption_operations.lock().unwrap();
         encryption_ops.migrate_atoms_to_encrypted()
     }
 
     /// Get a reference to the encryption wrapper for advanced operations
-    pub fn encryption_wrapper(&self) -> Option<&std::sync::Arc<crate::db_operations::EncryptionWrapper>> {
-        // This method needs to be handled differently since we can't access the internal encryption wrapper
-        // from the operations module. For now, return None.
-        // TODO: Refactor to properly expose encryption wrapper through operations module
-        None
+    pub fn encryption_wrapper(&self) -> Option<std::sync::Arc<crate::db_operations::EncryptionWrapper>> {
+        let encryption_ops = self.encryption_operations.lock().unwrap();
+        encryption_ops.encryption_wrapper().cloned()
     }
 }

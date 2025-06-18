@@ -11,6 +11,7 @@ use crate::fold_db_core::infrastructure::message_bus::{
     AtomRefUpdateRequest, MessageBus, SystemInitializationRequest,
 };
 use crate::fold_db_core::managers::AtomManager;
+use crate::fold_db_core::operations::EncryptionOperations;
 use crate::fold_db_core::orchestration::TransformOrchestrator;
 use crate::fold_db_core::services::field_retrieval::service::FieldRetrievalService;
 use crate::fold_db_core::transform_manager::TransformManager;
@@ -20,7 +21,7 @@ use crate::schema::core::{SchemaCore, SchemaState};
 use crate::schema::{Schema, SchemaError};
 use log::info;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 /// The main database coordinator that manages schemas, permissions, and data storage.
@@ -37,9 +38,8 @@ pub struct FoldDB {
     pub(crate) message_bus: Arc<MessageBus>,
     /// Event monitor for system-wide observability
     pub(crate) event_monitor: Arc<crate::fold_db_core::infrastructure::event_monitor::EventMonitor>,
-    /// Optional encryption wrapper for encrypted atom storage
-    #[allow(dead_code)]
-    pub(crate) encryption_wrapper: Option<Arc<crate::db_operations::EncryptionWrapper>>,
+    /// Stateful encryption operations coordinator
+    pub(crate) encryption_operations: Arc<Mutex<EncryptionOperations>>,
 }
 
 impl FoldDB {
@@ -171,7 +171,7 @@ impl FoldDB {
             permission_wrapper: PermissionWrapper::new(),
             message_bus,
             event_monitor,
-            encryption_wrapper: None,
+            encryption_operations: Arc::new(Mutex::new(EncryptionOperations::new(Arc::new(db_ops.clone())))),
         })
     }
 

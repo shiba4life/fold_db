@@ -82,7 +82,7 @@ impl EncryptionOperations {
     /// Disable encryption for atom storage (fallback to unencrypted)
     pub fn disable_atom_encryption(&mut self) {
         self.encryption_wrapper = None;
-        // Note: AtomManager will fall back to unencrypted operations when encryption_wrapper is None
+        // Note: AtomManager encryption wrapper should be cleared by the caller
     }
 
     /// Check if atom encryption is enabled
