@@ -53,6 +53,9 @@
 //! ```
 
 use super::core::DbOperations;
+use super::migration::{MigrationConfig, MigrationMode, MigrationStatus, MigrationUtils};
+use super::encrypted_data_format::EncryptedDataFormat;
+use super::contexts;
 use crate::config::crypto::CryptoConfig;
 use crate::crypto::{CryptoError, CryptoResult, MasterKeyPair};
 use crate::datafold_node::crypto::encryption_at_rest::{
@@ -62,246 +65,6 @@ use crate::schema::SchemaError;
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
 
-/// Version identifier for encrypted data format
-const ENCRYPTED_DATA_VERSION: u8 = 1;
-
-/// Magic bytes to identify encrypted data
-const ENCRYPTED_DATA_MAGIC: &[u8] = b"DF_ENC";
-
-/// Size of the encryption header (magic + version + context_len + context)
-const ENCRYPTION_HEADER_BASE_SIZE: usize = 6 + 1 + 1; // magic + version + context_len
-
-/// Maximum size for encryption context names
-const MAX_CONTEXT_NAME_SIZE: usize = 64;
-
-/// Migration modes for backward compatibility
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MigrationMode {
-    /// Read both encrypted and unencrypted data seamlessly, but don't encrypt new data
-    ReadOnlyCompatibility,
-    /// Encrypt new data while preserving existing unencrypted data
-    Gradual,
-    /// Convert all existing data to encrypted format
-    Full,
-}
-
-impl Default for MigrationMode {
-    fn default() -> Self {
-        Self::Gradual
-    }
-}
-
-/// Migration status information
-#[derive(Debug, Clone)]
-pub struct MigrationStatus {
-    /// Total number of items in the database
-    pub total_items: u64,
-    /// Number of encrypted items
-    pub encrypted_items: u64,
-    /// Number of unencrypted items
-    pub unencrypted_items: u64,
-    /// Current migration mode
-    pub migration_mode: MigrationMode,
-    /// Whether encryption is enabled for new data
-    pub encryption_enabled: bool,
-    /// Last migration timestamp (if any)
-    pub last_migration_at: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-impl MigrationStatus {
-    /// Calculate the encryption percentage
-    pub fn encryption_percentage(&self) -> f64 {
-        if self.total_items == 0 {
-            0.0
-        } else {
-            (self.encrypted_items as f64 / self.total_items as f64) * 100.0
-        }
-    }
-
-    /// Check if migration is complete (all data encrypted)
-    pub fn is_fully_encrypted(&self) -> bool {
-        self.total_items > 0 && self.unencrypted_items == 0
-    }
-
-    /// Check if this is a mixed environment
-    pub fn is_mixed_environment(&self) -> bool {
-        self.encrypted_items > 0 && self.unencrypted_items > 0
-    }
-}
-
-/// Migration configuration
-#[derive(Debug, Clone)]
-pub struct MigrationConfig {
-    /// Migration mode to use
-    pub mode: MigrationMode,
-    /// Batch size for migration operations
-    pub batch_size: usize,
-    /// Whether to verify data integrity during migration
-    pub verify_integrity: bool,
-    /// Whether to backup data before migration
-    pub backup_before_migration: bool,
-    /// Context to use for migrated data
-    pub target_context: String,
-}
-
-impl Default for MigrationConfig {
-    fn default() -> Self {
-        Self {
-            mode: MigrationMode::Gradual,
-            batch_size: 100,
-            verify_integrity: true,
-            backup_before_migration: true,
-            target_context: contexts::ATOM_DATA.to_string(),
-        }
-    }
-}
-
-/// Encryption contexts for different data types
-pub mod contexts {
-    /// Context for atom data encryption
-    pub const ATOM_DATA: &str = "atom_data";
-
-    /// Context for schema definition encryption
-    pub const SCHEMA_DATA: &str = "schema_data";
-
-    /// Context for metadata encryption
-    pub const METADATA: &str = "metadata";
-
-    /// Context for transform data encryption
-    pub const TRANSFORM_DATA: &str = "transform_data";
-
-    /// Context for orchestrator state encryption
-    pub const ORCHESTRATOR_STATE: &str = "orchestrator_state";
-
-    /// Context for permissions data encryption
-    pub const PERMISSIONS: &str = "permissions";
-
-    /// Context for schema state encryption
-    pub const SCHEMA_STATE: &str = "schema_state";
-
-    /// Get all available encryption contexts
-    pub fn all_contexts() -> &'static [&'static str] {
-        &[
-            ATOM_DATA,
-            SCHEMA_DATA,
-            METADATA,
-            TRANSFORM_DATA,
-            ORCHESTRATOR_STATE,
-            PERMISSIONS,
-            SCHEMA_STATE,
-        ]
-    }
-}
-
-/// Encrypted data format with context information
-#[derive(Debug, Clone)]
-struct EncryptedDataFormat {
-    /// Version of the encryption format
-    version: u8,
-    /// Encryption context used
-    context: String,
-    /// The actual encrypted data
-    encrypted_data: EncryptedData,
-}
-
-impl EncryptedDataFormat {
-    /// Create new encrypted data format
-    fn new(context: String, encrypted_data: EncryptedData) -> CryptoResult<Self> {
-        if context.len() > MAX_CONTEXT_NAME_SIZE {
-            return Err(CryptoError::InvalidInput(format!(
-                "Context name too long: {} bytes, maximum is {}",
-                context.len(),
-                MAX_CONTEXT_NAME_SIZE
-            )));
-        }
-
-        Ok(Self {
-            version: ENCRYPTED_DATA_VERSION,
-            context,
-            encrypted_data,
-        })
-    }
-
-    /// Serialize to bytes for storage
-    fn to_bytes(&self) -> CryptoResult<Vec<u8>> {
-        let context_bytes = self.context.as_bytes();
-        if context_bytes.len() > 255 {
-            return Err(CryptoError::InvalidInput(
-                "Context name too long for encoding".to_string(),
-            ));
-        }
-
-        let encrypted_bytes = self.encrypted_data.to_bytes();
-        let total_size = ENCRYPTION_HEADER_BASE_SIZE + context_bytes.len() + encrypted_bytes.len();
-
-        let mut result = Vec::with_capacity(total_size);
-
-        // Write header
-        result.extend_from_slice(ENCRYPTED_DATA_MAGIC);
-        result.push(self.version);
-        result.push(context_bytes.len() as u8);
-        result.extend_from_slice(context_bytes);
-
-        // Write encrypted data
-        result.extend_from_slice(&encrypted_bytes);
-
-        Ok(result)
-    }
-
-    /// Deserialize from bytes
-    fn from_bytes(data: &[u8]) -> CryptoResult<Self> {
-        if data.len() < ENCRYPTION_HEADER_BASE_SIZE {
-            return Err(CryptoError::InvalidInput(
-                "Data too small to contain encryption header".to_string(),
-            ));
-        }
-
-        // Check magic bytes
-        if &data[0..6] != ENCRYPTED_DATA_MAGIC {
-            return Err(CryptoError::InvalidInput(
-                "Invalid magic bytes in encrypted data".to_string(),
-            ));
-        }
-
-        // Read version
-        let version = data[6];
-        if version != ENCRYPTED_DATA_VERSION {
-            return Err(CryptoError::InvalidInput(format!(
-                "Unsupported encryption format version: {}",
-                version
-            )));
-        }
-
-        // Read context
-        let context_len = data[7] as usize;
-        if data.len() < ENCRYPTION_HEADER_BASE_SIZE + context_len {
-            return Err(CryptoError::InvalidInput(
-                "Data too small to contain context".to_string(),
-            ));
-        }
-
-        let context_start = 8;
-        let context_end = context_start + context_len;
-        let context = String::from_utf8(data[context_start..context_end].to_vec())
-            .map_err(|e| CryptoError::InvalidInput(format!("Invalid context UTF-8: {}", e)))?;
-
-        // Read encrypted data
-        let encrypted_start = context_end;
-        let encrypted_data = EncryptedData::from_bytes(&data[encrypted_start..])?;
-
-        Ok(Self {
-            version,
-            context,
-            encrypted_data,
-        })
-    }
-
-    /// Check if data is encrypted by examining magic bytes
-    fn is_encrypted_data(data: &[u8]) -> bool {
-        data.len() >= 6 && &data[0..6] == ENCRYPTED_DATA_MAGIC
-    }
-}
-
 /// Database encryption wrapper that provides transparent encryption with comprehensive backward compatibility
 pub struct EncryptionWrapper {
     /// The underlying database operations
@@ -310,7 +73,7 @@ pub struct EncryptionWrapper {
     #[allow(dead_code)]
     key_manager: KeyDerivationManager,
     /// Cached encryptors for different contexts
-    encryptors: HashMap<String, EncryptionAtRest>,
+    pub(crate) encryptors: HashMap<String, EncryptionAtRest>,
     /// Whether encryption is enabled for new data
     encryption_enabled: bool,
     /// Current migration mode for backward compatibility
@@ -388,10 +151,7 @@ impl EncryptionWrapper {
 
         let encryptors = key_manager.create_multiple_encryptors(contexts::all_contexts(), None)?;
 
-        let encryption_enabled = match migration_mode {
-            MigrationMode::ReadOnlyCompatibility => false,
-            MigrationMode::Gradual | MigrationMode::Full => true,
-        };
+        let encryption_enabled = MigrationUtils::can_encrypt_new_data(migration_mode);
 
         Ok(Self {
             db_ops,
@@ -409,15 +169,16 @@ impl EncryptionWrapper {
         master_keypair: &MasterKeyPair,
         migration_config: MigrationConfig,
     ) -> CryptoResult<Self> {
+        // Validate the migration configuration
+        MigrationUtils::validate_config(&migration_config)
+            .map_err(|e| CryptoError::InvalidInput(format!("Invalid migration config: {}", e)))?;
+
         let crypto_config = CryptoConfig::default();
         let key_manager = KeyDerivationManager::new(master_keypair, &crypto_config)?;
 
         let encryptors = key_manager.create_multiple_encryptors(contexts::all_contexts(), None)?;
 
-        let encryption_enabled = match migration_config.mode {
-            MigrationMode::ReadOnlyCompatibility => false,
-            MigrationMode::Gradual | MigrationMode::Full => true,
-        };
+        let encryption_enabled = MigrationUtils::can_encrypt_new_data(migration_config.mode);
 
         Ok(Self {
             db_ops,
@@ -471,10 +232,7 @@ impl EncryptionWrapper {
     pub fn set_migration_mode(&mut self, mode: MigrationMode) {
         self.migration_mode = mode;
         // Update encryption enabled based on mode
-        self.encryption_enabled = match mode {
-            MigrationMode::ReadOnlyCompatibility => false,
-            MigrationMode::Gradual | MigrationMode::Full => true,
-        };
+        self.encryption_enabled = MigrationUtils::can_encrypt_new_data(mode);
     }
 
     /// Get the current migration configuration
@@ -487,10 +245,7 @@ impl EncryptionWrapper {
         self.migration_mode = config.mode;
         self.migration_config = config;
         // Update encryption enabled based on mode
-        self.encryption_enabled = match self.migration_mode {
-            MigrationMode::ReadOnlyCompatibility => false,
-            MigrationMode::Gradual | MigrationMode::Full => true,
-        };
+        self.encryption_enabled = MigrationUtils::can_encrypt_new_data(self.migration_mode);
     }
 
     /// Store encrypted data with a specific context
@@ -598,10 +353,10 @@ impl EncryptionWrapper {
                         })?;
 
                     // Verify context matches
-                    if encrypted_format.context != context {
+                    if encrypted_format.context() != context {
                         return Err(SchemaError::InvalidData(format!(
                             "Context mismatch: expected '{}', found '{}'",
-                            context, encrypted_format.context
+                            context, encrypted_format.context()
                         )));
                     }
 
@@ -612,7 +367,7 @@ impl EncryptionWrapper {
 
                     // Decrypt the data
                     let decrypted_bytes = encryptor
-                        .decrypt(&encrypted_format.encrypted_data)
+                        .decrypt(encrypted_format.encrypted_data())
                         .map_err(|e| {
                             SchemaError::InvalidData(format!("Decryption failed: {}", e))
                         })?;
@@ -728,10 +483,10 @@ impl EncryptionWrapper {
                         })?;
 
                     // Verify context matches
-                    if encrypted_format.context != context {
+                    if encrypted_format.context() != context {
                         return Err(SchemaError::InvalidData(format!(
                             "Context mismatch: expected '{}', found '{}'",
-                            context, encrypted_format.context
+                            context, encrypted_format.context()
                         )));
                     }
 
@@ -742,7 +497,7 @@ impl EncryptionWrapper {
 
                     // Decrypt the data
                     let decrypted_bytes = encryptor
-                        .decrypt(&encrypted_format.encrypted_data)
+                        .decrypt(encrypted_format.encrypted_data())
                         .map_err(|e| {
                             SchemaError::InvalidData(format!("Decryption failed: {}", e))
                         })?;
@@ -907,6 +662,9 @@ impl EncryptionWrapper {
 
     /// Perform batch migration with comprehensive validation
     pub fn perform_batch_migration(&self, config: &MigrationConfig) -> Result<u64, SchemaError> {
+        // Validate configuration first
+        MigrationUtils::validate_config(config)?;
+
         // Check if encryption is disabled (read-only compatibility mode)
         if !self.encryption_enabled {
             return Err(SchemaError::InvalidData(
@@ -1011,11 +769,10 @@ impl EncryptionWrapper {
         for (key, unencrypted_bytes) in items {
             // Validate data integrity if requested
             if config.verify_integrity {
-                if let Err(e) = serde_json::from_slice::<serde_json::Value>(unencrypted_bytes) {
+                if let Err(_) = MigrationUtils::validate_json_integrity(unencrypted_bytes) {
                     log::warn!(
-                        "Skipping migration of potentially corrupted item '{}': {}",
-                        key,
-                        e
+                        "Skipping migration of potentially corrupted item '{}'",
+                        key
                     );
                     continue;
                 }
@@ -1089,7 +846,7 @@ impl EncryptionWrapper {
                     Ok(encrypted_format) => {
                         encrypted_count += 1;
                         *context_counts
-                            .entry(encrypted_format.context.clone())
+                            .entry(encrypted_format.context().to_string())
                             .or_insert(0) += 1;
                     }
                     Err(e) => {
@@ -1099,13 +856,12 @@ impl EncryptionWrapper {
                 }
             } else {
                 // Check if unencrypted data is valid JSON
-                match serde_json::from_slice::<serde_json::Value>(&value) {
+                match MigrationUtils::validate_json_integrity(&value) {
                     Ok(_) => unencrypted_count += 1,
                     Err(e) => {
                         log::warn!(
                             "Invalid JSON format for unencrypted key '{}': {}",
-                            key_str,
-                            e
+                            key_str, e
                         );
                         invalid_count += 1;
                     }
@@ -1216,14 +972,14 @@ impl EncryptionWrapper {
             self.store_encrypted_item(&test_key, &test_data, context)?;
 
             // Retrieve and verify
-            let retrieved: String =
-                self.get_encrypted_item(&test_key, context)?
-                    .ok_or_else(|| {
-                        SchemaError::InvalidData(format!(
-                            "Failed to retrieve test data for context: {}",
-                            context
-                        ))
-                    })?;
+            let retrieved: String = self
+                .get_encrypted_item(&test_key, context)?
+                .ok_or_else(|| {
+                    SchemaError::InvalidData(format!(
+                        "Failed to retrieve test data for context: {}",
+                        context
+                    ))
+                })?;
 
             if retrieved != test_data {
                 return Err(SchemaError::InvalidData(format!(
@@ -1239,214 +995,5 @@ impl EncryptionWrapper {
         }
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::crypto::generate_master_keypair;
-    use tempfile::tempdir;
-
-    fn create_test_encryption_wrapper() -> EncryptionWrapper {
-        let temp_dir = tempdir().unwrap();
-        let db = sled::open(temp_dir.path()).unwrap();
-        let db_ops = DbOperations::new(db).unwrap();
-
-        let master_keypair = generate_master_keypair().unwrap();
-        EncryptionWrapper::new(db_ops, &master_keypair).unwrap()
-    }
-
-    #[test]
-    fn test_encryption_wrapper_creation() {
-        let wrapper = create_test_encryption_wrapper();
-        assert!(wrapper.is_encryption_enabled());
-        assert_eq!(wrapper.encryptors.len(), contexts::all_contexts().len());
-    }
-
-    #[test]
-    fn test_store_and_retrieve_encrypted_item() {
-        let wrapper = create_test_encryption_wrapper();
-
-        let test_data = "test data for encryption";
-        let test_key = "test_key";
-        let context = contexts::ATOM_DATA;
-
-        // Store encrypted
-        wrapper
-            .store_encrypted_item(test_key, &test_data, context)
-            .unwrap();
-
-        // Retrieve and verify
-        let retrieved: String = wrapper
-            .get_encrypted_item(test_key, context)
-            .unwrap()
-            .unwrap();
-        assert_eq!(retrieved, test_data);
-    }
-
-    #[test]
-    fn test_backward_compatibility() {
-        let temp_dir = tempdir().unwrap();
-        let db = sled::open(temp_dir.path()).unwrap();
-        let db_ops = DbOperations::new(db).unwrap();
-
-        // Store unencrypted data using raw DbOperations
-        let test_data = "unencrypted test data";
-        let test_key = "legacy_key";
-        db_ops.store_item(test_key, &test_data).unwrap();
-
-        // Create encryption wrapper and try to read the unencrypted data
-        let master_keypair = generate_master_keypair().unwrap();
-        let wrapper = EncryptionWrapper::new(db_ops, &master_keypair).unwrap();
-
-        // Should be able to read unencrypted data
-        let retrieved: String = wrapper
-            .get_encrypted_item(test_key, contexts::ATOM_DATA)
-            .unwrap()
-            .unwrap();
-        assert_eq!(retrieved, test_data);
-    }
-
-    #[test]
-    fn test_different_encryption_contexts() {
-        let wrapper = create_test_encryption_wrapper();
-
-        let test_data = "context test data";
-        let test_key = "context_test_key";
-
-        // Store with one context
-        wrapper
-            .store_encrypted_item(test_key, &test_data, contexts::ATOM_DATA)
-            .unwrap();
-
-        // Try to retrieve with different context (should fail)
-        let result: Result<Option<String>, _> =
-            wrapper.get_encrypted_item(test_key, contexts::SCHEMA_DATA);
-        assert!(result.is_err());
-
-        // Retrieve with correct context (should work)
-        let retrieved: String = wrapper
-            .get_encrypted_item(test_key, contexts::ATOM_DATA)
-            .unwrap()
-            .unwrap();
-        assert_eq!(retrieved, test_data);
-    }
-
-    #[test]
-    fn test_tree_operations() {
-        let wrapper = create_test_encryption_wrapper();
-        let tree = &wrapper.db_ops.metadata_tree;
-
-        let test_data = "tree test data";
-        let test_key = "tree_test_key";
-        let context = contexts::METADATA;
-
-        // Store in tree
-        wrapper
-            .store_encrypted_in_tree(tree, test_key, &test_data, context)
-            .unwrap();
-
-        // Retrieve from tree
-        let retrieved: String = wrapper
-            .get_encrypted_from_tree(tree, test_key, context)
-            .unwrap()
-            .unwrap();
-        assert_eq!(retrieved, test_data);
-
-        // Check existence
-        assert!(wrapper.exists_in_tree(tree, test_key).unwrap());
-
-        // Delete
-        assert!(wrapper.delete_from_tree(tree, test_key).unwrap());
-        assert!(!wrapper.exists_in_tree(tree, test_key).unwrap());
-    }
-
-    #[test]
-    fn test_encryption_stats() {
-        let wrapper = create_test_encryption_wrapper();
-
-        // Store some encrypted data
-        wrapper
-            .store_encrypted_item("key1", &"data1", contexts::ATOM_DATA)
-            .unwrap();
-        wrapper
-            .store_encrypted_item("key2", &"data2", contexts::SCHEMA_DATA)
-            .unwrap();
-
-        // Store some unencrypted data directly
-        wrapper.db_ops.store_item("key3", &"data3").unwrap();
-
-        let stats = wrapper.get_encryption_stats().unwrap();
-        assert_eq!(stats.get("encrypted_items"), Some(&2));
-        assert_eq!(stats.get("unencrypted_items"), Some(&1));
-        assert_eq!(stats.get("encryption_enabled"), Some(&1));
-    }
-
-    #[test]
-    fn test_migration_to_encrypted() {
-        let temp_dir = tempdir().unwrap();
-        let db = sled::open(temp_dir.path()).unwrap();
-        let db_ops = DbOperations::new(db).unwrap();
-
-        // Store some unencrypted data
-        db_ops.store_item("item1", &"unencrypted data 1").unwrap();
-        db_ops.store_item("item2", &"unencrypted data 2").unwrap();
-
-        // Create encryption wrapper
-        let master_keypair = generate_master_keypair().unwrap();
-        let wrapper = EncryptionWrapper::new(db_ops, &master_keypair).unwrap();
-
-        // Migrate to encrypted
-        let migrated_count = wrapper.migrate_to_encrypted(contexts::ATOM_DATA).unwrap();
-        assert_eq!(migrated_count, 2);
-
-        // Verify data can still be read (now encrypted)
-        let retrieved1: String = wrapper
-            .get_encrypted_item("item1", contexts::ATOM_DATA)
-            .unwrap()
-            .unwrap();
-        assert_eq!(retrieved1, "unencrypted data 1");
-
-        let retrieved2: String = wrapper
-            .get_encrypted_item("item2", contexts::ATOM_DATA)
-            .unwrap()
-            .unwrap();
-        assert_eq!(retrieved2, "unencrypted data 2");
-
-        // Verify stats show all encrypted now
-        let stats = wrapper.get_encryption_stats().unwrap();
-        assert_eq!(stats.get("encrypted_items"), Some(&2));
-        assert_eq!(stats.get("unencrypted_items"), Some(&0));
-    }
-
-    #[test]
-    fn test_self_test() {
-        let wrapper = create_test_encryption_wrapper();
-        wrapper.self_test().unwrap();
-    }
-
-    #[test]
-    fn test_encryption_disabled_mode() {
-        let temp_dir = tempdir().unwrap();
-        let db = sled::open(temp_dir.path()).unwrap();
-        let db_ops = DbOperations::new(db).unwrap();
-
-        let wrapper = EncryptionWrapper::without_encryption(db_ops);
-        assert!(!wrapper.is_encryption_enabled());
-
-        // Should fall back to unencrypted storage
-        let test_data = "unencrypted data";
-        let test_key = "test_key";
-        wrapper
-            .store_encrypted_item(test_key, &test_data, contexts::ATOM_DATA)
-            .unwrap();
-
-        // Should be able to read it back
-        let retrieved: String = wrapper
-            .get_encrypted_item(test_key, contexts::ATOM_DATA)
-            .unwrap()
-            .unwrap();
-        assert_eq!(retrieved, test_data);
     }
 }

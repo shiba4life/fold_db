@@ -8,7 +8,7 @@
 //! - Multiple migration modes (gradual, full, read-only)
 
 use datafold::crypto::generate_master_keypair;
-use datafold::db_operations::encryption_wrapper::contexts;
+use datafold::db_operations::contexts;
 use datafold::db_operations::{DbOperations, EncryptionWrapper, MigrationConfig, MigrationMode};
 use datafold::schema::SchemaError;
 use serde_json::json;

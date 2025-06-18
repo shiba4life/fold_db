@@ -47,7 +47,7 @@
 //! ```
 
 use super::core::DbOperations;
-use super::encryption_wrapper::contexts;
+use super::contexts;
 use super::encryption_wrapper_async::{AsyncEncryptionWrapper, AsyncWrapperConfig};
 use crate::config::crypto::CryptoConfig;
 use crate::crypto::{CryptoError, CryptoResult, MasterKeyPair};

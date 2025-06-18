@@ -51,7 +51,7 @@ use datafold::{
     datafold_node::{DataFoldNode, NodeConfig},
     db_operations::{
         encrypted_backup::{BackupMode, BackupOptions, EncryptedBackupManager, RestoreOptions},
-        encryption_wrapper::{contexts, EncryptionWrapper, MigrationMode},
+        {contexts, EncryptionWrapper, MigrationMode},
         DbOperations,
     },
     security_types::SecurityLevel,

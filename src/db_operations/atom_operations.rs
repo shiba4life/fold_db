@@ -1,5 +1,5 @@
 use super::core::DbOperations;
-use super::encryption_wrapper::{contexts, EncryptionWrapper};
+use super::{contexts, EncryptionWrapper};
 use crate::atom::{Atom, AtomRef, AtomRefRange, AtomStatus};
 use crate::schema::SchemaError;
 use serde_json::Value;

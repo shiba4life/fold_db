@@ -6,7 +6,7 @@
 
 use crate::atom::{Atom, AtomStatus};
 use crate::crypto::{CryptoResult, MasterKeyPair};
-use crate::db_operations::encryption_wrapper::contexts;
+use crate::db_operations::contexts;
 use crate::db_operations::encryption_wrapper_async::{AsyncEncryptionWrapper, AsyncWrapperConfig};
 use crate::db_operations::DbOperations;
 use crate::schema::SchemaError;

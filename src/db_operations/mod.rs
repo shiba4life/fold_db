@@ -14,7 +14,14 @@ mod schema_operations;
 mod transform_operations;
 mod utility_operations;
 
+// New encryption modules
+pub mod migration;
+pub mod contexts;
+pub mod encrypted_data_format;
+
 // Tests module
+#[cfg(test)]
+pub mod tests;
 
 // Re-export the main DbOperations struct and error utilities
 pub use core::DbOperations;
@@ -24,7 +31,7 @@ pub use encrypted_backup::{
     RestoreOptions, RestoreStats,
 };
 pub use encrypted_backup_async::{AsyncBackupConfig, AsyncEncryptedBackup, ProgressInfo};
-pub use encryption_wrapper::{contexts, EncryptionWrapper, MigrationConfig, MigrationMode};
+pub use encryption_wrapper::EncryptionWrapper;
 pub use encryption_wrapper_async::{
     AsyncEncryptionWrapper, AsyncWrapperConfig, AsyncWrapperMetrics,
 };
@@ -33,5 +40,10 @@ pub use key_rotation_operations::{
     KeyAssociation, KeyRotationRecord, KEY_ASSOCIATIONS_TREE, KEY_ROTATION_INDEX_TREE,
     KEY_ROTATION_RECORDS_TREE,
 };
+
+// Re-export new encryption modules
+pub use migration::{MigrationConfig, MigrationMode, MigrationStatus};
+pub use encrypted_data_format::EncryptedDataFormat;
+
 // Re-export RotationStatus from security_types module
 pub use crate::security_types::RotationStatus;

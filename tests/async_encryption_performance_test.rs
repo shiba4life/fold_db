@@ -6,7 +6,7 @@
 use datafold::crypto::generate_master_keypair;
 use datafold::datafold_node::encryption_at_rest::EncryptionAtRest;
 use datafold::datafold_node::encryption_at_rest_async::{AsyncEncryptionAtRest, PerformanceConfig};
-use datafold::db_operations::encryption_wrapper::contexts;
+use datafold::db_operations::contexts;
 use datafold::db_operations::encryption_wrapper_async::{
     AsyncEncryptionWrapper, AsyncWrapperConfig,
 };

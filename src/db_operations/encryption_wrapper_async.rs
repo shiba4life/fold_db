@@ -46,7 +46,7 @@
 //! ```
 
 use super::core::DbOperations;
-use super::encryption_wrapper::{contexts, EncryptionWrapper, MigrationConfig, MigrationMode};
+use super::{contexts, EncryptionWrapper, MigrationConfig, MigrationMode};
 use crate::config::crypto::CryptoConfig;
 use crate::crypto::{CryptoError, CryptoResult, MasterKeyPair};
 use crate::datafold_node::crypto::encryption_at_rest::{

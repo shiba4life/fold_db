@@ -223,7 +223,7 @@ pub async fn get_nonce_store_stats(state: web::Data<AppState>) -> impl Responder
                     "total_nonces": nonce_stats.total_nonces,
                     "max_capacity": nonce_stats.max_capacity,
                     "utilization_percent": (nonce_stats.total_nonces as f64 / nonce_stats.max_capacity as f64 * 100.0).round(),
-                    "oldest_nonce_age_secs": nonce_stats.oldest_nonce_age_secs
+                    "oldest_nonce_age_secs": nonce_stats.oldest_nonce_age
                 }
             }))
         }
