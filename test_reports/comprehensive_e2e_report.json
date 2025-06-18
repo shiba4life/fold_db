@@ -1,5 +1,5 @@
 {
-  "timestamp": 1750212919,
+  "timestamp": 1750214815,
   "execution_metrics": {
     "total_tests": 3,
     "tests_passed": 2,
@@ -34,8 +34,8 @@
     "side_channel_resistance_tests": 0,
     "security_vulnerabilities_found": [],
     "compliance_checks": {
-      "cryptographic_strength": true,
-      "key_storage_security": true
+      "key_storage_security": true,
+      "cryptographic_strength": true
     }
   },
   "platform_metrics": {

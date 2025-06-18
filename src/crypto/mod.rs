@@ -36,7 +36,11 @@ pub mod error;
 pub mod key_rotation;
 pub mod key_rotation_audit;
 pub mod key_rotation_security;
-pub mod rotation_threat_monitor;
+pub mod threat_types;
+pub mod threat_config;
+pub mod threat_detection;
+pub mod threat_monitor;
+pub mod threat_tests;
 pub mod security_monitor;
 
 // Re-export commonly used types
@@ -67,10 +71,15 @@ pub use key_rotation_security::{
     IpRestrictionConfig, KeyRotationSecurityManager, KeyRotationSecurityPolicy, RateLimitConfig,
     RiskAssessmentConfig, SecurityEvaluationResult, SessionSecurityConfig, TimeRestrictionConfig,
 };
-pub use rotation_threat_monitor::{
-    RemediationAction, RotationThreatDetection, RotationThreatMonitor, RotationThreatMonitorConfig,
-    RotationThreatPattern, ThreatStatusSummary,
+pub use threat_types::{
+    ActivityWindow, AttackProgression, RemediationAction, RotationThreatDetection,
+    RotationThreatPattern,
 };
+pub use threat_config::{
+    IntegrationSettings, RotationThreatMonitorConfig, ThreatWeights, UserBehaviorBaseline,
+};
+pub use threat_detection::{RotationActivity, ThreatDetectionEngine};
+pub use threat_monitor::{RotationThreatMonitor, ThreatStatusSummary};
 pub use security_monitor::{
     get_global_security_monitor, init_global_security_monitor, CryptoSecurityMonitor,
     SecurityDetection, SecurityMonitorConfig, SecurityPattern,

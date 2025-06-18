@@ -8,7 +8,7 @@ use crate::crypto::key_rotation_audit::{
     KeyRotationAuditLogger, RotationAuditCorrelation, TamperProofAuditEntry,
 };
 use crate::crypto::key_rotation_security::KeyRotationSecurityManager;
-use crate::crypto::rotation_threat_monitor::RotationThreatMonitor;
+use crate::crypto::threat_monitor::RotationThreatMonitor;
 use crate::reporting::types::{
     ResolutionStatistics, SecurityIncidentSummary, TimeRange, UnifiedReport, UnifiedReportConfig,
     UnifiedReportFormat, UnifiedReportMetadata, UnifiedSummarySection,
@@ -1166,7 +1166,7 @@ mod tests {
             ),
         );
         let threat_monitor = Arc::new(
-            crate::crypto::rotation_threat_monitor::RotationThreatMonitor::with_default_config(
+            RotationThreatMonitor::with_default_config(
                 base_monitor,
                 audit_logger.clone(),
                 security_manager.clone(),
