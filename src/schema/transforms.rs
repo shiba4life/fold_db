@@ -11,9 +11,6 @@
 
 use crate::schema::core_types::SchemaCore;
 use crate::schema::types::{Field, Schema, SchemaError};
-use crate::transform_execution::{
-    TransformDefinition
-};
 use log::{info, warn};
 
 /// Ensure any transforms on fields have the correct output schema
@@ -63,36 +60,14 @@ pub fn register_schema_transforms(
 
             let transform_id = format!("{}.{}", schema.name, field_name);
 
-            // LEGACY REGISTRATION: Store in database for legacy TransformManager
+            // CONSOLIDATED: Direct registration with unified manager
+            // Store the transform in database for persistence
             if let Err(e) = schema_core.db_ops.store_transform(&transform_id, transform) {
-                log::error!("Failed to store legacy transform {}: {}", transform_id, e);
+                warn!("Failed to store transform {}: {}", transform_id, e);
                 continue;
             }
-
-            info!("✅ Stored legacy transform {} for auto-registration", transform_id);
-
-            // UNIFIED REGISTRATION: Store as unified transform definition
-            let unified_definition = TransformDefinition {
-                id: transform_id.clone(),
-                transform: transform.clone(),
-                inputs: transform.get_inputs().to_vec(),
-                metadata: {
-                    let mut meta = std::collections::HashMap::new();
-                    meta.insert("schema_name".to_string(), schema.name.clone());
-                    meta.insert("field_name".to_string(), field_name.clone());
-                    meta.insert("registration_source".to_string(), "schema_auto_registration".to_string());
-                    meta.insert("name".to_string(), format!("{}.{}", schema.name, field_name));
-                    meta.insert("description".to_string(), format!("Auto-registered transform for field {}.{}", schema.name, field_name));
-                    meta
-                },
-            };
-
-            // Store the basic transform - the UnifiedTransformManager will pick it up during initialization
-            if let Err(e) = schema_core.db_ops.store_transform(&transform_id, &unified_definition.transform) {
-                warn!("Failed to store transform {}: {}", transform_id, e);
-            } else {
-                info!("✅ Stored transform {} for auto-registration (unified manager will register it)", transform_id);
-            }
+            
+            info!("✅ Stored transform {} for unified registration", transform_id);
 
             // Create field-to-transform mappings for both systems
             for input_field in transform.get_inputs() {

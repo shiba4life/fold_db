@@ -521,6 +521,150 @@ impl Default for TransformErrorHandler {
         Self::new()
     }
 }
+/// Centralized error conversion utilities to eliminate duplicate error handling patterns.
+/// 
+/// This module provides standardized error conversion functions to replace the 81+ duplicate
+/// error handling patterns found throughout the codebase.
+pub mod error_conversion {
+    
+    use crate::schema::types::errors::SchemaError;
+
+    /// Converts any error to SchemaError::InvalidData with consistent formatting.
+    pub fn to_schema_error<E: std::fmt::Display>(error: E, operation: &str) -> SchemaError {
+        SchemaError::InvalidData(format!("{}: {}", operation, error))
+    }
+
+    /// Converts serialization errors with consistent messaging.
+    pub fn serialization_error<E: std::fmt::Display>(error: E) -> SchemaError {
+        SchemaError::InvalidData(format!("Failed to serialize item: {}", error))
+    }
+
+    /// Converts deserialization errors with consistent messaging.
+    pub fn deserialization_error<E: std::fmt::Display>(error: E) -> SchemaError {
+        SchemaError::InvalidData(format!("Failed to deserialize item: {}", error))
+    }
+
+    /// Converts database operation errors with consistent messaging.
+    pub fn database_error<E: std::fmt::Display>(error: E, operation: &str) -> SchemaError {
+        SchemaError::InvalidData(format!("Database {} failed: {}", operation, error))
+    }
+
+    /// Converts file operation errors with consistent messaging.
+    pub fn file_error<E: std::fmt::Display>(error: E, file_path: &str, operation: &str) -> SchemaError {
+        SchemaError::InvalidData(format!("Failed to {} file {}: {}", operation, file_path, error))
+    }
+
+    /// Converts JSON parsing errors with consistent messaging.
+    pub fn json_error<E: std::fmt::Display>(error: E) -> SchemaError {
+        SchemaError::InvalidData(format!("Invalid JSON: {}", error))
+    }
+
+    /// Converts encryption errors with consistent messaging.
+    pub fn encryption_error<E: std::fmt::Display>(error: E) -> SchemaError {
+        SchemaError::InvalidData(format!("Encryption failed: {}", error))
+    }
+
+    /// Converts decryption errors with consistent messaging.
+    pub fn decryption_error<E: std::fmt::Display>(error: E) -> SchemaError {
+        SchemaError::InvalidData(format!("Decryption failed: {}", error))
+    }
+
+    /// Converts async task errors with consistent messaging.
+    pub fn async_task_error<E: std::fmt::Display>(error: E) -> SchemaError {
+        SchemaError::InvalidData(format!("Async task failed: {}", error))
+    }
+
+    /// Converts directory creation errors with consistent messaging.
+    pub fn directory_error<E: std::fmt::Display>(error: E, path: &str) -> SchemaError {
+        SchemaError::InvalidData(format!("Failed to create directory {}: {}", path, error))
+    }
+
+    /// Converts transform execution errors with consistent messaging.
+    pub fn transform_execution_error<E: std::fmt::Display>(error: E) -> SchemaError {
+        SchemaError::InvalidData(format!("Unified transform execution failed: {}", error))
+    }
+
+    /// Converts tree operation errors with consistent messaging.
+    pub fn tree_error<E: std::fmt::Display>(error: E, operation: &str) -> SchemaError {
+        SchemaError::InvalidData(format!("Tree {} failed: {}", operation, error))
+    }
+
+    /// Converts flush operation errors with consistent messaging.
+    pub fn flush_error<E: std::fmt::Display>(error: E) -> SchemaError {
+        SchemaError::InvalidData(format!("Flush failed: {}", error))
+    }
+
+    /// Extension trait to add convenient error conversion methods to Result types.
+    pub trait ErrorConversion<T> {
+        fn map_to_schema_error(self, operation: &str) -> Result<T, SchemaError>;
+        fn map_serialization_error(self) -> Result<T, SchemaError>;
+        fn map_deserialization_error(self) -> Result<T, SchemaError>;
+        fn map_database_error(self, operation: &str) -> Result<T, SchemaError>;
+        fn map_file_error(self, file_path: &str, operation: &str) -> Result<T, SchemaError>;
+        fn map_json_error(self) -> Result<T, SchemaError>;
+        fn map_encryption_error(self) -> Result<T, SchemaError>;
+        fn map_decryption_error(self) -> Result<T, SchemaError>;
+        fn map_async_task_error(self) -> Result<T, SchemaError>;
+        fn map_directory_error(self, path: &str) -> Result<T, SchemaError>;
+        fn map_transform_execution_error(self) -> Result<T, SchemaError>;
+        fn map_tree_error(self, operation: &str) -> Result<T, SchemaError>;
+        fn map_flush_error(self) -> Result<T, SchemaError>;
+    }
+
+    impl<T, E: std::fmt::Display> ErrorConversion<T> for Result<T, E> {
+        fn map_to_schema_error(self, operation: &str) -> Result<T, SchemaError> {
+            self.map_err(|e| to_schema_error(e, operation))
+        }
+
+        fn map_serialization_error(self) -> Result<T, SchemaError> {
+            self.map_err(serialization_error)
+        }
+
+        fn map_deserialization_error(self) -> Result<T, SchemaError> {
+            self.map_err(deserialization_error)
+        }
+
+        fn map_database_error(self, operation: &str) -> Result<T, SchemaError> {
+            self.map_err(|e| database_error(e, operation))
+        }
+
+        fn map_file_error(self, file_path: &str, operation: &str) -> Result<T, SchemaError> {
+            self.map_err(|e| file_error(e, file_path, operation))
+        }
+
+        fn map_json_error(self) -> Result<T, SchemaError> {
+            self.map_err(json_error)
+        }
+
+        fn map_encryption_error(self) -> Result<T, SchemaError> {
+            self.map_err(encryption_error)
+        }
+
+        fn map_decryption_error(self) -> Result<T, SchemaError> {
+            self.map_err(decryption_error)
+        }
+
+        fn map_async_task_error(self) -> Result<T, SchemaError> {
+            self.map_err(async_task_error)
+        }
+
+        fn map_directory_error(self, path: &str) -> Result<T, SchemaError> {
+            self.map_err(|e| directory_error(e, path))
+        }
+
+        fn map_transform_execution_error(self) -> Result<T, SchemaError> {
+            self.map_err(transform_execution_error)
+        }
+
+        fn map_tree_error(self, operation: &str) -> Result<T, SchemaError> {
+            self.map_err(|e| tree_error(e, operation))
+        }
+
+        fn map_flush_error(self) -> Result<T, SchemaError> {
+            self.map_err(flush_error)
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -573,5 +717,56 @@ mod tests {
         assert_eq!(context.operation, "test_operation");
         assert_eq!(context.context_data.len(), 2);
         assert_eq!(context.context_data.get("key1"), Some(&"value1".to_string()));
+    }
+
+    #[test]
+    fn test_error_conversion_utilities() {
+        use error_conversion::*;
+        
+        // Test serialization error conversion
+        let result: Result<(), &str> = Err("test error");
+        let schema_error = result.map_serialization_error().unwrap_err();
+        assert!(schema_error.to_string().contains("Failed to serialize item"));
+        
+        // Test database error conversion
+        let result: Result<(), &str> = Err("connection failed");
+        let schema_error = result.map_database_error("insert").unwrap_err();
+        assert!(schema_error.to_string().contains("Database insert failed"));
+        
+        // Test file error conversion
+        let result: Result<(), &str> = Err("permission denied");
+        let schema_error = result.map_file_error("/test/path", "read").unwrap_err();
+        assert!(schema_error.to_string().contains("Failed to read file /test/path"));
+        
+        // Test JSON error conversion
+        let result: Result<(), &str> = Err("invalid syntax");
+        let schema_error = result.map_json_error().unwrap_err();
+        assert!(schema_error.to_string().contains("Invalid JSON"));
+        
+        // Test transform execution error conversion
+        let result: Result<(), &str> = Err("execution failed");
+        let schema_error = result.map_transform_execution_error().unwrap_err();
+        assert!(schema_error.to_string().contains("Unified transform execution failed"));
+    }
+
+    #[test]
+    fn test_specific_error_conversion_functions() {
+        use error_conversion::*;
+        
+        // Test individual conversion functions
+        let error = serialization_error("test error");
+        assert!(error.to_string().contains("Failed to serialize item: test error"));
+        
+        let error = database_error("connection timeout", "select");
+        assert!(error.to_string().contains("Database select failed: connection timeout"));
+        
+        let error = file_error("not found", "/path/to/file", "write");
+        assert!(error.to_string().contains("Failed to write file /path/to/file: not found"));
+        
+        let error = encryption_error("key invalid");
+        assert!(error.to_string().contains("Encryption failed: key invalid"));
+        
+        let error = async_task_error("task panicked");
+        assert!(error.to_string().contains("Async task failed: task panicked"));
     }
 }

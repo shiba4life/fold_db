@@ -8,8 +8,8 @@ mod tests {
     use super::super::coordinator::FoldDB;
     use super::super::operations::{EncryptionOperations, MutationOperations, QueryOperations};
     use crate::schema::types::{Mutation, Query};
-    use crate::schema::{Schema, SchemaError};
-    use serde_json::{json, Value};
+    use crate::schema::Schema;
+    use serde_json::json;
     use std::collections::HashMap;
     use tempfile::TempDir;
 
@@ -28,7 +28,7 @@ mod tests {
         /// Create a simple test schema
         pub fn create_test_schema() -> Schema {
             use crate::schema::types::field::{FieldVariant, SingleField};
-            use crate::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+            use crate::permissions::types::policy::PermissionsPolicy;
             use crate::fees::types::config::FieldPaymentConfig;
             use std::collections::HashMap;
 
@@ -60,7 +60,7 @@ mod tests {
         /// Create a test range schema
         pub fn create_test_range_schema() -> Schema {
             use crate::schema::types::field::{FieldVariant, RangeField};
-            use crate::permissions::types::policy::{PermissionsPolicy, TrustDistance};
+            use crate::permissions::types::policy::PermissionsPolicy;
             use crate::fees::types::config::FieldPaymentConfig;
             use std::collections::HashMap;
 
@@ -196,7 +196,7 @@ mod tests {
         let (fold_db, _temp_dir) = TestUtils::create_test_db();
         
         // Create encryption operations
-        let mut encryption_ops = EncryptionOperations::new(fold_db.db_ops());
+        let encryption_ops = EncryptionOperations::new(fold_db.db_ops());
         
         // Test encryption state
         assert!(!encryption_ops.is_atom_encryption_enabled());

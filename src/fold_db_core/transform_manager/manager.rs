@@ -198,23 +198,27 @@ impl TransformManager {
         &self,
         registration: TransformRegistration,
     ) -> Result<(), SchemaError> {
-        // Convert to unified format and register with unified manager
+        // CONSOLIDATED: Direct delegation to unified manager
+        info!("📝 TransformManager: Delegating event-driven registration to unified manager: {}", registration.transform_id);
+        
+        // Load transform from database
         let transform = match self.db_ops.get_transform(&registration.transform_id) {
             Ok(Some(transform)) => transform,
             Ok(None) => {
                 return Err(SchemaError::InvalidData(format!(
-                    "Transform '{}' not found in database", 
+                    "Transform '{}' not found in database",
                     registration.transform_id
                 )));
             },
             Err(e) => {
                 return Err(SchemaError::InvalidData(format!(
-                    "Failed to get transform from database: {:?}", 
+                    "Failed to get transform from database: {:?}",
                     e
                 )));
             }
         };
         
+        // Create unified definition and delegate
         let unified_definition = TransformDefinition {
             id: registration.transform_id.clone(),
             transform: transform.clone(),
@@ -228,19 +232,15 @@ impl TransformManager {
             },
         };
         
+        use crate::transform_execution::error::error_conversion::ErrorConversion;
         self.unified_manager.register_transform(unified_definition)
-            .map_err(|e| {
-                error!("Failed to register transform with unified manager: {:?}", e);
-                SchemaError::InvalidData(format!("Unified registration failed: {:?}", e))
-            })?;
+            .map_transform_execution_error()?;
             
-        info!("✅ Successfully registered transform '{}' with unified manager", registration.transform_id);
+        info!("✅ Successfully delegated transform '{}' registration to unified manager", registration.transform_id);
         Ok(())
     }
 
-    /// Registers a transform with automatic input dependency detection.
-    ///
-    /// LEGACY REMOVAL: Now uses only unified manager
+    /// CONSOLIDATED: Direct delegation to unified manager
     pub fn register_transform_auto(
         &self,
         transform_id: String,
@@ -249,7 +249,9 @@ impl TransformManager {
         schema_name: String,
         field_name: String,
     ) -> Result<(), SchemaError> {
-        // Convert to unified format
+        info!("📝 TransformManager: Delegating auto-registration to unified manager: {}", transform_id);
+        
+        // Create unified definition and delegate - no duplicate logic
         let unified_definition = TransformDefinition {
             id: transform_id.clone(),
             transform: transform.clone(),
@@ -264,13 +266,11 @@ impl TransformManager {
             },
         };
         
+        use crate::transform_execution::error::error_conversion::ErrorConversion;
         self.unified_manager.register_transform(unified_definition)
-            .map_err(|e| {
-                error!("Failed to auto-register transform with unified manager: {:?}", e);
-                SchemaError::InvalidData(format!("Unified auto-registration failed: {:?}", e))
-            })?;
+            .map_transform_execution_error()?;
             
-        info!("✅ Successfully auto-registered transform '{}' with unified manager", transform_id);
+        info!("✅ Successfully delegated auto-registration of '{}' to unified manager", transform_id);
         Ok(())
     }
 
@@ -321,61 +321,7 @@ impl TransformManager {
         Ok(())
     }
 
-    /// Execute transform directly using transform_id (DEPRECATED)
-    pub fn execute_transform_with_db(
-        _transform_id: &str,
-        _message_bus: &Arc<MessageBus>,
-        _db_ops: Option<&Arc<crate::db_operations::DbOperations>>,
-    ) -> (usize, bool, Option<String>) {
-        error!("❌ DEPRECATED: TransformManager::execute_transform_with_db is no longer used");
-        error!("❌ All execution should go through UnifiedTransformManager directly");
-        
-        let error_msg = Some("Direct transform execution through TransformManager is deprecated - use UnifiedTransformManager".to_string());
-        (0_usize, false, error_msg)
-    }
 
-    /// Execute a single transform (static method for backward compatibility)
-    pub fn execute_single_transform(
-        _transform_id: &str,
-        transform: &Transform,
-        db_ops: &Arc<DbOperations>,
-    ) -> Result<JsonValue, SchemaError> {
-        // For backward compatibility, use the transform executor directly
-        use crate::transform::executor::TransformExecutor;
-        
-        // Fetch inputs for the transform
-        let mut input_values = HashMap::new();
-        let inputs_to_process = if transform.get_inputs().is_empty() {
-            transform.analyze_dependencies().into_iter().collect::<Vec<_>>()
-        } else {
-            transform.get_inputs().to_vec()
-        };
-        
-        for input_field in inputs_to_process {
-            if let Some(dot_pos) = input_field.find('.') {
-                let input_schema = &input_field[..dot_pos];
-                let input_field_name = &input_field[dot_pos + 1..];
-                
-                // Simple field value fetching
-                if let Ok(Some(schema)) = db_ops.get_schema(input_schema) {
-                    if let Some(field) = schema.fields.get(input_field_name) {
-                        if let Some(ref_uuid) = field.ref_atom_uuid() {
-                            if let Ok(Some(atom_ref)) = db_ops.get_item::<crate::atom::AtomRef>(&format!("ref:{}", ref_uuid)) {
-                                if let Ok(Some(atom)) = db_ops.get_item::<crate::atom::Atom>(&format!("atom:{}", atom_ref.get_atom_uuid())) {
-                                    input_values.insert(input_field.clone(), atom.content().clone());
-                                    continue;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            // Default value if field not found
-            input_values.insert(input_field.clone(), JsonValue::Null);
-        }
-        
-        TransformExecutor::execute_transform(transform, input_values)
-    }
 
     /// Store transform result (static method for backward compatibility)
     pub fn store_transform_result_generic(
@@ -437,9 +383,14 @@ impl TransformManager {
 impl TransformRunner for TransformManager {
     /// Execute a transform now using the unified manager
     fn execute_transform_now(&self, transform_id: &str) -> Result<JsonValue, SchemaError> {
-        info!("🚀 TransformManager: Executing transform now: {}", transform_id);
+        info!("🚀 TransformManager: Delegating to unified manager: {}", transform_id);
 
-        // Load the transform from the database
+        // CONSOLIDATED: Use unified manager for all execution logic
+        // This eliminates the duplicate execution implementation that was here
+        use crate::transform_execution::types::{TransformInput, ExecutionContext};
+        use crate::transform_execution::error::error_conversion::ErrorConversion;
+        
+        // Load the transform to get output info for context
         let transform = match self.db_ops.get_transform(transform_id) {
             Ok(Some(transform)) => transform,
             Ok(None) => {
@@ -458,17 +409,39 @@ impl TransformRunner for TransformManager {
             }
         };
 
-        // Execute using static method for backward compatibility
-        let result = Self::execute_single_transform(transform_id, &transform, &self.db_ops)?;
+        // Create minimal context - unified manager handles input resolution
+        let (schema_name, field_name) = if let Some(dot_pos) = transform.get_output().find('.') {
+            (transform.get_output()[..dot_pos].to_string(), transform.get_output()[dot_pos + 1..].to_string())
+        } else {
+            ("unknown".to_string(), transform_id.to_string())
+        };
+
+        let context = ExecutionContext {
+            schema_name,
+            field_name,
+            atom_ref: None,
+            timestamp: std::time::SystemTime::now(),
+            additional_data: HashMap::new(),
+        };
+
+        // Empty input - unified manager will resolve all inputs internally
+        let input = TransformInput {
+            values: HashMap::new(),
+            context
+        };
+
+        // Delegate to unified manager - no duplicate logic
+        let result = self.unified_manager.execute_transform(transform_id.to_string(), input)
+            .map_transform_execution_error()?;
 
         // Store the result using static method
-        Self::store_transform_result_generic(&self.db_ops, &transform, &result)?;
+        Self::store_transform_result_generic(&self.db_ops, &transform, &result.value)?;
 
         info!(
-            "✅ Transform '{}' executed successfully: {}",
-            transform_id, result
+            "✅ Transform '{}' executed successfully via unified manager: {}",
+            transform_id, result.value
         );
-        Ok(result)
+        Ok(result.value)
     }
 
     fn transform_exists(&self, transform_id: &str) -> Result<bool, SchemaError> {

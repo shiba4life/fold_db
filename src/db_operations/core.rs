@@ -132,14 +132,16 @@ impl DbOperations {
         key: &str,
         item: &T,
     ) -> Result<(), SchemaError> {
+        use crate::transform_execution::error::error_conversion::ErrorConversion;
+        
         let bytes = serde_json::to_vec(item)
-            .map_err(|e| SchemaError::InvalidData(format!("Serialization failed: {}", e)))?;
+            .map_serialization_error()?;
 
         tree.insert(key.as_bytes(), bytes)
-            .map_err(|e| SchemaError::InvalidData(format!("Store failed: {}", e)))?;
+            .map_database_error("insert")?;
 
         tree.flush()
-            .map_err(|e| SchemaError::InvalidData(format!("Flush failed: {}", e)))?;
+            .map_flush_error()?;
 
         Ok(())
     }

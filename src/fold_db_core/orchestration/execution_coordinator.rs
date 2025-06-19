@@ -113,13 +113,14 @@ impl ExecutionCoordinator {
     /// Execute a transform with consolidated execution logic (no helper dependency)
     fn execute_transform_now(&self, transform_id: &str) -> Result<JsonValue, SchemaError> {
         info!(
-            "🔧 ExecutionCoordinator: Executing transform directly: {}",
+            "🔧 ExecutionCoordinator: Delegating to TransformManager: {}",
             transform_id
         );
 
         let execution_start_time = Instant::now();
 
-        // Execute transform using the TransformRunner interface
+        // CONSOLIDATED: Simplified delegation - no duplicate logic
+        // The TransformManager already handles all execution details
         match self.manager.execute_transform_now(transform_id) {
             Ok(result) => {
                 let duration = execution_start_time.elapsed();
@@ -135,7 +136,7 @@ impl ExecutionCoordinator {
                     "status": "executed_from_queue",
                     "transform_id": transform_id,
                     "result": result,
-                    "method": "delegated_execution",
+                    "method": "unified_execution",
                     "duration_ms": duration.as_millis(),
                     "execution_time": chrono::Utc::now().to_rfc3339()
                 }))
@@ -146,7 +147,6 @@ impl ExecutionCoordinator {
                     "❌ Transform {} failed during execution after {:?}: {}",
                     transform_id, duration, e
                 );
-                error!("❌ Execution error details: {:?}", e);
 
                 // Publish failure event
                 self.publish_failure_event(transform_id, &e.to_string())?;

@@ -14,7 +14,9 @@ use super::types::{
 };
 use crate::db_operations::DbOperations;
 use crate::schema::types::{Transform};
-use crate::transform::executor::TransformExecutor as LegacyTransformExecutor;
+use crate::transform::ast::Value;
+use crate::transform::interpreter::Interpreter;
+use crate::transform::parser::TransformParser;
 use log::{error, info, warn};
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, VecDeque};
@@ -197,22 +199,72 @@ impl TransformExecutor {
         }
     }
 
-    /// Executes the actual transform logic.
+    /// Executes the actual transform logic using native unified implementation.
     fn execute_transform_logic(
         &self,
         transform: &Transform,
         input: &TransformInput,
     ) -> TransformResult<TransformOutput> {
         let start_time = Instant::now();
+        info!("🧮 Native Transform Execution: Starting computation");
+        info!("🔧 Transform logic: {}", transform.logic);
 
-        // Convert input to legacy format
+        // Convert input to the format expected by the transform execution
         let input_values: HashMap<String, JsonValue> = input.values.clone();
 
-        // Execute using the legacy transform executor
-        let result = LegacyTransformExecutor::execute_transform(transform, input_values)
-            .map_err(|e| TransformError::SchemaError {
-                message: e.to_string(),
-            })?;
+        // Log individual input values
+        info!("📊 Input values for computation:");
+        for (key, value) in &input_values {
+            info!("  📋 {}: {}", key, value);
+        }
+
+        // Use the pre-parsed expression if available, otherwise parse the transform logic
+        let ast = match &transform.parsed_expression {
+            Some(expr) => expr.clone(),
+            None => {
+                // Parse the transform logic
+                let logic = &transform.logic;
+                let parser = TransformParser::new();
+                parser.parse_expression(logic).map_err(|e| {
+                    TransformError::ExecutionError {
+                        message: format!("Failed to parse transform: {}", e),
+                        transform_id: transform.get_output().to_owned(),
+                        input_data: None,
+                        stack_trace: None,
+                    }
+                })?
+            }
+        };
+
+        info!("🔍 Transform AST: {:?}", ast);
+        info!("📊 Input values: {:?}", input_values);
+
+        // Convert input values to interpreter values
+        info!("🔄 Converting input values to interpreter format...");
+        let input_values_for_error = input_values.clone(); // Keep a copy for error reporting
+        let variables = Self::convert_input_values_to_interpreter(input_values);
+        info!("🔄 Variables for interpreter: {:?}", variables);
+
+        // Create interpreter with input variables
+        info!("🧠 Creating interpreter with variables...");
+        let mut interpreter = Interpreter::with_variables(variables);
+
+        // Evaluate the AST
+        info!("⚡ Evaluating expression...");
+        let evaluated = interpreter.evaluate(&ast).map_err(|e| {
+            error!("❌ Expression evaluation failed: {}", e);
+            TransformError::ExecutionError {
+                message: format!("Failed to execute transform: {}", e),
+                transform_id: transform.get_output().to_owned(),
+                input_data: Some(format!("{:?}", input_values_for_error)),
+                stack_trace: None,
+            }
+        })?;
+
+        info!("🎯 Raw evaluation result: {:?}", evaluated);
+
+        let json_result = Self::convert_interpreter_result_to_json(evaluated)?;
+        info!("✨ Final JSON result: {}", json_result);
 
         let execution_time = start_time.elapsed();
 
@@ -225,9 +277,21 @@ impl TransformExecutor {
         };
 
         Ok(TransformOutput {
-            value: result,
+            value: json_result,
             metadata,
         })
+    }
+
+    /// Converts input values from JsonValue to interpreter Value.
+    // CONSOLIDATED: Use centralized conversion utilities
+    fn convert_input_values_to_interpreter(input_values: HashMap<String, JsonValue>) -> HashMap<String, Value> {
+        super::conversion::ConversionUtils::convert_input_values_to_interpreter(input_values)
+    }
+
+    /// CONSOLIDATED: Use centralized conversion utilities
+    fn convert_interpreter_result_to_json(value: Value) -> TransformResult<JsonValue> {
+        super::conversion::ConversionUtils::convert_interpreter_result_to_json(value)
+            .map_err(|e| TransformError::serialization(e.to_string(), "interpreter_result"))
     }
 
     /// Loads a transform from the database.

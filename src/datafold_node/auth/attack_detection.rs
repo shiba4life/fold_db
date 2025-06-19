@@ -249,8 +249,8 @@ impl AttackDetector {
 mod tests {
     use super::*;
     use crate::datafold_node::auth::auth_config::AttackDetectionConfig;
-    use crate::datafold_node::auth::auth_types::{SecurityEvent, SecurityEventType, ClientInfo, RequestInfo, SecurityMetrics};
-    use crate::security_types::Severity;
+    
+    
 
     fn create_test_config() -> AttackDetectionConfig {
         AttackDetectionConfig {
@@ -265,7 +265,7 @@ mod tests {
 
     #[test]
     fn test_attack_detection_basic() {
-        let mut detector = AttackDetector::new();
+        let detector = AttackDetector::new();
         let config = create_test_config();
 
         // Test basic functionality without requiring complex event creation
