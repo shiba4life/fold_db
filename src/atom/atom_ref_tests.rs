@@ -29,8 +29,6 @@ mod tests {
         assert!(updated_ref.updated_at() >= atom_ref.updated_at());
     }
 
-    // TODO: AtomRefCollection tests removed - collections are no longer supported
-    // Collections have been removed from the schema system
 
     #[test]
     fn test_atom_ref_range() {

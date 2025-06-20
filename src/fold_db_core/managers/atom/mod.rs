@@ -12,7 +12,7 @@ mod request_handlers;
 mod field_processing;
 mod helpers;
 
-use crate::atom::{Atom, AtomRef, AtomRefCollection, AtomRefRange};
+use crate::atom::{Atom, AtomRef, AtomRefRange};
 use crate::db_operations::DbOperations;
 use crate::fold_db_core::infrastructure::message_bus::MessageBus;
 use std::collections::HashMap;
@@ -27,7 +27,6 @@ pub struct AtomManager {
     pub(crate) db_ops: Arc<DbOperations>,
     pub(crate) atoms: Arc<Mutex<HashMap<String, Atom>>>,
     pub(crate) ref_atoms: Arc<Mutex<HashMap<String, AtomRef>>>,
-    pub(crate) ref_collections: Arc<Mutex<HashMap<String, AtomRefCollection>>>,
     pub(crate) ref_ranges: Arc<Mutex<HashMap<String, AtomRefRange>>>,
     pub(crate) message_bus: Arc<MessageBus>,
     pub(crate) stats: Arc<Mutex<EventDrivenAtomStats>>,
@@ -38,7 +37,6 @@ impl AtomManager {
     pub fn new(db_ops: DbOperations, message_bus: Arc<MessageBus>) -> Self {
         let mut atoms = HashMap::new();
         let mut ref_atoms = HashMap::new();
-        let mut ref_collections = HashMap::new();
         let mut ref_ranges = HashMap::new();
 
         // Load existing data from database
@@ -53,8 +51,6 @@ impl AtomManager {
             } else if let Some(stripped) = key_str.strip_prefix("ref:") {
                 if let Ok(atom_ref) = serde_json::from_slice::<AtomRef>(bytes) {
                     ref_atoms.insert(stripped.to_string(), atom_ref);
-                } else if let Ok(collection) = serde_json::from_slice::<AtomRefCollection>(bytes) {
-                    ref_collections.insert(stripped.to_string(), collection);
                 } else if let Ok(range) = serde_json::from_slice::<AtomRefRange>(bytes) {
                     ref_ranges.insert(stripped.to_string(), range);
                 }
@@ -65,7 +61,6 @@ impl AtomManager {
             db_ops: Arc::new(db_ops),
             atoms: Arc::new(Mutex::new(atoms)),
             ref_atoms: Arc::new(Mutex::new(ref_atoms)),
-            ref_collections: Arc::new(Mutex::new(ref_collections)),
             ref_ranges: Arc::new(Mutex::new(ref_ranges)),
             message_bus: Arc::clone(&message_bus),
             stats: Arc::new(Mutex::new(EventDrivenAtomStats::new())),
@@ -125,7 +120,6 @@ impl Clone for AtomManager {
             db_ops: Arc::clone(&self.db_ops),
             atoms: Arc::clone(&self.atoms),
             ref_atoms: Arc::clone(&self.ref_atoms),
-            ref_collections: Arc::clone(&self.ref_collections),
             ref_ranges: Arc::clone(&self.ref_ranges),
             message_bus: Arc::clone(&self.message_bus),
             stats: Arc::clone(&self.stats),

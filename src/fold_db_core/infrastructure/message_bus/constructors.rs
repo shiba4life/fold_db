@@ -579,7 +579,6 @@ impl AtomRefGetResponse {
     }
 }
 
-// TODO: CollectionUpdateRequest and CollectionUpdateResponse constructors removed during event system cleanup
 
 impl SystemInitializationRequest {
     /// Create a new SystemInitializationRequest

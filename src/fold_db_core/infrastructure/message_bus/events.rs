@@ -120,6 +120,7 @@ impl Event {
     }
 }
 
+
 impl EventType for Event {
     fn type_id() -> &'static str {
         "Event"

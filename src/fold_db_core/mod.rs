@@ -73,7 +73,6 @@ pub enum OperationResponse {
 pub struct FoldDB {
     pub(crate) atom_manager: AtomManager,
     pub(crate) field_retrieval_service: FieldRetrievalService,
-    // TODO: CollectionManager removed - collections are no longer supported
     pub(crate) schema_manager: Arc<SchemaCore>,
     pub(crate) transform_manager: Arc<TransformManager>,
     pub(crate) transform_orchestrator: Arc<TransformOrchestrator>,
@@ -150,8 +149,7 @@ impl FoldDB {
             SchemaCore::new(path, Arc::clone(&db_ops_arc), Arc::clone(&message_bus))
                 .map_err(|e| sled::Error::Unsupported(e.to_string()))?,
         );
-        // TODO: CollectionManager removed - collections are no longer supported
-        
+
         // Use standard initialization but with deprecated closures that recommend events
         let transform_manager = init_transform_manager(Arc::new(db_ops.clone()), Arc::clone(&message_bus))?;
         let orchestrator =
@@ -219,7 +217,6 @@ impl FoldDB {
         Ok(Self {
             atom_manager,
             field_retrieval_service: FieldRetrievalService::new(Arc::clone(&message_bus)),
-            // TODO: CollectionManager removed - collections are no longer supported
             schema_manager,
             transform_manager,
             transform_orchestrator: orchestrator,

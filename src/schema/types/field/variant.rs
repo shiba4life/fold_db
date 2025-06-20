@@ -13,7 +13,6 @@ use crate::schema::types::Transform;
 pub enum FieldVariant {
     /// Single value field
     Single(SingleField),
-    // TODO: Collection fields are no longer supported - CollectionField has been removed
     /// Range of values
     Range(RangeField),
 }
@@ -107,7 +106,6 @@ impl Serialize for FieldVariant {
                 inner: &f.inner,
                 field_type: FieldType::Single,
             },
-            // TODO: Collection fields are no longer supported - CollectionField has been removed
             Self::Range(f) => Helper {
                 inner: &f.inner,
                 field_type: FieldType::Range,
@@ -135,7 +133,6 @@ impl<'de> Deserialize<'de> for FieldVariant {
             FieldType::Single => Self::Single(SingleField {
                 inner: helper.inner,
             }),
-            // TODO: Collection variant was removed during event system cleanup
             FieldType::Range => {
                 let mut range_field = RangeField {
                     inner: helper.inner,

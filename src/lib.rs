@@ -43,6 +43,7 @@ pub mod testing_utils;
 pub mod transform;
 pub mod validation_utils;
 pub mod web_logger;
+pub mod constants;
 
 // Re-export main types for convenience
 pub use datafold_node::config::load_node_config;
@@ -71,3 +72,6 @@ pub use security::{
 
 // Re-export ingestion types
 pub use ingestion::{IngestionConfig, IngestionCore, IngestionError, IngestionResponse};
+
+// Re-export commonly used constants
+pub use constants::{DEFAULT_P2P_PORT, DEFAULT_HTTP_PORT};

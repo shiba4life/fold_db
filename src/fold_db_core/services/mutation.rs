@@ -61,7 +61,6 @@ impl MutationService {
             FieldVariant::Range(range_field) => {
                 self.update_range_field(schema, field_name, range_field, value, mutation_hash)
             }
-            // TODO: Collection fields are no longer supported - CollectionField has been removed
         }
     }
 
@@ -180,9 +179,6 @@ impl MutationService {
             field_name, schema.name
         )))
     }
-
-    // TODO: Collection fields are no longer supported - CollectionField has been removed
-
     /// Generate mutation hash for tracking
     pub fn generate_mutation_hash(mutation: &Mutation) -> Result<String, SchemaError> {
         let mutation_bytes = serde_json::to_vec(&mutation).map_err(|e| {
@@ -214,7 +210,6 @@ impl MutationService {
                 }
                 Ok(())
             }
-            // TODO: Collection fields are no longer supported - CollectionField has been removed
         }
     }
 }
@@ -268,7 +263,6 @@ pub fn validate_range_schema_mutation_format(
                         schema.name, field_name
                     )));
                 }
-                // TODO: Collection fields are no longer supported - CollectionField has been removed
             }
         }
 
