@@ -11,10 +11,10 @@
 //! 5. **Range Filtering and Search** - Advanced query capabilities
 //! 6. **Range Schema Validation** - Ensure Range schemas work correctly
 
-use datafold::schema::types::field::{FieldVariant, RangeField, Field};
-use datafold::schema::types::field::range_filter::{RangeFilter, RangeFilterResult};
+use datafold::schema::types::field::{FieldVariant, RangeField};
+use datafold::schema::types::field::range_filter::RangeFilter;
 use datafold::schema::{Schema, field_factory::FieldFactory};
-use datafold::atom::{Atom, AtomRef};
+use datafold::atom::Atom;
 use datafold::db_operations::DbOperations;
 use datafold::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSetRequest, FieldValueSetResponse};
 use datafold::fold_db_core::managers::atom::AtomManager;

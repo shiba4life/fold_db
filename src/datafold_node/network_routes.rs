@@ -125,7 +125,6 @@ mod tests {
         let node = DataFoldNode::new(config).unwrap();
         let state = web::Data::new(super::super::http_server::AppState {
             node: std::sync::Arc::new(tokio::sync::Mutex::new(node)),
-            security_manager: None,
         });
         use actix_web::test;
         let req = test::TestRequest::default().to_http_request();
@@ -139,7 +138,6 @@ mod tests {
         let node = DataFoldNode::new(config).unwrap();
         web::Data::new(super::super::http_server::AppState {
             node: std::sync::Arc::new(tokio::sync::Mutex::new(node)),
-            security_manager: None,
         })
     }
 

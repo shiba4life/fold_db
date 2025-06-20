@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use crate::security::SecurityConfig;
 
 /// Configuration for a DataFoldNode instance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,6 +13,9 @@ pub struct NodeConfig {
     /// Network listening address
     #[serde(default = "default_network_listen_address")]
     pub network_listen_address: String,
+    /// Security configuration
+    #[serde(default)]
+    pub security_config: SecurityConfig,
 }
 
 fn default_network_listen_address() -> String {
@@ -24,6 +28,7 @@ impl Default for NodeConfig {
             storage_path: PathBuf::from("data"),
             default_trust_distance: 1,
             network_listen_address: default_network_listen_address(),
+            security_config: SecurityConfig::from_env(),
         }
     }
 }
@@ -33,7 +38,9 @@ impl NodeConfig {
     pub fn new(storage_path: PathBuf) -> Self {
         Self {
             storage_path,
-            ..Default::default()
+            default_trust_distance: 1,
+            network_listen_address: default_network_listen_address(),
+            security_config: SecurityConfig::from_env(),
         }
     }
 

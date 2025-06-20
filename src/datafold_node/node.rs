@@ -9,6 +9,7 @@ use crate::datafold_node::config::NodeInfo;
 use crate::error::{FoldDbError, FoldDbResult, NetworkErrorKind};
 use crate::fold_db_core::FoldDB;
 use crate::network::{NetworkConfig, NetworkCore, PeerId};
+use crate::security::{SecurityManager, EncryptionManager};
 
 /// A node in the DataFold distributed database system.
 ///
@@ -66,6 +67,8 @@ pub struct DataFoldNode {
     pub(super) node_id: String,
     /// Network layer for P2P communication
     pub(super) network: Option<Arc<tokio::sync::Mutex<NetworkCore>>>,
+    /// Security manager for authentication and encryption
+    pub(super) security_manager: Arc<SecurityManager>,
 }
 
 /// Basic status information about the network layer
@@ -96,12 +99,26 @@ impl DataFoldNode {
                 .map_err(|e| FoldDbError::Config(format!("Failed to get node_id: {}", e)))?
         };
 
+        // Initialize security manager with node configuration
+        let mut security_config = config.security_config.clone();
+        
+        // Generate master key if encryption is enabled but no key is set
+        if security_config.encrypt_at_rest && security_config.master_key.is_none() {
+            security_config.master_key = Some(EncryptionManager::generate_master_key());
+        }
+        
+        let security_manager = Arc::new(
+            SecurityManager::new(security_config)
+                .map_err(|e| FoldDbError::SecurityError(e.to_string()))?
+        );
+
         Ok(Self {
             db,
             config,
             trusted_nodes: HashMap::new(),
             node_id,
             network: None,
+            security_manager,
         })
     }
 
@@ -395,6 +412,11 @@ impl DataFoldNode {
         &self.node_id
     }
 
+    /// Gets a reference to the security manager.
+    pub fn get_security_manager(&self) -> &Arc<SecurityManager> {
+        &self.security_manager
+    }
+
     /// Restart the node by reinitializing all components
     pub async fn restart(&mut self) -> FoldDbResult<()> {
         info!("Restarting DataFoldNode...");
@@ -443,6 +465,16 @@ impl DataFoldNode {
 
         // Clear trusted nodes (they can be re-added if needed)
         self.trusted_nodes.clear();
+
+        // Reinitialize security manager with current config
+        let mut security_config = self.config.security_config.clone();
+        if security_config.encrypt_at_rest && security_config.master_key.is_none() {
+            security_config.master_key = Some(EncryptionManager::generate_master_key());
+        }
+        self.security_manager = Arc::new(
+            SecurityManager::new(security_config)
+                .map_err(|e| FoldDbError::SecurityError(e.to_string()))?
+        );
 
         info!("DataFoldNode restart completed successfully");
         Ok(())

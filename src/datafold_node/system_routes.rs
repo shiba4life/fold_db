@@ -95,7 +95,6 @@ mod tests {
 
         let state = web::Data::new(AppState {
             node: Arc::new(tokio::sync::Mutex::new(node)),
-            security_manager: None,
         });
 
         let req = test::TestRequest::get().to_http_request();
@@ -111,7 +110,6 @@ mod tests {
 
         let state = web::Data::new(AppState {
             node: Arc::new(tokio::sync::Mutex::new(node)),
-            security_manager: None,
         });
 
         let req_body = ResetDatabaseRequest { confirm: false };
@@ -131,7 +129,6 @@ mod tests {
 
         let state = web::Data::new(AppState {
             node: Arc::new(tokio::sync::Mutex::new(node)),
-            security_manager: None,
         });
 
         let req_body = ResetDatabaseRequest { confirm: true };

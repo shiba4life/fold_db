@@ -3,7 +3,6 @@ use super::{network_routes, query_routes, schema_routes, security_routes, system
 use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
 use crate::ingestion::routes as ingestion_routes;
-use crate::security::{SecurityManager, SecurityConfigBuilder};
 
 use actix_cors::Cors;
 use actix_files::Files;
@@ -36,8 +35,6 @@ pub struct DataFoldHttpServer {
 pub struct AppState {
     /// The DataFold node
     pub(crate) node: Arc<tokio::sync::Mutex<DataFoldNode>>,
-    /// The security manager for authentication and encryption
-    pub(crate) security_manager: Option<Arc<SecurityManager>>,
 }
 
 impl DataFoldHttpServer {
@@ -94,21 +91,9 @@ impl DataFoldHttpServer {
     pub async fn run(&self) -> FoldDbResult<()> {
         info!("HTTP server running on {}", self.bind_address);
 
-        // Create security manager for this server instance
-        let security_config = SecurityConfigBuilder::new()
-            .require_signatures(true)
-            .enable_encryption()
-            .build();
-        
-        let security_manager = Arc::new(
-            SecurityManager::new(security_config)
-                .map_err(|e| FoldDbError::SecurityError(e.to_string()))?
-        );
-
         // Create shared application state
         let app_state = web::Data::new(AppState {
             node: self.node.clone(),
-            security_manager: Some(security_manager),
         });
 
         // Start the HTTP server

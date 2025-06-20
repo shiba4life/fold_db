@@ -18,7 +18,7 @@ use datafold::fold_db_core::transform_manager::TransformManager;
 use datafold::fold_db_core::managers::atom::AtomManager;
 use datafold::db_operations::DbOperations;
 use datafold::schema::{Schema, types::field::FieldVariant, field_factory::FieldFactory};
-use datafold::atom::{Atom, AtomRef};
+use datafold::atom::Atom;
 use serde_json::json;
 use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
 use std::time::{Duration, Instant};

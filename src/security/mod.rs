@@ -6,6 +6,8 @@
 //! - AES-GCM encryption/decryption for data at rest
 //! - Integration with network and permissions layers
 
+use base64::{Engine as _, engine::general_purpose};
+
 pub mod keys;
 pub mod signing;
 pub mod encryption;
@@ -54,7 +56,7 @@ pub enum SecurityError {
 pub type SecurityResult<T> = Result<T, SecurityError>;
 
 /// Security module configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SecurityConfig {
     /// Whether to require TLS for all connections
     pub require_tls: bool,
@@ -63,6 +65,7 @@ pub struct SecurityConfig {
     /// Whether to encrypt sensitive data at rest
     pub encrypt_at_rest: bool,
     /// Master key for at-rest encryption (should be securely managed)
+    #[serde(skip)]
     pub master_key: Option<[u8; 32]>,
 }
 
@@ -81,6 +84,37 @@ impl SecurityConfig {
     /// Create a new security config with default settings
     pub fn new() -> Self {
         Self::default()
+    }
+    
+    /// Load security configuration from environment variables
+    pub fn from_env() -> Self {
+        let mut config = Self::default();
+        
+        // Load from environment variables
+        if let Ok(value) = std::env::var("DATAFOLD_REQUIRE_TLS") {
+            config.require_tls = value.parse().unwrap_or(true);
+        }
+        
+        if let Ok(value) = std::env::var("DATAFOLD_REQUIRE_SIGNATURES") {
+            config.require_signatures = value.parse().unwrap_or(true);
+        }
+        
+        if let Ok(value) = std::env::var("DATAFOLD_ENCRYPT_AT_REST") {
+            config.encrypt_at_rest = value.parse().unwrap_or(true);
+        }
+        
+        // Load master key from environment (base64 encoded)
+        if let Ok(key_base64) = std::env::var("DATAFOLD_MASTER_KEY") {
+            if let Ok(key_bytes) = general_purpose::STANDARD.decode(&key_base64) {
+                if key_bytes.len() == 32 {
+                    let mut key = [0u8; 32];
+                    key.copy_from_slice(&key_bytes);
+                    config.master_key = Some(key);
+                }
+            }
+        }
+        
+        config
     }
     
     /// Enable or disable TLS requirement

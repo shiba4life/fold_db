@@ -32,6 +32,7 @@ use tokio::sync::Mutex;
 ///         storage_path: PathBuf::from("data"),
 ///         default_trust_distance: 1,
 ///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
+///         security_config: datafold::security::SecurityConfig::default(),
 ///     };
 ///     let node = DataFoldNode::new(config)?;
 ///     
@@ -87,6 +88,7 @@ impl TcpServer {
     ///         storage_path: PathBuf::from("data"),
     ///         default_trust_distance: 1,
     ///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
+    ///         security_config: datafold::security::SecurityConfig::default(),
     ///     };
     ///     let node = DataFoldNode::new(config)?;
     ///     let tcp_server = TcpServer::new(node, 9000).await?;
@@ -139,6 +141,7 @@ impl TcpServer {
     ///         storage_path: PathBuf::from("data"),
     ///         default_trust_distance: 1,
     ///         network_listen_address: "/ip4/127.0.0.1/tcp/0".to_string(),
+    ///         security_config: datafold::security::SecurityConfig::default(),
     ///     };
     ///     let node = DataFoldNode::new(config)?;
     ///     let tcp_server = TcpServer::new(node, 9000).await?;

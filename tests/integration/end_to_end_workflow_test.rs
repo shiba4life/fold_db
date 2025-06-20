@@ -23,7 +23,6 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
-use std::collections::HashMap;
 use tempfile::tempdir;
 use uuid::Uuid;
 

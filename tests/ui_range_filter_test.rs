@@ -5,7 +5,6 @@
 
 use log::info;
 use serde_json::json;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
@@ -17,14 +16,11 @@ use datafold::{
     },
     schema::{
         types::{
-            operations::{Mutation, MutationType, Query},
-            field::{FieldVariant, RangeField},
+            field::FieldVariant,
             Schema,
         },
         field_factory::FieldFactory,
     },
-    permissions::types::policy::PermissionsPolicy,
-    fees::types::config::FieldPaymentConfig,
 };
 use tempfile::TempDir;
 

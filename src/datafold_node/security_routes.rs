@@ -2,7 +2,7 @@
 
 use super::http_server::AppState;
 use crate::security::{
-    SecurityManager, SecurityConfigBuilder, KeyRegistrationRequest,
+    SecurityManager, KeyRegistrationRequest,
     SignedMessage, SecurityMiddleware, SecurityError,
     ClientSecurity,
 };
@@ -10,20 +10,10 @@ use actix_web::{web, HttpResponse, Result as ActixResult};
 use serde_json::json;
 use std::sync::Arc;
 
-/// Get the security manager from app state, creating one if it doesn't exist
-fn get_security_manager(data: &web::Data<AppState>) -> Arc<SecurityManager> {
-    // Use a simple Arc<SecurityManager> that gets created per server instance
-    if let Some(security_manager) = &data.security_manager {
-        security_manager.clone()
-    } else {
-        // Fallback: create a new security manager if none exists
-        let config = SecurityConfigBuilder::new()
-            .require_signatures(true)
-            .enable_encryption()
-            .build();
-        
-        Arc::new(SecurityManager::new(config).expect("Failed to create security manager"))
-    }
+/// Get the security manager from the node
+async fn get_security_manager(data: &web::Data<AppState>) -> Arc<SecurityManager> {
+    let node_guard = data.node.lock().await;
+    node_guard.get_security_manager().clone()
 }
 
 /// Register a new public key
@@ -31,7 +21,7 @@ pub async fn register_public_key(
     request: web::Json<KeyRegistrationRequest>,
     data: web::Data<AppState>,
 ) -> ActixResult<HttpResponse> {
-    let security_manager = get_security_manager(&data);
+    let security_manager = get_security_manager(&data).await;
     
     match security_manager.register_public_key(request.into_inner()) {
         Ok(response) => Ok(HttpResponse::Ok().json(response)),
@@ -46,7 +36,7 @@ pub async fn register_public_key(
 pub async fn list_public_keys(
     data: web::Data<AppState>,
 ) -> ActixResult<HttpResponse> {
-    let security_manager = get_security_manager(&data);
+    let security_manager = get_security_manager(&data).await;
     
     match security_manager.list_public_keys() {
         Ok(keys) => Ok(HttpResponse::Ok().json(json!({
@@ -66,7 +56,7 @@ pub async fn remove_public_key(
     data: web::Data<AppState>,
 ) -> ActixResult<HttpResponse> {
     let key_id = path.into_inner();
-    let security_manager = get_security_manager(&data);
+    let security_manager = get_security_manager(&data).await;
     
     match security_manager.remove_public_key(&key_id) {
         Ok(_) => Ok(HttpResponse::Ok().json(json!({
@@ -86,7 +76,7 @@ pub async fn get_public_key(
     data: web::Data<AppState>,
 ) -> ActixResult<HttpResponse> {
     let key_id = path.into_inner();
-    let security_manager = get_security_manager(&data);
+    let security_manager = get_security_manager(&data).await;
     
     match security_manager.get_public_key(&key_id) {
         Ok(Some(key_info)) => Ok(HttpResponse::Ok().json(json!({
@@ -109,7 +99,7 @@ pub async fn verify_message(
     message: web::Json<SignedMessage>,
     data: web::Data<AppState>,
 ) -> ActixResult<HttpResponse> {
-    let security_manager = get_security_manager(&data);
+    let security_manager = get_security_manager(&data).await;
     
     match security_manager.verify_message(&message.into_inner()) {
         Ok(result) => Ok(HttpResponse::Ok().json(json!({
@@ -154,7 +144,7 @@ pub async fn generate_demo_keypair(_data: web::Data<AppState>) -> ActixResult<Ht
 
 /// Get security configuration status
 pub async fn get_security_status(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
-    let security_manager = get_security_manager(&data);
+    let security_manager = get_security_manager(&data).await;
     
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
@@ -256,7 +246,7 @@ pub async fn verify_signed_request(
     data: web::Data<AppState>,
     required_permissions: Option<Vec<String>>,
 ) -> Result<String, SecurityError> {
-    let security_manager = get_security_manager(&data);
+    let security_manager = get_security_manager(&data).await;
     let middleware = SecurityMiddleware::new(security_manager);
     
     let permissions: Option<&[String]> = required_permissions.as_deref();
