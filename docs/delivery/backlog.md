@@ -117,4 +117,20 @@ Add logging and monitoring to the security layers for auditing and performance a
 
 ---
 
+### PBI-SEC-8: Implement Public Key Persistence
+
+**Description:**
+Add database persistence for Ed25519 public keys to prevent loss on node restart. Currently, all registered public keys are stored only in memory and are lost when the node restarts.
+
+**Acceptance Criteria:**
+- Public keys are stored in the sled database using `DbOperations`
+- `MessageVerifier` loads persisted keys on startup
+- Key registration persists keys immediately to database
+- All existing in-memory public key operations continue to work
+- Node restart preserves all registered public keys
+
+**Linked Plan:** [View Details](./SEC-8/prd.md)
+
+---
+
 *All PBIs must be explicitly linked to tasks and implementation plans. This backlog is the authoritative source for all work in the project.*

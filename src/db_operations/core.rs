@@ -16,6 +16,8 @@ pub struct DbOperations {
     pub(crate) orchestrator_tree: sled::Tree,
     pub(crate) schema_states_tree: sled::Tree,
     pub(crate) schemas_tree: sled::Tree,
+    /// Tree for storing public keys
+    pub(crate) public_keys_tree: sled::Tree,
 }
 
 impl DbOperations {
@@ -27,6 +29,7 @@ impl DbOperations {
         let orchestrator_tree = db.open_tree("orchestrator_state")?;
         let schema_states_tree = db.open_tree("schema_states")?;
         let schemas_tree = db.open_tree("schemas")?;
+        let public_keys_tree = db.open_tree("public_keys")?;
 
         Ok(Self {
             db,
@@ -36,6 +39,7 @@ impl DbOperations {
             orchestrator_tree,
             schema_states_tree,
             schemas_tree,
+            public_keys_tree,
         })
     }
 
@@ -108,6 +112,7 @@ impl DbOperations {
             self.schema_states_tree.len() as u64,
         );
         stats.insert("schemas".to_string(), self.schemas_tree.len() as u64);
+        stats.insert("public_keys".to_string(), self.public_keys_tree.len() as u64);
 
         Ok(stats)
     }

@@ -79,7 +79,6 @@ impl FieldFactory {
         }
     }
 
-    // TODO: Collection fields are no longer supported - CollectionField has been removed
 
     /// Create a RangeField with default configuration
     pub fn create_range_field() -> RangeField {
@@ -98,7 +97,6 @@ impl FieldFactory {
         FieldVariant::Single(Self::create_single_field())
     }
 
-    // TODO: Collection fields are no longer supported - CollectionField has been removed
 
     /// Create a FieldVariant::Range with default configuration
     pub fn create_range_variant() -> FieldVariant {
@@ -197,7 +195,6 @@ impl FieldBuilder {
         }
     }
 
-    // TODO: Collection fields are no longer supported - CollectionField has been removed
 
     /// Build a RangeField
     pub fn build_range(self) -> RangeField {

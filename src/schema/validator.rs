@@ -153,7 +153,6 @@ impl<'a> SchemaValidator<'a> {
                 let field_type = match field_variant {
                     crate::schema::types::field::FieldVariant::Single(_) => "Single",
                     crate::schema::types::field::FieldVariant::Range(_) => "Range", // Should not reach here
-                    // TODO: Collection fields are no longer supported - CollectionField has been removed
                 };
                 return Err(SchemaError::InvalidField(format!(
                     "RangeSchema '{}' has range_key field '{}' that is a {} field, but range_key must be a Range field",
@@ -185,7 +184,6 @@ impl<'a> SchemaValidator<'a> {
                         schema.name, field_name, field_name
                     )));
                 }
-                // TODO: Collection fields are no longer supported - CollectionField has been removed
             }
         }
 
@@ -238,13 +236,11 @@ impl<'a> SchemaValidator<'a> {
                     schema.name,
                     match field_def.field_type {
                         FieldType::Single => "Single",
-                        // TODO: Collection variant was removed during event system cleanup
                         FieldType::Range => "Range", // shouldn't reach here
                     },
                     field_name,
                     match field_def.field_type {
                         FieldType::Single => "Single",
-                        // TODO: Collection variant was removed during event system cleanup
                         FieldType::Range => "Range",
                     },
                     field_name

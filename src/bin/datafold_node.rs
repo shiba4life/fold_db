@@ -1,4 +1,5 @@
 use datafold::{
+    constants::DEFAULT_P2P_PORT,
     datafold_node::{load_node_config, DataFoldNode, TcpServer},
     network::NetworkConfig,
 };
@@ -11,11 +12,11 @@ use log::{error, info};
 #[command(author, version, about)]
 struct Cli {
     /// Port for the P2P network
-    #[arg(long, default_value_t = 9000)]
+    #[arg(long, default_value_t = DEFAULT_P2P_PORT)]
     port: u16,
 
     /// Port for the TCP server
-    #[arg(long, default_value_t = 9000)]
+    #[arg(long, default_value_t = DEFAULT_P2P_PORT)]
     tcp_port: u16,
 }
 
@@ -107,12 +108,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::Cli;
     use clap::Parser;
+    use datafold::constants::DEFAULT_P2P_PORT;
 
     #[test]
     fn defaults() {
         let cli = Cli::parse_from(["test"]);
-        assert_eq!(cli.port, 9000);
-        assert_eq!(cli.tcp_port, 9000);
+        assert_eq!(cli.port, DEFAULT_P2P_PORT);
+        assert_eq!(cli.tcp_port, DEFAULT_P2P_PORT);
     }
 
     #[test]

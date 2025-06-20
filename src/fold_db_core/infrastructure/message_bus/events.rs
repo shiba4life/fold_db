@@ -501,7 +501,6 @@ pub struct AtomRefGetResponse {
     pub error: Option<String>,
 }
 
-// TODO: CollectionUpdateRequest and CollectionUpdateResponse events removed during event system cleanup
 
 /// Request for system initialization
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -895,7 +894,6 @@ impl EventType for SystemInitializationResponse {
     }
 }
 
-// TODO: EventType implementations for CollectionUpdateRequest and CollectionUpdateResponse removed
 
 impl EventType for Event {
     fn type_id() -> &'static str {
