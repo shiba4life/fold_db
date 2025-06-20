@@ -27,6 +27,9 @@
 
 // Internal modules
 pub mod core;
+pub mod discovery;
+pub mod persistence;
+pub mod transform;
 pub mod duplicate_detection;
 pub mod field_factory;
 pub mod file_operations;
@@ -35,6 +38,9 @@ pub mod types;
 
 // Public re-exports
 pub use core::{SchemaCore, SchemaState};
+pub use discovery::*;
+pub use persistence::*;
+pub use transform::*;
 pub use field_factory::{FieldFactory, FieldBuilder, TransformSetupHelper, DatabaseInitHelper, TestEnvironment};
 pub use types::{errors::SchemaError, schema::Schema, Transform};
 pub mod validator;
