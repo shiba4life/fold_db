@@ -1,5 +1,8 @@
 use clap::Parser;
-use datafold::datafold_node::{load_node_config, DataFoldHttpServer, DataFoldNode};
+use datafold::{
+    constants::DEFAULT_HTTP_PORT,
+    datafold_node::{load_node_config, DataFoldHttpServer, DataFoldNode},
+};
 use log::info;
 
 /// Command line options for the HTTP server binary.
@@ -7,7 +10,7 @@ use log::info;
 #[command(author, version, about)]
 struct Cli {
     /// Port for the HTTP server
-    #[arg(long, default_value_t = 9001)]
+    #[arg(long, default_value_t = DEFAULT_HTTP_PORT)]
     port: u16,
 }
 
@@ -70,11 +73,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::Cli;
     use clap::Parser;
+    use datafold::constants::DEFAULT_HTTP_PORT;
 
     #[test]
     fn defaults() {
         let cli = Cli::parse_from(["test"]);
-        assert_eq!(cli.port, 9001);
+        assert_eq!(cli.port, DEFAULT_HTTP_PORT);
     }
 
     #[test]
