@@ -15,15 +15,16 @@
 | SEC-4 | Integration Tests for Security Boundaries | [Tasks](./SEC-4/tasks.md) | Done |
 | SEC-5 | Documentation and Developer Guide | [Tasks](./SEC-5/tasks.md) | Done |
 | SEC-6 | Migration Plan for Existing Functionality | [Tasks](./SEC-6/tasks.md) | Done |
-| SEC-7 | Performance and Audit Logging | [Tasks](./SEC-7/tasks.md) | InProgress |
+| SEC-7 | Performance and Audit Logging | [Tasks](./SEC-7/tasks.md) | Proposed |
+| SEC-8 | Implement Public Key Persistence | [Tasks](./SEC-8/tasks.md) | Proposed |
 
 ---
 
 ## Implementation Status Summary
 
-**✅ Completed (6/7 PBIs):**
+**✅ Completed (6/8 PBIs):**
 - **SEC-1**: Full Ed25519 signature verification middleware with comprehensive testing
-- **SEC-2**: Complete AES-GCM encryption layer with conditional encryption support  
+- **SEC-2**: Complete AES-GCM encryption layer with conditional encryption support
 - **SEC-3**: ✅ **VERIFIED** - Security infrastructure complete with comprehensive integration tests
 - **SEC-4**: Comprehensive integration tests covering all security scenarios
 - **SEC-5**: Complete documentation with multi-language client examples
@@ -31,6 +32,9 @@
 
 **🔄 In Progress (1 PBI):**
 - **SEC-7**: Basic logging present, enhanced audit and performance logging needed
+
+**📋 Proposed (1 PBI):**
+- **SEC-8**: Public key persistence to prevent loss on node restart
 
 ---
 

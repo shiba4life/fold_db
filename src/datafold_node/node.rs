@@ -417,6 +417,7 @@ impl DataFoldNode {
         &self.security_manager
     }
 
+
     /// Restart the node by reinitializing all components
     pub async fn restart(&mut self) -> FoldDbResult<()> {
         info!("Restarting DataFoldNode...");

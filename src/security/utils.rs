@@ -20,9 +20,28 @@ pub struct SecurityManager {
 }
 
 impl SecurityManager {
-    /// Create a new security manager
+    /// Create a new security manager without persistence
     pub fn new(config: crate::security::SecurityConfig) -> SecurityResult<Self> {
         let verifier = Arc::new(MessageVerifier::new(300)); // 5 minute timestamp drift
+        
+        let encryption = Arc::new(ConditionalEncryption::new(
+            config.encrypt_at_rest,
+            config.master_key,
+        )?);
+        
+        Ok(Self {
+            verifier,
+            encryption,
+            config,
+        })
+    }
+
+    /// Create a new security manager with database persistence
+    pub fn new_with_persistence(
+        config: crate::security::SecurityConfig,
+        db_ops: Arc<crate::db_operations::DbOperations>
+    ) -> SecurityResult<Self> {
+        let verifier = Arc::new(MessageVerifier::new_with_persistence(300, db_ops)?);
         
         let encryption = Arc::new(ConditionalEncryption::new(
             config.encrypt_at_rest,

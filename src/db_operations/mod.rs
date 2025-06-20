@@ -4,6 +4,7 @@ pub mod core;
 pub mod error_utils;
 mod metadata_operations;
 mod orchestrator_operations;
+mod public_key_operations;
 mod schema_operations;
 mod transform_operations;
 mod utility_operations;
