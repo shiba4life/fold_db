@@ -1466,7 +1466,6 @@ impl SchemaCore {
                 let key = format!("ref:{}", ref_atom_uuid);
                 
                 match field {
-                    // TODO: Collection fields are no longer supported - CollectionField has been removed
                     FieldVariant::Range(_) => {
                         // For range fields, create AtomRefRange
                         let atom_ref_range = AtomRefRange::new(ref_atom_uuid.clone());
@@ -1533,7 +1532,6 @@ impl SchemaCore {
         }
 
         // For now, we'll create all fields as Single fields
-        // TODO: Handle Collection and Range field types based on json_field.field_type
         FieldVariant::Single(single_field)
     }
 
