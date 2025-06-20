@@ -10,7 +10,7 @@ use datafold::fold_db_core::infrastructure::message_bus::{
 };
 use datafold::fold_db_core::managers::atom::AtomManager;
 use datafold::db_operations::DbOperations;
-use datafold::atom::{AtomRef, AtomRefBehavior};
+use datafold::atom::AtomRef;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
@@ -34,7 +34,7 @@ fn test_production_atomref_scenario() {
     let message_bus = Arc::new(MessageBus::new());
     
     // Create AtomManager
-    let atom_manager = AtomManager::new(db_ops.clone(), Arc::clone(&message_bus));
+    let _atom_manager = AtomManager::new(db_ops.clone(), Arc::clone(&message_bus));
     
     // Subscribe to FieldValueSetResponse events
     let mut response_consumer = message_bus.subscribe::<FieldValueSetResponse>();

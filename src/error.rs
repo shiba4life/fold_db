@@ -35,6 +35,9 @@ pub enum FoldDbError {
     /// Errors related to payment processing
     Payment(String),
 
+    /// Errors related to security operations
+    SecurityError(String),
+
     /// Other errors that don't fit into the above categories
     Other(String),
 }
@@ -93,6 +96,7 @@ impl fmt::Display for FoldDbError {
             Self::Io(err) => write!(f, "IO error: {}", err),
             Self::Serialization(msg) => write!(f, "Serialization error: {}", msg),
             Self::Payment(msg) => write!(f, "Payment error: {}", msg),
+            Self::SecurityError(msg) => write!(f, "Security error: {}", msg),
             Self::Other(msg) => write!(f, "Error: {}", msg),
         }
     }

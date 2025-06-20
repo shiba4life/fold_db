@@ -309,6 +309,7 @@ mod tests {
 
         web::Data::new(AppState {
             node: Arc::new(tokio::sync::Mutex::new(node)),
+            security_manager: None,
         })
     }
 

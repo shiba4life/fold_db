@@ -38,6 +38,7 @@ pub mod logging;
 pub mod network;
 pub mod permissions;
 pub mod schema;
+pub mod security;
 pub mod testing_utils;
 pub mod transform;
 pub mod validation_utils;
@@ -56,6 +57,17 @@ pub use schema::core::SchemaState;
 pub use schema::types::operation::Operation;
 pub use schema::types::operations::MutationType;
 pub use schema::Schema;
+
+// Re-export security types
+pub use security::{
+    SecurityConfig, SecurityManager, SecurityError, SecurityResult,
+    SignedMessage, PublicKeyInfo, VerificationResult, EncryptedData,
+    KeyRegistrationRequest, KeyRegistrationResponse,
+    Ed25519KeyPair, Ed25519PublicKey, MessageSigner, MessageVerifier,
+    EncryptionManager, ConditionalEncryption,
+    ClientSecurity, SecurityMiddleware, SecurityConfigBuilder,
+    KeyUtils, SigningUtils, EncryptionUtils,
+};
 
 // Re-export ingestion types
 pub use ingestion::{IngestionConfig, IngestionCore, IngestionError, IngestionResponse};
