@@ -33,3 +33,9 @@ impl From<sled::Error> for SchemaError {
         SchemaError::InvalidData(format!("Database error: {}", error))
     }
 }
+
+impl From<crate::unified_crypto::error::UnifiedCryptoError> for SchemaError {
+    fn from(error: crate::unified_crypto::error::UnifiedCryptoError) -> Self {
+        SchemaError::InvalidData(format!("Crypto error: {}", error))
+    }
+}

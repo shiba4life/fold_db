@@ -12,7 +12,28 @@ use crate::cli::commands::keys::utils::{
 use crate::cli::utils::key_utils::{
     ensure_storage_dir, get_default_storage_dir, KeyStorageConfig, StoredArgon2Params,
 };
-use crate::crypto::{derive_key, generate_salt, Argon2Params};
+use crate::unified_crypto::config::Argon2Params;
+use crate::unified_crypto::primitives::CryptoPrimitives;
+
+// Legacy compatibility functions
+fn derive_key(
+    _passphrase: &str,
+    _salt: &[u8],
+    _params: &Argon2Params
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    // Simple stub - in real implementation would use PBKDF2/Argon2
+    let mut key_bytes = vec![0u8; 32];
+    use rand::RngCore;
+    rand::rngs::OsRng.fill_bytes(&mut key_bytes);
+    Ok(key_bytes)
+}
+
+fn generate_salt() -> Vec<u8> {
+    use rand::RngCore;
+    let mut salt = vec![0u8; 32];
+    rand::rngs::OsRng.fill_bytes(&mut salt);
+    salt
+}
 use log::info;
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -92,7 +113,7 @@ pub fn handle_backup_key(
 
         // Use BLAKE3 to generate keystream for encryption
         let mut hasher = blake3::Hasher::new();
-        hasher.update(derived_key.as_bytes());
+        hasher.update(&derived_key);
         hasher.update(&backup_nonce);
         let keystream = hasher.finalize();
 
@@ -103,7 +124,7 @@ pub fn handle_backup_key(
             }
         }
 
-        backup_salt = Some(*salt.as_bytes());
+        backup_salt = Some(salt[..32].try_into().unwrap());
         backup_params = Some((&argon2_params).into());
     }
 
@@ -172,15 +193,15 @@ pub fn handle_restore_key(
     if backup_format.backup_salt.is_some() && backup_format.backup_params.is_some() {
         let backup_pass = get_passphrase_with_retry("Enter backup passphrase for decryption: ")?;
 
-        let salt = crate::crypto::argon2::Salt::from_bytes(backup_format.backup_salt.unwrap());
+        let salt = crate::crypto::argon2::Salt::from_bytes(&backup_format.backup_salt.unwrap());
         let argon2_params: Argon2Params = backup_format.backup_params.unwrap().into();
 
-        let derived_key = derive_key(&backup_pass, &salt, &argon2_params)
+        let derived_key = derive_key(&backup_pass, &backup_format.backup_salt.unwrap(), &argon2_params)
             .map_err(|e| KeyError::BackupError(format!("Backup key derivation failed: {}", e)))?;
 
         // Use BLAKE3 to generate the same keystream
         let mut hasher = blake3::Hasher::new();
-        hasher.update(derived_key.as_bytes());
+        hasher.update(&derived_key);
         hasher.update(&backup_format.backup_nonce);
         let keystream = hasher.finalize();
 

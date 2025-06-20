@@ -14,7 +14,9 @@ use crate::cli::commands::keys::utils::{
 use crate::cli::utils::key_utils::{
     decrypt_key, encrypt_key, ensure_storage_dir, get_default_storage_dir, KeyStorageConfig,
 };
-use crate::crypto::{derive_key, Argon2Params};
+use crate::unified_crypto::config::Argon2Params;
+use crate::unified_crypto::primitives::CryptoPrimitives;
+use crate::unified_crypto::derive_key;
 use log::info;
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -109,13 +111,13 @@ pub fn handle_export_key(
     let argon2_params = Argon2Params::sensitive();
 
     // Derive export encryption key
-    let salt_obj = crate::crypto::argon2::Salt::from_bytes(salt);
-    let derived_key = derive_key(&export_pass, &salt_obj, &argon2_params)
+    let salt_obj = crate::crypto::argon2::Salt::from_bytes(&salt[..]);
+    let derived_key = derive_key(export_pass.as_bytes(), salt_obj.as_bytes(), &argon2_params)
         .map_err(|e| KeyError::CryptographicError(format!("Export key derivation failed: {}", e)))?;
 
     // Encrypt the key using BLAKE3-based encryption (simplified)
     let mut hasher = blake3::Hasher::new();
-    hasher.update(derived_key.as_bytes());
+    hasher.update(&derived_key);
     hasher.update(&nonce);
     let keystream = hasher.finalize();
 
@@ -257,10 +259,10 @@ pub fn handle_import_key(
     }
     let mut salt_bytes = [0u8; 32];
     salt_bytes.copy_from_slice(&export_data.kdf_params.salt);
-    let salt = crate::crypto::argon2::Salt::from_bytes(salt_bytes);
+    let salt = crate::crypto::argon2::Salt::from_bytes(&salt_bytes[..]);
 
     // Derive decryption key
-    let derived_key = derive_key(&import_passphrase, &salt, &argon2_params)
+    let derived_key = derive_key(import_passphrase.as_bytes(), salt.as_bytes(), &argon2_params)
         .map_err(|e| KeyError::CryptographicError(format!("Import key derivation failed: {}", e)))?;
 
     // Decrypt the key data
@@ -271,7 +273,7 @@ pub fn handle_import_key(
     nonce.copy_from_slice(&export_data.nonce);
 
     let mut hasher = blake3::Hasher::new();
-    hasher.update(derived_key.as_bytes());
+    hasher.update(&derived_key);
     hasher.update(&nonce);
     let keystream = hasher.finalize();
 

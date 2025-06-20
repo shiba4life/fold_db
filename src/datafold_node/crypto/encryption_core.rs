@@ -34,7 +34,7 @@
 //! # }
 //! ```
 
-use crate::crypto::error::{CryptoError, CryptoResult};
+use crate::crypto::{CryptoError, CryptoResult};
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Key, Nonce,
@@ -74,8 +74,8 @@ impl EncryptionKey {
     /// Create a new encryption key from a slice
     pub fn from_slice(slice: &[u8]) -> CryptoResult<Self> {
         if slice.len() != AES_KEY_SIZE {
-            return Err(CryptoError::InvalidKey {
-                message: format!(
+            return Err(CryptoError::KeyFormat {
+                details: format!(
                     "Invalid key size: expected {} bytes, got {}",
                     AES_KEY_SIZE,
                     slice.len()
@@ -112,18 +112,22 @@ impl EncryptedData {
     /// Create new encrypted data container
     pub fn new(nonce: Vec<u8>, ciphertext: Vec<u8>) -> CryptoResult<Self> {
         if nonce.len() != AES_NONCE_SIZE {
-            return Err(CryptoError::InvalidInput(format!(
-                "Invalid nonce size: expected {} bytes, got {}",
-                AES_NONCE_SIZE,
-                nonce.len()
-            )));
+            return Err(CryptoError::InvalidInput {
+                message: format!(
+                    "Invalid nonce size: expected {} bytes, got {}",
+                    AES_NONCE_SIZE,
+                    nonce.len()
+                ),
+            });
         }
 
         if ciphertext.len() < AES_TAG_SIZE {
-            return Err(CryptoError::InvalidInput(format!(
-                "Invalid ciphertext size: must be at least {} bytes for tag",
-                AES_TAG_SIZE
-            )));
+            return Err(CryptoError::InvalidInput {
+                message: format!(
+                    "Invalid ciphertext size: must be at least {} bytes for tag",
+                    AES_TAG_SIZE
+                ),
+            });
         }
 
         Ok(Self { nonce, ciphertext })
@@ -145,11 +149,13 @@ impl EncryptedData {
     /// Create from compact binary format
     pub fn from_bytes(data: &[u8]) -> CryptoResult<Self> {
         if data.len() < MIN_ENCRYPTED_SIZE {
-            return Err(CryptoError::InvalidInput(format!(
-                "Encrypted data too small: {} bytes, minimum is {}",
-                data.len(),
-                MIN_ENCRYPTED_SIZE
-            )));
+            return Err(CryptoError::InvalidInput {
+                message: format!(
+                    "Encrypted data too small: {} bytes, minimum is {}",
+                    data.len(),
+                    MIN_ENCRYPTED_SIZE
+                ),
+            });
         }
 
         let nonce = data[..AES_NONCE_SIZE].to_vec();
@@ -218,11 +224,13 @@ impl EncryptionAtRest {
     pub fn encrypt(&self, plaintext: &[u8]) -> CryptoResult<EncryptedData> {
         // Safety check for plaintext size
         if plaintext.len() > MAX_PLAINTEXT_SIZE {
-            return Err(CryptoError::InvalidInput(format!(
-                "Plaintext too large: {} bytes, maximum is {}",
-                plaintext.len(),
-                MAX_PLAINTEXT_SIZE
-            )));
+            return Err(CryptoError::InvalidInput {
+                message: format!(
+                    "Plaintext too large: {} bytes, maximum is {}",
+                    plaintext.len(),
+                    MAX_PLAINTEXT_SIZE
+                ),
+            });
         }
 
         // Generate a secure random nonce
@@ -234,7 +242,7 @@ impl EncryptionAtRest {
             self.cipher
                 .encrypt(nonce, plaintext)
                 .map_err(|e| CryptoError::KeyGeneration {
-                    message: format!("AES-GCM encryption failed: {}", e),
+                    details: format!("AES-GCM encryption failed: {}", e),
                 })?;
 
         EncryptedData::new(nonce_bytes.to_vec(), ciphertext)
@@ -251,11 +259,13 @@ impl EncryptionAtRest {
     pub fn decrypt(&self, encrypted_data: &EncryptedData) -> CryptoResult<Vec<u8>> {
         // Validate nonce size
         if encrypted_data.nonce.len() != AES_NONCE_SIZE {
-            return Err(CryptoError::InvalidInput(format!(
-                "Invalid nonce size: expected {} bytes, got {}",
-                AES_NONCE_SIZE,
-                encrypted_data.nonce.len()
-            )));
+            return Err(CryptoError::InvalidInput {
+                message: format!(
+                    "Invalid nonce size: expected {} bytes, got {}",
+                    AES_NONCE_SIZE,
+                    encrypted_data.nonce.len()
+                ),
+            });
         }
 
         let nonce = Nonce::from_slice(&encrypted_data.nonce);
@@ -265,7 +275,7 @@ impl EncryptionAtRest {
             .cipher
             .decrypt(nonce, encrypted_data.ciphertext.as_ref())
             .map_err(|e| CryptoError::Signature {
-                message: format!("AES-GCM decryption/verification failed: {}", e),
+                details: format!("AES-GCM decryption/verification failed: {}", e),
             })?;
 
         Ok(plaintext)
@@ -313,7 +323,7 @@ impl EncryptionAtRest {
 
         if decrypted != test_data {
             return Err(CryptoError::Signature {
-                message: "Self-test failed: decrypted data does not match original".to_string(),
+                details: "Self-test failed: decrypted data does not match original".to_string(),
             });
         }
 

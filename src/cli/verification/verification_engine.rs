@@ -6,6 +6,7 @@ use super::verification_types::*;
 use crate::cli::auth::SignatureComponent;
 use crate::crypto::ed25519::{verify_signature, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use crate::security_types::SecurityLevel;
+use crate::unified_crypto::primitives::PublicKeyHandle;
 use base64::{engine::general_purpose, Engine as _};
 use chrono::Utc;
 use reqwest::Response;
@@ -141,7 +142,10 @@ impl CliSignatureVerifier {
 
         // Verify signature
         let step_start = Instant::now();
-        let crypto_valid = verify_signature(&public_key_bytes, message, &signature_array).is_ok();
+        // Convert bytes to PublicKeyHandle for verification
+        let public_key_handle = PublicKeyHandle::from_bytes(&public_key_bytes, crate::unified_crypto::types::Algorithm::Ed25519)
+            .map_err(|_| VerificationError::KeyManagement("Invalid public key".to_string()))?;
+        let crypto_valid = public_key_handle.verify(message, &signature_array).unwrap_or(false);
         step_timings.insert(
             "cryptographic_verification".to_string(),
             step_start.elapsed().as_millis() as u64,

@@ -6,7 +6,7 @@
 use crate::cli::auth::{
     CliAuthError, CliAuthProfile, CliAuthStatus, CliRequestSigner, CliSigningConfig,
 };
-use crate::crypto::ed25519::MasterKeyPair;
+use crate::unified_crypto::keys::KeyPair as MasterKeyPair;
 use reqwest::{Client, Method, RequestBuilder, Response, Url};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -102,7 +102,12 @@ impl AuthenticatedHttpClient {
             .build()?;
 
         let config = signing_config.unwrap_or_default();
-        let signer = CliRequestSigner::new(keypair, profile, config);
+        // Convert MasterKeyPair to KeyPair for signing
+        let key_pair = crate::unified_crypto::keys::KeyPair::from_secret_bytes(
+            keypair.secret_key_bytes(),
+            crate::unified_crypto::types::Algorithm::Ed25519
+        ).map_err(|e| HttpClientError::Auth(CliAuthError::Crypto(e)))?;
+        let signer = CliRequestSigner::new(key_pair, profile, config);
 
         Ok(Self {
             client,

@@ -792,7 +792,7 @@ impl DataFoldNode {
             db_guard.db_ops()
         };
 
-        crate::datafold_node::get_crypto_init_status(db_ops)
+        crate::datafold_node::get_crypto_init_status(db_ops, None)
             .map_err(|e| FoldDbError::Config(format!("Failed to get crypto status: {}", e)))
     }
 

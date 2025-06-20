@@ -254,7 +254,7 @@ impl SignatureVerifier {
         };
 
         // Verify the signature using Ed25519
-        let public_key = match crate::crypto::ed25519::PublicKey::from_bytes(&public_key_bytes) {
+        let public_key = match crate::unified_crypto::primitives::PublicKeyHandle::from_bytes(&public_key_bytes, crate::unified_crypto::types::Algorithm::Ed25519) {
             Ok(key) => key,
             Err(e) => {
                 return Err(AuthenticationError::InvalidSignatureFormat {
@@ -264,13 +264,38 @@ impl SignatureVerifier {
             }
         };
 
-        match public_key.verify(canonical_message.as_bytes(), &signature_bytes) {
-            Ok(()) => {
+        // Create signature object for verification
+        let signature = crate::unified_crypto::types::Signature::new(
+            Vec::from(signature_bytes),
+            crate::unified_crypto::types::SignatureAlgorithm::Ed25519,
+            public_key.id().clone(),
+        );
+
+        // Create crypto primitives for verification
+        let config = crate::unified_crypto::config::PrimitivesConfig::default();
+        let primitives = crate::unified_crypto::primitives::CryptoPrimitives::new(&config)
+            .map_err(|e| AuthenticationError::CryptographicError {
+                operation: format!("Failed to create crypto primitives: {}", e),
+                correlation_id: correlation_id.clone(),
+            })?;
+
+        match primitives.verify(canonical_message.as_bytes(), &signature, &public_key) {
+            Ok(true) => {
                 debug!(
                     "Signature verification successful for key_id: {}",
                     components.keyid
                 );
                 Ok(())
+            }
+            Ok(false) => {
+                warn!(
+                    "Signature verification failed for key_id: {}: signature invalid",
+                    components.keyid
+                );
+                Err(AuthenticationError::SignatureVerificationFailed {
+                    key_id: components.keyid.clone(),
+                    correlation_id,
+                })
             }
             Err(e) => {
                 warn!(
@@ -449,7 +474,7 @@ impl SignatureVerifier {
     ) -> Result<(), AuthenticationError> {
         let correlation_id = Self::generate_correlation_id();
 
-        let public_key = match crate::crypto::ed25519::PublicKey::from_bytes(public_key_bytes) {
+        let public_key = match crate::unified_crypto::primitives::PublicKeyHandle::from_bytes(public_key_bytes, crate::unified_crypto::types::Algorithm::Ed25519) {
             Ok(key) => key,
             Err(e) => {
                 return Err(AuthenticationError::InvalidSignatureFormat {
@@ -459,10 +484,32 @@ impl SignatureVerifier {
             }
         };
 
-        match public_key.verify(canonical_message.as_bytes(), signature_bytes) {
-            Ok(()) => {
+        // Create signature object for verification
+        let signature = crate::unified_crypto::types::Signature::new(
+            signature_bytes.to_vec(),
+            crate::unified_crypto::types::SignatureAlgorithm::Ed25519,
+            public_key.id().clone(),
+        );
+
+        // Create crypto primitives for verification
+        let config = crate::unified_crypto::config::PrimitivesConfig::default();
+        let primitives = crate::unified_crypto::primitives::CryptoPrimitives::new(&config)
+            .map_err(|e| AuthenticationError::CryptographicError {
+                operation: format!("Failed to create crypto primitives: {}", e),
+                correlation_id: correlation_id.clone(),
+            })?;
+
+        match primitives.verify(canonical_message.as_bytes(), &signature, &public_key) {
+            Ok(true) => {
                 debug!("Direct signature verification successful");
                 Ok(())
+            }
+            Ok(false) => {
+                warn!("Direct signature verification failed: signature invalid");
+                Err(AuthenticationError::SignatureVerificationFailed {
+                    key_id: "direct".to_string(),
+                    correlation_id,
+                })
             }
             Err(e) => {
                 warn!("Direct signature verification failed: {}", e);

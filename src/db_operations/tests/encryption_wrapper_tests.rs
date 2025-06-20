@@ -18,7 +18,7 @@ fn create_test_encryption_wrapper() -> EncryptionWrapper {
     let db_ops = DbOperations::new(db).unwrap();
 
     let master_keypair = generate_master_keypair().unwrap();
-    EncryptionWrapper::new(db_ops, &master_keypair).unwrap()
+    EncryptionWrapper::with_db_and_keypair(db_ops, &master_keypair).unwrap()
 }
 
 /// Test encryption wrapper creation and initialization
@@ -234,7 +234,7 @@ fn test_migration_status() {
     db_ops.store_item("unencrypted", &"data1").unwrap();
     
     let master_keypair = generate_master_keypair().unwrap();
-    let wrapper = EncryptionWrapper::new(db_ops, &master_keypair).unwrap();
+    let wrapper = EncryptionWrapper::with_db_and_keypair(db_ops, &master_keypair).unwrap();
     wrapper.store_encrypted_item("encrypted", &"data2", contexts::ATOM_DATA).unwrap();
 
     let status = wrapper.get_migration_status().unwrap();

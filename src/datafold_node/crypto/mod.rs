@@ -12,15 +12,10 @@ pub mod encryption_at_rest_async;
 // Compliance modules
 pub mod compliance_frameworks;
 pub mod compliance_reporting;
-pub mod compliance_data;
-pub mod compliance_manager;
-pub mod compliance_tests;
 
 // Re-export compliance types for convenience
 pub use compliance_frameworks::{ComplianceFramework, ComplianceControl};
 pub use compliance_reporting::{ComplianceReportConfig, ComplianceReportType, ReportSection};
-pub use compliance_data::{ComplianceReport, ComplianceStatus, RotationStatistics};
-pub use compliance_manager::KeyRotationComplianceManager;
 
 pub use crypto_init::{
     CryptoInitError, CryptoInitContext, initialize_database_crypto,

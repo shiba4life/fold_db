@@ -4,7 +4,8 @@
 //! initialization, including both random key generation and passphrase-based
 //! key derivation workflows.
 
-use crate::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
+use crate::config::crypto::CryptoConfig;
+use crate::unified_crypto::config::{MasterKeyConfig, LegacyKeyDerivationConfig, CryptoConfig as UnifiedCryptoConfig, GeneralConfig, PrimitivesConfig, KeyConfig, CryptoPolicy, AuditConfig, PerformanceConfig};
 use crate::datafold_node::crypto::crypto_init::{
     get_crypto_init_status, initialize_database_crypto, is_crypto_init_needed,
     validate_crypto_config_for_init, CryptoInitError,
@@ -87,6 +88,10 @@ impl From<CryptoInitError> for ApiError {
             CryptoInitError::Config(config_error) => ApiError::new(
                 "CONFIG_ERROR",
                 &format!("Configuration error: {}", config_error),
+            ),
+            CryptoInitError::Validation(validation_error) => ApiError::new(
+                "VALIDATION_ERROR",
+                &format!("Validation error: {}", validation_error),
             ),
             CryptoInitError::Crypto(crypto_error) => ApiError::new(
                 "CRYPTO_ERROR",
@@ -322,23 +327,29 @@ pub async fn init_passphrase_key(
         drop(db);
         drop(node);
 
-        // Create crypto configuration for passphrase
-        let mut key_derivation = KeyDerivationConfig::for_security_level(request.security_level);
+        // Create legacy key derivation config
+        let mut key_derivation = LegacyKeyDerivationConfig::default();
 
         // Apply custom parameters if provided
         if let Some(custom_params) = &request.custom_params {
             if let Some(memory_cost) = custom_params.memory_cost {
-                key_derivation.memory_cost = memory_cost;
+                key_derivation.argon2_params.memory_cost = memory_cost;
             }
             if let Some(time_cost) = custom_params.time_cost {
-                key_derivation.time_cost = time_cost;
+                key_derivation.argon2_params.time_cost = time_cost;
             }
             if let Some(parallelism) = custom_params.parallelism {
-                key_derivation.parallelism = parallelism;
+                key_derivation.argon2_params.parallelism = parallelism;
             }
         }
 
         let crypto_config = CryptoConfig {
+            general: Default::default(),
+            primitives: Default::default(),
+            keys: Default::default(),
+            policy: Default::default(),
+            audit: Default::default(),
+            performance: Default::default(),
             enabled: true,
             master_key: MasterKeyConfig::Passphrase {
                 passphrase: request.passphrase.clone(),
@@ -414,7 +425,7 @@ pub async fn get_crypto_status(app_state: web::Data<AppState>) -> ActixResult<Ht
         drop(node);
 
         // Get crypto status
-        let status = get_crypto_init_status(db_ops).map_err(ApiError::from)?;
+        let status = get_crypto_init_status(db_ops, None).map_err(ApiError::from)?;
 
         Ok(CryptoStatusResponse {
             initialized: status.initialized,
@@ -482,22 +493,28 @@ pub async fn validate_crypto_config(
                     warnings.push("Passphrase contains only letters - consider adding numbers and symbols".to_string());
                 }
 
-                let mut key_derivation = KeyDerivationConfig::for_security_level(request.security_level);
+                let mut key_derivation = LegacyKeyDerivationConfig::default();
 
                 // Apply custom parameters if provided
                 if let Some(custom_params) = &request.custom_params {
                     if let Some(memory_cost) = custom_params.memory_cost {
-                        key_derivation.memory_cost = memory_cost;
+                        key_derivation.argon2_params.memory_cost = memory_cost;
                     }
                     if let Some(time_cost) = custom_params.time_cost {
-                        key_derivation.time_cost = time_cost;
+                        key_derivation.argon2_params.time_cost = time_cost;
                     }
                     if let Some(parallelism) = custom_params.parallelism {
-                        key_derivation.parallelism = parallelism;
+                        key_derivation.argon2_params.parallelism = parallelism;
                     }
                 }
 
                 CryptoConfig {
+                    general: Default::default(),
+                    primitives: Default::default(),
+                    keys: Default::default(),
+                    policy: Default::default(),
+                    audit: Default::default(),
+                    performance: Default::default(),
                     enabled: true,
                     master_key: MasterKeyConfig::Passphrase { passphrase },
                     key_derivation,
@@ -514,6 +531,9 @@ pub async fn validate_crypto_config(
 
         // Check security level warnings
         match request.security_level {
+            SecurityLevel::Basic => {
+                warnings.push("Basic security level is for testing only - use Standard or High for production".to_string());
+            }
             SecurityLevel::Low => {
                 warnings.push("Low security level is optimized for user experience - consider Standard or High for higher security".to_string());
             }
@@ -580,7 +600,7 @@ pub async fn register_public_key(
         key_bytes_array.copy_from_slice(&public_key_bytes);
 
         // Validate the public key by creating a PublicKey instance
-        let _public_key = crate::crypto::PublicKey::from_bytes(&key_bytes_array).map_err(|_| {
+        let _public_key = crate::crypto::PublicKey::from_bytes(&key_bytes_array, crate::unified_crypto::types::Algorithm::Ed25519).map_err(|_| {
             ApiError::new("INVALID_PUBLIC_KEY", "Invalid Ed25519 public key format")
         })?;
 
@@ -906,7 +926,7 @@ pub async fn verify_signature(
         }
 
         // Create PublicKey instance for verification
-        let public_key = crate::crypto::PublicKey::from_bytes(&registration.public_key_bytes)
+        let public_key = crate::crypto::PublicKey::from_bytes(&registration.public_key_bytes, crate::unified_crypto::types::Algorithm::Ed25519)
             .map_err(|e| {
                 ApiError::new(
                     "INVALID_PUBLIC_KEY",

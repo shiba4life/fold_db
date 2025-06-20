@@ -7,13 +7,16 @@ use crate::cli::args::{CliSecurityLevel, RotationMethod};
 use crate::cli::commands::keys::error::{KeyError, KeyResult};
 use crate::cli::commands::keys::generation::hkdf_derive_key;
 use crate::cli::commands::keys::utils::{
-    confirm_operation, get_passphrase_with_retry, key_exists_in_storage, 
+    confirm_operation, get_passphrase_with_retry, key_exists_in_storage,
     security_level_to_argon2, set_secure_file_permissions, validate_key_id,
 };
 use crate::cli::utils::key_utils::{
     decrypt_key, encrypt_key, get_default_storage_dir, KeyStorageConfig,
 };
-use crate::crypto::{derive_key, generate_salt, ed25519::generate_master_keypair};
+use crate::unified_crypto::config::Argon2Params;
+use crate::unified_crypto::primitives::CryptoPrimitives;
+use crate::unified_crypto::keys::generate_master_keypair;
+use crate::unified_crypto::{derive_key, generate_salt};
 use log::info;
 use std::fs;
 use std::path::PathBuf;
@@ -65,19 +68,17 @@ pub fn handle_rotate_key(
     let new_key_bytes = match method {
         RotationMethod::Regenerate => {
             // Generate completely new random key
-            let keypair = generate_master_keypair()
+            let (_public_key, private_key) = generate_master_keypair()
                 .map_err(|e| KeyError::CryptographicError(format!("Failed to generate new keypair: {}", e)))?;
-            keypair.secret_key_bytes()
+            private_key.secret_key_bytes().to_vec()
         }
         RotationMethod::Derive => {
             // Derive new key from current key using incremental counter
             let context = format!("rotation-{}", chrono::Utc::now().timestamp());
             let salt = generate_salt();
             let derived_material =
-                hkdf_derive_key(&current_key_bytes, salt.as_bytes(), context.as_bytes(), 32);
-            let mut new_key = [0u8; 32];
-            new_key.copy_from_slice(&derived_material);
-            new_key
+                hkdf_derive_key(&current_key_bytes, &salt, &context.as_bytes(), 32);
+            derived_material.to_vec()
         }
         RotationMethod::Rederive => {
             // Re-derive from passphrase with new salt (if original was passphrase-based)
@@ -85,12 +86,12 @@ pub fn handle_rotate_key(
 
             let argon2_params = security_level_to_argon2(&security_level);
 
-            let derived_key = derive_key(&derive_passphrase, &generate_salt(), &argon2_params)
+            let derived_key = derive_key(derive_passphrase.as_bytes(), &generate_salt(), &argon2_params)
                 .map_err(|e| KeyError::CryptographicError(format!("Key re-derivation failed: {}", e)))?;
 
             let mut new_key = [0u8; 32];
-            new_key.copy_from_slice(derived_key.as_bytes());
-            new_key
+            new_key.copy_from_slice(&derived_key);
+            new_key.to_vec()
         }
     };
 
@@ -119,7 +120,9 @@ pub fn handle_rotate_key(
     let argon2_params = security_level_to_argon2(&security_level);
 
     // Encrypt the new key
-    let new_storage_config = encrypt_key(&new_key_bytes, &new_passphrase, &argon2_params)
+    let mut key_array = [0u8; 32];
+    key_array[..new_key_bytes.len().min(32)].copy_from_slice(&new_key_bytes[..new_key_bytes.len().min(32)]);
+    let new_storage_config = encrypt_key(&key_array, &new_passphrase, &argon2_params)
         .map_err(|e| KeyError::CryptographicError(format!("Failed to encrypt new key: {}", e)))?;
 
     // Write new encrypted key to file

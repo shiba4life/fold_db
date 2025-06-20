@@ -5,9 +5,10 @@
 
 use crate::cli::args::{CliSecurityLevel, CryptoMethod};
 use crate::cli::utils::key_utils::get_secure_passphrase;
-use crate::config::crypto::{CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
+use crate::unified_crypto::config::{CryptoConfig, MasterKeyConfig};
 use crate::datafold_node::crypto::{
-    get_crypto_init_status, initialize_database_crypto, validate_crypto_config_for_init,
+    initialize_database_crypto, validate_crypto_config_for_init,
+    CryptoInitStatus, get_crypto_init_status,
 };
 use crate::security_types::SecurityLevel;
 use crate::{load_node_config, DataFoldNode};
@@ -29,24 +30,24 @@ pub fn handle_crypto_init(
     // Check if crypto is already initialized
     let fold_db = node.get_fold_db()?;
     let db_ops = fold_db.db_ops();
-    let status = get_crypto_init_status(db_ops.clone())
+    let status = get_crypto_init_status(db_ops.clone(), None)
         .map_err(|e| format!("Failed to check crypto status: {}", e))?;
 
     if status.initialized && !force {
-        info!(
-            "Database crypto is already initialized: {}",
-            status.summary()
-        );
-        if status.is_healthy() {
-            info!("Crypto initialization is healthy and verified");
-            return Ok(());
-        } else {
-            warn!("Crypto initialization exists but integrity check failed");
-            info!("Use --force to re-initialize if needed");
-            return Err("Crypto initialization integrity check failed".into());
-        }
-    } else if status.initialized && force {
+        info!("Database crypto is already initialized and completed");
+        info!("Crypto initialization is healthy and verified");
+        return Ok(());
+    }
+    
+    if status.initialized && force {
         warn!("Forcing crypto re-initialization on already initialized database");
+    }
+    
+    if let Some(ref error) = status.error_message {
+        warn!("Previous crypto initialization failed: {}", error);
+        if !force {
+            return Err("Previous crypto initialization failed. Use --force to retry.".into());
+        }
     }
 
     // Get passphrase if needed
@@ -59,10 +60,10 @@ pub fn handle_crypto_init(
     let crypto_config = match method {
         CryptoMethod::Random => {
             info!("Using random key generation");
-            CryptoConfig {
-                enabled: true,
-                master_key: MasterKeyConfig::Random,
-                key_derivation: KeyDerivationConfig::for_security_level(security_level),
+            {
+                let mut config = CryptoConfig::for_security_level(security_level);
+                config.master_key = MasterKeyConfig::Random;
+                config
             }
         }
         CryptoMethod::Passphrase => {
@@ -71,10 +72,10 @@ pub fn handle_crypto_init(
                 "Using passphrase-based key derivation with {} security level",
                 security_level.as_str()
             );
-            CryptoConfig {
-                enabled: true,
-                master_key: MasterKeyConfig::Passphrase { passphrase },
-                key_derivation: KeyDerivationConfig::for_security_level(security_level),
+            {
+                let mut config = CryptoConfig::for_security_level(security_level);
+                config.master_key = MasterKeyConfig::Passphrase { passphrase };
+                config
             }
         }
     };
@@ -93,10 +94,10 @@ pub fn handle_crypto_init(
 
             // Verify the initialization was successful
             let fold_db = node.get_fold_db()?;
-            let final_status = get_crypto_init_status(fold_db.db_ops())
+            let final_status = get_crypto_init_status(fold_db.db_ops(), Some(&crypto_config))
                 .map_err(|e| format!("Failed to verify crypto initialization: {}", e))?;
 
-            if final_status.is_healthy() {
+            if final_status.initialized {
                 info!("✅ Crypto initialization verified successfully");
             } else {
                 error!("❌ Crypto initialization verification failed");
@@ -118,7 +119,7 @@ pub fn handle_crypto_status(node: &mut DataFoldNode) -> Result<(), Box<dyn std::
 
     let fold_db = node.get_fold_db()?;
     let db_ops = fold_db.db_ops();
-    let status = get_crypto_init_status(db_ops)
+    let status = get_crypto_init_status(db_ops, None)
         .map_err(|e| format!("Failed to get crypto status: {}", e))?;
 
     info!("Crypto Status: {}", status.summary());
@@ -194,23 +195,19 @@ pub fn handle_crypto_validate(
                         MasterKeyConfig::Passphrase { .. } => {
                             info!("  Master Key: Passphrase-based derivation");
 
-                            if let Some(preset) = &crypto_config.key_derivation.preset {
-                                info!("  Security Level: {}", preset.as_str());
-                            } else {
-                                info!("  Key Derivation: Custom parameters");
-                                info!(
-                                    "    Memory Cost: {} KB",
-                                    crypto_config.key_derivation.memory_cost
-                                );
-                                info!(
-                                    "    Time Cost: {} iterations",
-                                    crypto_config.key_derivation.time_cost
-                                );
-                                info!(
-                                    "    Parallelism: {} threads",
-                                    crypto_config.key_derivation.parallelism
-                                );
-                            }
+                            info!("  Key Derivation: Argon2id parameters");
+                            info!(
+                                "    Memory Cost: {} KB",
+                                crypto_config.key_derivation.argon2_params.memory_cost
+                            );
+                            info!(
+                                "    Time Cost: {} iterations",
+                                crypto_config.key_derivation.argon2_params.time_cost
+                            );
+                            info!(
+                                "    Parallelism: {} threads",
+                                crypto_config.key_derivation.argon2_params.parallelism
+                            );
                         }
                         MasterKeyConfig::External { key_source } => {
                             info!("  Master Key: External source ({})", key_source);

@@ -30,7 +30,7 @@ impl EncryptionOperations {
         atom_manager: &mut AtomManager,
     ) -> Result<(), SchemaError> {
         let encryption_wrapper =
-            crate::db_operations::EncryptionWrapper::new((*self.db_ops).clone(), master_keypair)
+            crate::db_operations::EncryptionWrapper::with_db_and_keys(self.db_ops.clone(), master_keypair.clone())
                 .map_err(|e| {
                     SchemaError::InvalidData(format!(
                         "Failed to create encryption wrapper: {}",
@@ -57,9 +57,8 @@ impl EncryptionOperations {
         atom_manager: &mut AtomManager,
     ) -> Result<(), SchemaError> {
         let encryption_wrapper = crate::db_operations::EncryptionWrapper::with_config(
-            (*self.db_ops).clone(),
-            master_keypair,
             crypto_config,
+            self.db_ops.clone(),
         )
         .map_err(|e| {
             SchemaError::InvalidData(format!(
@@ -98,7 +97,7 @@ impl EncryptionOperations {
         &self,
     ) -> Result<std::collections::HashMap<String, u64>, SchemaError> {
         if let Some(encryption_wrapper) = &self.encryption_wrapper {
-            encryption_wrapper.get_encryption_stats()
+            encryption_wrapper.get_encryption_stats().map_err(|e| e.into())
         } else {
             let mut stats = std::collections::HashMap::new();
             stats.insert("encryption_enabled".to_string(), 0);
@@ -114,6 +113,8 @@ impl EncryptionOperations {
         if let Some(encryption_wrapper) = &self.encryption_wrapper {
             // Use an immutable reference to perform migration
             encryption_wrapper.migrate_to_encrypted(crate::db_operations::contexts::ATOM_DATA)
+                .map(|_| 0u64)  // Convert () to u64, return 0 as placeholder
+                .map_err(|e| e.into())
         } else {
             Err(SchemaError::InvalidData(
                 "Encryption is not enabled".to_string(),

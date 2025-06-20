@@ -3,7 +3,9 @@
 //! This module provides functionality for signing HTTP requests made by the DataFold CLI
 //! using Ed25519 signatures according to RFC 9421 standards.
 
-use crate::crypto::ed25519::{MasterKeyPair, PUBLIC_KEY_LENGTH};
+use crate::unified_crypto::keys::KeyPair as MasterKeyPair;
+
+const PUBLIC_KEY_LENGTH: usize = 32; // Ed25519 public key length
 use crate::error::FoldDbError;
 use base64::{engine::general_purpose, Engine as _};
 use chrono::{DateTime, Utc};
@@ -33,7 +35,7 @@ pub enum CliAuthError {
     HttpHeader(String),
 
     #[error("Crypto error: {0}")]
-    Crypto(#[from] crate::crypto::error::CryptoError),
+    Crypto(#[from] crate::unified_crypto::error::UnifiedCryptoError),
 
     #[error("FoldDb error: {0}")]
     FoldDb(#[from] FoldDbError),
@@ -411,7 +413,10 @@ impl CliRequestSigner {
 
     /// Get the public key for this signer
     pub fn public_key_bytes(&self) -> [u8; PUBLIC_KEY_LENGTH] {
-        self.keypair.public_key_bytes()
+        let bytes = self.keypair.public_key_bytes();
+        let mut array = [0u8; PUBLIC_KEY_LENGTH];
+        array.copy_from_slice(&bytes[..PUBLIC_KEY_LENGTH]);
+        array
     }
 }
 

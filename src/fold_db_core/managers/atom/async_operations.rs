@@ -109,8 +109,7 @@ impl AsyncAtomManager {
     ) -> CryptoResult<Self> {
         let async_wrapper_config = AsyncWrapperConfig::default();
         let async_encryption =
-            AsyncEncryptionWrapper::new(db_ops.clone(), master_keypair, async_wrapper_config)
-                .await?;
+            AsyncEncryptionWrapper::new(db_ops.clone(), master_keypair, async_wrapper_config);
 
         let operation_semaphore = Arc::new(Semaphore::new(config.max_concurrent_operations));
         let atom_cache = Arc::new(RwLock::new(lru::LruCache::new(

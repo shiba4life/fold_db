@@ -251,4 +251,174 @@ impl DbOperations {
     pub fn schema_states_tree(&self) -> &sled::Tree {
         &self.schema_states_tree
     }
+
+    /// Check if crypto metadata exists in the database
+    pub fn has_crypto_metadata(&self) -> Result<bool, SchemaError> {
+        self.exists_in_tree(&self.metadata_tree, "crypto_metadata")
+    }
+
+    /// Get crypto metadata from the database
+    pub fn get_crypto_metadata(&self) -> Result<Option<CryptoMetadata>, SchemaError> {
+        self.get_from_tree(&self.metadata_tree, "crypto_metadata")
+    }
+
+    /// Store crypto metadata in the database
+    pub fn store_crypto_metadata(&self, metadata: &CryptoMetadata) -> Result<(), SchemaError> {
+        self.store_in_tree(&self.metadata_tree, "crypto_metadata", metadata)
+    }
+
+    // ========== KEY ROTATION OPERATIONS ==========
+
+    /// Store a key association for rotation tracking
+    pub fn store_key_association(&self, association: &KeyAssociation) -> Result<(), SchemaError> {
+        let key_rotation_tree = self.db.open_tree("key_associations")
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to open key_associations tree: {}", e)))?;
+        self.store_in_tree(&key_rotation_tree, &association.association_id, association)
+    }
+
+    /// Get a key association by ID
+    pub fn get_key_association(&self, association_id: &str) -> Result<Option<KeyAssociation>, SchemaError> {
+        let key_rotation_tree = self.db.open_tree("key_associations")
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to open key_associations tree: {}", e)))?;
+        self.get_from_tree(&key_rotation_tree, association_id)
+    }
+
+    /// Get all key associations for a public key
+    pub fn get_key_associations(&self, public_key_hex: &str) -> Result<Vec<KeyAssociation>, SchemaError> {
+        let key_rotation_tree = self.db.open_tree("key_associations")
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to open key_associations tree: {}", e)))?;
+        
+        let mut associations = Vec::new();
+        for result in key_rotation_tree.iter() {
+            let (_, value) = result.map_err(|e| SchemaError::InvalidData(format!("Iterator failed: {}", e)))?;
+            let association: KeyAssociation = serde_json::from_slice(&value)
+                .map_err(|e| SchemaError::InvalidData(format!("Deserialization failed: {}", e)))?;
+            
+            if association.public_key_hex == public_key_hex {
+                associations.push(association);
+            }
+        }
+        Ok(associations)
+    }
+
+    /// Delete a key association
+    pub fn delete_key_association(&self, association_id: &str) -> Result<bool, SchemaError> {
+        let key_rotation_tree = self.db.open_tree("key_associations")
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to open key_associations tree: {}", e)))?;
+        self.delete_from_tree(&key_rotation_tree, association_id)
+    }
+
+    /// Store a key rotation record
+    pub fn store_rotation_record(&self, record: &KeyRotationRecord) -> Result<(), SchemaError> {
+        let rotation_tree = self.db.open_tree("key_rotation_records")
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to open key_rotation_records tree: {}", e)))?;
+        self.store_in_tree(&rotation_tree, &record.operation_id, record)
+    }
+
+    /// Get a rotation record by operation ID
+    pub fn get_rotation_record(&self, operation_id: &str) -> Result<Option<KeyRotationRecord>, SchemaError> {
+        let rotation_tree = self.db.open_tree("key_rotation_records")
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to open key_rotation_records tree: {}", e)))?;
+        self.get_from_tree(&rotation_tree, operation_id)
+    }
+
+    /// Get rotation history for a public key
+    pub fn get_rotation_history(&self, public_key_hex: &str) -> Result<Vec<KeyRotationRecord>, SchemaError> {
+        let rotation_tree = self.db.open_tree("key_rotation_records")
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to open key_rotation_records tree: {}", e)))?;
+        
+        let mut records = Vec::new();
+        for result in rotation_tree.iter() {
+            let (_, value) = result.map_err(|e| SchemaError::InvalidData(format!("Iterator failed: {}", e)))?;
+            let record: KeyRotationRecord = serde_json::from_slice(&value)
+                .map_err(|e| SchemaError::InvalidData(format!("Deserialization failed: {}", e)))?;
+            
+            if record.old_public_key_hex == public_key_hex || record.new_public_key_hex == public_key_hex {
+                records.push(record);
+            }
+        }
+        Ok(records)
+    }
+
+    /// Get rotation statistics
+    pub fn get_rotation_statistics(&self) -> Result<RotationStatistics, SchemaError> {
+        let rotation_tree = self.db.open_tree("key_rotation_records")
+            .map_err(|e| SchemaError::InvalidData(format!("Failed to open key_rotation_records tree: {}", e)))?;
+        
+        let mut stats = RotationStatistics::default();
+        for result in rotation_tree.iter() {
+            let (_, value) = result.map_err(|e| SchemaError::InvalidData(format!("Iterator failed: {}", e)))?;
+            let _record: KeyRotationRecord = serde_json::from_slice(&value)
+                .map_err(|e| SchemaError::InvalidData(format!("Deserialization failed: {}", e)))?;
+            stats.total_rotations += 1;
+        }
+        Ok(stats)
+    }
+}
+
+/// Crypto metadata structure for database storage
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CryptoMetadata {
+    /// Whether crypto is initialized
+    pub initialized: bool,
+    /// Crypto version
+    pub version: String,
+    /// Algorithm in use
+    pub algorithm: String,
+    /// Additional metadata
+    pub metadata: std::collections::HashMap<String, String>,
+}
+
+impl Default for CryptoMetadata {
+    fn default() -> Self {
+        Self {
+            initialized: false,
+            version: "1.0".to_string(),
+            algorithm: "Ed25519".to_string(),
+            metadata: std::collections::HashMap::new(),
+        }
+    }
+}
+
+/// Key association for rotation tracking
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct KeyAssociation {
+    /// Association identifier
+    pub association_id: String,
+    /// Public key hex
+    pub public_key_hex: String,
+    /// Associated metadata
+    pub metadata: std::collections::HashMap<String, String>,
+    /// Creation timestamp
+    pub created_at: std::time::SystemTime,
+}
+
+/// Key rotation record
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct KeyRotationRecord {
+    /// Operation identifier
+    pub operation_id: String,
+    /// Old public key hex
+    pub old_public_key_hex: String,
+    /// New public key hex
+    pub new_public_key_hex: String,
+    /// Rotation timestamp
+    pub rotated_at: std::time::SystemTime,
+    /// Rotation reason
+    pub reason: String,
+    /// Success status
+    pub success: bool,
+    /// Additional metadata
+    pub metadata: std::collections::HashMap<String, String>,
+}
+
+/// Rotation statistics
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct RotationStatistics {
+    /// Total number of rotations
+    pub total_rotations: u64,
+    /// Number of successful rotations
+    pub successful_rotations: u64,
+    /// Number of failed rotations
+    pub failed_rotations: u64,
 }

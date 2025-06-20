@@ -4,7 +4,10 @@
 //! storage, retrieval, encryption, decryption, and directory management.
 
 use crate::cli::args::KeyFormat;
-use crate::crypto::{derive_key, generate_salt, Argon2Params, MasterKeyPair};
+use crate::unified_crypto::config::Argon2Params;
+use crate::unified_crypto::primitives::CryptoPrimitives;
+use crate::unified_crypto::keys::MasterKeyPair;
+use crate::unified_crypto::{derive_key, generate_salt};
 use base64::{engine::general_purpose, Engine as _};
 use log::{error, info};
 use rand::{rngs::OsRng, RngCore};
@@ -85,17 +88,19 @@ pub fn encrypt_key(
     argon2_params: &Argon2Params,
 ) -> Result<KeyStorageConfig, Box<dyn std::error::Error>> {
     // Generate salt and nonce
-    let salt = generate_salt();
+    let salt_vec = generate_salt();
+    let mut salt = [0u8; 32];
+    salt.copy_from_slice(&salt_vec[..32]);
     let mut nonce = [0u8; 12];
     OsRng.fill_bytes(&mut nonce);
 
     // Derive encryption key from passphrase
-    let derived_key = derive_key(passphrase, &salt, argon2_params)
+    let derived_key = derive_key(passphrase.as_bytes(), &salt_vec, argon2_params)
         .map_err(|e| format!("Key derivation failed: {}", e))?;
 
     // Use BLAKE3 to generate a keystream for encryption
     let mut hasher = blake3::Hasher::new();
-    hasher.update(derived_key.as_bytes());
+    hasher.update(&derived_key);
     hasher.update(&nonce);
     let keystream = hasher.finalize();
 
@@ -108,7 +113,7 @@ pub fn encrypt_key(
     Ok(KeyStorageConfig {
         encrypted_key: encrypted_key.to_vec(),
         nonce,
-        salt: *salt.as_bytes(),
+        salt,
         argon2_params: argon2_params.into(),
         created_at: chrono::Utc::now().to_rfc3339(),
         version: 1,
@@ -124,15 +129,15 @@ pub fn decrypt_key(
     let argon2_params: Argon2Params = config.argon2_params.clone().into();
 
     // Create Salt from stored bytes
-    let salt = crate::crypto::argon2::Salt::from_bytes(config.salt);
+    let salt = crate::crypto::argon2::Salt::from_bytes(&config.salt);
 
     // Derive decryption key from passphrase
-    let derived_key = derive_key(passphrase, &salt, &argon2_params)
+    let derived_key = derive_key(passphrase.as_bytes(), &config.salt, &argon2_params)
         .map_err(|e| format!("Key derivation failed: {}", e))?;
 
     // Use BLAKE3 to generate the same keystream
     let mut hasher = blake3::Hasher::new();
-    hasher.update(derived_key.as_bytes());
+    hasher.update(&derived_key);
     hasher.update(&config.nonce);
     let keystream = hasher.finalize();
 

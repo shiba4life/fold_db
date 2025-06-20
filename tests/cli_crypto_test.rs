@@ -54,7 +54,7 @@ async fn test_crypto_init_with_random_key() {
     // Check crypto status - should be initialized
     let fold_db = node.get_fold_db().unwrap();
     let db_ops = fold_db.db_ops();
-    let status = get_crypto_init_status(db_ops).unwrap();
+    let status = get_crypto_init_status(db_ops, None).unwrap();
 
     assert!(status.initialized);
     assert!(status.is_healthy());
@@ -73,7 +73,7 @@ async fn test_crypto_init_with_passphrase() {
     // Check crypto status
     let fold_db = node.get_fold_db().unwrap();
     let db_ops = fold_db.db_ops();
-    let status = get_crypto_init_status(db_ops).unwrap();
+    let status = get_crypto_init_status(db_ops, None).unwrap();
 
     assert!(status.initialized);
     assert!(status.is_healthy());
@@ -83,18 +83,17 @@ async fn test_crypto_init_with_passphrase() {
 #[tokio::test]
 async fn test_crypto_init_with_different_security_levels() {
     for security_level in &[
+        SecurityLevel::Basic,
         SecurityLevel::Low,
         SecurityLevel::Standard,
         SecurityLevel::High,
     ] {
         // Create configuration with specific security level
-        let crypto_config = CryptoConfig {
-            enabled: true,
-            master_key: MasterKeyConfig::Passphrase {
-                passphrase: "secure-test-passphrase".to_string(),
-            },
-            key_derivation: KeyDerivationConfig::for_security_level(*security_level),
+        let mut crypto_config = CryptoConfig::for_security_level(*security_level);
+        crypto_config.master_key = MasterKeyConfig::Passphrase {
+            passphrase: "secure-test-passphrase".to_string(),
         };
+        crypto_config.enabled = true;
 
         let (node_config, _temp_dir) = create_test_node_config_with_crypto(crypto_config);
 
@@ -104,13 +103,14 @@ async fn test_crypto_init_with_different_security_levels() {
         // Check crypto status
         let fold_db = node.get_fold_db().unwrap();
         let db_ops = fold_db.db_ops();
-        let status = get_crypto_init_status(db_ops).unwrap();
+        let status = get_crypto_init_status(db_ops, None).unwrap();
 
         assert!(status.initialized);
         assert!(status.is_healthy());
 
         let method = status.derivation_method.unwrap();
         match security_level {
+            SecurityLevel::Basic => assert_eq!(method, "Argon2id-Basic"),
             SecurityLevel::Low => assert_eq!(method, "Argon2id-Low"),
             SecurityLevel::Standard => assert_eq!(method, "Argon2id-Standard"),
             SecurityLevel::High => assert_eq!(method, "Argon2id-High"),
@@ -131,7 +131,7 @@ async fn test_crypto_status_on_uninitialized_database() {
     // Check crypto status - should not be initialized
     let fold_db = node.get_fold_db().unwrap();
     let db_ops = fold_db.db_ops();
-    let status = get_crypto_init_status(db_ops).unwrap();
+    let status = get_crypto_init_status(db_ops, None).unwrap();
 
     assert!(!status.initialized);
     assert!(!status.is_healthy());
@@ -156,22 +156,18 @@ fn test_crypto_config_validation_valid_configurations() {
 #[test]
 fn test_crypto_config_validation_invalid_configurations() {
     // Test empty passphrase
-    let empty_passphrase_config = CryptoConfig {
-        enabled: true,
-        master_key: MasterKeyConfig::Passphrase {
-            passphrase: "".to_string(),
-        },
-        key_derivation: KeyDerivationConfig::default(),
+    let mut empty_passphrase_config = CryptoConfig::default();
+    empty_passphrase_config.enabled = true;
+    empty_passphrase_config.master_key = MasterKeyConfig::Passphrase {
+        passphrase: "".to_string(),
     };
     assert!(empty_passphrase_config.validate().is_err());
 
     // Test very short passphrase
-    let short_passphrase_config = CryptoConfig {
-        enabled: true,
-        master_key: MasterKeyConfig::Passphrase {
-            passphrase: "12345".to_string(),
-        },
-        key_derivation: KeyDerivationConfig::default(),
+    let mut short_passphrase_config = CryptoConfig::default();
+    short_passphrase_config.enabled = true;
+    short_passphrase_config.master_key = MasterKeyConfig::Passphrase {
+        passphrase: "12345".to_string(),
     };
     assert!(short_passphrase_config.validate().is_err());
 }
@@ -198,7 +194,7 @@ async fn test_manual_crypto_initialization() {
     assert_eq!(context.derivation_method, "Argon2id-Standard");
 
     // Check status
-    let status = get_crypto_init_status(db_ops).unwrap();
+    let status = get_crypto_init_status(db_ops, None).unwrap();
     assert!(status.initialized);
     assert!(status.is_healthy());
 }
@@ -295,7 +291,7 @@ async fn test_crypto_metadata_integrity() {
     assert!(metadata.verify_integrity().unwrap());
 
     // Check status reflects healthy state
-    let status = get_crypto_init_status(db_ops).unwrap();
+    let status = get_crypto_init_status(db_ops, None).unwrap();
     assert!(status.is_healthy());
     assert_eq!(status.integrity_verified, Some(true));
 }

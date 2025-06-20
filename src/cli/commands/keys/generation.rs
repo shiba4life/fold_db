@@ -8,8 +8,10 @@ use crate::cli::commands::keys::error::{KeyError, KeyResult};
 use crate::cli::commands::keys::utils::{
     format_and_output_key, format_and_output_key_with_index, get_operation_passphrase, security_level_to_argon2,
 };
-use crate::crypto::ed25519::generate_master_keypair;
-use crate::crypto::{generate_salt, Argon2Params};
+use crate::unified_crypto::config::Argon2Params;
+use crate::unified_crypto::primitives::{CryptoPrimitives, generate_master_keypair_from_seed};
+use crate::unified_crypto::keys::generate_master_keypair;
+use crate::generate_salt;
 use log::info;
 use std::path::PathBuf;
 
@@ -83,11 +85,20 @@ pub fn handle_generate_key(
     }
 
     for i in 0..count {
-        let keypair = generate_master_keypair()
+        let (public_key, private_key) = generate_master_keypair()
             .map_err(|e| KeyError::CryptographicError(format!("Failed to generate keypair: {}", e)))?;
 
-        let public_key_bytes = keypair.public_key_bytes();
-        let private_key_bytes = keypair.secret_key_bytes();
+        let public_key_bytes = public_key.to_bytes();
+        let private_key_bytes = private_key.secret_key_bytes().to_vec();
+
+        // Convert to fixed-size arrays for compatibility
+        let mut public_key_array = [0u8; 32];
+        let pub_len = public_key_bytes.len().min(32);
+        public_key_array[..pub_len].copy_from_slice(&public_key_bytes[..pub_len]);
+
+        let mut private_key_array = [0u8; 32];
+        let priv_len = private_key_bytes.len().min(32);
+        private_key_array[..priv_len].copy_from_slice(&private_key_bytes[..priv_len]);
 
         if count > 1 {
             info!("Generating keypair {} of {}", i + 1, count);
@@ -100,7 +111,7 @@ pub fn handle_generate_key(
         if !public_only {
             if count > 1 {
                 format_and_output_key_with_index(
-                    &private_key_bytes,
+                    &private_key_array,
                     &format,
                     private_key_file.as_ref(),
                     "private",
@@ -111,7 +122,7 @@ pub fn handle_generate_key(
                 )?;
             } else {
                 format_and_output_key(
-                    &private_key_bytes,
+                    &private_key_array,
                     &format,
                     private_key_file.as_ref(),
                     "private",
@@ -125,7 +136,7 @@ pub fn handle_generate_key(
         if !private_only {
             if count > 1 {
                 format_and_output_key_with_index(
-                    &public_key_bytes,
+                    &public_key_array,
                     &format,
                     public_key_file.as_ref(),
                     "public",
@@ -136,7 +147,7 @@ pub fn handle_generate_key(
                 )?;
             } else {
                 format_and_output_key(
-                    &public_key_bytes,
+                    &public_key_array,
                     &format,
                     public_key_file.as_ref(),
                     "public",
@@ -147,7 +158,7 @@ pub fn handle_generate_key(
         }
 
         // Clear sensitive data
-        drop(keypair);
+        drop((public_key, private_key));
     }
 
     Ok(())
@@ -175,16 +186,28 @@ pub fn handle_derive_key(
     let argon2_params = security_level_to_argon2(&security_level);
 
     // Generate salt and derive keypair
-    let (_salt, keypair) = generate_salt_and_derive_keypair(&passphrase, &argon2_params)
+    let (_salt, keypair) = generate_salt_and_derive_keypair(&passphrase)
         .map_err(|e| KeyError::CryptographicError(format!("Failed to derive keypair from passphrase: {}", e)))?;
 
-    let public_key_bytes = keypair.public_key_bytes();
-    let private_key_bytes = keypair.secret_key_bytes();
+    // keypair is Vec<u8> containing the private key bytes
+    let private_key_bytes = keypair;
+    let (public_key, _private_key) = generate_master_keypair_from_seed(&private_key_bytes)
+        .map_err(|e| KeyError::CryptographicError(format!("Failed to generate keypair from seed: {}", e)))?;
+    let public_key_bytes = public_key.to_bytes();
+
+    // Convert to fixed-size arrays for format_and_output_key
+    let mut private_key_array = [0u8; 32];
+    let len = private_key_bytes.len().min(32);
+    private_key_array[..len].copy_from_slice(&private_key_bytes[..len]);
+
+    let mut public_key_array = [0u8; 32];
+    let pub_len = public_key_bytes.len().min(32);
+    public_key_array[..pub_len].copy_from_slice(&public_key_bytes[..pub_len]);
 
     // Output private key if requested
     if !public_only {
         format_and_output_key(
-            &private_key_bytes,
+            &private_key_array,
             &format,
             private_key_file.as_ref(),
             "private",
@@ -196,7 +219,7 @@ pub fn handle_derive_key(
     // Output public key if requested
     if !private_only {
         format_and_output_key(
-            &public_key_bytes,
+            &public_key_array,
             &format,
             public_key_file.as_ref(),
             "public",
@@ -205,8 +228,7 @@ pub fn handle_derive_key(
         )?;
     }
 
-    // Clear sensitive data
-    drop(keypair);
+    // Note: keypair was moved to private_key_bytes, no need to drop
 
     Ok(())
 }
@@ -260,7 +282,7 @@ pub fn handle_derive_from_master(
     let context_bytes = context.as_bytes();
     let salt = generate_salt();
     let derived_key_material =
-        hkdf_derive_key(&master_key_bytes, salt.as_bytes(), context_bytes, 32);
+        hkdf_derive_key(&master_key_bytes, &salt, context_bytes, 32);
 
     if derived_key_material.len() != 32 {
         return Err(KeyError::CryptographicError("Failed to derive 32-byte key".to_string()));

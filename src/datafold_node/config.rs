@@ -76,7 +76,7 @@ impl NodeConfig {
     pub fn validate(&self) -> Result<(), ConfigError> {
         // Validate crypto configuration if enabled
         if let Some(crypto) = &self.crypto {
-            crypto.validate().map_err(ConfigError::CryptoValidation)?;
+            crypto.validate().map_err(|e| ConfigError::CryptoValidation(Box::new(e)))?;
         }
 
         // Validate signature authentication configuration (mandatory)

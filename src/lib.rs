@@ -45,6 +45,7 @@ pub mod schema;
 pub mod security_types;
 pub mod transform;
 pub mod transform_execution;
+pub mod unified_crypto;
 pub mod utils;
 
 pub mod tests;
@@ -67,17 +68,37 @@ pub use schema::Schema;
 pub use ingestion::{IngestionConfig, IngestionCore, IngestionError, IngestionResponse};
 
 // Re-export crypto types
-pub use crypto::{
-    derive_master_keypair, derive_master_keypair_default, generate_master_keypair, generate_salt,
-    generate_salt_and_derive_keypair, Argon2Params, CryptoError, CryptoResult, DerivedKey,
-    MasterKeyPair, PublicKey, Salt,
+pub use unified_crypto::{
+    config::{Argon2Params, CryptoConfig, MasterKeyConfig},
+    error::{UnifiedCryptoError as CryptoError, UnifiedCryptoResult as CryptoResult},
+    keys::MasterKeyPair,
+    primitives::{PublicKeyHandle as PublicKey, generate_master_keypair, generate_salt},
 };
 
-// Re-export config types
-pub use config::crypto::{ConfigError, CryptoConfig, KeyDerivationConfig, MasterKeyConfig};
 
-// Re-export database crypto metadata types
-pub use db_operations::crypto_metadata::CryptoMetadata;
+// Database crypto metadata - create stub for now
+pub mod crypto_metadata {
+    use serde::{Deserialize, Serialize};
+    
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct CryptoMetadata {
+        pub encryption_enabled: bool,
+        pub algorithm: String,
+        pub key_id: Option<String>,
+    }
+    
+    impl Default for CryptoMetadata {
+        fn default() -> Self {
+            Self {
+                encryption_enabled: false,
+                algorithm: "none".to_string(),
+                key_id: None,
+            }
+        }
+    }
+}
+
+pub use crypto_metadata::CryptoMetadata;
 
 // Re-export crypto initialization types
 pub use datafold_node::{
@@ -105,4 +126,10 @@ pub use security_types::{HealthStatus, RotationStatus, SecurityLevel, Severity};
 pub use transform_execution::{
     TransformConfig, TransformConfigLoader, TransformEngine, TransformError, TransformResult,
     TransformState, TransformStateStore, UnifiedTransformManager,
+};
+
+// Re-export unified crypto types
+pub use unified_crypto::{
+    CryptoConfig as UnifiedCryptoConfig, KeyManager, KeyPair, PrivateKeyHandle, PublicKeyHandle,
+    UnifiedCrypto, UnifiedCryptoError, UnifiedCryptoResult,
 };

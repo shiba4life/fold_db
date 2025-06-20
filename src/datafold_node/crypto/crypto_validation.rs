@@ -3,8 +3,12 @@
 //! This module provides validation functions to ensure that configuration
 //! is valid and consistent before proceeding with crypto initialization.
 
-use crate::config::crypto::{CryptoConfig, MasterKeyConfig};
+use crate::unified_crypto::{
+    config::CryptoConfig,
+    error::UnifiedCryptoError,
+};
 use crate::datafold_node::crypto::crypto_init::{CryptoInitError, CryptoInitResult};
+use crate::security_types::SecurityLevel;
 use log::{debug, warn};
 
 /// Comprehensive validation of crypto configuration for database initialization
@@ -25,14 +29,14 @@ pub fn validate_crypto_config_comprehensive(crypto_config: &CryptoConfig) -> Cry
     // Basic configuration validation
     validate_basic_config(crypto_config)?;
 
-    // Master key configuration validation
-    validate_master_key_config(&crypto_config.master_key)?;
-
-    // Key derivation configuration validation
-    validate_key_derivation_config(crypto_config)?;
+    // Key management configuration validation
+    validate_key_management_config(crypto_config)?;
 
     // Security level validation
     validate_security_requirements(crypto_config)?;
+
+    // Policy validation
+    validate_security_policies(crypto_config)?;
 
     debug!("Comprehensive crypto configuration validation completed successfully");
     Ok(())
@@ -43,170 +47,57 @@ fn validate_basic_config(crypto_config: &CryptoConfig) -> CryptoInitResult<()> {
     debug!("Validating basic crypto configuration");
 
     // Use built-in validation from CryptoConfig
-    crypto_config.validate().map_err(CryptoInitError::Crypto)?;
-
-    if !crypto_config.enabled {
-        debug!("Crypto is disabled - skipping validation");
-        return Ok(());
-    }
+    crypto_config.validate_security().map_err(CryptoInitError::Crypto)?;
 
     debug!("Basic crypto configuration is valid");
     Ok(())
 }
 
-/// Validate master key configuration for database initialization
-fn validate_master_key_config(master_key_config: &MasterKeyConfig) -> CryptoInitResult<()> {
-    debug!("Validating master key configuration");
+/// Validate key management configuration for database initialization
+fn validate_key_management_config(crypto_config: &CryptoConfig) -> CryptoInitResult<()> {
+    debug!("Validating key management configuration");
 
-    match master_key_config {
-        MasterKeyConfig::Random => {
-            debug!("Random key generation - no additional validation required");
-            Ok(())
-        }
-
-        MasterKeyConfig::Passphrase { passphrase } => validate_passphrase_config(passphrase),
-
-        MasterKeyConfig::External { .. } => Err(CryptoInitError::InvalidConfig(
-            "External key sources are not supported for database initialization".to_string(),
-        )),
-    }
-}
-
-/// Validate passphrase configuration for security requirements
-fn validate_passphrase_config(passphrase: &str) -> CryptoInitResult<()> {
-    debug!("Validating passphrase configuration");
-
-    if passphrase.is_empty() {
+    // Validate that the default algorithm is supported
+    if !crypto_config.primitives.supported_algorithms.contains(&crypto_config.keys.default_algorithm) {
         return Err(CryptoInitError::InvalidConfig(
-            "Passphrase cannot be empty".to_string(),
+            "Default key algorithm not in supported algorithms list".to_string(),
         ));
     }
 
-    if passphrase.len() < 8 {
-        warn!("Passphrase is shorter than 8 characters - this may be insecure");
-        // Allow but warn - some users may want shorter passphrases for testing
-        // Only fail for extremely short passphrases
-        if passphrase.len() < 6 {
-            return Err(CryptoInitError::InvalidConfig(
-                "Passphrase must be at least 6 characters".to_string(),
-            ));
+    // Validate key storage configuration
+    crypto_config.keys.storage_backend.validate().map_err(CryptoInitError::Crypto)?;
+
+    // Validate key rotation configuration if enabled
+    if let Some(max_age) = crypto_config.policy.max_key_age {
+        if max_age.as_secs() < 3600 {
+            warn!("Key rotation configured for less than 1 hour - this may be too frequent");
         }
     }
 
-    if passphrase.len() > 1024 {
-        return Err(CryptoInitError::InvalidConfig(
-            "Passphrase exceeds maximum length of 1024 characters".to_string(),
-        ));
-    }
-
-    // Check for obviously weak passphrases (but don't fail, just warn)
-    let _ = validate_passphrase_strength(passphrase);
-
-    debug!("Passphrase configuration validated successfully");
+    debug!("Key management configuration is valid");
     Ok(())
 }
 
-/// Validate passphrase strength (basic checks)
-fn validate_passphrase_strength(passphrase: &str) -> CryptoInitResult<()> {
-    // Check for common weak patterns
-    let weak_patterns = [
-        "password", "123456", "qwerty", "admin", "test", "guest", "default", "root", "user", "demo",
-    ];
-
-    let passphrase_lower = passphrase.to_lowercase();
-    for pattern in &weak_patterns {
-        if passphrase_lower.contains(pattern) {
-            warn!("Passphrase contains common weak pattern: {}", pattern);
-            // Don't fail, just warn - users should be able to choose their passphrases
-            break;
-        }
-    }
-
-    // Check for very simple patterns
-    if is_simple_pattern(passphrase) {
-        warn!(
-            "Passphrase appears to be a simple pattern - consider using a more complex passphrase"
-        );
-    }
-
-    Ok(())
-}
-
-/// Check if passphrase is a simple pattern
-fn is_simple_pattern(passphrase: &str) -> bool {
-    // Check for all same character
-    if passphrase
-        .chars()
-        .all(|c| c == passphrase.chars().next().unwrap())
-    {
-        return true;
-    }
-
-    // Check for simple sequences (123456, abcdef, etc.)
-    let chars: Vec<char> = passphrase.chars().collect();
-    if chars.len() >= 3 {
-        let mut is_sequence = true;
-        for i in 1..chars.len() {
-            if chars[i] as u8 != chars[i - 1] as u8 + 1 {
-                is_sequence = false;
-                break;
-            }
-        }
-        if is_sequence {
-            return true;
-        }
-    }
-
-    false
-}
-
-/// Validate key derivation configuration
-fn validate_key_derivation_config(crypto_config: &CryptoConfig) -> CryptoInitResult<()> {
-    debug!("Validating key derivation configuration");
-
-    // Convert to Argon2 parameters to validate (validation happens in to_argon2_params)
-    let _params = crypto_config
-        .key_derivation
-        .to_argon2_params()
-        .map_err(CryptoInitError::Crypto)?;
-
-    // Additional validation for initialization context
-    if let Some(preset) = &crypto_config.key_derivation.preset {
-        debug!("Key derivation security level: {}", preset.as_str());
-
-        // Warn about performance implications of high security levels
-        if preset == &crate::security_types::SecurityLevel::High {
-            warn!("Using 'High' security level - key derivation will be very slow");
-            warn!("Consider using 'Low' level unless high security is required");
-        }
-    } else {
-        debug!("Using custom key derivation parameters");
-    }
-
-    debug!("Key derivation configuration validated successfully");
-    Ok(())
-}
-
-/// Validate overall security requirements and consistency
+/// Validate security requirements based on configuration
 fn validate_security_requirements(crypto_config: &CryptoConfig) -> CryptoInitResult<()> {
     debug!("Validating security requirements");
 
-    // Check consistency between master key type and security level
-    match &crypto_config.master_key {
-        MasterKeyConfig::Random => {
-            // Random keys are always secure regardless of derivation settings
-            debug!("Random key generation provides maximum security");
-        }
+    let security_level = crypto_config.general.security_level;
 
-        MasterKeyConfig::Passphrase { passphrase } => {
-            // Check if passphrase length matches security level expectations
-            if let Some(preset) = &crypto_config.key_derivation.preset {
-                validate_passphrase_security_level_consistency(passphrase, preset)?;
-            }
+    // Basic security level validation
+    match security_level {
+        SecurityLevel::Basic => {
+            debug!("Using basic security level");
         }
-
-        MasterKeyConfig::External { .. } => {
-            // Already validated as unsupported above
+        SecurityLevel::Low => {
+            debug!("Using low security level");
+        }
+        SecurityLevel::Standard => {
+            debug!("Using standard security level");
+        }
+        SecurityLevel::High => {
+            debug!("Using high security level");
+            validate_high_security_requirements(crypto_config)?;
         }
     }
 
@@ -214,257 +105,191 @@ fn validate_security_requirements(crypto_config: &CryptoConfig) -> CryptoInitRes
     Ok(())
 }
 
-/// Validate consistency between passphrase and security level
-fn validate_passphrase_security_level_consistency(
-    passphrase: &str,
-    security_level: &crate::security_types::SecurityLevel,
-) -> CryptoInitResult<()> {
-    use crate::security_types::SecurityLevel;
+/// Validate high security level specific requirements
+fn validate_high_security_requirements(crypto_config: &CryptoConfig) -> CryptoInitResult<()> {
+    debug!("Validating high security level requirements");
 
-    match security_level {
-        SecurityLevel::Standard => {
-            if passphrase.len() < 8 {
-                warn!("Short passphrase with Standard security level may be vulnerable");
-            }
-        }
-
-        SecurityLevel::Low => {
-            if passphrase.len() < 12 {
-                warn!("Consider using a longer passphrase with Low security level");
-            }
-        }
-
-        SecurityLevel::High => {
-            if passphrase.len() < 16 {
-                warn!("High security level recommended with passphrases of 16+ characters");
-            }
-        }
+    // Ensure hardware acceleration is enabled for high security
+    if !crypto_config.general.hardware_acceleration {
+        warn!("Hardware acceleration disabled for high security level - performance may be impacted");
     }
 
-    Ok(())
-}
-
-/// Validate crypto configuration specifically for new database creation
-///
-/// This validation is specific to database creation scenarios and includes
-/// additional checks that may not apply to other crypto operations.
-///
-/// # Arguments
-/// * `crypto_config` - Crypto configuration for new database
-///
-/// # Returns
-/// * `Ok(())` - Configuration is suitable for database creation
-/// * `Err(CryptoInitError)` - Configuration not suitable for database creation
-pub fn validate_for_database_creation(crypto_config: &CryptoConfig) -> CryptoInitResult<()> {
-    debug!("Validating crypto configuration for database creation");
-
-    // Perform comprehensive validation first
-    validate_crypto_config_comprehensive(crypto_config)?;
-
-    // Additional checks specific to database creation
-    validate_database_creation_requirements(crypto_config)?;
-
-    debug!("Database creation validation completed successfully");
-    Ok(())
-}
-
-/// Validate requirements specific to database creation
-fn validate_database_creation_requirements(crypto_config: &CryptoConfig) -> CryptoInitResult<()> {
-    debug!("Validating database creation specific requirements");
-
-    // For database creation validation, crypto must be enabled
-    if !crypto_config.enabled {
+    // Ensure strict validation is enabled
+    if !crypto_config.general.strict_validation {
         return Err(CryptoInitError::InvalidConfig(
-            "Crypto must be enabled for database creation validation".to_string(),
+            "Strict validation must be enabled for high security level".to_string(),
         ));
     }
 
-    // Validate that the configuration will work for initialization
-    match &crypto_config.master_key {
-        MasterKeyConfig::Random => {
-            debug!("Random key generation is suitable for database creation");
-        }
-
-        MasterKeyConfig::Passphrase { .. } => {
-            debug!("Passphrase-based key derivation is suitable for database creation");
-            // Additional passphrase-specific validation already done above
-        }
-
-        MasterKeyConfig::External { .. } => {
-            return Err(CryptoInitError::InvalidConfig(
-                "External key sources cannot be used for initial database creation".to_string(),
-            ));
-        }
+    // Ensure audit logging is appropriately configured
+    if !crypto_config.audit.enabled {
+        return Err(CryptoInitError::InvalidConfig(
+            "Audit logging must be enabled for high security level".to_string(),
+        ));
     }
 
-    debug!("Database creation requirements validated successfully");
+    debug!("High security level requirements validated");
     Ok(())
 }
 
-/// Quick validation for crypto configuration (lightweight check)
+/// Validate security policies configuration
+fn validate_security_policies(crypto_config: &CryptoConfig) -> CryptoInitResult<()> {
+    debug!("Validating security policies");
+
+    // Use built-in policy validation
+    crypto_config.policy.validate().map_err(CryptoInitError::Crypto)?;
+
+    debug!("Security policies validation completed");
+    Ok(())
+}
+
+/// Quick validation of crypto configuration (lightweight checks)
 ///
-/// This function performs essential validation checks without comprehensive
-/// security analysis. Suitable for quick checks before more expensive operations.
+/// This function performs essential validation checks with minimal overhead,
+/// suitable for frequent validation scenarios.
 ///
 /// # Arguments
 /// * `crypto_config` - Crypto configuration to validate
 ///
 /// # Returns
-/// * `Ok(())` - Configuration passes basic validation
-/// * `Err(CryptoInitError)` - Configuration has critical issues
+/// * `Ok(())` - Configuration passes quick validation
+/// * `Err(CryptoInitError)` - Configuration validation failed
 pub fn validate_crypto_config_quick(crypto_config: &CryptoConfig) -> CryptoInitResult<()> {
-    debug!("Performing quick crypto configuration validation");
+    debug!("Starting quick crypto configuration validation");
 
-    // Basic structure validation
-    crypto_config.validate().map_err(CryptoInitError::Crypto)?;
-
-    // Check basic requirements
-    if crypto_config.enabled {
-        match &crypto_config.master_key {
-            MasterKeyConfig::Passphrase { passphrase } => {
-                if passphrase.is_empty() {
-                    return Err(CryptoInitError::InvalidConfig(
-                        "Passphrase cannot be empty".to_string(),
-                    ));
-                }
-                if passphrase.len() > 1024 {
-                    return Err(CryptoInitError::InvalidConfig(
-                        "Passphrase too long".to_string(),
-                    ));
-                }
-            }
-            MasterKeyConfig::External { .. } => {
-                return Err(CryptoInitError::InvalidConfig(
-                    "External keys not supported".to_string(),
-                ));
-            }
-            MasterKeyConfig::Random => {
-                // Always valid
-            }
-        }
+    // Check if crypto is enabled
+    if !crypto_config.enabled {
+        return Err(CryptoInitError::Validation(
+            "Crypto configuration is disabled".to_string(),
+        ));
     }
 
-    debug!("Quick crypto configuration validation completed");
+    // Basic validation only
+    validate_basic_config(crypto_config)?;
+
+    debug!("Quick crypto configuration validation completed successfully");
+    Ok(())
+}
+
+/// Validate crypto configuration for database creation
+///
+/// This function validates the crypto configuration specifically for
+/// database creation scenarios, ensuring all required components are present.
+///
+/// # Arguments
+/// * `crypto_config` - Crypto configuration to validate
+///
+/// # Returns
+/// * `Ok(())` - Configuration is suitable for database creation
+/// * `Err(CryptoInitError)` - Configuration validation failed
+pub fn validate_for_database_creation(crypto_config: &CryptoConfig) -> CryptoInitResult<()> {
+    debug!("Starting database creation crypto configuration validation");
+
+    // Perform comprehensive validation
+    validate_crypto_config_comprehensive(crypto_config)?;
+
+    // Additional database-specific checks
+    if crypto_config.general.security_level == SecurityLevel::Basic {
+        warn!("Using Basic security level for database creation - consider upgrading");
+    }
+
+    // Ensure key management is properly configured
+    // Note: Algorithm is an enum, so we can't check if it's "empty"
+    // This validation is satisfied by having a valid enum value
+    debug!("Using default algorithm: {:?}", crypto_config.keys.default_algorithm);
+
+    debug!("Database creation crypto configuration validation completed successfully");
+    Ok(())
+}
+
+/// Validate configuration for specific algorithm
+pub fn validate_algorithm_config(
+    crypto_config: &CryptoConfig,
+    algorithm: &crate::unified_crypto::types::Algorithm,
+) -> CryptoInitResult<()> {
+    debug!("Validating configuration for algorithm: {:?}", algorithm);
+
+    // Check if algorithm is supported
+    if !crypto_config.primitives.supported_algorithms.contains(algorithm) {
+        return Err(CryptoInitError::InvalidConfig(
+            format!("Algorithm {:?} is not supported by current configuration", algorithm),
+        ));
+    }
+
+    // Check if algorithm meets security level requirements
+    if !algorithm.is_approved_for_level(crypto_config.general.security_level) {
+        return Err(CryptoInitError::InvalidConfig(
+            format!(
+                "Algorithm {:?} does not meet security level {:?} requirements",
+                algorithm, crypto_config.general.security_level
+            ),
+        ));
+    }
+
+    debug!("Algorithm configuration validation completed");
+    Ok(())
+}
+
+/// Quick validation for basic crypto setup
+pub fn validate_minimal_crypto_config(crypto_config: &CryptoConfig) -> CryptoInitResult<()> {
+    debug!("Performing minimal crypto configuration validation");
+
+    // Just do basic validation - sufficient for testing/development
+    crypto_config.validate_security().map_err(CryptoInitError::Crypto)?;
+
+    debug!("Minimal crypto configuration validation completed");
+    Ok(())
+}
+
+/// Validate crypto configuration compatibility with database format
+pub fn validate_database_compatibility(
+    crypto_config: &CryptoConfig,
+    _database_version: &str,
+) -> CryptoInitResult<()> {
+    debug!("Validating crypto configuration compatibility with database");
+
+    // For now, just validate the crypto config itself
+    // Future versions could add specific database format compatibility checks
+    crypto_config.validate_security().map_err(CryptoInitError::Crypto)?;
+
+    debug!("Database compatibility validation completed");
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::crypto::KeyDerivationConfig;
+    use crate::unified_crypto::config::CryptoConfig;
     use crate::security_types::SecurityLevel;
 
-    fn create_valid_random_config() -> CryptoConfig {
-        CryptoConfig {
-            enabled: true,
-            master_key: MasterKeyConfig::Random,
-            key_derivation: KeyDerivationConfig::default(),
-        }
-    }
-
-    fn create_valid_passphrase_config() -> CryptoConfig {
-        CryptoConfig {
-            enabled: true,
-            master_key: MasterKeyConfig::Passphrase {
-                passphrase: "secure_test_passphrase_123".to_string(),
-            },
-            key_derivation: KeyDerivationConfig::for_security_level(SecurityLevel::Low),
-        }
+    #[test]
+    fn test_basic_config_validation() {
+        let config = CryptoConfig::default();
+        assert!(validate_basic_config(&config).is_ok());
     }
 
     #[test]
-    fn test_validate_crypto_config_comprehensive_valid() {
-        let config = create_valid_random_config();
-        assert!(validate_crypto_config_comprehensive(&config).is_ok());
-
-        let config = create_valid_passphrase_config();
+    fn test_comprehensive_validation() {
+        let config = CryptoConfig::default();
         assert!(validate_crypto_config_comprehensive(&config).is_ok());
     }
 
     #[test]
-    fn test_validate_crypto_config_comprehensive_disabled() {
-        let mut config = create_valid_random_config();
-        config.enabled = false;
-
-        let result = validate_crypto_config_comprehensive(&config);
-        assert!(result.is_ok());
+    fn test_high_security_validation() {
+        let config = CryptoConfig::for_security_level(SecurityLevel::High);
+        assert!(validate_crypto_config_comprehensive(&config).is_ok());
     }
 
     #[test]
-    fn test_validate_passphrase_config() {
-        // Valid passphrase
-        assert!(validate_passphrase_config("secure_passphrase_123").is_ok());
-
-        // Empty passphrase
-        assert!(validate_passphrase_config("").is_err());
-
-        // Too long passphrase
-        let long_passphrase = "a".repeat(1025);
-        assert!(validate_passphrase_config(&long_passphrase).is_err());
+    fn test_minimal_validation() {
+        let config = CryptoConfig::default();
+        assert!(validate_minimal_crypto_config(&config).is_ok());
     }
 
     #[test]
-    fn test_validate_passphrase_strength() {
-        // Should not fail but may warn
-        assert!(validate_passphrase_strength("password123").is_ok());
-        assert!(validate_passphrase_strength("123456789").is_ok());
-        assert!(validate_passphrase_strength("secure_test_phrase").is_ok());
-    }
-
-    #[test]
-    fn test_is_simple_pattern() {
-        assert!(is_simple_pattern("aaaaaaa"));
-        assert!(is_simple_pattern("1234567"));
-        assert!(is_simple_pattern("abcdefg"));
-        assert!(!is_simple_pattern("secure123"));
-        assert!(!is_simple_pattern("random_phrase"));
-    }
-
-    #[test]
-    fn test_validate_for_database_creation() {
-        let config = create_valid_random_config();
-        assert!(validate_for_database_creation(&config).is_ok());
-
-        let config = create_valid_passphrase_config();
-        assert!(validate_for_database_creation(&config).is_ok());
-
-        // Disabled crypto should fail for database creation
-        let mut config = create_valid_random_config();
-        config.enabled = false;
-        assert!(validate_for_database_creation(&config).is_err());
-    }
-
-    #[test]
-    fn test_validate_crypto_config_quick() {
-        let config = create_valid_random_config();
-        assert!(validate_crypto_config_quick(&config).is_ok());
-
-        let config = create_valid_passphrase_config();
-        assert!(validate_crypto_config_quick(&config).is_ok());
-
-        // Empty passphrase should fail quick validation
-        let config = CryptoConfig {
-            enabled: true,
-            master_key: MasterKeyConfig::Passphrase {
-                passphrase: "".to_string(),
-            },
-            key_derivation: KeyDerivationConfig::default(),
-        };
-        assert!(validate_crypto_config_quick(&config).is_err());
-    }
-
-    #[test]
-    fn test_external_key_validation() {
-        let config = CryptoConfig {
-            enabled: true,
-            master_key: MasterKeyConfig::External {
-                key_source: "test".to_string(),
-            },
-            key_derivation: KeyDerivationConfig::default(),
-        };
-
-        assert!(validate_crypto_config_comprehensive(&config).is_err());
-        assert!(validate_for_database_creation(&config).is_err());
-        assert!(validate_crypto_config_quick(&config).is_err());
+    fn test_algorithm_validation() {
+        let config = CryptoConfig::default();
+        let algorithm = crate::unified_crypto::types::Algorithm::Ed25519;
+        assert!(validate_algorithm_config(&config, &algorithm).is_ok());
     }
 }

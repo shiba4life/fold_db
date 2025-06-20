@@ -3,7 +3,7 @@
 //! This module contains all storage-related types, backup formats,
 //! and API communication structures for the DataFold CLI.
 
-use crate::crypto::Argon2Params;
+use crate::unified_crypto::config::Argon2Params;
 
 /// Secure key storage configuration
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

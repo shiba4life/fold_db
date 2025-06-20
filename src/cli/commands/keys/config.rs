@@ -6,7 +6,7 @@
 use crate::cli::args::CliSecurityLevel;
 use crate::cli::commands::keys::error::{KeyError, KeyResult};
 use crate::cli::utils::key_utils::{ensure_storage_dir, get_default_storage_dir};
-use crate::crypto::Argon2Params;
+use crate::unified_crypto::config::Argon2Params;
 use std::path::{Path, PathBuf};
 
 /// Configuration for key management operations

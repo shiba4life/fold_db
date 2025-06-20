@@ -59,6 +59,11 @@ pub enum AuthenticationError {
         client_id: String,
         correlation_id: String,
     },
+    /// Cryptographic operation errors
+    CryptographicError {
+        operation: String,
+        correlation_id: String,
+    },
 }
 
 impl AuthenticationError {
@@ -73,6 +78,7 @@ impl AuthenticationError {
             Self::ConfigurationError { correlation_id, .. } => correlation_id,
             Self::UnsupportedAlgorithm { correlation_id, .. } => correlation_id,
             Self::RateLimitExceeded { correlation_id, .. } => correlation_id,
+            Self::CryptographicError { correlation_id, .. } => correlation_id,
         }
     }
 
@@ -87,6 +93,7 @@ impl AuthenticationError {
             Self::ConfigurationError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             Self::UnsupportedAlgorithm { .. } => StatusCode::BAD_REQUEST,
             Self::RateLimitExceeded { .. } => StatusCode::TOO_MANY_REQUESTS,
+            Self::CryptographicError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
@@ -102,6 +109,7 @@ impl AuthenticationError {
             Self::ConfigurationError { .. } => "CONFIGURATION_ERROR",
             Self::UnsupportedAlgorithm { .. } => "UNSUPPORTED_ALGORITHM",
             Self::RateLimitExceeded { .. } => "RATE_LIMIT_EXCEEDED",
+            Self::CryptographicError { .. } => "CRYPTOGRAPHIC_ERROR",
         }
     }
 
@@ -116,6 +124,7 @@ impl AuthenticationError {
             Self::ConfigurationError { .. } => "Internal server error. Please contact system administrator.".to_string(),
             Self::UnsupportedAlgorithm { .. } => "Unsupported signature algorithm. Please use ed25519.".to_string(),
             Self::RateLimitExceeded { .. } => "Rate limit exceeded. Please reduce request frequency and try again later.".to_string(),
+            Self::CryptographicError { .. } => "Cryptographic operation failed. Please contact system administrator.".to_string(),
         }
     }
 
@@ -231,6 +240,15 @@ impl AuthenticationError {
                     client_id
                 )
             }
+            Self::CryptographicError { operation, .. } => {
+                format!(
+                    "Cryptographic operation failed: {}. \
+                • Check system cryptographic libraries\n\
+                • Verify key material integrity\n\
+                • Ensure sufficient system entropy",
+                    operation
+                )
+            }
         }
     }
 
@@ -260,6 +278,9 @@ impl AuthenticationError {
             }
             Self::RateLimitExceeded { .. } => {
                 "https://docs.datafold.dev/signature-auth/rate-limits"
+            }
+            Self::CryptographicError { .. } => {
+                "https://docs.datafold.dev/authentication/troubleshooting#crypto-errors"
             }
         }
         .to_string()
@@ -313,6 +334,11 @@ impl AuthenticationError {
                 "Use exponential backoff retry logic".to_string(),
                 "Review and optimize request patterns".to_string(),
             ],
+            Self::CryptographicError { .. } => vec![
+                "Check cryptographic library installation".to_string(),
+                "Verify system entropy availability".to_string(),
+                "Review key material integrity".to_string(),
+            ],
         }
     }
 
@@ -327,6 +353,7 @@ impl AuthenticationError {
             Self::ConfigurationError { .. } => Severity::Critical,
             Self::UnsupportedAlgorithm { .. } => Severity::Info,
             Self::RateLimitExceeded { .. } => Severity::Critical,
+            Self::CryptographicError { .. } => Severity::Critical,
         }
     }
 }
@@ -426,6 +453,16 @@ impl std::fmt::Display for AuthenticationError {
                     f,
                     "Rate limit exceeded for client: {} (correlation_id: {})",
                     client_id, correlation_id
+                )
+            }
+            Self::CryptographicError {
+                operation,
+                correlation_id,
+            } => {
+                write!(
+                    f,
+                    "Cryptographic operation failed: {} (correlation_id: {})",
+                    operation, correlation_id
                 )
             }
         }

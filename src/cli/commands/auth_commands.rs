@@ -6,13 +6,14 @@
 use crate::cli::args::{CliSecurityLevel, HttpMethod, MessageEncoding, ProfileAction};
 use crate::cli::auth::{CliAuthProfile, CliSigningConfig};
 use crate::cli::config::CliConfigManager;
-use crate::cli::http_client::HttpClientBuilder;
+use crate::cli::http_client::{HttpClientBuilder, HttpClientError};
 use crate::cli::utils::key_utils::{
     decrypt_key, encrypt_key, ensure_storage_dir, get_default_storage_dir, get_secure_passphrase,
     KeyStorageConfig,
 };
 use crate::crypto::ed25519::generate_master_keypair;
-use crate::crypto::{Argon2Params, MasterKeyPair};
+use crate::unified_crypto::config::Argon2Params;
+use crate::unified_crypto::keys::{KeyPair, MasterKeyPair};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -579,8 +580,11 @@ pub async fn handle_auth_keygen(
         CliSecurityLevel::Sensitive => Argon2Params::sensitive(),
     };
 
-    // Encrypt the key
-    let storage_config = encrypt_key(&private_key_bytes, &_passphrase, &argon2_params)?;
+    // Encrypt the key - convert to fixed array if needed
+    let mut key_array = [0u8; 32];
+    let len = private_key_bytes.len().min(32);
+    key_array[..len].copy_from_slice(&private_key_bytes[..len]);
+    let storage_config = encrypt_key(&key_array, &_passphrase, &argon2_params)?;
 
     // Write encrypted key to file
     let config_json = serde_json::to_string_pretty(&storage_config)?;
@@ -699,7 +703,8 @@ pub async fn handle_auth_test(
     let passphrase = get_secure_passphrase()?;
 
     let private_key_bytes = decrypt_key(&key_config, &passphrase)?;
-    let master_keypair = MasterKeyPair::from_secret_bytes(&private_key_bytes)?;
+    let master_keypair = KeyPair::from_secret_bytes(&private_key_bytes, crate::unified_crypto::types::Algorithm::Ed25519)
+        .map_err(|e| HttpClientError::Configuration(format!("Failed to create master keypair: {}", e)))?;
 
     // Create authenticated HTTP client
     let signing_config = CliSigningConfig::default();
@@ -836,9 +841,10 @@ pub async fn handle_register_key(
     let private_key_bytes = decrypt_key(&key_config, &passphrase)?;
 
     // Extract public key from private key
-    let master_keypair = MasterKeyPair::from_secret_bytes(&private_key_bytes)?;
-    let public_key = master_keypair.public_key();
-    let public_key_hex = hex::encode(public_key.to_bytes());
+    let master_keypair = MasterKeyPair::from_secret_bytes(&private_key_bytes)
+        .map_err(|e| format!("Failed to create master keypair: {}", e))?;
+    let public_key = &master_keypair.public_key_bytes;
+    let public_key_hex = hex::encode(public_key);
 
     // Generate client ID if not provided
     let client_id = client_id.unwrap_or_else(|| format!("cli_{}", uuid::Uuid::new_v4()));
@@ -975,7 +981,8 @@ pub async fn handle_sign_and_verify(
     let passphrase = get_secure_passphrase()?;
 
     let private_key_bytes = decrypt_key(&key_config, &passphrase)?;
-    let master_keypair = MasterKeyPair::from_secret_bytes(&private_key_bytes)?;
+    let master_keypair = MasterKeyPair::from_secret_bytes(&private_key_bytes)
+        .map_err(|e| format!("Failed to create master keypair: {}", e))?;
 
     // Get message to sign
     let message_to_sign = match (message, message_file) {
@@ -1092,7 +1099,11 @@ pub async fn handle_test_server_integration(
         CliSecurityLevel::Sensitive => Argon2Params::sensitive(),
     };
 
-    let storage_config = encrypt_key(&private_key_bytes, &_passphrase, &argon2_params)?;
+    // Convert to fixed array if needed
+    let mut key_array = [0u8; 32];
+    let len = private_key_bytes.len().min(32);
+    key_array[..len].copy_from_slice(&private_key_bytes[..len]);
+    let storage_config = encrypt_key(&key_array, &_passphrase, &argon2_params)?;
     let key_file_path = storage_dir.join(format!("{}.json", test_key_id));
     let config_json = serde_json::to_string_pretty(&storage_config)?;
     fs::write(&key_file_path, config_json)?;

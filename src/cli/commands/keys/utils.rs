@@ -7,7 +7,7 @@ use crate::cli::args::{CliSecurityLevel, KeyFormat};
 use crate::cli::utils::key_utils::{
     format_key, get_secure_passphrase, output_key, parse_key_input
 };
-use crate::crypto::Argon2Params;
+use crate::unified_crypto::config::Argon2Params;
 use crate::cli::commands::keys::error::{KeyError, KeyResult};
 use rand::{rngs::OsRng, RngCore};
 use rpassword::read_password;

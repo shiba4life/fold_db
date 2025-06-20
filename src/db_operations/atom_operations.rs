@@ -66,6 +66,7 @@ impl DbOperations {
         atom_uuid: &str,
     ) -> Result<Option<Atom>, SchemaError> {
         encryption_wrapper.get_encrypted_item(&format!("atom:{}", atom_uuid), contexts::ATOM_DATA)
+            .map_err(|e| SchemaError::InvalidData(format!("Encryption error: {}", e)))
     }
 
     /// Creates or updates a single atom reference

@@ -5,7 +5,8 @@
 //! and comprehensive error handling.
 
 use super::encryption_core::{EncryptionAtRest, AES_KEY_SIZE};
-use crate::config::crypto::{CryptoConfig, MasterKeyConfig};
+use crate::config::crypto::CryptoConfig;
+use crate::unified_crypto::config::MasterKeyConfig;
 use crate::crypto::{CryptoError, CryptoResult, MasterKeyPair};
 use blake3::Hasher;
 use std::collections::HashMap;
@@ -34,7 +35,10 @@ impl KeyDerivationManager {
         crypto_config: &CryptoConfig,
     ) -> CryptoResult<Self> {
         // Extract the Ed25519 private key bytes as master key material
-        let master_key_bytes = master_keypair.secret_key_bytes();
+        let secret_bytes = master_keypair.secret_key_bytes();
+        let mut master_key_bytes = [0u8; 32];
+        let len = secret_bytes.len().min(32);
+        master_key_bytes[..len].copy_from_slice(&secret_bytes[..len]);
 
         // Create a configuration hash for additional entropy
         let config_hash = Self::compute_config_hash(crypto_config)?;
@@ -246,7 +250,7 @@ pub mod integration {
         crypto_config
             .validate()
             .map_err(|e| CryptoError::KeyDerivation {
-                message: format!("Invalid crypto config: {}", e),
+                details: format!("Invalid crypto config: {}", e),
             })?;
 
         // Create key derivation manager
@@ -298,19 +302,19 @@ pub mod integration {
                 encryptor
                     .encrypt(test_data)
                     .map_err(|e| CryptoError::KeyGeneration {
-                        message: format!("Encryption failed for context '{}': {}", context, e),
+                        details: format!("Encryption failed for context '{}': {}", context, e),
                     })?;
 
             let decrypted =
                 encryptor
                     .decrypt(&encrypted)
                     .map_err(|e| CryptoError::Signature {
-                        message: format!("Decryption failed for context '{}': {}", context, e),
+                        details: format!("Decryption failed for context '{}': {}", context, e),
                     })?;
 
             if decrypted != test_data {
                 return Err(CryptoError::Signature {
-                    message: format!("Round-trip test failed for context '{}'", context),
+                    details: format!("Round-trip test failed for context '{}'", context),
                 });
             }
         }
@@ -409,7 +413,10 @@ mod tests {
             .expect("Should create key derivation manager");
 
         // Test creation from raw bytes
-        let master_key_bytes = master_keys.secret_key_bytes();
+        let secret_bytes = master_keys.secret_key_bytes();
+        let mut master_key_bytes = [0u8; 32];
+        let len = secret_bytes.len().min(32);
+        master_key_bytes[..len].copy_from_slice(&secret_bytes[..len]);
         let manager2 =
             KeyDerivationManager::from_bytes(master_key_bytes, &crypto_config)
                 .expect("Should create key derivation manager from bytes");

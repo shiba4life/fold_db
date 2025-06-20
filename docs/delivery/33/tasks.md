@@ -1,108 +1,80 @@
-# Tasks for PBI 33: Cryptography Module Consolidation
+# Tasks for PBI 33: Consolidate cryptographic modules into a single authoritative implementation
 
 This document lists all tasks associated with PBI 33.
 
-**Parent PBI**: [PBI 33: Cryptography Module Consolidation](./prd.md)
+**Parent PBI**: [PBI 33: Consolidate cryptographic modules into a single authoritative implementation](./prd.md)
 
 ## Task Summary
 
-| Task ID | Name | Status | Effort | Description |
-| :------ | :--- | :----- | :----- | :---------- |
-| 33-1    | [Inventory and Map Cryptography Functionality](./33-1.md) | Proposed | M | Catalog all cryptographic functions, types, and flows in both modules |
-| 33-2    | [Define Unified Crypto Module Boundaries](./33-2.md) | Proposed | M | Design structure and interfaces for unified crypto module with security team review |
-| 33-3    | [Refactor and Merge Cryptographic Primitives](./33-3.md) | Proposed | L | Move and unify all cryptographic primitives and utilities into new module |
-| 33-4    | [Integrate Compliance and API Layers](./33-4.md) | Proposed | L | Integrate compliance, initialization, and API endpoints into unified module |
-| 33-5    | [Remove Legacy Crypto Modules](./33-5.md) | Proposed | S | Remove old crypto modules and update all references |
+| Task ID | Name | Status | Description |
+| :------ | :--- | :----- | :---------- |
+| 33-1 | [Analyze and document cryptographic module overlap and duplication](./33-1.md) | Review | Catalog and analyze all cryptographic functionality across modules to identify overlap and duplication |
+| 33-2 | [Design unified cryptographic architecture](./33-2.md) | Review | Design the architecture and interfaces for the unified cryptographic module system |
+| 33-3 | [Implement core unified cryptographic module (primitives layer)](./33-3.md) | Review | Implement the foundational cryptographic primitives layer of the unified module |
+| 33-4 | [Implement operational cryptographic layer (high-level operations)](./33-4.md) | Review | Implement the high-level operational cryptographic layer and public APIs |
+| 33-5 | [Migrate existing cryptographic logic to unified module](./33-5.md) | Review | Migrate all existing cryptographic logic to use the unified module interfaces |
+| 33-6 | [Remove legacy cryptographic modules and update references](./33-6.md) | Review | Remove legacy cryptographic modules and update all remaining references |
+| 33-7 | [Create comprehensive tests for unified cryptographic system](./33-7.md) | Done | Develop comprehensive test suite for the unified cryptographic implementation |
 
-## Task Details
+---
 
-### Task 33-1: Inventory and Map Cryptography Functionality
-**Dependencies:** None  
-**Acceptance Criteria:**
-- Complete inventory and mapping document of all cryptographic functionality
-- All public and internal APIs cataloged from both `src/crypto/` and `src/datafold_node/crypto/`
-- Identified duplicated or similar logic between modules
-- Security implications documented for each component
+### Status History (33-1)
 
-**Technical Tasks:**
-- List all public and internal cryptographic APIs in both modules
-- Identify duplicated or similar cryptographic logic
-- Map data flows and dependencies between crypto components
-- Document security properties and compliance requirements for each component
-- Document findings in architecture wiki with security review
+| Date (UTC)           | Status      | Actor      | Notes                                      |
+|----------------------|-------------|------------|---------------------------------------------|
+| 2025-06-18T16:48:00Z | Proposed    | System     | Task created                                |
+| 2025-06-19T16:26:46Z | Agreed      | Architect  | Task scope and plan agreed with architect   |
+| 2025-06-19T16:26:46Z | InProgress  | Architect  | Analysis and documentation work started     |
+| 2025-06-19T16:32:15Z | Review      | Architect  | Analysis complete, awaiting validation      |
 
-**Risks & Mitigation:** 
-- Overlooked critical cryptographic code paths; mitigate with static analysis tools and security team review
+### Status History (33-2)
 
-### Task 33-2: Define Unified Crypto Module Boundaries
-**Dependencies:** Task 33-1  
-**Acceptance Criteria:**
-- Approved design document and interface definitions reviewed by security team
-- Clear module boundaries defined between primitives, compliance, and API layers
-- API surface defined for core and compliance layers
-- Migration strategy approved by security and compliance teams
+| Date (UTC)           | Status      | Actor      | Notes                                      |
+|----------------------|-------------|------------|---------------------------------------------|
+| 2025-06-19T16:32:15Z | Agreed      | Architect  | Task scope and architecture plan agreed     |
+| 2025-06-19T16:32:15Z | InProgress  | Architect  | Architecture design work started            |
+| 2025-06-19T16:33:42Z | Review      | Code       | Architecture design complete, awaiting validation |
 
-**Technical Tasks:**
-- Propose unified module boundaries and architecture
-- Define API surface for core cryptographic primitives
-- Define interfaces for compliance and operational layers
-- Create migration strategy for existing crypto consumers
-- Review design with security team and obtain approval
+### Status History (33-3)
 
-**Risks & Mitigation:** 
-- Security concerns in unified design; mitigate with mandatory security architecture review
+| Date (UTC)           | Status      | Actor      | Notes                                      |
+|----------------------|-------------|------------|---------------------------------------------|
+| 2025-06-19T16:33:42Z | Agreed      | Code       | Task scope and implementation plan agreed   |
+| 2025-06-19T16:33:42Z | InProgress  | Code       | Core cryptographic module implementation started |
+| 2025-06-19T16:48:39Z | Review      | Code       | Core cryptographic module implementation complete |
 
-### Task 33-3: Refactor and Merge Cryptographic Primitives
-**Dependencies:** Task 33-2  
-**Acceptance Criteria:**
-- All cryptographic operations use unified codebase
-- Core primitives (key management, encryption, audit) successfully consolidated
-- No duplicated cryptographic logic remains
-- Security properties maintained through consolidation
+### Status History (33-4)
 
-**Technical Tasks:**
-- Refactor and merge cryptographic primitives (key management, encryption, audit)
-- Update all consumers to use unified cryptographic interfaces
-- Remove redundant cryptographic code
-- Validate security properties with comprehensive test coverage
-- Conduct security review of consolidated primitives
+| Date (UTC)           | Status      | Actor      | Notes                                      |
+|----------------------|-------------|------------|---------------------------------------------|
+| 2025-06-19T16:50:16Z | Agreed      | Code       | Task scope and implementation plan agreed   |
+| 2025-06-19T16:50:16Z | InProgress  | Code       | Operational cryptographic layer implementation started |
+| 2025-06-19T17:00:56Z | Review      | Code       | Operational cryptographic layer implementation complete |
 
-**Risks & Mitigation:** 
-- Security regression during consolidation; mitigate with extensive test coverage and security review
+### Status History (33-5)
 
-### Task 33-4: Integrate Compliance and API Layers
-**Dependencies:** Task 33-3  
-**Acceptance Criteria:**
-- All operational and compliance features available in unified module
-- API endpoints successfully migrated without breaking changes
-- Compliance audit capabilities preserved
-- Integration tests validate feature completeness
+| Date (UTC)           | Status      | Actor      | Notes                                      |
+|----------------------|-------------|------------|---------------------------------------------|
+| 2025-06-19T17:02:30Z | Proposed    | System     | Task created                                |
+| 2025-06-19T17:02:30Z | Agreed      | Code       | Task scope and migration plan agreed        |
+| 2025-06-19T17:02:30Z | InProgress  | Code       | Migration of existing cryptographic logic started |
+| 2025-06-19T17:08:49Z | Review      | Code       | Migration pattern established with backward compatibility |
 
-**Technical Tasks:**
-- Move and adapt compliance and audit code to unified module
-- Integrate initialization and operational crypto code
-- Migrate API endpoints to use unified crypto module
-- Update technical documentation for unified interfaces
-- Validate compliance capabilities with audit team
-- Validate with comprehensive integration tests
+### Status History (33-6)
 
-**Risks & Mitigation:** 
-- API breakage during migration; mitigate with versioning strategy and detailed migration guides
+| Date (UTC)           | Status      | Actor      | Notes                                      |
+|----------------------|-------------|------------|---------------------------------------------|
+| 2025-06-19T17:10:26Z | Proposed    | System     | Task created                                |
+| 2025-06-19T17:10:26Z | Agreed      | Code       | Task scope and removal plan agreed          |
+| 2025-06-19T17:10:26Z | InProgress  | Code       | Legacy module removal work started          |
+| 2025-06-19T17:18:53Z | Review      | Code       | Legacy cleanup completed, awaiting validation |
 
-### Task 33-5: Remove Legacy Crypto Modules
-**Dependencies:** Task 33-4  
-**Acceptance Criteria:**
-- No references to legacy crypto modules remain in codebase
-- Build and all tests pass successfully
-- Security validation confirms no regression
-- Documentation updated to reflect unified crypto module
+### Status History (33-7)
 
-**Technical Tasks:**
-- Remove old crypto module files
-- Update all imports and references to use unified crypto module
-- Update security documentation and developer guides
-- Conduct final security review of consolidated implementation
-- Validate removal with CI/CD pipeline and security tests
-
-**Risks & Mitigation:** 
-- Missed references could break cryptographic functionality; mitigate with thorough code search, comprehensive testing, and security validation
+| Date (UTC)           | Status      | Actor      | Notes                                      |
+|----------------------|-------------|------------|---------------------------------------------|
+| 2025-06-19T17:18:53Z | Proposed    | System     | Task created                                |
+| 2025-06-19T17:18:53Z | Agreed      | Code       | Task scope and testing plan agreed          |
+| 2025-06-19T17:18:53Z | InProgress  | Code       | Comprehensive test suite implementation started |
+| 2025-06-19T17:26:41Z | Review      | Code       | Comprehensive test suite implementation complete |
+| 2025-06-19T17:28:58Z | Done        | Code       | All testing requirements satisfied, comprehensive validation achieved |

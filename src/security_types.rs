@@ -184,8 +184,10 @@ impl Ord for Severity {
 /// - **Low**: Fast parameters suitable for interactive use, lower security
 /// - **Standard**: Balanced parameters for general use, good security/performance balance  
 /// - **High**: Strong parameters for sensitive operations, higher security
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum SecurityLevel {
+    /// Basic parameters with minimal security (for testing/development)
+    Basic,
     /// Fast parameters suitable for interactive use (lower security)
     Low,
     /// Balanced parameters for general use (standard security)
@@ -198,6 +200,7 @@ impl SecurityLevel {
     /// Returns Argon2 parameters (memory, time, parallelism) for this security level
     pub fn argon2_params(&self) -> (u32, u32, u32) {
         match self {
+            Self::Basic => (16384, 1, 1),    // Minimal/Testing: ~10ms
             Self::Low => (32768, 2, 2),      // Fast/Interactive: ~50ms
             Self::Standard => (65536, 3, 4), // Balanced: ~200ms
             Self::High => (131_072, 4, 8),   // High security/Sensitive: ~500ms
@@ -207,6 +210,7 @@ impl SecurityLevel {
     /// Get string representation of security level for compatibility
     pub fn as_str(&self) -> &'static str {
         match self {
+            Self::Basic => "Basic",
             Self::Low => "Low",
             Self::Standard => "Standard",
             Self::High => "High",
@@ -216,6 +220,7 @@ impl SecurityLevel {
     /// Returns the recommended key derivation iterations for this security level
     pub fn key_derivation_rounds(&self) -> u32 {
         match self {
+            Self::Basic => 1_000,
             Self::Low => 10_000,
             Self::Standard => 50_000,
             Self::High => 100_000,
@@ -242,6 +247,7 @@ impl Default for SecurityLevel {
 impl std::fmt::Display for SecurityLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Basic => write!(f, "Basic"),
             Self::Low => write!(f, "Low"),
             Self::Standard => write!(f, "Standard"),
             Self::High => write!(f, "High"),

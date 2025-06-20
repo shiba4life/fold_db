@@ -140,8 +140,15 @@ pub fn handle_retrieve_key(
             .map_err(|e| KeyError::InvalidKey(format!("Failed to generate keypair from stored key: {}", e)))?;
         let public_key_bytes = keypair.public_key_bytes();
         
+        // Convert to fixed-size array for compatibility
+        if public_key_bytes.len() != 32 {
+            return Err(KeyError::InvalidKey("Public key must be 32 bytes".to_string()));
+        }
+        let mut public_key_array = [0u8; 32];
+        public_key_array.copy_from_slice(public_key_bytes);
+        
         format_and_output_key(
-            &public_key_bytes,
+            &public_key_array,
             &format,
             output_file.as_ref(),
             "public",

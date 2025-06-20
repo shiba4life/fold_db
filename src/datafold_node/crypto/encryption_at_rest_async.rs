@@ -38,7 +38,7 @@
 //! # }
 //! ```
 
-use crate::crypto::error::{CryptoError, CryptoResult};
+use crate::crypto::{CryptoError, CryptoResult};
 use crate::datafold_node::crypto::encryption_at_rest::{EncryptedData, EncryptionAtRest, AES_KEY_SIZE};
 use bytes::BytesMut;
 use futures::future::join_all;
@@ -282,7 +282,7 @@ impl EncryptionContextPool {
 
     async fn acquire_context(&self) -> CryptoResult<EncryptionAtRest> {
         let _permit = self.semaphore.acquire().await.map_err(|_| {
-            CryptoError::InvalidInput("Failed to acquire context from pool".to_string())
+            CryptoError::InvalidInput { message: "Failed to acquire context from pool".to_string() }
         })?;
 
         let mut contexts = self.contexts.write().await;
@@ -345,7 +345,7 @@ impl AsyncEncryptionAtRest {
     /// Encrypt data asynchronously
     pub async fn encrypt_async(&self, plaintext: &[u8]) -> CryptoResult<EncryptedData> {
         let _permit = self.operation_semaphore.acquire().await.map_err(|_| {
-            CryptoError::InvalidInput("Failed to acquire operation permit".to_string())
+            CryptoError::InvalidInput { message: "Failed to acquire operation permit".to_string() }
         })?;
 
         let start_time = Instant::now();
@@ -356,7 +356,7 @@ impl AsyncEncryptionAtRest {
 
         let result = task::spawn_blocking(move || context.encrypt(&plaintext_bytes))
             .await
-            .map_err(|e| CryptoError::InvalidInput(format!("Encryption task failed: {}", e)))??;
+            .map_err(|e| CryptoError::InvalidInput { message: format!("Encryption task failed: {}", e) })??;
 
         let elapsed = start_time.elapsed();
 
@@ -377,7 +377,7 @@ impl AsyncEncryptionAtRest {
     /// Decrypt data asynchronously
     pub async fn decrypt_async(&self, encrypted_data: &EncryptedData) -> CryptoResult<Vec<u8>> {
         let _permit = self.operation_semaphore.acquire().await.map_err(|_| {
-            CryptoError::InvalidInput("Failed to acquire operation permit".to_string())
+            CryptoError::InvalidInput { message: "Failed to acquire operation permit".to_string() }
         })?;
 
         let start_time = Instant::now();
@@ -388,7 +388,7 @@ impl AsyncEncryptionAtRest {
 
         let result = task::spawn_blocking(move || context.decrypt(&encrypted_data_clone))
             .await
-            .map_err(|e| CryptoError::InvalidInput(format!("Decryption task failed: {}", e)))??;
+            .map_err(|e| CryptoError::InvalidInput { message: format!("Decryption task failed: {}", e) })??;
 
         let elapsed = start_time.elapsed();
 
@@ -487,7 +487,7 @@ impl AsyncEncryptionAtRest {
         loop {
             buffer.resize(self.config.streaming_buffer_size, 0);
             let bytes_read = reader.read(&mut buffer).await.map_err(|e| {
-                CryptoError::InvalidInput(format!("Failed to read from stream: {}", e))
+                CryptoError::InvalidInput { message: format!("Failed to read from stream: {}", e) }
             })?;
 
             if bytes_read == 0 {
