@@ -1,8 +1,8 @@
 //! Event processing threads for AtomManager
 
 use super::AtomManager;
-use crate::fold_db_core::infrastructure::message_bus::{
-    AtomCreateRequest, AtomUpdateRequest, AtomRefCreateRequest, 
+use crate::fold_db_core::infrastructure::message_bus::request_events::{
+    AtomCreateRequest, AtomUpdateRequest, AtomRefCreateRequest,
     AtomRefUpdateRequest, FieldValueSetRequest,
 };
 use log::{info, warn, error};

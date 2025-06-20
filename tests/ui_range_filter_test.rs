@@ -12,7 +12,10 @@ use datafold::{
     db_operations::DbOperations,
     fold_db_core::{
         managers::atom::AtomManager,
-        infrastructure::message_bus::{MessageBus, FieldValueSetRequest, FieldValueSetResponse}
+        infrastructure::message_bus::{
+            MessageBus,
+            request_events::{FieldValueSetRequest, FieldValueSetResponse},
+        }
     },
     schema::{
         types::{

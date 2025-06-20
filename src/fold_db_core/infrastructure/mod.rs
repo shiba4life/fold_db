@@ -13,7 +13,6 @@ pub mod factory;
 
 pub use message_bus::{
     MessageBus,
-    TransformExecuted, TransformTriggered,
-    SchemaChanged
+    schema_events::{TransformExecuted, TransformTriggered, SchemaChanged},
 };
 pub use event_monitor::EventMonitor;

@@ -11,9 +11,7 @@
 //! - Multiple executions with different values
 
 use crate::test_utils::TestFixture;
-use datafold::fold_db_core::infrastructure::message_bus::{
-    TransformTriggered,
-};
+use datafold::fold_db_core::infrastructure::message_bus::schema_events::TransformTriggered;
 
 // TODO: These tests need to be updated for the new event-driven architecture
 // The following functions are temporarily commented out until the new architecture is complete
