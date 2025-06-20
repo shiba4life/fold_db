@@ -223,7 +223,7 @@ impl SchemaCore {
         }
 
         // Publish SchemaLoaded event
-        use crate::fold_db_core::infrastructure::message_bus::SchemaLoaded;
+        use crate::fold_db_core::infrastructure::message_bus::schema_events::SchemaLoaded;
         let schema_loaded_event = SchemaLoaded::new(name.clone(), "loaded");
         if let Err(e) = self.message_bus.publish(schema_loaded_event) {
             log::warn!("Failed to publish SchemaLoaded event: {}", e);
@@ -310,14 +310,14 @@ impl SchemaCore {
         info!("✅ Transform registration handled by event-driven TransformManager reload");
 
         // Publish SchemaLoaded event for approval
-        use crate::fold_db_core::infrastructure::message_bus::SchemaLoaded;
+        use crate::fold_db_core::infrastructure::message_bus::schema_events::SchemaLoaded;
         let schema_loaded_event = SchemaLoaded::new(schema_name, "approved");
         if let Err(e) = self.message_bus.publish(schema_loaded_event) {
             log::warn!("Failed to publish SchemaLoaded event for approval: {}", e);
         }
 
         // Publish SchemaChanged event for approval
-        use crate::fold_db_core::infrastructure::message_bus::SchemaChanged;
+        use crate::fold_db_core::infrastructure::message_bus::schema_events::SchemaChanged;
         let schema_changed_event = SchemaChanged::new(schema_name);
         if let Err(e) = self.message_bus.publish(schema_changed_event) {
             log::warn!("Failed to publish SchemaChanged event for approval: {}", e);
@@ -393,7 +393,7 @@ impl SchemaCore {
         self.set_schema_state(schema_name, SchemaState::Blocked)?;
         
         // Publish SchemaChanged event for blocking
-        use crate::fold_db_core::infrastructure::message_bus::SchemaChanged;
+        use crate::fold_db_core::infrastructure::message_bus::schema_events::SchemaChanged;
         let schema_changed_event = SchemaChanged::new(schema_name);
         if let Err(e) = self.message_bus.publish(schema_changed_event) {
             log::warn!("Failed to publish SchemaChanged event for blocking: {}", e);

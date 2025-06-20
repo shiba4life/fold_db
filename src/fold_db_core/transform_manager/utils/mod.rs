@@ -11,7 +11,10 @@
 //! - validation_helper.rs: Validation utilities
 //! - Plus multiple duplicate logging/helper patterns found throughout
 
-use crate::fold_db_core::infrastructure::message_bus::{MessageBus, TransformExecuted};
+use crate::fold_db_core::infrastructure::message_bus::{
+    MessageBus,
+    schema_events::TransformExecuted,
+};
 use crate::schema::types::{SchemaError, Schema, Transform};
 use crate::schema::types::field::variant::FieldVariant;
 use crate::schema::types::field::common::Field;

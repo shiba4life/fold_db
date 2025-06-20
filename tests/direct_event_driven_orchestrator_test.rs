@@ -1,7 +1,11 @@
 //! Specific test for the new directly event-driven TransformOrchestrator implementation
 
 use datafold::db_operations::DbOperations;
-use datafold::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSet, TransformExecuted};
+use datafold::fold_db_core::infrastructure::message_bus::{
+    MessageBus,
+    atom_events::FieldValueSet,
+    schema_events::TransformExecuted,
+};
 use datafold::fold_db_core::transform_manager::TransformManager;
 use serde_json::json;
 use std::sync::Arc;

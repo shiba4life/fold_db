@@ -12,7 +12,7 @@
 //!
 //! ## Usage Example
 //! ```rust
-//! use datafold::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSet};
+//! use datafold::fold_db_core::infrastructure::message_bus::{MessageBus, atom_events::FieldValueSet};
 //! use serde_json::json;
 //!
 //! let mut bus = MessageBus::new();
@@ -52,7 +52,7 @@
 //! The [`MessageBus`] provides synchronous pub/sub messaging:
 //!
 //! ```rust
-//! use datafold::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSet};
+//! use datafold::fold_db_core::infrastructure::message_bus::{MessageBus, atom_events::FieldValueSet};
 //! use serde_json::json;
 //!
 //! let bus = MessageBus::new();
@@ -69,7 +69,7 @@
 //! The [`AsyncMessageBus`] provides async pub/sub messaging:
 //!
 //! ```rust
-//! use datafold::fold_db_core::infrastructure::message_bus::{AsyncMessageBus, Event, AtomCreated};
+//! use datafold::fold_db_core::infrastructure::message_bus::{AsyncMessageBus, Event, atom_events::AtomCreated};
 //! use serde_json::json;
 //!
 //! # async fn example() {
@@ -88,7 +88,7 @@
 //! The [`AsyncMessageBus`] provides advanced features:
 //!
 //! ```rust
-//! use datafold::fold_db_core::infrastructure::message_bus::{AsyncMessageBus, FieldValueSet, Event};
+//! use datafold::fold_db_core::infrastructure::message_bus::{AsyncMessageBus, atom_events::FieldValueSet, Event};
 //! use serde_json::json;
 //!
 //! # async fn example() {
@@ -106,8 +106,8 @@
 //! # }
 //! ```
 
-// Re-export all public types and traits
-pub use events::*;
+// Re-export all public types and event modules
+pub use events::{atom_events, query_events, request_events, schema_events, Event, EventType};
 pub use error_handling::{
     AsyncRecvError, AsyncTryRecvError, DeadLetterEvent, EventHistoryEntry, MessageBusError,
     MessageBusResult, RetryableEvent,
@@ -132,12 +132,12 @@ mod integration_tests {
     #[test]
     fn test_message_bus_integration() {
         let bus = MessageBus::new();
-        let mut field_consumer = bus.subscribe::<FieldValueSet>();
-        let mut atom_consumer = bus.subscribe::<AtomCreated>();
+        let mut field_consumer = bus.subscribe::<atom_events::FieldValueSet>();
+        let mut atom_consumer = bus.subscribe::<atom_events::AtomCreated>();
 
         // Test that different event types work correctly
-        let field_event = FieldValueSet::new("integration.test", json!("success"), "test");
-        let atom_event = AtomCreated::new("integration-atom", json!({"test": true}));
+        let field_event = atom_events::FieldValueSet::new("integration.test", json!("success"), "test");
+        let atom_event = atom_events::AtomCreated::new("integration-atom", json!({"test": true}));
 
         bus.publish(field_event.clone()).unwrap();
         bus.publish(atom_event.clone()).unwrap();
@@ -154,9 +154,9 @@ mod integration_tests {
     #[test]
     fn test_unified_event_publishing() {
         let bus = MessageBus::new();
-        let mut consumer = bus.subscribe::<QueryExecuted>();
+        let mut consumer = bus.subscribe::<query_events::QueryExecuted>();
 
-        let query_event = QueryExecuted::new("integration_query", "TestSchema", 100, 5);
+        let query_event = query_events::QueryExecuted::new("integration_query", "TestSchema", 100, 5);
         let unified_event = Event::QueryExecuted(query_event.clone());
 
         bus.publish_event(unified_event).unwrap();
@@ -169,7 +169,7 @@ mod integration_tests {
         let bus = AsyncMessageBus::new();
         let mut consumer = bus.subscribe("MutationExecuted").await;
 
-        let mutation_event = MutationExecuted::new("create", "User", 75, 3);
+        let mutation_event = query_events::MutationExecuted::new("create", "User", 75, 3);
         bus.publish_mutation_executed(mutation_event).await.unwrap();
 
         let received = consumer.recv().await;
@@ -180,22 +180,22 @@ mod integration_tests {
     #[test]
     fn test_event_constructors() {
         // Test that all constructor methods work correctly
-        let field_event = FieldValueSet::new("test.field", json!("value"), "source");
+        let field_event = atom_events::FieldValueSet::new("test.field", json!("value"), "source");
         assert_eq!(field_event.field, "test.field");
         assert_eq!(field_event.value, json!("value"));
         assert_eq!(field_event.source, "source");
 
-        let atom_event = AtomCreated::new("atom-id", json!({"data": "test"}));
+        let atom_event = atom_events::AtomCreated::new("atom-id", json!({"data": "test"}));
         assert_eq!(atom_event.atom_id, "atom-id");
         assert_eq!(atom_event.data, json!({"data": "test"}));
 
-        let query_event = QueryExecuted::new("range_query", "Schema", 150, 10);
+        let query_event = query_events::QueryExecuted::new("range_query", "Schema", 150, 10);
         assert_eq!(query_event.query_type, "range_query");
         assert_eq!(query_event.schema, "Schema");
         assert_eq!(query_event.execution_time_ms, 150);
         assert_eq!(query_event.result_count, 10);
 
-        let request = AtomCreateRequest::new(
+        let request = request_events::AtomCreateRequest::new(
             "req-123".to_string(),
             "User".to_string(),
             "pub-key".to_string(),
@@ -211,26 +211,26 @@ mod integration_tests {
     #[test]
     fn test_all_event_types_have_type_ids() {
         // Ensure all event types properly implement EventType
-        assert_eq!(FieldValueSet::type_id(), "FieldValueSet");
-        assert_eq!(AtomCreated::type_id(), "AtomCreated");
-        assert_eq!(AtomUpdated::type_id(), "AtomUpdated");
-        assert_eq!(AtomRefCreated::type_id(), "AtomRefCreated");
-        assert_eq!(AtomRefUpdated::type_id(), "AtomRefUpdated");
-        assert_eq!(SchemaLoaded::type_id(), "SchemaLoaded");
-        assert_eq!(TransformExecuted::type_id(), "TransformExecuted");
-        assert_eq!(SchemaChanged::type_id(), "SchemaChanged");
-        assert_eq!(TransformTriggered::type_id(), "TransformTriggered");
-        assert_eq!(QueryExecuted::type_id(), "QueryExecuted");
-        assert_eq!(MutationExecuted::type_id(), "MutationExecuted");
+        assert_eq!(atom_events::FieldValueSet::type_id(), "FieldValueSet");
+        assert_eq!(atom_events::AtomCreated::type_id(), "AtomCreated");
+        assert_eq!(atom_events::AtomUpdated::type_id(), "AtomUpdated");
+        assert_eq!(atom_events::AtomRefCreated::type_id(), "AtomRefCreated");
+        assert_eq!(atom_events::AtomRefUpdated::type_id(), "AtomRefUpdated");
+        assert_eq!(schema_events::SchemaLoaded::type_id(), "SchemaLoaded");
+        assert_eq!(schema_events::TransformExecuted::type_id(), "TransformExecuted");
+        assert_eq!(schema_events::SchemaChanged::type_id(), "SchemaChanged");
+        assert_eq!(schema_events::TransformTriggered::type_id(), "TransformTriggered");
+        assert_eq!(query_events::QueryExecuted::type_id(), "QueryExecuted");
+        assert_eq!(query_events::MutationExecuted::type_id(), "MutationExecuted");
         assert_eq!(Event::type_id(), "Event");
 
         // Test request/response types
-        assert_eq!(AtomCreateRequest::type_id(), "AtomCreateRequest");
-        assert_eq!(AtomCreateResponse::type_id(), "AtomCreateResponse");
-        assert_eq!(FieldValueSetRequest::type_id(), "FieldValueSetRequest");
-        assert_eq!(FieldValueSetResponse::type_id(), "FieldValueSetResponse");
-        assert_eq!(SystemInitializationRequest::type_id(), "SystemInitializationRequest");
-        assert_eq!(SystemInitializationResponse::type_id(), "SystemInitializationResponse");
+        assert_eq!(request_events::AtomCreateRequest::type_id(), "AtomCreateRequest");
+        assert_eq!(request_events::AtomCreateResponse::type_id(), "AtomCreateResponse");
+        assert_eq!(request_events::FieldValueSetRequest::type_id(), "FieldValueSetRequest");
+        assert_eq!(request_events::FieldValueSetResponse::type_id(), "FieldValueSetResponse");
+        assert_eq!(request_events::SystemInitializationRequest::type_id(), "SystemInitializationRequest");
+        assert_eq!(request_events::SystemInitializationResponse::type_id(), "SystemInitializationResponse");
     }
 
     #[test]

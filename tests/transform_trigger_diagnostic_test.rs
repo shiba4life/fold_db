@@ -4,7 +4,10 @@
 //! resolves the transform trigger issue.
 
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus, FieldValueSetRequest, FieldValueSetResponse, FieldValueSet, TransformTriggered
+    MessageBus,
+    atom_events::FieldValueSet,
+    request_events::{FieldValueSetRequest, FieldValueSetResponse},
+    schema_events::TransformTriggered,
 };
 use datafold::fold_db_core::managers::atom::AtomManager;
 use datafold::fold_db_core::orchestration::event_monitor::EventMonitor;

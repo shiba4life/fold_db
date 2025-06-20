@@ -4,7 +4,10 @@
 //! appropriate specialized retrievers based on field type. This replaces the
 //! complex branching logic in FieldManager.
 
-use crate::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueQueryRequest};
+use crate::fold_db_core::infrastructure::message_bus::{
+    MessageBus,
+    request_events::FieldValueQueryRequest,
+};
 use crate::schema::types::field::FieldVariant;
 use crate::schema::Schema;
 use crate::schema::SchemaError;

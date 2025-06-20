@@ -16,7 +16,10 @@ use datafold::schema::types::field::range_filter::RangeFilter;
 use datafold::schema::{Schema, field_factory::FieldFactory};
 use datafold::atom::Atom;
 use datafold::db_operations::DbOperations;
-use datafold::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSetRequest, FieldValueSetResponse};
+use datafold::fold_db_core::infrastructure::message_bus::{
+    MessageBus,
+    request_events::{FieldValueSetRequest, FieldValueSetResponse},
+};
 use datafold::fold_db_core::managers::atom::AtomManager;
 use serde_json::json;
 use std::sync::Arc;

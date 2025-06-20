@@ -12,7 +12,9 @@
 //! 6. **Resource Cleanup and Recovery** - System stability after stress
 
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus, FieldValueSetRequest, FieldValueSetResponse, TransformTriggered, TransformExecuted
+    MessageBus,
+    request_events::{FieldValueSetRequest, FieldValueSetResponse},
+    schema_events::{TransformTriggered, TransformExecuted},
 };
 use datafold::fold_db_core::transform_manager::TransformManager;
 use datafold::fold_db_core::managers::atom::AtomManager;

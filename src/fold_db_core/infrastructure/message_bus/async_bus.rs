@@ -3,7 +3,8 @@
 //! This module provides the asynchronous message bus that uses tokio::sync::mpsc
 //! for async communication between components.
 
-use super::events::{Event, EventType, FieldValueSet, AtomCreated, QueryExecuted, MutationExecuted};
+use super::events::{Event, EventType};
+use super::{atom_events::{FieldValueSet, AtomCreated}, query_events::{QueryExecuted, MutationExecuted}};
 use super::error_handling::{AsyncRecvError, AsyncTryRecvError, MessageBusError, MessageBusResult};
 use std::collections::HashMap;
 use std::sync::Arc;

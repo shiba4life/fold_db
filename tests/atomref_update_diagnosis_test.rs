@@ -4,7 +4,8 @@
 //! the AtomRef update is failing in the FieldValueSetRequest handler.
 
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus, FieldValueSetRequest, FieldValueSetResponse
+    MessageBus,
+    request_events::{FieldValueSetRequest, FieldValueSetResponse},
 };
 use datafold::fold_db_core::managers::atom::AtomManager;
 use datafold::db_operations::DbOperations;
