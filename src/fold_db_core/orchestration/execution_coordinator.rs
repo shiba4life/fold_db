@@ -134,7 +134,7 @@ impl ExecutionCoordinator {
     
     /// Publish success event with consistent error handling
     fn publish_success_event(&self, transform_id: &str, result: &str) -> Result<(), SchemaError> {
-        use crate::fold_db_core::infrastructure::message_bus::TransformExecuted;
+        use crate::fold_db_core::infrastructure::message_bus::schema_events::TransformExecuted;
         
         info!("📢 Publishing TransformExecuted success event...");
         
@@ -154,7 +154,7 @@ impl ExecutionCoordinator {
 
     /// Publish failure event with consistent error handling
     fn publish_failure_event(&self, transform_id: &str, error_msg: &str) -> Result<(), SchemaError> {
-        use crate::fold_db_core::infrastructure::message_bus::TransformExecuted;
+        use crate::fold_db_core::infrastructure::message_bus::schema_events::TransformExecuted;
         
         info!("📢 Publishing TransformExecuted failure event for: {}", transform_id);
         

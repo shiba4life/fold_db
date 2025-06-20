@@ -3,7 +3,8 @@
 use super::AtomManager;
 use crate::atom::{Atom, AtomStatus};
 use crate::fold_db_core::infrastructure::message_bus::{
-    FieldValueSetRequest, FieldValueSetResponse, FieldValueSet,
+    atom_events::FieldValueSet,
+    request_events::{FieldValueSetRequest, FieldValueSetResponse},
 };
 use log::{info, warn, error};
 use std::time::Instant;

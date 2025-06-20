@@ -7,7 +7,11 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use log::{error, info};
-use crate::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSet, TransformTriggered, TransformExecuted};
+use crate::fold_db_core::infrastructure::message_bus::{
+    MessageBus,
+    atom_events::FieldValueSet,
+    schema_events::{TransformTriggered, TransformExecuted},
+};
 use crate::fold_db_core::transform_manager::types::TransformRunner;
 use crate::schema::SchemaError;
 use super::persistence_manager::PersistenceManager;

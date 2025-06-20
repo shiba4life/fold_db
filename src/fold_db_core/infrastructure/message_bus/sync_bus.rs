@@ -164,6 +164,12 @@ impl MessageBus {
             Event::FieldValueQueryResponse(e) => self.publish(e),
             Event::AtomRefQueryRequest(e) => self.publish(e),
             Event::AtomRefQueryResponse(e) => self.publish(e),
+            Event::SchemaStatusRequest(e) => self.publish(e),
+            Event::SchemaStatusResponse(e) => self.publish(e),
+            Event::SchemaDiscoveryRequest(e) => self.publish(e),
+            Event::SchemaDiscoveryResponse(e) => self.publish(e),
+            Event::AtomRefGetRequest(e) => self.publish(e),
+            Event::AtomRefGetResponse(e) => self.publish(e),
             Event::SystemInitializationRequest(e) => self.publish(e),
             Event::SystemInitializationResponse(e) => self.publish(e),
         }
@@ -185,7 +191,11 @@ impl Default for MessageBus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fold_db_core::infrastructure::message_bus::events::{FieldValueSet, AtomCreated, SchemaChanged, TransformTriggered, QueryExecuted, MutationExecuted};
+    use crate::fold_db_core::infrastructure::message_bus::{
+        atom_events::{FieldValueSet, AtomCreated},
+        schema_events::{SchemaChanged, TransformTriggered},
+        query_events::{QueryExecuted, MutationExecuted},
+    };
     use serde_json::json;
     use std::time::Duration;
 

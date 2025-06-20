@@ -28,10 +28,11 @@ pub use shared::*;
 
 // Import infrastructure components that are used internally
 use infrastructure::message_bus::{
-    FieldValueSetResponse, FieldUpdateResponse, SchemaLoadResponse, SchemaApprovalResponse, AtomCreateResponse, AtomRefCreateResponse,
-    AtomRefUpdateRequest,
-    MutationExecuted,
-    SystemInitializationRequest
+    request_events::{
+        FieldValueSetResponse, FieldUpdateResponse, SchemaLoadResponse, SchemaApprovalResponse,
+        AtomCreateResponse, AtomRefCreateResponse, AtomRefUpdateRequest, SystemInitializationRequest,
+    },
+    query_events::MutationExecuted,
 };
 use crate::fold_db_core::transform_manager::types::TransformRunner;
 use infrastructure::init::{init_orchestrator, init_transform_manager};

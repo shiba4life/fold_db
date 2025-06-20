@@ -5,8 +5,10 @@
 //! with a single component that can see all system activity.
 
 use super::message_bus::{
-    AtomCreated, AtomRefCreated, AtomRefUpdated, AtomUpdated, Consumer, FieldValueSet,
-    MessageBus, MutationExecuted, QueryExecuted, SchemaChanged, SchemaLoaded, TransformExecuted, TransformTriggered,
+    MessageBus, Consumer,
+    atom_events::{FieldValueSet, AtomCreated, AtomRefCreated, AtomRefUpdated, AtomUpdated},
+    schema_events::{TransformExecuted, TransformTriggered, SchemaLoaded, SchemaChanged},
+    query_events::{QueryExecuted, MutationExecuted},
 };
 use log::info;
 use std::sync::{Arc, Mutex};

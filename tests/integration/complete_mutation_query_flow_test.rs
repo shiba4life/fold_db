@@ -15,7 +15,8 @@
 //! the fix is working correctly.
 
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus, FieldValueSetRequest, FieldValueSetResponse
+    MessageBus,
+    request_events::{FieldValueSetRequest, FieldValueSetResponse},
 };
 use datafold::fold_db_core::transform_manager::utils::TransformUtils;
 use datafold::db_operations::DbOperations;

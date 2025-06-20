@@ -3,10 +3,12 @@
 use super::AtomManager;
 use crate::atom::{Atom, AtomStatus};
 use crate::fold_db_core::infrastructure::message_bus::{
-    AtomCreateRequest, AtomCreateResponse, AtomUpdateRequest, AtomUpdateResponse,
-    AtomRefCreateRequest, AtomRefCreateResponse, AtomRefUpdateRequest, AtomRefUpdateResponse,
-    FieldValueSetRequest,
-    AtomCreated, AtomUpdated, AtomRefCreated, AtomRefUpdated,
+    atom_events::{AtomCreated, AtomUpdated, AtomRefCreated, AtomRefUpdated},
+    request_events::{
+        AtomCreateRequest, AtomCreateResponse, AtomUpdateRequest, AtomUpdateResponse,
+        AtomRefCreateRequest, AtomRefCreateResponse, AtomRefUpdateRequest, AtomRefUpdateResponse,
+        FieldValueSetRequest,
+    },
 };
 use log::{info, warn};
 use std::time::Instant;

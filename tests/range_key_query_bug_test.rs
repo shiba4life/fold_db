@@ -5,7 +5,8 @@
 
 use datafold::db_operations::DbOperations;
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus, FieldValueSetRequest, FieldValueSetResponse
+    MessageBus,
+    request_events::{FieldValueSetRequest, FieldValueSetResponse},
 };
 use datafold::fold_db_core::managers::atom::AtomManager;
 use datafold::schema::{Schema, field_factory::FieldFactory};

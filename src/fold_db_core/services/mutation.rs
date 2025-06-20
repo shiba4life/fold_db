@@ -11,7 +11,10 @@
 //! - Event publishing (belongs to FoldDB)
 //! - Schema validation (belongs to FoldDB)
 
-use crate::fold_db_core::infrastructure::message_bus::{MessageBus, FieldValueSetRequest};
+use crate::fold_db_core::infrastructure::message_bus::{
+    MessageBus,
+    request_events::FieldValueSetRequest,
+};
 use crate::fold_db_core::infrastructure::factory::InfrastructureLogger;
 use crate::schema::types::field::FieldVariant;
 use crate::schema::types::schema::Schema;
