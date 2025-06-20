@@ -184,8 +184,6 @@ impl MutationGenerator {
         }
     }
 
-    // TODO: Collection field mutations are no longer supported
-    // Collections have been removed from the schema system
     /// Generate mutations for collection fields (arrays) - DEPRECATED
     pub fn generate_collection_mutations(
         &self,
@@ -199,11 +197,6 @@ impl MutationGenerator {
         Ok(Vec::new())
     }
 
-    // TODO: Removed get_base_collection_path - collections no longer supported
-
-    // TODO: Removed generate_collection_field_mutations - collections no longer supported
-
-    // TODO: Removed replace_array_index_in_path - collections no longer supported
 }
 
 /// Parts of a JSON path

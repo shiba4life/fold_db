@@ -79,7 +79,6 @@ impl DbOperations {
         Ok(aref)
     }
 
-    // TODO: Collection operations are no longer supported - AtomRefCollection has been removed
 
     /// Creates or updates a range of atom references
     pub fn update_atom_ref_range(
