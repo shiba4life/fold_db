@@ -1,50 +1,16 @@
 //! Specific test for the new directly event-driven TransformOrchestrator implementation
 
-use datafold::db_operations::DbOperations;
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus,
     atom_events::FieldValueSet,
     schema_events::TransformExecuted,
 };
-use datafold::fold_db_core::transform_manager::TransformManager;
+#[path = "test_utils.rs"] mod test_utils;
+use test_utils::TestFixture;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
-use tempfile::tempdir;
 
-// Simple test fixture
-struct TestFixture {
-    pub _transform_manager: TransformManager,
-    pub message_bus: Arc<MessageBus>,
-    pub _db_ops: Arc<DbOperations>,
-    pub _temp_dir: tempfile::TempDir,
-}
 
-impl TestFixture {
-    fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let temp_dir = tempdir()?;
-        
-        let db = sled::Config::new()
-            .path(temp_dir.path())
-            .temporary(true)
-            .open()?;
-            
-        let db_ops = Arc::new(DbOperations::new(db)?);
-        let message_bus = Arc::new(MessageBus::new());
-        
-        let transform_manager = TransformManager::new(
-            Arc::clone(&db_ops),
-            Arc::clone(&message_bus),
-        )?;
-
-        Ok(Self {
-            _transform_manager: transform_manager,
-            message_bus,
-            _db_ops: db_ops,
-            _temp_dir: temp_dir,
-        })
-    }
-}
 
 #[tokio::test]
 async fn test_direct_event_driven_orchestrator_functionality() {

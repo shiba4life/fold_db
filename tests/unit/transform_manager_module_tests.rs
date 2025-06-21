@@ -3,7 +3,8 @@
 //! This module contains focused unit tests for each decomposed module to ensure
 //! they function correctly in isolation and maintain their specific responsibilities.
 
-use crate::test_utils::CommonTestFixture;
+#[path = "../test_utils.rs"] mod test_utils;
+use test_utils::CommonTestFixture;
 use datafold::fold_db_core::infrastructure::message_bus::schema_events::{
     TransformTriggered,
     SchemaChanged,

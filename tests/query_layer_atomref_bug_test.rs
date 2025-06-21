@@ -6,19 +6,20 @@
 //! 3. Result: Query finds old/wrong atom UUIDs
 
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus,
     request_events::{FieldValueSetRequest, FieldValueSetResponse},
+    MessageBus,
 };
-use datafold::fold_db_core::managers::atom::AtomManager;  
+use datafold::fold_db_core::managers::atom::AtomManager;
 use datafold::fold_db_core::transform_manager::utils::TransformUtils;
 use datafold::db_operations::DbOperations;
 use datafold::schema::{Schema, types::field::FieldVariant};
+#[path = "test_utils.rs"] mod test_utils;
+use test_utils::TestFixture;
 use datafold::fold_db_core::infrastructure::factory::InfrastructureLogger;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
-use tempfile::tempdir;
 
 #[test]
 fn test_query_layer_atomref_bug_reproduction() {
@@ -27,19 +28,13 @@ fn test_query_layer_atomref_bug_reproduction() {
         "start",
     );
     
-    // Setup database
-    let temp_dir = tempdir().expect("Failed to create temp dir");
-    let db = sled::Config::new()
-        .path(temp_dir.path())
-        .temporary(true)
-        .open()
-        .expect("Failed to open database");
-    
-    let db_ops = DbOperations::new(db.clone()).expect("Failed to create DbOperations");
-    let message_bus = Arc::new(MessageBus::new());
+    // Setup unified test fixture
+    let fixture = TestFixture::new().expect("Failed to create TestFixture");
+    let db_ops = fixture.db_ops.clone();
+    let message_bus = fixture.message_bus.clone();
     
     // Create AtomManager
-    let _atom_manager = AtomManager::new(db_ops.clone(), Arc::clone(&message_bus));
+    let _atom_manager = AtomManager::new((*db_ops).clone(), Arc::clone(&message_bus));
     
     // Subscribe to FieldValueSetResponse events
     let mut response_consumer = message_bus.subscribe::<FieldValueSetResponse>();
@@ -98,7 +93,7 @@ fn test_query_layer_atomref_bug_reproduction() {
     // STEP 4: Test query layer - this should reveal the bug!
     
     // Use the query layer to resolve field value
-    match TransformUtils::resolve_field_value(&Arc::new(db_ops.clone()), &test_schema, "test_field", None) {
+    match TransformUtils::resolve_field_value(&db_ops, &test_schema, "test_field", None) {
         Ok(value) => {
             
             // If our fix worked, the value should match what we set
@@ -147,7 +142,8 @@ fn test_query_layer_atomref_bug_reproduction() {
     assert_ne!(updated_atom_uuid, dynamic_atom_uuid, "Should point to newer atom after second mutation");
     
     // Test query layer again
-    match TransformUtils::resolve_field_value(&Arc::new(db_ops), &test_schema, "test_field", None) {
+    println!("🔍 STEP 6: Testing query layer after second mutation");
+    match TransformUtils::resolve_field_value(&db_ops, &test_schema, "test_field", None) {
         Ok(value) => {
             
             if let Some(obj) = value.as_object() {

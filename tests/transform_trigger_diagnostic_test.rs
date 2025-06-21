@@ -4,23 +4,24 @@
 //! resolves the transform trigger issue.
 
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus,
     atom_events::FieldValueSet,
     request_events::{FieldValueSetRequest, FieldValueSetResponse},
     schema_events::TransformTriggered,
+    MessageBus,
 };
 use datafold::fold_db_core::managers::atom::AtomManager;
 use datafold::fold_db_core::orchestration::event_monitor::EventMonitor;
 use datafold::fold_db_core::orchestration::persistence_manager::PersistenceManager;
 use datafold::fold_db_core::transform_manager::types::TransformRunner;
 use datafold::db_operations::DbOperations;
+#[path = "test_utils.rs"] mod test_utils;
+use test_utils::TestFixture;
 use datafold::schema::types::SchemaError;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
 use std::collections::HashSet;
-use tempfile::tempdir;
 
 struct MockTransformRunner;
 
@@ -54,16 +55,12 @@ impl TransformRunner for MockTransformRunner {
 fn test_transform_trigger_diagnostic_fix() {
     println!("🚀 Starting transform trigger diagnostic test");
     
-    // Setup database
-    let temp_dir = tempdir().expect("Failed to create temp dir");
-    let db = sled::Config::new()
-        .path(temp_dir.path())
-        .temporary(true)
-        .open()
-        .expect("Failed to open database");
-    
-    let db_ops = Arc::new(DbOperations::new(db.clone()).expect("Failed to create DbOperations"));
-    let message_bus = Arc::new(MessageBus::new());
+    // Setup unified test fixture
+    let fixture = TestFixture::new().expect("Failed to create TestFixture");
+    let db_ops = Arc::clone(&fixture.db_ops);
+    let message_bus = fixture.message_bus.clone();
+
+    let db = fixture.db_ops.db().clone();
     
     // Create AtomManager with the fix
     println!("🔧 Creating AtomManager with diagnostic fix");
@@ -157,15 +154,10 @@ fn test_transform_trigger_with_no_transforms() {
     println!("🚀 Testing transform trigger with no matching transforms");
     
     // Setup database
-    let temp_dir = tempdir().expect("Failed to create temp dir");
-    let db = sled::Config::new()
-        .path(temp_dir.path())
-        .temporary(true)
-        .open()
-        .expect("Failed to open database");
-    
-    let db_ops = Arc::new(DbOperations::new(db.clone()).expect("Failed to create DbOperations"));
-    let message_bus = Arc::new(MessageBus::new());
+    let fixture = TestFixture::new().expect("Failed to create TestFixture");
+    let db = fixture.db_ops.db().clone();
+    let db_ops = Arc::clone(&fixture.db_ops);
+    let message_bus = fixture.message_bus.clone();
     
     // Create AtomManager
     let _atom_manager = AtomManager::new((*db_ops).clone(), Arc::clone(&message_bus));

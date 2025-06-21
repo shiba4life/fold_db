@@ -22,7 +22,8 @@ use datafold::db_operations::DbOperations;
 use datafold::atom::{Atom, AtomRef, AtomRefBehavior};
 use serde_json::json;
 use std::collections::HashMap;
-use tempfile::tempdir;
+#[path = "../test_utils.rs"] mod test_utils;
+use test_utils::TestFixture;
 use uuid::Uuid;
 
 /// Test fixture for collection removal validation
@@ -33,18 +34,11 @@ struct CollectionRemovalTestFixture {
 
 impl CollectionRemovalTestFixture {
     fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let temp_dir = tempdir()?;
-        
-        let db = sled::Config::new()
-            .path(temp_dir.path())
-            .temporary(true)
-            .open()?;
-            
-        let db_ops = std::sync::Arc::new(DbOperations::new(db)?);
-        
+        let fixture = TestFixture::new()?;
+
         Ok(Self {
-            db_ops,
-            _temp_dir: temp_dir,
+            db_ops: fixture.db_ops,
+            _temp_dir: fixture._temp_dir,
         })
     }
 }

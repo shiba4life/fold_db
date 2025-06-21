@@ -5,13 +5,15 @@
 
 use datafold::db_operations::DbOperations;
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus,
     request_events::{FieldValueSetRequest, FieldValueSetResponse},
+    MessageBus,
 };
 use datafold::fold_db_core::transform_manager::utils::TransformUtils;
 use datafold::fold_db_core::managers::atom::AtomManager;
 use datafold::schema::{Schema, field_factory::FieldFactory};
 use datafold::schema::types::field::FieldVariant;
+#[path = "test_utils.rs"] mod test_utils;
+use test_utils::TestFixture;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
@@ -27,23 +29,15 @@ struct RangeKeyFixTestFixture {
 
 impl RangeKeyFixTestFixture {
     fn new() -> Self {
-        let temp_dir = TempDir::new().expect("Failed to create temp directory");
-        
-        let db = sled::Config::new()
-            .path(temp_dir.path())
-            .temporary(true)
-            .open()
-            .expect("Failed to open sled DB");
-            
-        let db_ops = Arc::new(DbOperations::new(db).expect("Failed to create DB"));
-        let message_bus = Arc::new(MessageBus::new());
-        let atom_manager = AtomManager::new((*db_ops).clone(), Arc::clone(&message_bus));
-        
+        let fixture = TestFixture::new().expect("Failed to create TestFixture");
+
+        let atom_manager = AtomManager::new((*fixture.db_ops).clone(), Arc::clone(&fixture.message_bus));
+
         Self {
-            db_ops,
-            message_bus,
+            db_ops: fixture.db_ops,
+            message_bus: fixture.message_bus,
             atom_manager,
-            _temp_dir: temp_dir,
+            _temp_dir: fixture._temp_dir,
         }
     }
     

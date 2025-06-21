@@ -12,8 +12,8 @@
 //! 6. **Event-Driven Orchestration** - Event system coordination
 
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus,
     request_events::{FieldValueSetRequest, FieldValueSetResponse},
+    MessageBus,
 };
 use datafold::fold_db_core::transform_manager::{TransformManager, TransformUtils};
 use datafold::fold_db_core::managers::atom::AtomManager;
@@ -24,7 +24,8 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
-use tempfile::tempdir;
+#[path = "../test_utils.rs"] mod test_utils;
+use test_utils::TestFixture;
 use uuid::Uuid;
 
 /// Test fixture for end-to-end workflow testing
@@ -38,32 +39,21 @@ struct EndToEndWorkflowFixture {
 
 impl EndToEndWorkflowFixture {
     fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let temp_dir = tempdir()?;
-        
-        let db = sled::Config::new()
-            .path(temp_dir.path())
-            .temporary(true)
-            .open()?;
-            
-        let db_ops = Arc::new(DbOperations::new(db)?);
-        let message_bus = Arc::new(MessageBus::new());
-        
-        let transform_manager = Arc::new(TransformManager::new(
-            Arc::clone(&db_ops),
-            Arc::clone(&message_bus),
-        )?);
-        
+        let fixture = TestFixture::new()?;
+
+        let transform_manager = Arc::clone(&fixture.transform_manager);
+
         let atom_manager = AtomManager::new(
-            (*db_ops).clone(),
-            Arc::clone(&message_bus)
+            (*fixture.db_ops).clone(),
+            Arc::clone(&fixture.message_bus)
         );
-        
+
         Ok(Self {
-            db_ops,
-            message_bus,
+            db_ops: fixture.db_ops,
+            message_bus: fixture.message_bus,
             transform_manager,
             _atom_manager: atom_manager,
-            _temp_dir: temp_dir,
+            _temp_dir: fixture._temp_dir,
         })
     }
     

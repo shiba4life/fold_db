@@ -15,8 +15,8 @@
 //! the fix is working correctly.
 
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus,
     request_events::{FieldValueSetRequest, FieldValueSetResponse},
+    MessageBus,
 };
 use datafold::fold_db_core::transform_manager::utils::TransformUtils;
 use datafold::db_operations::DbOperations;
@@ -29,7 +29,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
 use std::collections::HashMap;
-use tempfile::tempdir;
+#[path = "../test_utils.rs"] mod test_utils;
+use test_utils::TestFixture;
 
 /// Test fixture for comprehensive mutation→query flow testing
 struct MutationQueryTestFixture {
@@ -40,26 +41,18 @@ struct MutationQueryTestFixture {
 
 impl MutationQueryTestFixture {
     fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let temp_dir = tempdir()?;
-        
-        let db = sled::Config::new()
-            .path(temp_dir.path())
-            .temporary(true)
-            .open()?;
-            
-        let db_ops = Arc::new(DbOperations::new(db)?);
-        let message_bus = Arc::new(MessageBus::new());
-        
+        let fixture = TestFixture::new()?;
+
         // Create AtomManager to handle FieldValueSetRequest events
         let _atom_manager = datafold::fold_db_core::managers::atom::AtomManager::new(
-            (*db_ops).clone(), 
-            Arc::clone(&message_bus)
+            (*fixture.db_ops).clone(),
+            Arc::clone(&fixture.message_bus)
         );
-        
+
         Ok(Self {
-            db_ops,
-            message_bus,
-            _temp_dir: temp_dir,
+            db_ops: fixture.db_ops,
+            message_bus: fixture.message_bus,
+            _temp_dir: fixture._temp_dir,
         })
     }
     
