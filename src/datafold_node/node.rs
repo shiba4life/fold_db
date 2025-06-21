@@ -106,8 +106,15 @@ impl DataFoldNode {
             security_config.master_key = Some(EncryptionManager::generate_master_key());
         }
         
+        let db_ops = {
+            let guard = db
+                .lock()
+                .map_err(|_| FoldDbError::Config("Cannot lock database mutex".into()))?;
+            guard.db_ops()
+        };
+
         let security_manager = Arc::new(
-            SecurityManager::new(security_config)
+            SecurityManager::new_with_persistence(security_config, db_ops)
                 .map_err(|e| FoldDbError::SecurityError(e.to_string()))?
         );
 
