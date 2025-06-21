@@ -4,7 +4,7 @@
 
 ## Description
 
-Connect React components to existing backend security endpoints for signature verification and public key management. This task leverages the comprehensive security infrastructure already implemented in [`security_routes.rs`](../../src/datafold_node/security_routes.rs) and related backend systems.
+Connect the React UI components to the existing backend security endpoints that handle **signature verification**. The integration for public key registration was completed in task [PKM-1-2](./PKM-1-2.md). This task will focus on sending signed messages to protected endpoints and handling the responses.
 
 ## Status History
 
@@ -23,25 +23,17 @@ Connect React components to existing backend security endpoints for signature ve
 
 ## Implementation Plan
 
-1. **API Client Setup**:
-   - Create API client for security route endpoints
-   - Implement request/response type definitions
-   - Add authentication headers and CSRF protection
+**Note**: Integration with the `/api/security/register-key` endpoint is already complete. This task will focus on endpoints that require a valid signature for access.
 
-2. **Public Key Operations**:
-   - Integrate with existing [`public_key_operations.rs`](../../src/db_operations/public_key_operations.rs)
-   - Implement public key registration via security routes
-   - Add public key retrieval and listing functionality
-
-3. **Signature Operations**:
-   - Connect to existing signature verification in [`signing.rs`](../../src/security/signing.rs)
-   - Implement signature submission and verification flow
-   - Add signature format compatibility layer
-
-4. **Audit and Logging**:
-   - Ensure operations are logged via [`audit.rs`](../../src/security/audit.rs)
-   - Add client-side logging for debugging
-   - Implement security event tracking
+1.  **API Client**:
+    *   Create a utility or hook for making authenticated API requests.
+    *   This function will take a request payload, sign it using the client-side private key (from `useKeyGeneration` state), and structure it according to the `SignedMessage` format expected by the backend.
+2.  **Endpoint Integration**:
+    *   Identify a protected backend endpoint (e.g., a test endpoint like `/api/security/protected-endpoint`).
+    *   Use the authenticated API client to send a request to this endpoint.
+3.  **UI Feedback**:
+    *   Update the UI to display the result of the signed request (success or failure).
+    *   Provide clear error messages if signature verification fails.
 
 ## Verification
 

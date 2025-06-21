@@ -4,7 +4,9 @@
 
 ## Description
 
-Implement unit, integration, and E2E tests for cryptographic operations and UI workflows including private key import functionality. This task ensures comprehensive test coverage for all components of the React UI Ed25519 key management system before the final E2E CoS validation.
+This task is to implement the remaining **integration and end-to-end (E2E) tests** for the PBI's Conditions of Satisfaction.
+
+Unit tests for the `KeyGenerationComponent` were created in task [PKM-1-2](./PKM-1-2.md) and serve as a foundation. This task will build on that by creating tests for component interactions, signing workflows, and full user journeys.
 
 ## Status History
 
@@ -23,33 +25,27 @@ Implement unit, integration, and E2E tests for cryptographic operations and UI w
 
 ## Implementation Plan
 
-1. **Unit Test Suite**:
-   - Test cryptographic functions (key generation, import validation, signing)
-   - Test React components (key generation, import, data storage)
-   - Test import validation functions and format conversion utilities
-   - Test utility functions and hooks
-   - Mock external dependencies
+**Note**: Unit tests for key generation are complete. This plan focuses on the remaining tests.
 
-2. **Integration Test Suite**:
-   - Test API client integrations with backend
-   - Test complete workflows (key generation → signing → storage)
-   - Test complete workflows (key import → validation → signing → storage)
-   - Test error handling and edge cases for both generation and import
-   - Test session management integration
-
-3. **Security Test Suite**:
-   - Validate private keys never persist to storage
-   - Test signature compatibility with backend verification
-   - Validate import validation security (no private key exposure in errors)
-   - Test import format validation edge cases and malicious inputs
-   - Validate memory clearing on session end
-   - Test cryptographic randomness quality
-
-4. **Performance and Accessibility**:
-   - Benchmark key generation and signing performance
-   - Test UI responsiveness under load
-   - Validate accessibility compliance
-   - Test cross-browser compatibility
+1.  **Integration Tests**:
+    *   Test the interaction between the `KeyManagementTab` and the `KeyGenerationComponent`.
+    *   Write tests for the client-side signing functionality (`useSigning` hook and utilities from `PKM-1-3`).
+    *   Create integration tests that mock the `fetch` API to verify correct interaction with the backend signature verification endpoints.
+2.  **End-to-End (E2E) Tests**:
+    *   Using a testing framework like Cypress or Playwright (if available) or Vitest's browser mode.
+    *   **Scenario 1: Full Key Lifecycle**:
+        *   User navigates to the "Keys" tab.
+        *   User clicks "Generate New Keypair".
+        *   Verify keys are displayed.
+        *   User clicks "Register Public Key".
+        *   Verify success message appears.
+        *   User clicks "Clear Keys".
+        *   Verify keys are removed from the UI.
+    *   **Scenario 2: Signed Action**:
+        *   (Depends on `PKM-1-3` and `PKM-1-4`)
+        *   User generates and registers a key.
+        *   User performs an action that requires a signature.
+        *   Verify the action is successful.
 
 ## Verification
 

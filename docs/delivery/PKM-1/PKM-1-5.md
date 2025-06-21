@@ -4,7 +4,7 @@
 
 ## Description
 
-Add private key lifecycle management with automatic cleanup on logout/session expiry. This critical security task ensures private keys are properly managed in React state with zero persistence and automatic cleanup when sessions end.
+This task focuses on the **automated** lifecycle management of the client-side private key. The goal is to ensure the key is automatically cleared from memory when it's no longer needed, such as on session expiry or user logout, to minimize its exposure.
 
 ## Status History
 
@@ -22,6 +22,8 @@ Add private key lifecycle management with automatic cleanup on logout/session ex
 6. **User Feedback**: Clear indication of key status and security state
 
 ## Implementation Plan
+
+**Note**: A manual `clearKeys` function was implemented in [PKM-1-2](./PKM-1-2.md). This task will build on that by creating an automated cleanup process.
 
 1. **Lifecycle Management**:
    - Create `useKeyLifecycle()` hook for key state management
@@ -43,6 +45,16 @@ Add private key lifecycle management with automatic cleanup on logout/session ex
    - Create key status indicators
    - Add security messaging about temporary storage
    - Implement key regeneration controls
+
+5. **Session Integration**:
+   - Hook into the application's session management or authentication context.
+   - Identify the events that signify the end of a user session (e.g., logout action, session cookie expiry).
+
+6. **Automated Cleanup**:
+   - When a session-ending event is detected, automatically call the `clearKeys` function from the `useKeyGeneration` hook/`KeyGenerationComponent` state.
+
+7. **UI State Reset**:
+   - Ensure that when keys are cleared, the `KeyManagementTab` and any other related components are reset to their initial state.
 
 ## Verification
 

@@ -23,22 +23,29 @@ Create signing utilities and React hooks for client-side Ed25519 signature gener
 
 ## Implementation Plan
 
-1. **Signing Utilities**:
-   - Create `signMessage()` function using selected Ed25519 library
+**Note**: Key generation is complete (see [PKM-1-2](./PKM-1-2.md)). This task will focus on *using* the generated private key (held in React state) to create signatures.
+
+1. **Signing Utility**:
+   - Create `signMessage` utility function in `src/datafold_node/static-react/src/utils/ed25519.ts`.
+   - The function should take a message payload and a private key (`Uint8Array`) as input.
+   - It will use `ed.signAsync` from `@noble/ed25519` to generate the signature.
+   - The output should be a hex-encoded signature string.
+
+2. **Signing Utilities**:
    - Implement message formatting and encoding utilities
    - Add signature format conversion for backend compatibility
 
-2. **React Integration**:
+3. **React Integration**:
    - Create `useSigning()` hook for React components
    - Implement state management for signing operations
    - Add loading states and error handling
 
-3. **API Integration**:
+4. **API Integration**:
    - Format signatures for existing security route endpoints
    - Add request signing utilities for authenticated API calls
    - Implement retry logic for failed signing operations
 
-4. **Testing**:
+5. **Testing**:
    - Unit tests for signing functions
    - Integration tests with backend verification
    - Performance benchmarks for signing operations
