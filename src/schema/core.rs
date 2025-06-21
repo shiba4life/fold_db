@@ -132,50 +132,47 @@ impl SchemaCore {
             schema.fields.keys().collect::<Vec<_>>()
         );
 
-        // Check if there's already a persisted schema in the database
-        // If so, use that instead of the JSON version to preserve field assignments
+        schema = self.resolve_persisted_schema(schema)?;
+
+        self.log_field_refs(&schema);
+
+        self.fix_transform_outputs(&mut schema);
+        self.register_schema_transforms(&schema)?;
+
+        self.persist_if_needed(&schema)?;
+
+        self.update_state_and_memory(schema)?;
+
+        Ok(())
+    }
+
+    fn resolve_persisted_schema(&self, schema: Schema) -> Result<Schema, SchemaError> {
         if let Ok(Some(persisted_schema)) = self.db_ops.get_schema(&schema.name) {
             info!(
                 "📂 Found persisted schema for '{}' in database, using persisted version with field assignments",
                 schema.name
             );
-            schema = persisted_schema;
+            Ok(persisted_schema)
         } else {
-            info!(
-                "📋 No persisted schema found for '{}', using JSON version",
-                schema.name
-            );
+            info!("📋 No persisted schema found for '{}', using JSON version", schema.name);
+            Ok(schema)
         }
+    }
 
-        // Log ref_atom_uuid values for each field
+    fn log_field_refs(&self, schema: &Schema) {
         for (field_name, field) in &schema.fields {
             let ref_uuid = field
                 .ref_atom_uuid()
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| "None".to_string());
-            info!(
-                "📋 Field {}.{} has ref_atom_uuid: {}",
-                schema.name, field_name, ref_uuid
-            );
+            info!("📋 Field {}.{} has ref_atom_uuid: {}", schema.name, field_name, ref_uuid);
         }
+    }
 
-        // Ensure any transforms on fields have the correct output schema
-        self.fix_transform_outputs(&mut schema);
-        
-        // Auto-register field transforms with TransformManager
-        info!("🔧 DEBUG: About to call register_schema_transforms for schema: {}", schema.name);
-        self.register_schema_transforms(&schema)?;
-        info!(
-            "After fix_transform_outputs, schema '{}' has {} fields: {:?}",
-            schema.name,
-            schema.fields.len(),
-            schema.fields.keys().collect::<Vec<_>>()
-        );
-
-        // Only persist if we're using the JSON version (don't overwrite good database version)
-        let should_persist = schema.fields.values().all(|field| field.ref_atom_uuid().is_none());
+    fn persist_if_needed(&self, schema: &Schema) -> Result<(), SchemaError> {
+        let should_persist = schema.fields.values().all(|f| f.ref_atom_uuid().is_none());
         if should_persist {
-            self.persist_schema(&schema)?;
+            self.persist_schema(schema)?;
             info!(
                 "After persist_schema, schema '{}' has {} fields: {:?}",
                 schema.name,
@@ -188,8 +185,10 @@ impl SchemaCore {
                 schema.name
             );
         }
+        Ok(())
+    }
 
-        // Check for existing schema state, preserve it if it exists
+    fn update_state_and_memory(&self, schema: Schema) -> Result<(), SchemaError> {
         let name = schema.name.clone();
         let existing_state = self.db_ops.get_schema_state(&name).unwrap_or(None);
         let schema_state = existing_state.unwrap_or(SchemaState::Available);
@@ -199,7 +198,6 @@ impl SchemaCore {
             name, existing_state, schema_state
         );
 
-        // Add to memory with preserved or default state
         {
             let mut all = self.available.lock().map_err(|_| {
                 SchemaError::InvalidData("Failed to acquire schema lock".to_string())
@@ -207,29 +205,23 @@ impl SchemaCore {
             all.insert(name.clone(), (schema, schema_state));
         }
 
-        // Only persist state changes if we're using the default Available state
-        // (existing states are already persisted)
         if existing_state.is_none() {
             self.set_schema_state(&name, SchemaState::Available)?;
-            info!(
-                "Schema '{}' loaded and marked as Available (new schema)",
-                name
-            );
+            info!("Schema '{}' loaded and marked as Available (new schema)", name);
         } else {
-            info!(
-                "Schema '{}' loaded with preserved state: {:?}",
-                name, schema_state
-            );
+            info!("Schema '{}' loaded with preserved state: {:?}", name, schema_state);
         }
 
-        // Publish SchemaLoaded event
+        self.publish_schema_loaded(&name);
+        Ok(())
+    }
+
+    fn publish_schema_loaded(&self, name: &str) {
         use crate::fold_db_core::infrastructure::message_bus::schema_events::SchemaLoaded;
-        let schema_loaded_event = SchemaLoaded::new(name.clone(), "loaded");
+        let schema_loaded_event = SchemaLoaded::new(name.to_string(), "loaded");
         if let Err(e) = self.message_bus.publish(schema_loaded_event) {
             log::warn!("Failed to publish SchemaLoaded event: {}", e);
         }
-
-        Ok(())
     }
 
     /// Approve a schema for queries and mutations
