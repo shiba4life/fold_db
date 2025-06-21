@@ -25,6 +25,7 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::thread;
+use crate::test_utils::TEST_WAIT_MS;
 use tempfile::tempdir;
 use uuid::Uuid;
 
@@ -146,7 +147,7 @@ impl RangeArchitectureTestFixture {
         self.message_bus.publish(request)?;
         
         // Wait for processing
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(TEST_WAIT_MS));
         
         let response = response_consumer.recv_timeout(Duration::from_millis(2000))
             .map_err(|_| "Timeout waiting for FieldValueSetResponse")?;

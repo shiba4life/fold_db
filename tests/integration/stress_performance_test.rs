@@ -25,6 +25,7 @@ use serde_json::json;
 use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
 use std::time::{Duration, Instant};
 use std::thread;
+use crate::test_utils::TEST_WAIT_MS;
 use tempfile::tempdir;
 use uuid::Uuid;
 
@@ -173,7 +174,7 @@ impl StressPerformanceTestFixture {
                     
                     if message_bus.publish(request).is_ok() {
                         // Try to get response (with short timeout for high throughput)
-                        match response_consumer.recv_timeout(Duration::from_millis(100)) {
+                        match response_consumer.recv_timeout(Duration::from_millis(TEST_WAIT_MS)) {
                             Ok(response) if response.success => {
                                 successful.fetch_add(1, Ordering::Relaxed);
                             }
@@ -320,7 +321,7 @@ fn test_high_volume_mutations() {
         println!("   Burst {}: {:.2} mutations/sec", burst_num + 1, burst_rate);
         
         // Small delay between bursts
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(TEST_WAIT_MS));
     }
     
     let avg_burst_rate = burst_rates.iter().sum::<f64>() / burst_rates.len() as f64;
@@ -405,7 +406,7 @@ fn test_concurrent_transform_execution() {
     let monitor_timeout = Duration::from_secs(10);
     
     while monitor_start.elapsed() < monitor_timeout {
-        match executed_consumer.recv_timeout(Duration::from_millis(100)) {
+        match executed_consumer.recv_timeout(Duration::from_millis(TEST_WAIT_MS)) {
             Ok(_executed_event) => {
                 executed_count.fetch_add(1, Ordering::Relaxed);
             }
@@ -899,7 +900,7 @@ fn test_event_system_performance_under_load() {
             consumer_done = true;
             println!("Slow consumer completed");
         }
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(TEST_WAIT_MS));
     }
     
     // Force completion

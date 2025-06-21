@@ -28,6 +28,7 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
+use crate::test_utils::TEST_WAIT_MS;
 use std::collections::HashMap;
 use tempfile::tempdir;
 
@@ -383,7 +384,7 @@ fn test_concurrent_mutations_and_queries() {
             
             // Publish and wait for response
             message_bus.publish(request).expect("Failed to publish request");
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(TEST_WAIT_MS));
             
             let response = response_consumer.recv_timeout(Duration::from_millis(1000))
                 .expect("Failed to receive response");

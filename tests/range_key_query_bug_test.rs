@@ -15,6 +15,8 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
+mod test_utils;
+use test_utils::TEST_WAIT_MS;
 use tempfile::TempDir;
 
 struct RangeKeyTestFixture {
@@ -69,7 +71,7 @@ impl RangeKeyTestFixture {
     
     fn store_range_data(&self, range_key: &str, test_id_value: &str, test_data_value: &str) -> Result<(), Box<dyn std::error::Error>> {
         // Give the atom manager time to initialize its event processing
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(TEST_WAIT_MS));
         
         // Subscribe to responses
         let mut response_consumer = self.message_bus.subscribe::<FieldValueSetResponse>();
@@ -87,7 +89,7 @@ impl RangeKeyTestFixture {
         );
         
         self.message_bus.publish(test_id_request)?;
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(TEST_WAIT_MS));
         let _response1 = response_consumer.recv_timeout(Duration::from_millis(2000))?;
         
         // Store test_data field
@@ -103,7 +105,7 @@ impl RangeKeyTestFixture {
         );
         
         self.message_bus.publish(test_data_request)?;
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(TEST_WAIT_MS));
         let _response2 = response_consumer.recv_timeout(Duration::from_millis(2000))?;
         
         Ok(())

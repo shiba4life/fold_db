@@ -17,6 +17,9 @@ use std::sync::Arc;
 use tempfile::TempDir;
 use uuid::Uuid;
 
+/// Default wait duration for asynchronous test operations
+pub const TEST_WAIT_MS: u64 = 100;
+
 /// Single unified test fixture eliminating all duplication
 pub struct TestFixture {
     pub transform_manager: Arc<TransformManager>,
@@ -164,7 +167,7 @@ impl TestFixture {
 
     /// Unified wait function - consolidates sleep patterns
     pub async fn wait_for_async_operation() {
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(TEST_WAIT_MS)).await;
     }
 
     /// Unified correlation ID generation
