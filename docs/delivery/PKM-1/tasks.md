@@ -8,7 +8,7 @@ This document lists all tasks associated with PBI PKM-1.
 
 | Task ID | Name | Status | Description |
 | :------ | :--------------------------------------- | :------- | :--------------------------------- |
-| PKM-1-1 | [Research client-side Ed25519 cryptography libraries](./PKM-1-1.md) | Review | Evaluate @noble/ed25519 and other browser-compatible Ed25519 libraries for client-side key operations |
+| PKM-1-1 | [Research client-side Ed25519 cryptography libraries](./PKM-1-1.md) | Done | Evaluate @noble/ed25519 and other browser-compatible Ed25519 libraries for client-side key operations |
 | PKM-1-2 | [Implement React key generation component](./PKM-1-2.md) | Proposed | Create React component for Ed25519 keypair generation with secure random and temporary state storage |
 | PKM-1-3 | [Implement client-side signing functionality](./PKM-1-3.md) | Proposed | Create signing utilities and React hooks for client-side Ed25519 signature generation |
 | PKM-1-4 | [Integrate with existing security routes](./PKM-1-4.md) | Proposed | Connect React components to existing backend security endpoints for signature verification |
