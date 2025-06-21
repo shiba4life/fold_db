@@ -15,6 +15,7 @@ use datafold::db_operations::DbOperations;
 use datafold::schema::{Schema, types::field::FieldVariant};
 #[path = "test_utils.rs"] mod test_utils;
 use test_utils::TestFixture;
+use datafold::fold_db_core::infrastructure::factory::InfrastructureLogger;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
@@ -22,8 +23,10 @@ use std::thread;
 
 #[test]
 fn test_query_layer_atomref_bug_reproduction() {
-    println!("🚨 TESTING QUERY LAYER ATOMREF BUG");
-    println!("   This test reproduces the exact bug where query reads static schema refs");
+    InfrastructureLogger::log_investigation(
+        "test_query_layer_atomref_bug_reproduction",
+        "start",
+    );
     
     // Setup unified test fixture
     let fixture = TestFixture::new().expect("Failed to create TestFixture");
@@ -37,7 +40,6 @@ fn test_query_layer_atomref_bug_reproduction() {
     let mut response_consumer = message_bus.subscribe::<FieldValueSetResponse>();
     
     // STEP 1: Create a test schema with initial static field reference
-    println!("📝 STEP 1: Creating test schema with static field reference");
     let mut test_schema = Schema::new("test_schema".to_string());
     
     // Add a field with a static atom reference (this will become stale)
@@ -58,10 +60,8 @@ fn test_query_layer_atomref_bug_reproduction() {
     
     let field_variant = FieldVariant::Single(single_field);
     test_schema.fields.insert("test_field".to_string(), field_variant);
-    println!("✅ Schema created with static ref_atom_uuid: {}", initial_static_atom_uuid);
     
     // STEP 2: Use mutation layer to create new field value (updates dynamic AtomRef)
-    println!("📝 STEP 2: Using mutation layer to create new field value");
     let mutation_request = FieldValueSetRequest::new(
         "mutation_test".to_string(),
         "test_schema".to_string(),
@@ -78,48 +78,34 @@ fn test_query_layer_atomref_bug_reproduction() {
     
     assert!(mutation_response.success, "Mutation should succeed");
     let dynamic_aref_uuid = mutation_response.aref_uuid.expect("Should return AtomRef UUID");
-    println!("✅ Mutation created dynamic AtomRef: {}", dynamic_aref_uuid);
     
     // STEP 3: Verify dynamic AtomRef was created and points to new atom  
-    println!("🔍 STEP 3: Verifying dynamic AtomRef state");
     let dynamic_aref = db_ops.get_item::<datafold::atom::AtomRef>(&format!("ref:{}", dynamic_aref_uuid))
         .expect("Should be able to query dynamic AtomRef")
         .expect("Dynamic AtomRef should exist");
     
     let dynamic_atom_uuid = dynamic_aref.get_atom_uuid().clone();
-    println!("✅ Dynamic AtomRef points to atom: {}", dynamic_atom_uuid);
     
     // CRITICAL TEST: This should be DIFFERENT from the static schema reference
     assert_ne!(dynamic_atom_uuid, initial_static_atom_uuid, 
         "Dynamic atom UUID should differ from static schema reference");
     
     // STEP 4: Test query layer - this should reveal the bug!
-    println!("🚨 STEP 4: Testing query layer (this will show the bug)");
-    println!("   Expected: Query should find atom {}", dynamic_atom_uuid);
-    println!("   Bug: Query will try to find atom {}", initial_static_atom_uuid);
     
     // Use the query layer to resolve field value
     match TransformUtils::resolve_field_value(&db_ops, &test_schema, "test_field", None) {
         Ok(value) => {
-            println!("✅ Query layer returned value: {}", value);
-            println!("🔍 Check logs above to see if the fix was applied");
             
             // If our fix worked, the value should match what we set
             if let Some(obj) = value.as_object() {
                 if let Some(content) = obj.get("content") {
                     assert_eq!(content, &json!("new_value_v1"), "Content should match what we set via mutation");
-                    println!("✅ QUERY LAYER FIX CONFIRMED: Returned correct updated content");
                 } else {
-                    println!("⚠️ Query returned object but missing 'content' field: {}", value);
                 }
             } else {
-                println!("⚠️ Query returned non-object value: {}", value);
             }
         }
         Err(e) => {
-            println!("❌ Query layer failed: {}", e);
-            println!("🔍 This might indicate the static schema reference is broken");
-            println!("   Check the diagnostic logs above for details");
             
             // This failure is expected if static reference doesn't exist
             // The diagnostic logs should show the mismatch
@@ -127,7 +113,6 @@ fn test_query_layer_atomref_bug_reproduction() {
     }
     
     // STEP 5: Create another mutation to further test the system
-    println!("📝 STEP 5: Testing second mutation to verify dynamic AtomRef updates");
     let mutation_request_2 = FieldValueSetRequest::new(
         "mutation_test_2".to_string(),
         "test_schema".to_string(),
@@ -154,30 +139,21 @@ fn test_query_layer_atomref_bug_reproduction() {
         .expect("Updated AtomRef should exist");
     
     let updated_atom_uuid = updated_aref.get_atom_uuid().clone();
-    println!("✅ After second mutation, AtomRef points to atom: {}", updated_atom_uuid);
     assert_ne!(updated_atom_uuid, dynamic_atom_uuid, "Should point to newer atom after second mutation");
     
     // Test query layer again
     println!("🔍 STEP 6: Testing query layer after second mutation");
     match TransformUtils::resolve_field_value(&db_ops, &test_schema, "test_field", None) {
         Ok(value) => {
-            println!("✅ Query layer returned value after second mutation: {}", value);
             
             if let Some(obj) = value.as_object() {
                 if let Some(content) = obj.get("content") {
                     assert_eq!(content, &json!("new_value_v2"), "Should return latest content after second mutation");
-                    println!("✅ QUERY LAYER FULLY WORKING: Returns latest content after multiple mutations");
                 }
             }
         }
         Err(e) => {
-            println!("❌ Query layer failed after second mutation: {}", e);
         }
     }
     
-    println!("✅ QUERY LAYER ATOMREF BUG TEST COMPLETED");
-    println!("   Static schema ref: {}", initial_static_atom_uuid);
-    println!("   Dynamic AtomRef:   {}", dynamic_aref_uuid);
-    println!("   Final atom UUID:   {}", updated_atom_uuid);
-    println!("   Check diagnostic logs for bug confirmation and fix validation");
 }

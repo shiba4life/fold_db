@@ -68,65 +68,6 @@ async fn test_event_handlers_module_exists() {
     println!("✅ Event handlers module integrated correctly");
 }
 
-// TODO: The following tests need to be updated for the new event-driven architecture
-// They are temporarily commented out until the new architecture is complete
-
-/*
-#[tokio::test]
-async fn test_event_handlers_trigger_request_processing() {
-    // This test needs to be updated for the new event-driven architecture
-    println!("⚠️ Test temporarily disabled - needs update for new architecture");
-}
-
-#[tokio::test]
-async fn test_event_handlers_execution_request_processing() {
-    // This test needs to be updated for the new event-driven architecture 
-    println!("⚠️ Test temporarily disabled - needs update for new architecture");
-}
-
-#[tokio::test]
-async fn test_execution_module_transform_triggered_correlation() {
-    // This test needs to be updated for the new event-driven architecture
-    println!("⚠️ Test temporarily disabled - needs update for new architecture");
-}
-
-#[tokio::test]
-async fn test_execution_module_generic_correlation_handling() {
-    // This test needs to be updated for the new event-driven architecture
-    println!("⚠️ Test temporarily disabled - needs update for new architecture");
-}
-
-#[tokio::test]
-async fn test_loading_module_functionality() {
-    // This test needs to be updated for the new event-driven architecture
-    println!("⚠️ Test temporarily disabled - needs update for new architecture");
-}
-
-#[tokio::test] 
-async fn test_persistence_module_functionality() {
-    // This test needs to be updated for the new event-driven architecture
-    println!("⚠️ Test temporarily disabled - needs update for new architecture");
-}
-
-#[tokio::test]
-async fn test_registry_module_functionality() {
-    // This test needs to be updated for the new event-driven architecture
-    println!("⚠️ Test temporarily disabled - needs update for new architecture");
-}
-
-#[tokio::test]
-async fn test_types_module_functionality() {
-    // This test needs to be updated for the new event-driven architecture
-    println!("⚠️ Test temporarily disabled - needs update for new architecture");
-}
-
-#[tokio::test]
-async fn test_monitoring_module_functionality() {
-    // This test needs to be updated for the new event-driven architecture
-    println!("⚠️ Test temporarily disabled - needs update for new architecture");
-}
-*/
-
 // ========== Basic Integration Tests ==========
 
 #[tokio::test]
