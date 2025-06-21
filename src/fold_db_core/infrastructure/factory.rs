@@ -21,11 +21,6 @@ impl InfrastructureFactory {
         Arc::new(MessageBus::new())
     }
 
-    /// Create a shared MessageBus instance  
-    pub fn create_enhanced_message_bus() -> Arc<MessageBus> {
-        Arc::new(MessageBus::new())
-    }
-
     /// Create shared database operations
     /// Consolidates: Arc::new(db_ops) pattern found 10+ times
     pub fn create_db_ops(db: sled::Db) -> Result<Arc<DbOperations>, sled::Error> {
