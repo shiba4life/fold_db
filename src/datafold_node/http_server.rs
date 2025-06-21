@@ -232,7 +232,7 @@ impl DataFoldHttpServer {
                         // Security endpoints
                         .service(
                             web::scope("/security")
-                                .route("/register-key", web::post().to(security_routes::register_public_key))
+                                .route("/keys/register", web::post().to(security_routes::register_public_key))
                                 .route("/keys", web::get().to(security_routes::list_public_keys))
                                 .route("/keys/{id}", web::get().to(security_routes::get_public_key))
                                 .route("/keys/{id}", web::delete().to(security_routes::remove_public_key))

@@ -372,7 +372,9 @@ async fn test_error_handling_and_edge_cases() {
     let invalid_registration = json!({
         "public_key": "invalid_key_format",
         "owner_id": "test_user",
-        "permissions": ["read"]
+        "permissions": ["read"],
+        "metadata": {},
+        "expires_at": null
     });
     
     let register_url = format!("http://{}/api/security/keys/register", server_addr);
@@ -399,7 +401,7 @@ async fn test_error_handling_and_edge_cases() {
     
     // Test invalid message verification
     let invalid_message = json!({
-        "payload": {"test": "data"},
+        "payload": "aW52YWxpZCBwYXlsb2FkIGRhdGE=", // Base64 encoded string instead of object
         "signature": "invalid_signature",
         "public_key_id": "nonexistent_key",
         "timestamp": 1234567890

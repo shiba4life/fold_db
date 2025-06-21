@@ -110,7 +110,7 @@ fn test_query_layer_atomref_bug_reproduction() {
             } else {
             }
         }
-        Err(e) => {
+        Err(_e) => {
             
             // This failure is expected if static reference doesn't exist
             // The diagnostic logs should show the mismatch
@@ -156,7 +156,7 @@ fn test_query_layer_atomref_bug_reproduction() {
                 }
             }
         }
-        Err(e) => {
+        Err(_e) => {
         }
     }
     

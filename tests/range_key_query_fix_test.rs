@@ -18,6 +18,7 @@ use std::time::Duration;
 use std::thread;
 use tempfile::TempDir;
 
+#[allow(dead_code)]
 struct RangeKeyFixTestFixture {
     db_ops: Arc<DbOperations>,
     message_bus: Arc<MessageBus>,

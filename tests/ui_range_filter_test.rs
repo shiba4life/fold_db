@@ -29,6 +29,7 @@ use datafold::{
 };
 use tempfile::TempDir;
 
+#[allow(dead_code)]
 struct UIRangeFilterTestFixture {
     db_ops: Arc<DbOperations>,
     message_bus: Arc<MessageBus>,

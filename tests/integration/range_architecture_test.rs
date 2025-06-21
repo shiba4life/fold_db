@@ -168,7 +168,7 @@ fn test_range_fields_as_collection_replacement() {
     let fixture = RangeArchitectureTestFixture::new()
         .expect("Failed to create test fixture");
     
-    let schema = fixture.create_test_range_schema()
+    let _schema = fixture.create_test_range_schema()
         .expect("Failed to create Range schema");
     
     // Test 1: Create Range field and validate collection-like behavior
@@ -401,7 +401,7 @@ fn test_range_field_mutations_and_queries() {
     let fixture = RangeArchitectureTestFixture::new()
         .expect("Failed to create test fixture");
     
-    let schema = fixture.create_test_range_schema()
+    let _schema = fixture.create_test_range_schema()
         .expect("Failed to create Range schema");
     
     // Test 1: Create operations via mutations
@@ -452,7 +452,7 @@ fn test_range_field_mutations_and_queries() {
         .expect("Failed to populate query field");
     
     // Individual reads
-    for (user_key, expected_data) in &new_users {
+    for (user_key, _expected_data) in &new_users {
         let read_filter = RangeFilter::Key(user_key.to_string());
         let read_result = query_field.apply_filter(&read_filter);
         
@@ -488,7 +488,7 @@ fn test_range_field_mutations_and_queries() {
     ];
     
     for (user_key, updated_data) in &update_data {
-        let update_uuid = fixture.mutate_range_field(
+        let _update_uuid = fixture.mutate_range_field(
             "UserCatalog",
             "profile_data",
             "user_id", 
@@ -833,7 +833,7 @@ fn test_range_filtering_and_search_capabilities() {
     println!("🔍 Test 5: Complex Filtering Scenarios");
     
     // Pagination simulation
-    let page_size = 5;
+    let _page_size = 5;
     let page_1_filter = RangeFilter::KeyRange {
         start: "product_book_000".to_string(),
         end: "product_laptop_001".to_string(),

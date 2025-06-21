@@ -30,6 +30,7 @@ use tempfile::tempdir;
 use uuid::Uuid;
 
 /// Test fixture for stress and performance testing
+#[allow(dead_code)]
 struct StressPerformanceTestFixture {
     pub db_ops: Arc<DbOperations>,
     pub message_bus: Arc<MessageBus>,
@@ -154,7 +155,7 @@ impl StressPerformanceTestFixture {
                 let mut response_consumer = message_bus.subscribe::<FieldValueSetResponse>();
                 
                 for i in 0..mutations_per_thread {
-                    let data_id = format!("stress_{}_{}", thread_id, i);
+                    let _data_id = format!("stress_{}_{}", thread_id, i);
                     let payload = json!({
                         "thread_id": thread_id,
                         "sequence": i,
@@ -215,6 +216,7 @@ impl StressPerformanceTestFixture {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct MemoryUsageStats {
     initial_usage: usize,
     peak_usage: usize,

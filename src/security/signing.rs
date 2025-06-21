@@ -256,9 +256,9 @@ impl MessageVerifier {
     
     /// Recreate the message that was signed for verification
     fn create_message_to_verify(&self, signed_message: &SignedMessage) -> SecurityResult<Vec<u8>> {
-        // Serialize the payload to canonical JSON
-        let payload_bytes = serde_json::to_vec(&signed_message.payload)
-            .map_err(|e| SecurityError::SerializationError(e.to_string()))?;
+        // Decode the base64-encoded payload back to original JSON bytes
+        let payload_bytes = general_purpose::STANDARD.decode(&signed_message.payload)
+            .map_err(|e| SecurityError::SerializationError(format!("Failed to decode payload: {}", e)))?;
         
         // Recreate the signed message (payload + timestamp + key_id)
         let mut message_to_verify = payload_bytes;

@@ -10,6 +10,7 @@
 use datafold::db_operations::DbOperations;
 use datafold::fold_db_core::infrastructure::message_bus::MessageBus;
 use datafold::fold_db_core::transform_manager::TransformManager;
+use datafold::fold_db_core::managers::atom::AtomManager;
 use datafold::datafold_node::config::NodeConfig;
 use datafold::datafold_node::DataFoldNode;
 use datafold::schema::types::{Transform, TransformRegistration, SchemaError};
@@ -21,14 +22,17 @@ use uuid::Uuid;
 pub const TEST_WAIT_MS: u64 = 100;
 
 /// Single unified test fixture eliminating all duplication
+#[allow(dead_code)]
 pub struct TestFixture {
     pub transform_manager: Arc<TransformManager>,
     pub message_bus: Arc<MessageBus>,
     pub db_ops: Arc<DbOperations>,
+    pub atom_manager: datafold::fold_db_core::managers::atom::AtomManager,
     pub _temp_dir: TempDir,
 }
 
 /// Extended fixture for full integration testing
+#[allow(dead_code)]
 pub struct CommonTestFixture {
     pub common: TestFixture,
     pub node: DataFoldNode,
@@ -36,6 +40,7 @@ pub struct CommonTestFixture {
 }
 
 /// Specialized fixture for orchestrator testing
+#[allow(dead_code)]
 pub struct DirectEventTestFixture {
     pub transform_manager: Arc<TransformManager>,
     pub transform_orchestrator: datafold::fold_db_core::orchestration::transform_orchestrator::TransformOrchestrator,
@@ -44,8 +49,10 @@ pub struct DirectEventTestFixture {
     pub _temp_dir: TempDir,
 }
 
+#[allow(dead_code)]
 impl TestFixture {
     /// Unified test fixture creation - eliminates 26+ tempfile duplicate patterns
+    #[allow(dead_code)]
     pub fn new() -> Result<Self, SchemaError> {
         let temp_dir = tempfile::tempdir().map_err(|e| {
             SchemaError::InvalidData(format!("Failed to create temp directory: {}", e))
@@ -72,10 +79,17 @@ impl TestFixture {
             Arc::clone(&message_bus),
         )?;
 
+        // Create AtomManager to handle FieldValueSetRequest events
+        let atom_manager = AtomManager::new(
+            (*db_ops).clone(),
+            Arc::clone(&message_bus),
+        );
+
         Ok(Self {
             transform_manager: Arc::new(transform_manager),
             message_bus,
             db_ops,
+            atom_manager,
             _temp_dir: temp_dir,
         })
     }
@@ -176,8 +190,10 @@ impl TestFixture {
     }
 }
 
+#[allow(dead_code)]
 impl CommonTestFixture {
     /// Create with schemas - consolidates NodeConfig patterns
+    #[allow(dead_code)]
     pub async fn new_with_schemas() -> Result<CommonTestFixture, SchemaError> {
         let temp_dir = tempfile::tempdir().map_err(|e| {
             SchemaError::InvalidData(format!("Failed to create temp directory: {}", e))
@@ -238,10 +254,17 @@ impl CommonTestFixture {
         let transform_manager = fold_db.transform_manager().clone();
         let db_ops = fold_db.db_ops();
 
+        // Create AtomManager to handle FieldValueSetRequest events
+        let atom_manager = AtomManager::new(
+            (*db_ops).clone(),
+            message_bus.clone(),
+        );
+
         let common = TestFixture {
             transform_manager,
             message_bus,
             db_ops,
+            atom_manager,
             _temp_dir: tempfile::tempdir().expect("Should create temp dir"),
         };
 
@@ -257,13 +280,16 @@ impl CommonTestFixture {
         TestFixture::create_sample_registration()
     }
 
+    #[allow(dead_code)]
     pub async fn wait_for_async_operation() {
         TestFixture::wait_for_async_operation().await;
     }
 }
 
+#[allow(dead_code)]
 impl DirectEventTestFixture {
     /// Unified test transform creation
+    #[allow(dead_code)]
     pub fn create_test_transform() -> Transform {
         Transform::new(
             "TransformBase.value1 + TransformBase.value2".to_string(),
@@ -280,10 +306,12 @@ impl DirectEventTestFixture {
 }
 
 /// Global utility functions to avoid further duplication
+#[allow(dead_code)]
 pub fn generate_test_correlation_id() -> String {
     format!("test-{}", Uuid::new_v4())
 }
 
+#[allow(dead_code)]
 pub async fn wait_for_async_operation() {
     TestFixture::wait_for_async_operation().await;
 }

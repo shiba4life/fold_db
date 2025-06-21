@@ -99,7 +99,7 @@ async fn test_current_api_security_status() {
     // Only the security/protected endpoint currently requires auth
     let protected_url = format!("http://{}/api/security/protected", server_addr);
     let invalid_message = json!({
-        "payload": {"test": "data"},
+        "payload": "aW52YWxpZCBwYXlsb2FkIGRhdGE=", // Base64 encoded string instead of object
         "signature": "invalid",
         "public_key_id": "fake",
         "timestamp": 1234567890

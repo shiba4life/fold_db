@@ -30,6 +30,7 @@ use crate::test_utils::TEST_WAIT_MS;
 use tempfile::tempdir;
 
 /// Test fixture for regression prevention testing
+#[allow(dead_code)]
 struct RegressionPreventionTestFixture {
     pub db_ops: Arc<DbOperations>,
     pub message_bus: Arc<MessageBus>,
@@ -227,6 +228,7 @@ impl RegressionPreventionTestFixture {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct MutationResult {
     correlation_id: String,
     success: bool,
@@ -237,6 +239,7 @@ struct MutationResult {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct AtomRefLifecycleResult {
     initial_aref_uuid: String,
     update_aref_uuid: String,
@@ -970,7 +973,7 @@ fn test_event_ordering_and_timing_safeguards() {
         "timestamp": chrono::Utc::now().to_rfc3339(),
     });
     
-    let timeout_start = Instant::now();
+    let _timeout_start = Instant::now();
     let mut timeout_consumer = fixture.message_bus.subscribe::<FieldValueSetResponse>();
     
     let timeout_request = FieldValueSetRequest::new(

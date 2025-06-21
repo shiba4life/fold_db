@@ -28,6 +28,7 @@ use tempfile::tempdir;
 use uuid::Uuid;
 
 /// Test fixture for end-to-end workflow testing
+#[allow(dead_code)]
 struct EndToEndWorkflowFixture {
     pub db_ops: Arc<DbOperations>,
     pub message_bus: Arc<MessageBus>,
@@ -817,7 +818,7 @@ fn test_error_recovery_scenarios() {
     println!("🔧 Scenario 2: Data Corruption Recovery");
     
     // Store valid data first
-    let valid_data = json!({"name": "Alice", "age": 30});
+    let _valid_data = json!({"name": "Alice", "age": 30});
     fixture.mutate_range_field_simple(
         "UserProfile",
         "first_name",

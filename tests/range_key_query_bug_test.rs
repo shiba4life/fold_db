@@ -19,6 +19,7 @@ mod test_utils;
 use test_utils::TEST_WAIT_MS;
 use tempfile::TempDir;
 
+#[allow(dead_code)]
 struct RangeKeyTestFixture {
     db_ops: Arc<DbOperations>,
     message_bus: Arc<MessageBus>,
