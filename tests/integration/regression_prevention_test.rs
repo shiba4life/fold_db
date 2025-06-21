@@ -26,6 +26,7 @@ use serde_json::json;
 use std::sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}};
 use std::time::{Duration, Instant};
 use std::thread;
+use crate::test_utils::TEST_WAIT_MS;
 use tempfile::tempdir;
 
 /// Test fixture for regression prevention testing
@@ -116,7 +117,7 @@ impl RegressionPreventionTestFixture {
         self.message_bus.publish(request)?;
         
         // Wait for processing
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(TEST_WAIT_MS));
         
         let response = response_consumer.recv_timeout(Duration::from_millis(2000))
             .map_err(|_| "Timeout waiting for FieldValueSetResponse")?;
@@ -408,7 +409,7 @@ fn test_transform_trigger_bug_prevention() {
     let monitor_timeout = Duration::from_secs(5);
     
     while monitor_start.elapsed() < monitor_timeout {
-        match executed_consumer.recv_timeout(Duration::from_millis(100)) {
+        match executed_consumer.recv_timeout(Duration::from_millis(TEST_WAIT_MS)) {
             Ok(executed_event) => {
                 executed_transforms.lock().unwrap().push(executed_event.transform_id);
             }
@@ -451,7 +452,7 @@ fn test_transform_trigger_bug_prevention() {
     let order_timeout = Duration::from_secs(3);
     
     while order_start.elapsed() < order_timeout && received_order.lock().unwrap().len() < order_test_count {
-        match order_consumer.recv_timeout(Duration::from_millis(100)) {
+        match order_consumer.recv_timeout(Duration::from_millis(TEST_WAIT_MS)) {
             Ok(executed_event) => {
                 received_order.lock().unwrap().push(executed_event.transform_id);
             }
@@ -817,7 +818,7 @@ fn test_event_ordering_and_timing_safeguards() {
     let response_timeout = Duration::from_secs(5);
     
     while response_start.elapsed() < response_timeout && received_events.lock().unwrap().len() < sequence_length {
-        match response_consumer.recv_timeout(Duration::from_millis(100)) {
+        match response_consumer.recv_timeout(Duration::from_millis(TEST_WAIT_MS)) {
             Ok(response) => {
                 received_events.lock().unwrap().push(response.correlation_id);
             }
@@ -873,7 +874,7 @@ fn test_event_ordering_and_timing_safeguards() {
                     total.fetch_add(1, Ordering::Relaxed);
                     
                     // Try to get response
-                    match response_consumer.recv_timeout(Duration::from_millis(100)) {
+                    match response_consumer.recv_timeout(Duration::from_millis(TEST_WAIT_MS)) {
                         Ok(response) if response.success => {
                             successful.fetch_add(1, Ordering::Relaxed);
                         }
@@ -985,7 +986,7 @@ fn test_event_ordering_and_timing_safeguards() {
     
     // Test different timeout scenarios
     let short_timeout_result = timeout_consumer.recv_timeout(Duration::from_millis(10));
-    let medium_timeout_result = timeout_consumer.recv_timeout(Duration::from_millis(100));
+    let medium_timeout_result = timeout_consumer.recv_timeout(Duration::from_millis(TEST_WAIT_MS));
     let long_timeout_result = timeout_consumer.recv_timeout(Duration::from_millis(1000));
     
     println!("✅ Timeout behavior:");

@@ -2,6 +2,7 @@
 //!
 //! The schema module defines the structure and behavior of data in the DataFold system.
 //! Schemas define fields, their types, permissions, and payment requirements.
+#![allow(unused_imports)]
 //!
 //! ## Components
 //!

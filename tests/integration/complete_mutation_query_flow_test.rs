@@ -14,12 +14,10 @@
 //! static schema references, causing "Atom not found" errors. This test ensures
 //! the fix is working correctly.
 
-use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus,
-    request_events::{FieldValueSetRequest, FieldValueSetResponse},
+use datafold::fold_db_core::infrastructure::message_bus::request_events::{
+    FieldValueSetRequest, FieldValueSetResponse,
 };
 use datafold::fold_db_core::transform_manager::utils::TransformUtils;
-use datafold::db_operations::DbOperations;
 use datafold::schema::{Schema, types::field::FieldVariant};
 use datafold::schema::types::field::{SingleField, Field};
 use datafold::permissions::types::policy::PermissionsPolicy;
@@ -28,43 +26,13 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
+use crate::test_utils::TEST_WAIT_MS;
 use std::collections::HashMap;
-use tempfile::tempdir;
 
-/// Test fixture for comprehensive mutation→query flow testing
-struct MutationQueryTestFixture {
-    pub db_ops: Arc<DbOperations>,
-    pub message_bus: Arc<MessageBus>,
-    pub _temp_dir: tempfile::TempDir,
-}
-
-impl MutationQueryTestFixture {
-    fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let temp_dir = tempdir()?;
-        
-        let db = sled::Config::new()
-            .path(temp_dir.path())
-            .temporary(true)
-            .open()?;
-            
-        let db_ops = Arc::new(DbOperations::new(db)?);
-        let message_bus = Arc::new(MessageBus::new());
-        
-        // Create AtomManager to handle FieldValueSetRequest events
-        let _atom_manager = datafold::fold_db_core::managers::atom::AtomManager::new(
-            (*db_ops).clone(), 
-            Arc::clone(&message_bus)
-        );
-        
-        Ok(Self {
-            db_ops,
-            message_bus,
-            _temp_dir: temp_dir,
-        })
-    }
+use crate::test_utils::TestFixture;
     
     /// Create a realistic test schema based on TransformBase
-    fn create_transform_base_schema(&self) -> Schema {
+fn create_transform_base_schema() -> Schema {
         println!("🏗️  Creating TransformBase schema with single fields");
         
         let mut schema = Schema::new("TransformBase".to_string());
@@ -92,20 +60,20 @@ impl MutationQueryTestFixture {
         println!("✅ TransformBase schema created with fields: {:?}", schema.fields.keys().collect::<Vec<_>>());
         println!("🔧 Static references set (will be overridden by dynamic AtomRef system)");
         schema
-    }
-    
-    /// Perform a field mutation and verify it succeeds
-    fn mutate_field_value(
-        &self,
-        schema_name: &str,
-        field_name: &str,
-        value: serde_json::Value,
-        source: &str,
-    ) -> Result<String, Box<dyn std::error::Error>> {
+}
+
+/// Perform a field mutation and verify it succeeds
+fn mutate_field_value(
+    fixture: &TestFixture,
+    schema_name: &str,
+    field_name: &str,
+    value: serde_json::Value,
+    source: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
         println!("🔄 Mutating {}.{} = {} (source: {})", schema_name, field_name, value, source);
         
         // Subscribe to FieldValueSetResponse events
-        let mut response_consumer = self.message_bus.subscribe::<FieldValueSetResponse>();
+        let mut response_consumer = fixture.message_bus.subscribe::<FieldValueSetResponse>();
         
         // Create and publish FieldValueSetRequest
         let correlation_id = format!("mutation_{}_{}", schema_name, field_name);
@@ -117,7 +85,7 @@ impl MutationQueryTestFixture {
             source.to_string(),
         );
         
-        self.message_bus.publish(request)?;
+        fixture.message_bus.publish(request)?;
         
         // Wait for processing and response
         thread::sleep(Duration::from_millis(200));
@@ -137,14 +105,14 @@ impl MutationQueryTestFixture {
         
         // DIAGNOSTIC: Verify AtomRef was created in database
         let aref_key = format!("ref:{}", aref_uuid);
-        match self.db_ops.get_item::<datafold::atom::AtomRef>(&aref_key) {
+        match fixture.db_ops.get_item::<datafold::atom::AtomRef>(&aref_key) {
             Ok(Some(aref)) => {
                 let atom_uuid = aref.get_atom_uuid();
                 println!("🔍 DIAGNOSTIC: AtomRef {} points to atom {}", aref_uuid, atom_uuid);
                 
                 // Verify atom exists and contains expected data
                 let atom_key = format!("atom:{}", atom_uuid);
-                match self.db_ops.get_item::<datafold::atom::Atom>(&atom_key) {
+                match fixture.db_ops.get_item::<datafold::atom::Atom>(&atom_key) {
                     Ok(Some(atom)) => {
                         println!("🔍 DIAGNOSTIC: Atom {} contains: {}", atom_uuid, atom.content());
                     }
@@ -168,16 +136,16 @@ impl MutationQueryTestFixture {
     }
     
     /// Query a field value and verify it returns correct data
-    fn query_field_value(
-        &self,
-        schema: &Schema,
-        field_name: &str,
-        expected_value: &serde_json::Value,
-    ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+fn query_field_value(
+    fixture: &TestFixture,
+    schema: &Schema,
+    field_name: &str,
+    expected_value: &serde_json::Value,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
         println!("🔍 Querying {}.{} (expecting: {})", schema.name, field_name, expected_value);
         
         // Use the query system to resolve field value
-        let result = TransformUtils::resolve_field_value(&self.db_ops, schema, field_name, None)?;
+    let result = TransformUtils::resolve_field_value(&fixture.db_ops, schema, field_name, None)?;
         
         println!("✅ Query returned: {}", result);
         
@@ -192,25 +160,24 @@ impl MutationQueryTestFixture {
         println!("🎯 Query validation passed - correct value returned");
         Ok(result)
     }
-}
 
 #[test]
 fn test_single_field_mutation_to_query_flow() {
     println!("🧪 TEST: Single Field Mutation→Query Flow");
     println!("   This validates the complete flow for individual field mutations");
     
-    let fixture = MutationQueryTestFixture::new()
+    let fixture = TestFixture::new()
         .expect("Failed to create test fixture");
     
-    let schema = fixture.create_transform_base_schema();
+    let schema = create_transform_base_schema();
     
     // Step 1: Perform mutation on value1 field
     let test_value = json!(42);
-    let aref_uuid = fixture.mutate_field_value("TransformBase", "value1", test_value.clone(), "test_source")
+    let aref_uuid = mutate_field_value(&fixture, "TransformBase", "value1", test_value.clone(), "test_source")
         .expect("Failed to mutate value1");
     
     // Step 2: Query the same field and verify it returns the mutated value
-    let result = fixture.query_field_value(&schema, "value1", &test_value)
+    let result = query_field_value(&fixture, &schema, "value1", &test_value)
         .expect("Failed to query value1");
     
     assert_eq!(result, test_value, "Query should return the mutated value");
@@ -225,10 +192,10 @@ fn test_multiple_field_mutations_and_queries() {
     println!("🧪 TEST: Multiple Field Mutations and Queries");
     println!("   This validates mutations and queries across multiple fields");
     
-    let fixture = MutationQueryTestFixture::new()
+    let fixture = TestFixture::new()
         .expect("Failed to create test fixture");
     
-    let schema = fixture.create_transform_base_schema();
+    let schema = create_transform_base_schema();
     
     // Test data for multiple fields
     let test_cases = vec![
@@ -241,7 +208,7 @@ fn test_multiple_field_mutations_and_queries() {
     // Step 1: Perform mutations on multiple fields
     for (field_name, value, source) in &test_cases {
         println!("📝 Mutating field: {}", field_name);
-        let aref_uuid = fixture.mutate_field_value("TransformBase", field_name, value.clone(), source)
+        let aref_uuid = mutate_field_value(&fixture, "TransformBase", field_name, value.clone(), source)
             .expect(&format!("Failed to mutate {}", field_name));
         aref_uuids.push(aref_uuid);
     }
@@ -249,7 +216,7 @@ fn test_multiple_field_mutations_and_queries() {
     // Step 2: Query all fields and verify they return correct values
     for (field_name, expected_value, _) in &test_cases {
         println!("🔍 Querying field: {}", field_name);
-        let result = fixture.query_field_value(&schema, field_name, expected_value)
+        let result = query_field_value(&fixture, &schema, field_name, expected_value)
             .expect(&format!("Failed to query {}", field_name));
         
         assert_eq!(&result, expected_value, "Field {} should return correct value", field_name);
@@ -264,10 +231,10 @@ fn test_multiple_mutation_cycles_on_same_field() {
     println!("🧪 TEST: Multiple Mutation Cycles on Same Field");
     println!("   This validates that AtomRef updates work consistently across multiple mutations");
     
-    let fixture = MutationQueryTestFixture::new()
+    let fixture = TestFixture::new()
         .expect("Failed to create test fixture");
     
-    let schema = fixture.create_transform_base_schema();
+    let schema = create_transform_base_schema();
     
     // Test multiple mutation cycles on the same field
     let mutation_cycles = vec![
@@ -283,12 +250,12 @@ fn test_multiple_mutation_cycles_on_same_field() {
         println!("📝 Mutation cycle {} of {}", i + 1, mutation_cycles.len());
         
         // Perform mutation
-        let aref_uuid = fixture.mutate_field_value("TransformBase", "value1", value.clone(), source)
+        let aref_uuid = mutate_field_value(&fixture, "TransformBase", "value1", value.clone(), source)
             .expect(&format!("Failed to mutate in cycle {}", i + 1));
         aref_uuids.push(aref_uuid.clone());
         
         // Verify query returns the latest value
-        let result = fixture.query_field_value(&schema, "value1", value)
+        let result = query_field_value(&fixture, &schema, "value1", value)
             .expect(&format!("Failed to query in cycle {}", i + 1));
         
         assert_eq!(&result, value, "Cycle {}: Query should return latest mutated value", i + 1);
@@ -313,10 +280,10 @@ fn test_mutation_query_flow_with_different_data_types() {
     println!("🧪 TEST: Mutation→Query Flow with Different Data Types");
     println!("   This validates the system handles various JSON data types correctly");
     
-    let fixture = MutationQueryTestFixture::new()
+    let fixture = TestFixture::new()
         .expect("Failed to create test fixture");
     
-    let schema = fixture.create_transform_base_schema();
+    let schema = create_transform_base_schema();
     
     // Test different data types
     let test_data_types = vec![
@@ -336,11 +303,11 @@ fn test_mutation_query_flow_with_different_data_types() {
         let source = format!("datatype_{}", data_type);
         
         // Perform mutation
-        let aref_uuid = fixture.mutate_field_value("TransformBase", "value1", value.clone(), &source)
+        let aref_uuid = mutate_field_value(&fixture, "TransformBase", "value1", value.clone(), &source)
             .expect(&format!("Failed to mutate {} data type", data_type));
         
         // Verify query returns correct value
-        let result = fixture.query_field_value(&schema, "value1", &value)
+        let result = query_field_value(&fixture, &schema, "value1", &value)
             .expect(&format!("Failed to query {} data type", data_type));
         
         assert_eq!(result, value, "Data type {}: Query should return correct value", data_type);
@@ -356,10 +323,10 @@ fn test_concurrent_mutations_and_queries() {
     println!("🧪 TEST: Concurrent Mutations and Queries");
     println!("   This validates thread safety and consistency under concurrent operations");
     
-    let fixture = MutationQueryTestFixture::new()
+    let fixture = TestFixture::new()
         .expect("Failed to create test fixture");
     
-    let schema = fixture.create_transform_base_schema();
+    let schema = create_transform_base_schema();
     
     // Perform concurrent mutations on different fields
     let mutation_handles: Vec<_> = (0..5).map(|i| {
@@ -383,7 +350,7 @@ fn test_concurrent_mutations_and_queries() {
             
             // Publish and wait for response
             message_bus.publish(request).expect("Failed to publish request");
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(TEST_WAIT_MS));
             
             let response = response_consumer.recv_timeout(Duration::from_millis(1000))
                 .expect("Failed to receive response");
@@ -421,10 +388,10 @@ fn test_complete_range_only_architecture_validation() {
     println!("🧪 TEST: Complete Range-Only Architecture Validation");
     println!("   This validates that the system works correctly without Collection dependencies");
     
-    let fixture = MutationQueryTestFixture::new()
+    let fixture = TestFixture::new()
         .expect("Failed to create test fixture");
     
-    let schema = fixture.create_transform_base_schema();
+    let schema = create_transform_base_schema();
     
     // Verify schema only contains Single and Range fields (no Collections)
     for (field_name, field_variant) in &schema.fields {
@@ -442,10 +409,10 @@ fn test_complete_range_only_architecture_validation() {
     // Test that mutations and queries work correctly in Range-only environment
     let test_value = json!({"architecture": "range_only", "collections_removed": true});
     
-    let aref_uuid = fixture.mutate_field_value("TransformBase", "value1", test_value.clone(), "range_only_test")
+    let aref_uuid = mutate_field_value(&fixture, "TransformBase", "value1", test_value.clone(), "range_only_test")
         .expect("Failed to mutate in range-only architecture");
     
-    let result = fixture.query_field_value(&schema, "value1", &test_value)
+    let result = query_field_value(&fixture, &schema, "value1", &test_value)
         .expect("Failed to query in range-only architecture");
     
     assert_eq!(result, test_value, "Range-only architecture should handle mutations and queries correctly");
@@ -460,10 +427,10 @@ fn test_diagnostic_atomref_bug_prevention() {
     println!("🧪 TEST: Diagnostic AtomRef Bug Prevention");
     println!("   This validates that the static-schema-reference bug is prevented");
     
-    let fixture = MutationQueryTestFixture::new()
+    let fixture = TestFixture::new()
         .expect("Failed to create test fixture");
     
-    let mut schema = fixture.create_transform_base_schema();
+    let mut schema = create_transform_base_schema();
     
     // SIMULATE THE BUG: Set a static ref_atom_uuid in the schema field
     if let Some(FieldVariant::Single(single_field)) = schema.fields.get_mut("value1") {
@@ -474,7 +441,7 @@ fn test_diagnostic_atomref_bug_prevention() {
     
     // Perform mutation to create dynamic AtomRef
     let test_value = json!("dynamic_value_from_mutation");
-    let dynamic_aref_uuid = fixture.mutate_field_value("TransformBase", "value1", test_value.clone(), "bug_prevention_test")
+    let dynamic_aref_uuid = mutate_field_value(&fixture, "TransformBase", "value1", test_value.clone(), "bug_prevention_test")
         .expect("Failed to mutate with static reference present");
     
     println!("✅ Dynamic AtomRef created: {}", dynamic_aref_uuid);
@@ -489,7 +456,7 @@ fn test_diagnostic_atomref_bug_prevention() {
     println!("🔍 Dynamic AtomRef points to atom: {}", dynamic_atom_uuid);
     
     // CRITICAL TEST: Query should use dynamic AtomRef, NOT static schema reference
-    let result = fixture.query_field_value(&schema, "value1", &test_value)
+    let result = query_field_value(&fixture, &schema, "value1", &test_value)
         .expect("Query should succeed using dynamic AtomRef (bug prevention working)");
     
     assert_eq!(result, test_value, "Query should return value from dynamic AtomRef, not static reference");
@@ -510,10 +477,10 @@ fn test_complete_mutation_query_integration_workflow() {
     println!("🧪 COMPREHENSIVE TEST: Complete Mutation→Query Integration Workflow");
     println!("   This validates the entire end-to-end flow with realistic scenarios");
     
-    let fixture = MutationQueryTestFixture::new()
+    let fixture = TestFixture::new()
         .expect("Failed to create test fixture");
     
-    let schema = fixture.create_transform_base_schema();
+    let schema = create_transform_base_schema();
     
     // Phase 1: Initial Setup and Basic Mutations
     println!("\n📋 Phase 1: Initial Setup and Basic Mutations");
@@ -524,10 +491,10 @@ fn test_complete_mutation_query_integration_workflow() {
     ];
     
     for (field_name, value, source) in &initial_values {
-        fixture.mutate_field_value("TransformBase", field_name, value.clone(), source)
+        mutate_field_value(&fixture, "TransformBase", field_name, value.clone(), source)
             .expect(&format!("Failed initial mutation for {}", field_name));
         
-        fixture.query_field_value(&schema, field_name, value)
+        query_field_value(&fixture, &schema, field_name, value)
             .expect(&format!("Failed initial query for {}", field_name));
     }
     
@@ -543,10 +510,10 @@ fn test_complete_mutation_query_integration_workflow() {
         "tags": ["integration", "mutation", "query"]
     });
     
-    fixture.mutate_field_value("TransformBase", "value1", complex_update.clone(), "complex_phase")
+    mutate_field_value(&fixture, "TransformBase", "value1", complex_update.clone(), "complex_phase")
         .expect("Failed complex mutation");
     
-    fixture.query_field_value(&schema, "value1", &complex_update)
+    query_field_value(&fixture, &schema, "value1", &complex_update)
         .expect("Failed complex query");
     
     // Phase 3: Rapid Update Cycles
@@ -555,10 +522,10 @@ fn test_complete_mutation_query_integration_workflow() {
     for cycle in 1..=3 {
         let cycle_value = json!(format!("rapid_cycle_{}", cycle));
         
-        fixture.mutate_field_value("TransformBase", "value2", cycle_value.clone(), &format!("rapid_cycle_{}", cycle))
+        mutate_field_value(&fixture, "TransformBase", "value2", cycle_value.clone(), &format!("rapid_cycle_{}", cycle))
             .expect(&format!("Failed rapid cycle {} mutation", cycle));
         
-        fixture.query_field_value(&schema, "value2", &cycle_value)
+        query_field_value(&fixture, &schema, "value2", &cycle_value)
             .expect(&format!("Failed rapid cycle {} query", cycle));
         
         // Small delay between cycles
