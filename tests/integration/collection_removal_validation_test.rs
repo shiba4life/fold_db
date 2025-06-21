@@ -18,43 +18,19 @@ use datafold::schema::{field_factory::FieldFactory};
 use datafold::permissions::types::policy::{PermissionsPolicy, TrustDistance};
 use datafold::fees::{SchemaPaymentConfig, FieldPaymentConfig};
 use datafold::fees::types::config::TrustDistanceScaling;
-use datafold::db_operations::DbOperations;
 use datafold::atom::{Atom, AtomRef, AtomRefBehavior};
 use serde_json::json;
 use std::collections::HashMap;
-use tempfile::tempdir;
 use uuid::Uuid;
 
-/// Test fixture for collection removal validation
-struct CollectionRemovalTestFixture {
-    pub db_ops: std::sync::Arc<DbOperations>,
-    pub _temp_dir: tempfile::TempDir,
-}
-
-impl CollectionRemovalTestFixture {
-    fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let temp_dir = tempdir()?;
-        
-        let db = sled::Config::new()
-            .path(temp_dir.path())
-            .temporary(true)
-            .open()?;
-            
-        let db_ops = std::sync::Arc::new(DbOperations::new(db)?);
-        
-        Ok(Self {
-            db_ops,
-            _temp_dir: temp_dir,
-        })
-    }
-}
+use crate::test_utils::TestFixture;
 
 #[test]
 fn test_single_field_complete_operations() {
     println!("🧪 TEST: Single Field Complete Operations");
     println!("   This validates full CRUD operations on Single fields");
     
-    let fixture = CollectionRemovalTestFixture::new()
+    let fixture = TestFixture::new()
         .expect("Failed to create test fixture");
     
     // Test 1: Create Single field
@@ -114,7 +90,7 @@ fn test_range_field_complete_operations() {
     println!("🧪 TEST: Range Field Complete Operations");
     println!("   This validates full CRUD operations on Range fields");
     
-    let fixture = CollectionRemovalTestFixture::new()
+    let fixture = TestFixture::new()
         .expect("Failed to create test fixture");
     
     // Test 1: Create Range field
@@ -193,7 +169,7 @@ fn test_schema_creation_with_single_and_range_fields() {
     println!("🧪 TEST: Schema Creation with Single and Range Fields");
     println!("   This validates schema creation and validation with new field types");
     
-    let fixture = CollectionRemovalTestFixture::new()
+    let fixture = TestFixture::new()
         .expect("Failed to create test fixture");
     
     // Test 1: Create schema with Single fields
@@ -470,7 +446,7 @@ fn test_database_storage_and_retrieval_operations() {
     println!("🧪 TEST: Database Storage and Retrieval Operations");
     println!("   This validates complete database operations with new field types");
     
-    let fixture = CollectionRemovalTestFixture::new()
+    let fixture = TestFixture::new()
         .expect("Failed to create test fixture");
     
     // Test 1: Store and retrieve atoms with different content types

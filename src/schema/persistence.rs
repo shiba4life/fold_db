@@ -109,6 +109,7 @@ impl SchemaCore {
     }
 
     /// Loads schema states from sled and loads schemas that are marked as Approved.
+    #[allow(dead_code)]
     pub(crate) fn load_schema_states_from_disk(&self) -> Result<(), SchemaError> {
         let states = self.load_states();
         info!("Loading schema states from sled: {:?}", states);
