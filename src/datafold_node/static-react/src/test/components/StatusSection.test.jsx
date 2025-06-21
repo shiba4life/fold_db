@@ -93,7 +93,7 @@ describe('StatusSection Component', () => {
       const resetButton = screen.getByRole('button', { name: /reset database/i })
       fireEvent.click(resetButton)
       
-      expect(screen.getByText('Reset Database')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /reset database/i })).toBeInTheDocument()
       expect(screen.getByText(/This will permanently delete all data/)).toBeInTheDocument()
       expect(screen.getByText(/All schemas will be removed/)).toBeInTheDocument()
       expect(screen.getByText(/This action cannot be undone/)).toBeInTheDocument()
@@ -108,7 +108,7 @@ describe('StatusSection Component', () => {
       const cancelButton = screen.getByRole('button', { name: /cancel/i })
       fireEvent.click(cancelButton)
       
-      expect(screen.queryByText('Reset Database')).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: /reset database/i })).not.toBeInTheDocument()
     })
 
     it('calls reset API when confirmed', async () => {
@@ -122,7 +122,7 @@ describe('StatusSection Component', () => {
       const resetButton = screen.getByRole('button', { name: /reset database/i })
       fireEvent.click(resetButton)
       
-      const confirmButton = screen.getByRole('button', { name: /reset database/i })
+      const confirmButton = screen.getAllByRole('button', { name: /reset database/i })[1]
       fireEvent.click(confirmButton)
       
       await waitFor(() => {
@@ -147,7 +147,7 @@ describe('StatusSection Component', () => {
       const resetButton = screen.getByRole('button', { name: /reset database/i })
       fireEvent.click(resetButton)
       
-      const confirmButton = screen.getByRole('button', { name: /reset database/i })
+      const confirmButton = screen.getAllByRole('button', { name: /reset database/i })[1] // Get the modal button
       fireEvent.click(confirmButton)
       
       await waitFor(() => {
@@ -166,7 +166,7 @@ describe('StatusSection Component', () => {
       const resetButton = screen.getByRole('button', { name: /reset database/i })
       fireEvent.click(resetButton)
       
-      const confirmButton = screen.getByRole('button', { name: /reset database/i })
+      const confirmButton = screen.getAllByRole('button', { name: /reset database/i })[1] // Get the modal button
       fireEvent.click(confirmButton)
       
       await waitFor(() => {
@@ -182,7 +182,7 @@ describe('StatusSection Component', () => {
       const resetButton = screen.getByRole('button', { name: /reset database/i })
       fireEvent.click(resetButton)
       
-      const confirmButton = screen.getByRole('button', { name: /reset database/i })
+      const confirmButton = screen.getAllByRole('button', { name: /reset database/i })[1] // Get the modal button
       fireEvent.click(confirmButton)
       
       await waitFor(() => {
@@ -198,7 +198,7 @@ describe('StatusSection Component', () => {
       const resetButton = screen.getByRole('button', { name: /reset database/i })
       fireEvent.click(resetButton)
       
-      const confirmButton = screen.getByRole('button', { name: /reset database/i })
+      const confirmButton = screen.getAllByRole('button', { name: /reset database/i })[1] // Get the modal button
       fireEvent.click(confirmButton)
       
       // Button should show "Resetting..." and be disabled
@@ -216,7 +216,7 @@ describe('StatusSection Component', () => {
       const resetButton = screen.getByRole('button', { name: /reset database/i })
       fireEvent.click(resetButton)
       
-      const confirmButton = screen.getByRole('button', { name: /reset database/i })
+      const confirmButton = screen.getAllByRole('button', { name: /reset database/i })[1] // Get the modal button
       expect(confirmButton).toHaveClass('bg-red-600', 'text-white', 'hover:bg-red-700')
     })
 
@@ -240,7 +240,7 @@ describe('StatusSection Component', () => {
       
       // Check for proper button roles
       expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /reset database/i })).toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: /reset database/i })[1]).toBeInTheDocument() // Get the modal button
     })
   })
 })

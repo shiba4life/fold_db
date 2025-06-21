@@ -31,8 +31,8 @@ describe('MutationEditor', () => {
     expect(screen.getByText('metrics_by_timeframe')).toBeInTheDocument()
     expect(screen.getByText('user_segments')).toBeInTheDocument()
     
-    // Check for Range field type labels
-    const rangeLabels = screen.getAllByText('Range')
+    // Check for Range field type labels (should show "Range (Complex)" for non-range schemas)
+    const rangeLabels = screen.getAllByText('Range (Complex)')
     expect(rangeLabels).toHaveLength(2)
   })
 

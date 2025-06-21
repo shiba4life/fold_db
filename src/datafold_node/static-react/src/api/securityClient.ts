@@ -1,5 +1,10 @@
 import type { SignedMessage } from '../types/cryptography';
-import type { ApiResponse, VerificationResponse } from '../types/api';
+import type {
+  ApiResponse,
+  VerificationResponse,
+  KeyRegistrationResponse,
+} from '../types/api';
+import type { KeyRegistrationRequest } from '../types/cryptography';
 
 const API_BASE_URL = '/api/security';
 
@@ -47,4 +52,10 @@ export async function verifyMessage(
   signedMessage: SignedMessage
 ): Promise<ApiResponse<VerificationResponse>> {
   return post<VerificationResponse>('/verify-message', signedMessage);
-} 
+}
+
+export async function registerPublicKey(
+  request: KeyRegistrationRequest,
+): Promise<ApiResponse<KeyRegistrationResponse>> {
+  return post<KeyRegistrationResponse>('/keys/register', request);
+}

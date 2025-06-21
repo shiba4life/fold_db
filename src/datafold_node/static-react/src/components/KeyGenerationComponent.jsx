@@ -1,9 +1,12 @@
 // React component for Ed25519 key generation
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { KeyIcon, ClipboardIcon, CheckIcon, ExclamationTriangleIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useSecurityAPI } from '../hooks/useSecurityAPI';
-import { useKeyLifecycle } from '../hooks/useKeyLifecycle';
+import { bytesToBase64, hexToBytes } from '../utils/ed25519';
+import { registerPublicKey as registerPublicKeyApi } from '../api/securityClient';
+
+import * as ed from '@noble/ed25519';
 
 // Ed25519 utilities using @noble/ed25519
 const bytesToHex = (bytes) => {
@@ -47,7 +50,7 @@ const KeyGenerationComponent = ({
 }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
-  useKeyLifecycle(clearKeys);
+  const [publicKeyId, setPublicKeyId] = useState(null);
 
   const {
     result: verificationResult,
@@ -55,6 +58,20 @@ const KeyGenerationComponent = ({
     isLoading: isVerifying,
     testSignatureVerification,
   } = useSecurityAPI(keyPair, publicKeyBase64);
+
+  // Listen for logout and session expiry events to clear keys
+  useEffect(() => {
+    const handleLogout = () => clearKeys();
+    const handleSessionExpiry = () => clearKeys();
+
+    window.addEventListener('logout', handleLogout);
+    window.addEventListener('session-expired', handleSessionExpiry);
+
+    return () => {
+      window.removeEventListener('logout', handleLogout);
+      window.removeEventListener('session-expired', handleSessionExpiry);
+    };
+  }, [clearKeys]);
 
   const registerPublicKey = async () => {
     if (!publicKeyBase64) return;
@@ -84,21 +101,12 @@ const KeyGenerationComponent = ({
         }
       }
 
-      const response = await fetch('/api/security/keys/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await registerPublicKeyApi(requestBody);
       if (data.success) {
         setIsRegistered(true);
+        if (data.public_key_id) {
+          setPublicKeyId(data.public_key_id);
+        }
       } else {
         throw new Error(data.error || 'Registration failed');
       }
@@ -199,6 +207,7 @@ const KeyGenerationComponent = ({
               <div className="text-sm text-green-700">
                 <p className="font-medium">Success!</p>
                 <p>Public key has been registered with the server.</p>
+                {publicKeyId && <p>Key ID: {publicKeyId}</p>}
               </div>
             </div>
           </div>
@@ -286,7 +295,8 @@ const KeyGenerationComponent = ({
             <h3 className="text-sm font-medium text-gray-900 mb-2">Key Information</h3>
             <div className="text-xs text-gray-600 space-y-1">
               <p>• Algorithm: Ed25519</p>
-              <p>• Public Key Length: 32 bytes (64 hex characters)</p>
+              <p>• Private Key Length: 32 bytes (44 base64 characters)</p>
+              <p>• Public Key Length: 32 bytes (44 base64 characters)</p>
               <p>• Generated: {new Date().toLocaleString()}</p>
               <p>• Registered: {isRegistered ? 'Yes' : 'No'}</p>
             </div>

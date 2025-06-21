@@ -1,8 +1,14 @@
 // Custom hook for Ed25519 key generation and management
 
 import { useState, useCallback } from 'react';
-import type { KeyGenerationState, KeyGenerationResult, SecurityApiResponse, KeyRegistrationRequest } from '../types/cryptography';
+import type {
+  KeyGenerationState,
+  KeyGenerationResult,
+  SecurityApiResponse,
+  KeyRegistrationRequest,
+} from '../types/cryptography';
 import { generateKeyPairWithBase64 } from '../utils/ed25519';
+import { registerPublicKey as registerPublicKeyApi } from '../api/securityClient';
 
 const INITIAL_RESULT: KeyGenerationResult = {
   keyPair: null,
@@ -54,20 +60,8 @@ export function useKeyGeneration(): KeyGenerationState {
         expires_at: null // No expiration by default
       };
 
-      const response = await fetch('/api/security/keys/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: SecurityApiResponse = await response.json();
-      return data.success;
+      const data: SecurityApiResponse = await registerPublicKeyApi(requestBody);
+      return data.success ?? false;
     } catch (error) {
       console.error('Failed to register public key:', error);
       return false;

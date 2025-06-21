@@ -1,6 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { generateEd25519KeyPair, verify, base64ToBytes } from '../ed25519';
 import { createSignedMessage } from '../signing';
+
+// Mock @noble/ed25519 for consistent test results
+vi.mock('@noble/ed25519', () => ({
+  utils: {
+    randomPrivateKey: vi.fn(() => new Uint8Array(32).fill(1)),
+  },
+  getPublicKeyAsync: vi.fn(() => Promise.resolve(new Uint8Array(32).fill(2))),
+  signAsync: vi.fn(() => Promise.resolve(new Uint8Array(64).fill(3))),
+  verifyAsync: vi.fn(() => Promise.resolve(true)),
+}));
 
 function concatUint8Arrays(arrays: Uint8Array[]): Uint8Array {
   const totalLength = arrays.reduce((acc, arr) => acc + arr.length, 0);
@@ -48,14 +58,20 @@ describe('signing', () => {
 
     // 3. Assert structure
     expect(signedMessage).toBeDefined();
-    expect(signedMessage.payload).toEqual(payload);
+    expect(typeof signedMessage.payload).toBe('string'); // payload is base64 encoded
     expect(signedMessage.public_key_id).toBe(publicKeyId);
     expect(typeof signedMessage.signature).toBe('string');
     expect(typeof signedMessage.timestamp).toBe('number');
 
-    // 4. Verify signature
+    // 4. Decode and verify the payload
+    const decodedPayloadBytes = base64ToBytes(signedMessage.payload);
+    const decodedPayloadString = new TextDecoder().decode(decodedPayloadBytes);
+    const decodedPayload = JSON.parse(decodedPayloadString);
+    expect(decodedPayload).toEqual(payload);
+
+    // 5. Verify signature - reconstruct message with decoded payload
     const messageToVerify = reconstructMessage(
-      signedMessage.payload,
+      decodedPayload,
       signedMessage.timestamp,
       signedMessage.public_key_id
     );

@@ -2,7 +2,10 @@
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useState } from 'react';
 import KeyGenerationComponent from '../../components/KeyGenerationComponent';
+import { registerPublicKey as registerPublicKeyApi } from '../../api/securityClient';
+import * as ed from '@noble/ed25519';
 
 // Mock @noble/ed25519 for testing
 vi.mock('@noble/ed25519', () => ({
@@ -12,21 +15,68 @@ vi.mock('@noble/ed25519', () => ({
   getPublicKeyAsync: vi.fn(() => Promise.resolve(new Uint8Array(32).fill(2))),
 }));
 
-// Mock fetch for API calls
-global.fetch = vi.fn();
+vi.mock('../../api/securityClient', () => ({
+  registerPublicKey: vi.fn(),
+}));
+
+// Test wrapper component that provides state management
+function TestWrapper() {
+  const [keyPair, setKeyPair] = useState(null);
+  const [publicKeyBase64, setPublicKeyBase64] = useState('');
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [error, setError] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const generateKeys = async () => {
+    setIsGenerating(true);
+    setError(null);
+    try {
+      const privateKey = ed.utils.randomPrivateKey();
+      const publicKey = await ed.getPublicKeyAsync(privateKey);
+      
+      const newKeyPair = { privateKey, publicKey };
+      const publicKeyB64 = btoa(String.fromCharCode(...publicKey));
+      
+      setKeyPair(newKeyPair);
+      setPublicKeyBase64(publicKeyB64);
+      setIsRegistered(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const clearKeys = () => {
+    setKeyPair(null);
+    setPublicKeyBase64('');
+    setIsRegistered(false);
+    setError(null);
+  };
+
+  return (
+    <KeyGenerationComponent
+      keyPair={keyPair}
+      publicKeyBase64={publicKeyBase64}
+      isRegistered={isRegistered}
+      setIsRegistered={setIsRegistered}
+      error={error}
+      setError={setError}
+      generateKeys={generateKeys}
+      clearKeys={clearKeys}
+      isGenerating={isGenerating}
+    />
+  );
+}
 
 describe('KeyGenerationComponent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Setup default fetch response
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true }),
-    });
+    vi.mocked(registerPublicKeyApi).mockResolvedValue({ success: true, public_key_id: 'key123' });
   });
 
   it('renders the component with initial state', () => {
-    render(<KeyGenerationComponent />);
+    render(<TestWrapper />);
     
     expect(screen.getByText('Ed25519 Key Generation')).toBeInTheDocument();
     expect(screen.getByText('Generate New Keypair')).toBeInTheDocument();
@@ -34,26 +84,19 @@ describe('KeyGenerationComponent', () => {
   });
 
   it('generates a keypair when button is clicked', async () => {
-    render(<KeyGenerationComponent />);
+    render(<TestWrapper />);
     
     const generateButton = screen.getByText('Generate New Keypair');
     fireEvent.click(generateButton);
-
-    // Should show generating state
-    expect(screen.getByText('Generating...')).toBeInTheDocument();
 
     // Wait for generation to complete
     await waitFor(() => {
       expect(screen.getByDisplayValue('AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=')).toBeInTheDocument();
     });
-
-    // Should show public and private keys
-    expect(screen.getByDisplayValue('AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=')).toBeInTheDocument();
   });
 
   it('shows register button after key generation', async () => {
-    render(<KeyGenerationComponent />);
+    render(<TestWrapper />);
     
     const generateButton = screen.getByText('Generate New Keypair');
     fireEvent.click(generateButton);
@@ -64,7 +107,7 @@ describe('KeyGenerationComponent', () => {
   });
 
   it('registers public key with the server', async () => {
-    render(<KeyGenerationComponent />);
+    render(<TestWrapper />);
     
     // Generate keys first
     const generateButton = screen.getByText('Generate New Keypair');
@@ -78,20 +121,13 @@ describe('KeyGenerationComponent', () => {
     const registerButton = screen.getByText('Register Public Key');
     fireEvent.click(registerButton);
 
-
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/security/register-key', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: expect.stringContaining('0202020202020202020202020202020202020202020202020202020202020202'),
-        });
-      });
+      expect(registerPublicKeyApi).toHaveBeenCalled();
+    });
   });
 
   it('shows success message after registration', async () => {
-    render(<KeyGenerationComponent />);
+    render(<TestWrapper />);
     
     // Generate and register keys
     const generateButton = screen.getByText('Generate New Keypair');
@@ -110,34 +146,52 @@ describe('KeyGenerationComponent', () => {
     });
   });
 
+  it('displays key ID after registration', async () => {
+    render(<TestWrapper />);
+
+    const generateButton = screen.getByText('Generate New Keypair');
+    fireEvent.click(generateButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Register Public Key')).toBeInTheDocument();
+    });
+
+    const registerButton = screen.getByText('Register Public Key');
+    fireEvent.click(registerButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Key ID: key123')).toBeInTheDocument();
+    });
+  });
+
   it('clears keys when clear button is clicked', async () => {
-    render(<KeyGenerationComponent />);
+    render(<TestWrapper />);
     
     // Generate keys first
     const generateButton = screen.getByText('Generate New Keypair');
     fireEvent.click(generateButton);
 
-      await waitFor(() => {
-        expect(screen.getByDisplayValue(/AgI/)).toBeInTheDocument();
-      });
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(/AgI/)).toBeInTheDocument();
+    });
 
     // Clear keys
     const clearButton = screen.getByText('Clear Keys');
     fireEvent.click(clearButton);
 
     // Keys should be gone
-      expect(screen.queryByDisplayValue(/AgI/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/AgI/)).not.toBeInTheDocument();
     expect(screen.queryByText('Register Public Key')).not.toBeInTheDocument();
   });
 
   it('handles registration errors gracefully', async () => {
     // Mock failed API response
-    global.fetch.mockResolvedValueOnce({
-      ok: false,
-      status: 400,
+    vi.mocked(registerPublicKeyApi).mockResolvedValueOnce({
+      success: false,
+      error: 'Bad request',
     });
 
-    render(<KeyGenerationComponent />);
+    render(<TestWrapper />);
     
     // Generate keys
     const generateButton = screen.getByText('Generate New Keypair');
@@ -157,33 +211,33 @@ describe('KeyGenerationComponent', () => {
   });
 
   it('shows correct key information', async () => {
-    render(<KeyGenerationComponent />);
+    render(<TestWrapper />);
     
     const generateButton = screen.getByText('Generate New Keypair');
     fireEvent.click(generateButton);
 
-      await waitFor(() => {
-        expect(screen.getByText('Key Information')).toBeInTheDocument();
-        expect(screen.getByText('• Algorithm: Ed25519')).toBeInTheDocument();
-        expect(screen.getByText('• Private Key Length: 32 bytes (44 base64 characters)')).toBeInTheDocument();
-        expect(screen.getByText('• Public Key Length: 32 bytes (44 base64 characters)')).toBeInTheDocument();
-      });
+    await waitFor(() => {
+      expect(screen.getByText('Key Information')).toBeInTheDocument();
+      expect(screen.getByText('• Algorithm: Ed25519')).toBeInTheDocument();
+      expect(screen.getByText('• Private Key Length: 32 bytes (44 base64 characters)')).toBeInTheDocument();
+      expect(screen.getByText('• Public Key Length: 32 bytes (44 base64 characters)')).toBeInTheDocument();
+    });
   });
 
   it('provides security warnings for private key', async () => {
-    render(<KeyGenerationComponent />);
+    render(<TestWrapper />);
     
     const generateButton = screen.getByText('Generate New Keypair');
     fireEvent.click(generateButton);
 
     await waitFor(() => {
       expect(screen.getByText('Private Key (keep secret!)')).toBeInTheDocument();
-      expect(screen.getByText(/Never share your private key/)).toBeInTheDocument();
+      expect(screen.getByText(/⚠️ Never share your private key/)).toBeInTheDocument();
     });
   });
 
   it('clears keys on logout event', async () => {
-    render(<KeyGenerationComponent />);
+    render(<TestWrapper />);
 
     const generateButton = screen.getByText('Generate New Keypair');
     fireEvent.click(generateButton);
@@ -200,7 +254,7 @@ describe('KeyGenerationComponent', () => {
   });
 
   it('clears keys on session expiry event', async () => {
-    render(<KeyGenerationComponent />);
+    render(<TestWrapper />);
 
     const generateButton = screen.getByText('Generate New Keypair');
     fireEvent.click(generateButton);

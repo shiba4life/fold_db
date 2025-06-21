@@ -119,7 +119,7 @@ describe('App Integration Tests', () => {
     // Check Query tab is active
     await waitFor(() => {
       expect(queryTab).toHaveClass('text-primary')
-      expect(screen.getByText('Run Sample Query')).toBeInTheDocument()
+      expect(screen.getByText('Execute Query')).toBeInTheDocument()
     })
     
     // Click Mutation tab
@@ -129,7 +129,7 @@ describe('App Integration Tests', () => {
     // Check Mutation tab is active
     await waitFor(() => {
       expect(mutationTab).toHaveClass('text-primary')
-      expect(screen.getByText('Run Sample Mutation')).toBeInTheDocument()
+      expect(screen.getByText('Execute Mutation')).toBeInTheDocument()
     })
   })
 
