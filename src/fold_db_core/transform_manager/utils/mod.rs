@@ -8,6 +8,7 @@
 //! - default_value_helper.rs: Default value generation utilities
 //! - lock_helper.rs: Lock acquisition utilities
 //! - logging_helper.rs: Debug logging utilities
+#![allow(unused_imports)]
 //! - validation_helper.rs: Validation utilities
 //! - Plus multiple duplicate logging/helper patterns found throughout
 
