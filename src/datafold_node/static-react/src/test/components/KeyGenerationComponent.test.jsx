@@ -44,12 +44,12 @@ describe('KeyGenerationComponent', () => {
 
     // Wait for generation to complete
     await waitFor(() => {
-      expect(screen.getByDisplayValue('0202020202020202020202020202020202020202020202020202020202020202')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=')).toBeInTheDocument();
     });
 
     // Should show public and private keys
-    expect(screen.getByDisplayValue('0202020202020202020202020202020202020202020202020202020202020202')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('0101010101010101010101010101010101010101010101010101010101010101')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=')).toBeInTheDocument();
   });
 
   it('shows register button after key generation', async () => {
@@ -78,15 +78,16 @@ describe('KeyGenerationComponent', () => {
     const registerButton = screen.getByText('Register Public Key');
     fireEvent.click(registerButton);
 
+
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith('/api/security/register-key', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: expect.stringContaining('0202020202020202020202020202020202020202020202020202020202020202'),
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: expect.stringContaining('0202020202020202020202020202020202020202020202020202020202020202'),
+        });
       });
-    });
   });
 
   it('shows success message after registration', async () => {
@@ -116,16 +117,16 @@ describe('KeyGenerationComponent', () => {
     const generateButton = screen.getByText('Generate New Keypair');
     fireEvent.click(generateButton);
 
-    await waitFor(() => {
-      expect(screen.getByDisplayValue(/020/)).toBeInTheDocument();
-    });
+      await waitFor(() => {
+        expect(screen.getByDisplayValue(/AgI/)).toBeInTheDocument();
+      });
 
     // Clear keys
     const clearButton = screen.getByText('Clear Keys');
     fireEvent.click(clearButton);
 
     // Keys should be gone
-    expect(screen.queryByDisplayValue(/020/)).not.toBeInTheDocument();
+      expect(screen.queryByDisplayValue(/AgI/)).not.toBeInTheDocument();
     expect(screen.queryByText('Register Public Key')).not.toBeInTheDocument();
   });
 
@@ -161,12 +162,12 @@ describe('KeyGenerationComponent', () => {
     const generateButton = screen.getByText('Generate New Keypair');
     fireEvent.click(generateButton);
 
-    await waitFor(() => {
-      expect(screen.getByText('Key Information')).toBeInTheDocument();
-      expect(screen.getByText('• Algorithm: Ed25519')).toBeInTheDocument();
-      expect(screen.getByText('• Private Key Length: 32 bytes (64 hex characters)')).toBeInTheDocument();
-      expect(screen.getByText('• Public Key Length: 32 bytes (64 hex characters)')).toBeInTheDocument();
-    });
+      await waitFor(() => {
+        expect(screen.getByText('Key Information')).toBeInTheDocument();
+        expect(screen.getByText('• Algorithm: Ed25519')).toBeInTheDocument();
+        expect(screen.getByText('• Private Key Length: 32 bytes (44 base64 characters)')).toBeInTheDocument();
+        expect(screen.getByText('• Public Key Length: 32 bytes (44 base64 characters)')).toBeInTheDocument();
+      });
   });
 
   it('provides security warnings for private key', async () => {
@@ -178,6 +179,40 @@ describe('KeyGenerationComponent', () => {
     await waitFor(() => {
       expect(screen.getByText('Private Key (keep secret!)')).toBeInTheDocument();
       expect(screen.getByText(/Never share your private key/)).toBeInTheDocument();
+    });
+  });
+
+  it('clears keys on logout event', async () => {
+    render(<KeyGenerationComponent />);
+
+    const generateButton = screen.getByText('Generate New Keypair');
+    fireEvent.click(generateButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Register Public Key')).toBeInTheDocument();
+    });
+
+    window.dispatchEvent(new Event('logout'));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Register Public Key')).not.toBeInTheDocument();
+    });
+  });
+
+  it('clears keys on session expiry event', async () => {
+    render(<KeyGenerationComponent />);
+
+    const generateButton = screen.getByText('Generate New Keypair');
+    fireEvent.click(generateButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Register Public Key')).toBeInTheDocument();
+    });
+
+    window.dispatchEvent(new Event('session-expired'));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Register Public Key')).not.toBeInTheDocument();
     });
   });
 });

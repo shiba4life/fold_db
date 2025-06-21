@@ -268,9 +268,8 @@ impl FoldDB {
         self.schema_manager.get_schema(schema_name)
     }
 
-
     /// Provides access to the underlying database operations
-    pub fn db_ops(&self) -> Arc<DbOperations> {
+    pub fn get_db_ops(&self) -> Arc<DbOperations> {
         Arc::clone(&self.db_ops)
     }
 
@@ -314,7 +313,119 @@ impl FoldDB {
         Arc::clone(&self.schema_manager)
     }
 
-    // ========== EVENT-DRIVEN API METHODS ==========
+    /// Query a Range schema and return grouped results by range_key
+    pub fn query_range_schema(&self, _query: Query) -> Result<Value, SchemaError> {
+        // CONVERTED TO EVENT-DRIVEN: Use SchemaLoadRequest instead of direct schema_manager access
+        Err(SchemaError::InvalidData(
+            "Method deprecated: Use event-driven SchemaLoadRequest via message bus instead of direct schema_manager access".to_string()
+        ))
+    }
+
+    /// Query multiple fields from a schema
+    pub fn query(&self, query: Query) -> Result<Value, SchemaError> {
+        use log::info;
+        
+        info!("🔍 EVENT-DRIVEN query for schema: {}", query.schema_name);
+        
+        // Get schema first
+        let schema = match self.schema_manager.get_schema(&query.schema_name)? {
+            Some(schema) => schema,
+            None => {
+                return Err(SchemaError::NotFound(format!(
+                    "Schema '{}' not found",
+                    query.schema_name
+                )));
+            }
+        };
+        
+        // Check field-level permissions for each field in the query
+        for field_name in &query.fields {
+            let permission_result = self.permission_wrapper.check_query_field_permission(
+                &query,
+                field_name,
+                &self.schema_manager,
+            );
+            
+            if !permission_result.allowed {
+                return Err(permission_result.error.unwrap_or_else(|| {
+                    SchemaError::InvalidData(format!(
+                        "Permission denied for field '{}' in schema '{}' with trust distance {}",
+                        field_name, query.schema_name, query.trust_distance
+                    ))
+                }));
+            }
+        }
+        
+        // Extract range key filter if this is a range schema with a filter
+        let range_key_filter = if let (Some(range_key), Some(filter)) = (schema.range_key(), &query.filter) {
+            if let Some(range_filter_obj) = filter.get("range_filter") {
+                if let Some(range_filter_map) = range_filter_obj.as_object() {
+                    if let Some(range_key_value) = range_filter_map.get(range_key) {
+                        // Extract the actual filter value - handle different filter types
+                        let extracted_value = if let Some(obj) = range_key_value.as_object() {
+                            // Handle complex filters like {"Key": "1"}, {"KeyPrefix": "abc"}, etc.
+                            if let Some(key_value) = obj.get("Key") {
+                                Some(key_value.as_str().unwrap_or("").to_string())
+                            } else if let Some(prefix_value) = obj.get("KeyPrefix") {
+                                Some(prefix_value.as_str().unwrap_or("").to_string())
+                            } else if let Some(pattern_value) = obj.get("KeyPattern") {
+                                Some(pattern_value.as_str().unwrap_or("").to_string())
+                            } else {
+                                // For other filter types, try to extract any string value
+                                obj.values()
+                                    .find_map(|v| v.as_str())
+                                    .map(|s| s.to_string())
+                            }
+                        } else {
+                            // Simple string filter like "1"
+                            Some(range_key_value.to_string().trim_matches('"').to_string())
+                        };
+                        
+                        info!("🎯 RANGE FILTER EXTRACTED: range_key='{}', filter_value={:?}", range_key, extracted_value);
+                        extracted_value
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Retrieve actual field values by accessing database directly
+        let mut field_values = serde_json::Map::new();
+        
+        for field_name in &query.fields {
+            match self.get_field_value_from_db(&schema, field_name, range_key_filter.clone()) {
+                Ok(value) => {
+                    field_values.insert(field_name.clone(), value);
+                }
+                Err(e) => {
+                    info!("Failed to retrieve field '{}': {}", field_name, e);
+                    field_values.insert(field_name.clone(), serde_json::Value::Null);
+                }
+            }
+        }
+        
+        // Return actual field values
+        Ok(serde_json::Value::Object(field_values))
+    }
+
+    /// Get field value directly from database using unified resolver
+    fn get_field_value_from_db(&self, schema: &Schema, field_name: &str, range_key_filter: Option<String>) -> Result<Value, SchemaError> {
+        // Use the unified FieldValueResolver to eliminate duplicate code
+        crate::fold_db_core::transform_manager::utils::TransformUtils::resolve_field_value(&self.db_ops, schema, field_name, range_key_filter)
+    }
+
+    /// Query a schema (compatibility method)
+    pub fn query_schema(&self, query: Query) -> Vec<Result<Value, SchemaError>> {
+        // Delegate to the main query method and wrap in Vec
+        vec![self.query(query)]
+    }
 
     /// Write schema operation - main orchestration method for mutations
     pub fn write_schema(&mut self, mutation: Mutation) -> Result<(), SchemaError> {
@@ -484,120 +595,5 @@ impl FoldDB {
     pub fn process_transform_queue(&self) {
         // Transform orchestrator processing is handled automatically by events
         // self.transform_orchestrator.process_pending_transforms();
-    }
-
-    /// Query a Range schema and return grouped results by range_key
-    pub fn query_range_schema(&self, _query: Query) -> Result<Value, SchemaError> {
-        // CONVERTED TO EVENT-DRIVEN: Use SchemaLoadRequest instead of direct schema_manager access
-        Err(SchemaError::InvalidData(
-            "Method deprecated: Use event-driven SchemaLoadRequest via message bus instead of direct schema_manager access".to_string()
-        ))
-    }
-
-    /// Query multiple fields from a schema
-    pub fn query(&self, query: Query) -> Result<Value, SchemaError> {
-        use log::info;
-        
-        info!("🔍 EVENT-DRIVEN query for schema: {}", query.schema_name);
-        
-        // Get schema first
-        let schema = match self.schema_manager.get_schema(&query.schema_name)? {
-            Some(schema) => schema,
-            None => {
-                return Err(SchemaError::NotFound(format!(
-                    "Schema '{}' not found",
-                    query.schema_name
-                )));
-            }
-        };
-        
-        // Check field-level permissions for each field in the query
-        for field_name in &query.fields {
-            let permission_result = self.permission_wrapper.check_query_field_permission(
-                &query,
-                field_name,
-                &self.schema_manager,
-            );
-            
-            if !permission_result.allowed {
-                return Err(permission_result.error.unwrap_or_else(|| {
-                    SchemaError::InvalidData(format!(
-                        "Permission denied for field '{}' in schema '{}' with trust distance {}",
-                        field_name, query.schema_name, query.trust_distance
-                    ))
-                }));
-            }
-        }
-        
-        // Extract range key filter if this is a range schema with a filter
-        let range_key_filter = if let (Some(range_key), Some(filter)) = (schema.range_key(), &query.filter) {
-            if let Some(range_filter_obj) = filter.get("range_filter") {
-                if let Some(range_filter_map) = range_filter_obj.as_object() {
-                    if let Some(range_key_value) = range_filter_map.get(range_key) {
-                        // Extract the actual filter value - handle different filter types
-                        let extracted_value = if let Some(obj) = range_key_value.as_object() {
-                            // Handle complex filters like {"Key": "1"}, {"KeyPrefix": "abc"}, etc.
-                            if let Some(key_value) = obj.get("Key") {
-                                Some(key_value.as_str().unwrap_or("").to_string())
-                            } else if let Some(prefix_value) = obj.get("KeyPrefix") {
-                                Some(prefix_value.as_str().unwrap_or("").to_string())
-                            } else if let Some(pattern_value) = obj.get("KeyPattern") {
-                                Some(pattern_value.as_str().unwrap_or("").to_string())
-                            } else {
-                                // For other filter types, try to extract any string value
-                                obj.values()
-                                    .find_map(|v| v.as_str())
-                                    .map(|s| s.to_string())
-                            }
-                        } else {
-                            // Simple string filter like "1"
-                            Some(range_key_value.to_string().trim_matches('"').to_string())
-                        };
-                        
-                        info!("🎯 RANGE FILTER EXTRACTED: range_key='{}', filter_value={:?}", range_key, extracted_value);
-                        extracted_value
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        // Retrieve actual field values by accessing database directly
-        let mut field_values = serde_json::Map::new();
-        
-        for field_name in &query.fields {
-            match self.get_field_value_from_db(&schema, field_name, range_key_filter.clone()) {
-                Ok(value) => {
-                    field_values.insert(field_name.clone(), value);
-                }
-                Err(e) => {
-                    info!("Failed to retrieve field '{}': {}", field_name, e);
-                    field_values.insert(field_name.clone(), serde_json::Value::Null);
-                }
-            }
-        }
-        
-        // Return actual field values
-        Ok(serde_json::Value::Object(field_values))
-    }
-
-    /// Get field value directly from database using unified resolver
-    fn get_field_value_from_db(&self, schema: &Schema, field_name: &str, range_key_filter: Option<String>) -> Result<Value, SchemaError> {
-        // Use the unified FieldValueResolver to eliminate duplicate code
-        crate::fold_db_core::transform_manager::utils::TransformUtils::resolve_field_value(&self.db_ops, schema, field_name, range_key_filter)
-    }
-    
-
-    /// Query a schema (compatibility method)
-    pub fn query_schema(&self, query: Query) -> Vec<Result<Value, SchemaError>> {
-        // Delegate to the main query method and wrap in Vec
-        vec![self.query(query)]
     }
 }

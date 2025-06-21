@@ -248,17 +248,12 @@ impl CommonTestFixture {
     /// Create from existing node
     fn new_from_node(node: DataFoldNode, temp_dir: TempDir) -> Self {
         let node_clone = node.clone();
-        let fold_db = node_clone.get_fold_db().expect("FoldDB should be available");
-        
-        let message_bus = fold_db.message_bus().clone();
-        let transform_manager = fold_db.transform_manager().clone();
-        let db_ops = fold_db.db_ops();
+        let fold_db = node_clone.get_fold_db().unwrap();
 
-        // Create AtomManager to handle FieldValueSetRequest events
-        let atom_manager = AtomManager::new(
-            (*db_ops).clone(),
-            message_bus.clone(),
-        );
+        let db_ops = fold_db.get_db_ops();
+        let message_bus = fold_db.message_bus();
+        let transform_manager = fold_db.transform_manager();
+        let atom_manager = fold_db.atom_manager().clone();
 
         let common = TestFixture {
             transform_manager,
