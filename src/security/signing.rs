@@ -4,6 +4,7 @@ use crate::security::{
     SecurityError, SecurityResult, SignedMessage, PublicKeyInfo, VerificationResult,
     Ed25519PublicKey, KeyUtils,
 };
+use base64::{engine::general_purpose, Engine as _};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -32,7 +33,7 @@ impl MessageSigner {
         let timestamp = chrono::Utc::now().timestamp();
         
         // Create message to sign (payload + timestamp + key_id)
-        let mut message_to_sign = payload_bytes;
+        let mut message_to_sign = payload_bytes.clone();
         message_to_sign.extend_from_slice(&timestamp.to_be_bytes());
         message_to_sign.extend_from_slice(self.public_key_id.as_bytes());
         
@@ -40,19 +41,15 @@ impl MessageSigner {
         let signature = self.keypair.sign(&message_to_sign);
         let signature_base64 = KeyUtils::signature_to_base64(&signature);
         
+        // Base64 encode the original payload for storage
+        let payload_base64 = general_purpose::STANDARD.encode(&payload_bytes);
+        
         Ok(SignedMessage::new(
-            payload,
-            signature_base64,
+            payload_base64,
             self.public_key_id.clone(),
+            signature_base64,
             timestamp,
         ))
-    }
-    
-    /// Sign a message with a nonce for additional security
-    pub fn sign_message_with_nonce(&self, payload: Value, nonce: String) -> SecurityResult<SignedMessage> {
-        let mut signed_message = self.sign_message(payload)?;
-        signed_message.nonce = Some(nonce);
-        Ok(signed_message)
     }
     
     /// Serialize payload to canonical JSON bytes

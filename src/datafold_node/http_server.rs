@@ -2,6 +2,7 @@ use super::log_routes;
 use super::{network_routes, query_routes, schema_routes, security_routes, system_routes};
 use crate::datafold_node::DataFoldNode;
 use crate::error::{FoldDbError, FoldDbResult};
+use crate::error_handling::http_errors;
 use crate::ingestion::routes as ingestion_routes;
 
 use actix_cors::Cors;
@@ -104,10 +105,15 @@ impl DataFoldHttpServer {
                 .allow_any_method()
                 .allow_any_header()
                 .max_age(3600);
+            
+            // Configure custom JSON error handler
+            let json_config = web::JsonConfig::default()
+                .error_handler(http_errors::json_error_handler);
 
             App::new()
                 .wrap(cors)
                 .app_data(app_state.clone())
+                .app_data(json_config)
                 .service(
                     web::scope("/api")
                         // Schema endpoints
@@ -226,7 +232,7 @@ impl DataFoldHttpServer {
                         // Security endpoints
                         .service(
                             web::scope("/security")
-                                .route("/keys/register", web::post().to(security_routes::register_public_key))
+                                .route("/register-key", web::post().to(security_routes::register_public_key))
                                 .route("/keys", web::get().to(security_routes::list_public_keys))
                                 .route("/keys/{id}", web::get().to(security_routes::get_public_key))
                                 .route("/keys/{id}", web::delete().to(security_routes::remove_public_key))

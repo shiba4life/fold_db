@@ -1,8 +1,9 @@
 // React component for Ed25519 key generation
 
 import { useState, useEffect } from 'react';
-import { KeyIcon, ClipboardIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import * as ed from '@noble/ed25519';
+import { KeyIcon, ClipboardIcon, CheckIcon, ExclamationTriangleIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { useSecurityAPI } from '../hooks/useSecurityAPI';
+import { bytesToBase64, hexToBytes } from '../utils/ed25519';
 
 // Ed25519 utilities using @noble/ed25519
 const bytesToHex = (bytes) => {
@@ -34,53 +35,58 @@ const generateKeyPairWithHex = async () => {
   }
 };
 
-const KeyGenerationComponent = () => {
-  const [keyPair, setKeyPair] = useState(null);
-  const [publicKeyHex, setPublicKeyHex] = useState(null);
-  const [privateKeyHex, setPrivateKeyHex] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState(null);
-  const [isRegistered, setIsRegistered] = useState(false);
+const KeyGenerationComponent = ({
+  keyPair,
+  publicKeyHex,
+  isRegistered,
+  setIsRegistered,
+  error,
+  setError,
+  generateKeys,
+  clearKeys,
+}) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
 
-  const generateKeys = async () => {
-    setIsGenerating(true);
-    setError(null);
-    setIsRegistered(false);
-    
-    try {
-      const result = await generateKeyPairWithHex();
-      setKeyPair(result.keyPair);
-      setPublicKeyHex(result.publicKeyHex);
-      setPrivateKeyHex(result.privateKeyHex);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+  const {
+    result: verificationResult,
+    error: verificationError,
+    isLoading: isVerifying,
+    testSignatureVerification,
+  } = useSecurityAPI(keyPair, publicKeyHex);
 
   const registerPublicKey = async () => {
     if (!publicKeyHex) return;
-    
+
     setIsRegistering(true);
     setError(null);
-    
+
     try {
+      const publicKeyBytes = hexToBytes(publicKeyHex);
+      const publicKeyBase64 = bytesToBase64(publicKeyBytes);
+
       const requestBody = {
-        public_key: publicKeyHex,
+        public_key: publicKeyBase64,
         owner_id: 'web-user',
         permissions: ['read', 'write'],
         metadata: {
           generated_by: 'web-interface',
           generation_time: new Date().toISOString(),
-          key_type: 'ed25519'
+          key_type: 'ed25519',
         },
-        expires_at: null
       };
 
-      const response = await fetch('/api/security/register-key', {
+      if (requestBody.expires_at === null) {
+        delete requestBody.expires_at;
+      }
+
+      for (const key in requestBody.metadata) {
+        if (typeof requestBody.metadata[key] !== 'string') {
+          requestBody.metadata[key] = String(requestBody.metadata[key]);
+        }
+      }
+
+      const response = await fetch('/api/security/keys/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -103,15 +109,6 @@ const KeyGenerationComponent = () => {
     } finally {
       setIsRegistering(false);
     }
-  };
-
-  const clearKeys = () => {
-    setKeyPair(null);
-    setPublicKeyHex(null);
-    setPrivateKeyHex(null);
-    setError(null);
-    setIsRegistered(false);
-    setCopiedField(null);
   };
 
   const copyToClipboard = async (text, field) => {
@@ -147,10 +144,9 @@ const KeyGenerationComponent = () => {
         <div className="flex flex-wrap gap-3 mb-6">
           <button
             onClick={generateKeys}
-            disabled={isGenerating}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
           >
-            {isGenerating ? 'Generating...' : 'Generate New Keypair'}
+            Generate New Keypair
           </button>
 
           {publicKeyHex && !isRegistered && (
@@ -160,6 +156,17 @@ const KeyGenerationComponent = () => {
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
             >
               {isRegistering ? 'Registering...' : 'Register Public Key'}
+            </button>
+          )}
+          
+          {isRegistered && (
+            <button
+              onClick={() => testSignatureVerification({})}
+              disabled={isVerifying}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              <ShieldCheckIcon className="h-5 w-5 mr-2" />
+              {isVerifying ? 'Verifying...' : 'Test Signature Verification'}
             </button>
           )}
 
@@ -199,6 +206,30 @@ const KeyGenerationComponent = () => {
           </div>
         )}
 
+        {/* Verification Result */}
+        {(verificationResult || verificationError) && (
+          <div className={`rounded-md p-4 mb-6 ${verificationResult?.is_valid ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+            <div className="flex">
+              {verificationResult?.is_valid ? (
+                 <ShieldCheckIcon className="h-5 w-5 text-green-400 mr-2 flex-shrink-0" />
+              ) : (
+                 <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mr-2 flex-shrink-0" />
+              )}
+              <div className={`text-sm ${verificationResult?.is_valid ? 'text-green-700' : 'text-red-700'}`}>
+                <p className="font-medium">Verification Result:</p>
+                {verificationResult && (
+                  <>
+                    <p>Signature Valid: {verificationResult.is_valid ? '✅ Yes' : '❌ No'}</p>
+                    {verificationResult.error && <p>Error: {verificationResult.error}</p>}
+                    {verificationResult.owner_id && <p>Owner ID: {verificationResult.owner_id}</p>}
+                  </>
+                )}
+                {verificationError && <p>{verificationError}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Key Display */}
         {publicKeyHex && (
           <div className="space-y-4">
@@ -233,19 +264,15 @@ const KeyGenerationComponent = () => {
               <div className="flex">
                 <input
                   type="text"
-                  value={privateKeyHex}
+                  value={"*".repeat(64)}
                   readOnly
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-red-50 text-sm font-mono"
                 />
                 <button
-                  onClick={() => copyToClipboard(privateKeyHex, 'private')}
+                  onClick={() => alert("Private key cannot be copied for security reasons.")}
                   className="px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {copiedField === 'private' ? (
-                    <CheckIcon className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <ClipboardIcon className="h-4 w-4 text-gray-500" />
-                  )}
+                  <ClipboardIcon className="h-4 w-4 text-gray-500" />
                 </button>
               </div>
               <p className="text-xs text-red-600 mt-1">
@@ -261,7 +288,6 @@ const KeyGenerationComponent = () => {
             <h3 className="text-sm font-medium text-gray-900 mb-2">Key Information</h3>
             <div className="text-xs text-gray-600 space-y-1">
               <p>• Algorithm: Ed25519</p>
-              <p>• Private Key Length: 32 bytes (64 hex characters)</p>
               <p>• Public Key Length: 32 bytes (64 hex characters)</p>
               <p>• Generated: {new Date().toLocaleString()}</p>
               <p>• Registered: {isRegistered ? 'Yes' : 'No'}</p>

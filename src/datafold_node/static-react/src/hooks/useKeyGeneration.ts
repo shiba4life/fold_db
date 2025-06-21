@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import type { KeyGenerationState, KeyGenerationResult, SecurityApiResponse, KeyRegistrationRequest } from '../types/cryptography';
-import { generateKeyPairWithHex } from '../utils/ed25519';
+import { generateKeyPairWithBase64 } from '../utils/ed25519';
 
 const INITIAL_RESULT: KeyGenerationResult = {
   keyPair: null,
@@ -18,11 +18,11 @@ export function useKeyGeneration(): KeyGenerationState {
     setResult(prev => ({ ...prev, isGenerating: true, error: null }));
     
     try {
-      const { keyPair, publicKeyHex } = await generateKeyPairWithHex();
+      const { keyPair, publicKeyBase64 } = await generateKeyPairWithBase64();
       
       setResult({
         keyPair,
-        publicKeyHex,
+        publicKeyHex: publicKeyBase64,
         error: null,
         isGenerating: false,
       });
@@ -40,10 +40,10 @@ export function useKeyGeneration(): KeyGenerationState {
     setResult(INITIAL_RESULT);
   }, []);
 
-  const registerPublicKey = useCallback(async (publicKeyHex: string): Promise<boolean> => {
+  const registerPublicKey = useCallback(async (publicKeyBase64: string): Promise<boolean> => {
     try {
       const requestBody: KeyRegistrationRequest = {
-        public_key: publicKeyHex,
+        public_key: publicKeyBase64,
         owner_id: 'web-user', // Default owner ID for web interface
         permissions: ['read', 'write'], // Default permissions
         metadata: {

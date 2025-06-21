@@ -17,7 +17,10 @@ pub mod utils;
 pub use keys::*;
 pub use signing::*;
 pub use encryption::*;
-pub use types::*;
+pub use types::{
+    EncryptedData, KeyRegistrationRequest, KeyRegistrationResponse, PublicKeyInfo,
+    PublicKeyRegistration, SignedMessage, VerificationResult,
+};
 pub use utils::*;
 
 use thiserror::Error;

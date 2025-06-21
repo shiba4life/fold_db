@@ -25,10 +25,11 @@ pub async fn register_public_key(
     
     match security_manager.register_public_key(request.into_inner()) {
         Ok(response) => Ok(HttpResponse::Ok().json(response)),
-        Err(e) => Ok(HttpResponse::BadRequest().json(json!({
-            "success": false,
-            "error": e.to_string()
-        }))),
+        Err(e) => {
+            log::error!("Failed to register public key: {}", e);
+            // Let the framework handle the error response
+            Err(actix_web::error::ErrorBadRequest(e.to_string()))
+        }
     }
 }
 

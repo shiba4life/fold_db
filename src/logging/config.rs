@@ -271,16 +271,16 @@ impl LogConfig {
     /// Get default feature-specific log levels
     fn default_features() -> HashMap<String, String> {
         let mut features = HashMap::new();
-        features.insert("transform".to_string(), "DEBUG".to_string());
-        features.insert("network".to_string(), "INFO".to_string());
-        features.insert("database".to_string(), "WARN".to_string());
-        features.insert("schema".to_string(), "INFO".to_string());
         features.insert("query".to_string(), "INFO".to_string());
         features.insert("mutation".to_string(), "INFO".to_string());
-        features.insert("permissions".to_string(), "INFO".to_string());
-        features.insert("http_server".to_string(), "INFO".to_string());
-        features.insert("tcp_server".to_string(), "INFO".to_string());
+        features.insert("schema".to_string(), "INFO".to_string());
         features.insert("ingestion".to_string(), "INFO".to_string());
+        features.insert("transform".to_string(), "DEBUG".to_string());
+        features.insert("network".to_string(), "INFO".to_string());
+        features.insert("permissions".to_string(), "INFO".to_string());
+        features.insert("http_server".to_string(), "DEBUG".to_string());
+        features.insert("tcp_server".to_string(), "INFO".to_string());
+        features.insert("database".to_string(), "WARN".to_string());
         features
     }
 

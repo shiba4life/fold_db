@@ -64,10 +64,10 @@ impl SecurityManager {
         // Generate a unique key ID
         let key_id = KeyUtils::generate_key_id(&public_key);
         
-        // Create public key info
+        // Create public key info, using the validated and re-encoded key
         let mut key_info = PublicKeyInfo::new(
             key_id.clone(),
-            request.public_key,
+            public_key.to_base64(), // Use the validated key, re-encoded
             request.owner_id,
             request.permissions,
         );

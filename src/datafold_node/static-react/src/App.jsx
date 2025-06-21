@@ -11,11 +11,13 @@ import SchemaDependenciesTab from './components/tabs/SchemaDependenciesTab'
 import IngestionTab from './components/tabs/IngestionTab'
 import KeyManagementTab from './components/tabs/KeyManagementTab'
 import LogSidebar from './components/LogSidebar'
+import { useKeyGeneration } from './hooks/useKeyGeneration'
 
 function App() {
   const [activeTab, setActiveTab] = useState('schemas')
   const [results, setResults] = useState(null)
   const [schemas, setSchemas] = useState([])
+  const keyGenerationResult = useKeyGeneration()
 
   useEffect(() => {
     fetchSchemas()
@@ -98,7 +100,14 @@ function App() {
       case 'query':
         return <QueryTab schemas={schemas} onResult={handleOperationResult} />
       case 'mutation':
-        return <MutationTab schemas={schemas} onResult={handleOperationResult} />
+        return (
+          <div className="tab-content">
+            <MutationTab
+              schemas={schemas}
+              onResult={handleOperationResult}
+            />
+          </div>
+        )
       case 'ingestion':
         return <IngestionTab onResult={handleOperationResult} />
       case 'transforms':
@@ -106,7 +115,12 @@ function App() {
       case 'dependencies':
         return <SchemaDependenciesTab schemas={schemas} />
       case 'keys':
-        return <KeyManagementTab onResult={handleOperationResult} />
+        return (
+          <KeyManagementTab
+            onResult={handleOperationResult}
+            keyGenerationResult={keyGenerationResult}
+          />
+        )
       default:
         return null
     }

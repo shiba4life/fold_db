@@ -3,43 +3,43 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// A signed message sent from client to backend
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignedMessage {
-    /// The actual message payload (JSON)
-    pub payload: serde_json::Value,
-    /// Base64-encoded Ed25519 signature of the payload
-    pub signature: String,
-    /// Unique identifier for the public key used to sign this message
-    pub public_key_id: String,
-    /// Timestamp when the message was signed (for replay protection)
-    pub timestamp: i64,
-    /// Optional nonce for additional replay protection
-    pub nonce: Option<String>,
+    pub payload: String,        // Base64 encoded JSON payload
+    pub public_key_id: String, // ID of the public key
+    pub signature: String,      // Hex-encoded signature
+    pub timestamp: i64,         // Unix timestamp
 }
 
 impl SignedMessage {
-    /// Create a new signed message
     pub fn new(
-        payload: serde_json::Value,
-        signature: String,
+        payload: String,
         public_key_id: String,
+        signature: String,
         timestamp: i64,
     ) -> Self {
         Self {
             payload,
-            signature,
             public_key_id,
+            signature,
             timestamp,
-            nonce: None,
         }
     }
-    
-    /// Add a nonce for additional security
-    pub fn with_nonce(mut self, nonce: String) -> Self {
-        self.nonce = Some(nonce);
-        self
-    }
+}
+
+/// Public key registration request from client
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct PublicKeyRegistration {
+    /// Base64-encoded Ed25519 public key
+    pub public_key: String,
+    /// User or client ID
+    pub owner_id: String,
+    /// Requested permissions
+    pub permissions: Vec<String>,
+    /// Optional metadata
+    pub metadata: HashMap<String, String>,
+    /// Optional expiration timestamp
+    pub expires_at: Option<u64>,
 }
 
 /// Public key information stored on the backend

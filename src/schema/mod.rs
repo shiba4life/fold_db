@@ -35,16 +35,12 @@ pub mod field_factory;
 pub mod file_operations;
 pub mod hasher;
 pub mod types;
+pub mod validator;
 
 // Public re-exports
-pub use core::{SchemaCore, SchemaState};
-pub use discovery::*;
-pub use persistence::*;
-pub use transform::*;
-pub use field_factory::{FieldFactory, FieldBuilder, TransformSetupHelper, DatabaseInitHelper, TestEnvironment};
-pub use types::{errors::SchemaError, schema::Schema, Transform};
-pub mod validator;
-pub use crate::{MutationType, Operation};
+pub use core::*;
+pub use field_factory::*;
+pub use types::*;
 pub use duplicate_detection::SchemaDuplicateDetector;
 pub use file_operations::SchemaFileOperations;
 pub use hasher::SchemaHasher;
