@@ -19,6 +19,8 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
+mod test_utils;
+use test_utils::TEST_WAIT_MS;
 use std::collections::HashSet;
 use tempfile::tempdir;
 
@@ -105,7 +107,7 @@ fn test_transform_trigger_diagnostic_fix() {
     
     // Verify FieldValueSetResponse
     println!("🔍 Checking for FieldValueSetResponse");
-    let response = response_consumer.recv_timeout(Duration::from_millis(100))
+    let response = response_consumer.recv_timeout(Duration::from_millis(TEST_WAIT_MS))
         .expect("Should receive FieldValueSetResponse");
     
     println!("✅ DIAGNOSTIC: Received FieldValueSetResponse - success: {}", response.success);
@@ -114,7 +116,7 @@ fn test_transform_trigger_diagnostic_fix() {
     
     // CRITICAL CHECK: Verify FieldValueSet event was published (THE FIX)
     println!("🔍 DIAGNOSTIC: Checking for FieldValueSet event (the critical fix)");
-    match field_value_consumer.recv_timeout(Duration::from_millis(100)) {
+    match field_value_consumer.recv_timeout(Duration::from_millis(TEST_WAIT_MS)) {
         Ok(field_event) => {
             println!("✅ DIAGNOSTIC FIX SUCCESS: FieldValueSet event received!");
             println!("   Field: {}", field_event.field);
@@ -129,7 +131,7 @@ fn test_transform_trigger_diagnostic_fix() {
             
             // Check for TransformTriggered event
             println!("🔍 DIAGNOSTIC: Checking for TransformTriggered event");
-            match triggered_consumer.recv_timeout(Duration::from_millis(100)) {
+            match triggered_consumer.recv_timeout(Duration::from_millis(TEST_WAIT_MS)) {
                 Ok(triggered_event) => {
                     println!("✅ DIAGNOSTIC: TransformTriggered event received!");
                     println!("   Transform ID: {}", triggered_event.transform_id);
@@ -199,13 +201,13 @@ fn test_transform_trigger_with_no_transforms() {
     thread::sleep(Duration::from_millis(300));
     
     // Should still receive FieldValueSet event
-    let field_event = field_value_consumer.recv_timeout(Duration::from_millis(100))
+    let field_event = field_value_consumer.recv_timeout(Duration::from_millis(TEST_WAIT_MS))
         .expect("Should receive FieldValueSet event even with no transforms");
     
     println!("✅ FieldValueSet event received for field with no transforms: {}", field_event.field);
     
     // Should NOT receive TransformTriggered event
-    match triggered_consumer.recv_timeout(Duration::from_millis(100)) {
+    match triggered_consumer.recv_timeout(Duration::from_millis(TEST_WAIT_MS)) {
         Ok(_) => panic!("Should not receive TransformTriggered for field with no transforms"),
         Err(_) => println!("✅ Correctly no TransformTriggered event for field with no transforms"),
     }
