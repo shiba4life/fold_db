@@ -14,7 +14,7 @@ Create a React component for Ed25519 keypair generation that operates entirely c
 
 ## Requirements
 
-1. **Client-Side Key Generation**: Ed25519 keypair generation using selected library from PKM-1-1
+1. **Client-Side Key Generation**: Ed25519 keypair generation using **@noble/ed25519** (selected from PKM-1-1)
 2. **Secure State Management**: Private keys stored only in React state, never persisted
 3. **Public Key Registration**: Integration with existing backend endpoints for public key storage
 4. **User Interface**: Clean, accessible interface for key generation operations
@@ -29,9 +29,10 @@ Create a React component for Ed25519 keypair generation that operates entirely c
    - Add TypeScript interfaces for key management state
 
 2. **Cryptographic Integration**:
-   - Integrate selected Ed25519 library from PKM-1-1
-   - Implement secure random key generation
-   - Add key format conversion utilities
+   - Integrate **@noble/ed25519** library (4KB bundle, async API)
+   - Implement secure random key generation using `ed.utils.randomPrivateKey()`
+   - Add key format conversion utilities (hex encoding/decoding)
+   - Follow patterns from [PKM-1-1-noble-ed25519-guide.md](./PKM-1-1-noble-ed25519-guide.md)
 
 3. **Backend Integration**:
    - Connect to existing security routes for public key registration
@@ -42,6 +43,30 @@ Create a React component for Ed25519 keypair generation that operates entirely c
    - Design key generation interface with security messaging
    - Add progress indicators and success/error states
    - Implement accessibility features (ARIA labels, keyboard navigation)
+
+## Implementation Guidance
+
+Based on PKM-1-1 research findings, use the following @noble/ed25519 patterns:
+
+**Key Generation:**
+```typescript
+import * as ed from '@noble/ed25519';
+
+// Generate keypair
+const privateKey = ed.utils.randomPrivateKey();
+const publicKey = await ed.getPublicKeyAsync(privateKey);
+```
+
+**Performance Expectations:**
+- Key Generation: ~9,173 ops/sec
+- Bundle Size: 4KB gzipped
+- Browser Support: Chrome 67+, Firefox 60+, Safari 13+, Edge 18+
+
+**Security Considerations:**
+- Use async API for better performance
+- Private keys are 32 bytes, public keys are 32 bytes
+- Implement proper error handling for cryptographic operations
+- Follow security patterns from the comprehensive guide
 
 ## Verification
 
@@ -54,10 +79,16 @@ Create a React component for Ed25519 keypair generation that operates entirely c
 - [ ] Unit tests cover key generation and state management
 - [ ] Integration tests verify backend connectivity
 
+## Dependencies
+
+- **@noble/ed25519**: Primary cryptographic library (install via `npm install @noble/ed25519`)
+- **Reference Implementation**: See [PKM-1-1-noble-ed25519-guide.md](./PKM-1-1-noble-ed25519-guide.md) for React integration patterns
+
 ## Files Modified
 
 - `src/datafold_node/static-react/components/KeyGenerationComponent.tsx` (to be created)
 - `src/datafold_node/static-react/hooks/useKeyGeneration.ts` (to be created)
 - `src/datafold_node/static-react/types/cryptography.ts` (to be created)
 - `src/datafold_node/static-react/utils/ed25519.ts` (to be created)
+- `package.json` (add @noble/ed25519 dependency)
 - Related test files (to be created)
