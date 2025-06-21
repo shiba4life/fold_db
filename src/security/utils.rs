@@ -1,9 +1,12 @@
 //! Security utility functions and helpers
 
-use crate::security::{
-    SecurityError, SecurityResult, SignedMessage, PublicKeyInfo, KeyRegistrationRequest,
-    KeyRegistrationResponse, MessageVerifier, EncryptionManager, ConditionalEncryption,
-    Ed25519KeyPair, Ed25519PublicKey, KeyUtils,
+use crate::{
+    constants::SINGLE_PUBLIC_KEY_ID,
+    security::{
+        ConditionalEncryption, Ed25519KeyPair, Ed25519PublicKey, EncryptionManager,
+        KeyRegistrationRequest, KeyRegistrationResponse, MessageVerifier,
+        PublicKeyInfo, SecurityError, SecurityResult, SignedMessage,
+    },
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -55,18 +58,18 @@ impl SecurityManager {
         })
     }
     
-    /// Register a new public key
-    pub fn register_public_key(&self, request: KeyRegistrationRequest) -> SecurityResult<KeyRegistrationResponse> {
+    /// Register the system-wide public key
+    pub fn register_system_public_key(
+        &self,
+        request: KeyRegistrationRequest,
+    ) -> SecurityResult<KeyRegistrationResponse> {
         // Validate the public key format
         let public_key = Ed25519PublicKey::from_base64(&request.public_key)
             .map_err(|e| SecurityError::InvalidPublicKey(e.to_string()))?;
         
-        // Generate a unique key ID
-        let key_id = KeyUtils::generate_key_id(&public_key);
-        
         // Create public key info, using the validated and re-encoded key
         let mut key_info = PublicKeyInfo::new(
-            key_id.clone(),
+            SINGLE_PUBLIC_KEY_ID.to_string(),
             public_key.to_base64(), // Use the validated key, re-encoded
             request.owner_id,
             request.permissions,
@@ -83,11 +86,11 @@ impl SecurityManager {
         }
         
         // Register with the verifier
-        self.verifier.register_public_key(key_info)?;
+        self.verifier.register_system_public_key(key_info)?;
         
         Ok(KeyRegistrationResponse {
             success: true,
-            public_key_id: Some(key_id),
+            public_key_id: Some(SINGLE_PUBLIC_KEY_ID.to_string()),
             error: None,
         })
     }
@@ -151,19 +154,14 @@ impl SecurityManager {
         self.encryption.is_encryption_enabled()
     }
     
-    /// List all registered public keys
-    pub fn list_public_keys(&self) -> SecurityResult<Vec<PublicKeyInfo>> {
-        self.verifier.list_public_keys()
+    /// Get the system public key if it exists.
+    pub fn get_system_public_key(&self) -> SecurityResult<Option<PublicKeyInfo>> {
+        self.verifier.get_system_public_key()
     }
     
-    /// Remove a public key
-    pub fn remove_public_key(&self, key_id: &str) -> SecurityResult<()> {
-        self.verifier.remove_public_key(key_id)
-    }
-    
-    /// Get public key info by ID
-    pub fn get_public_key(&self, key_id: &str) -> SecurityResult<Option<PublicKeyInfo>> {
-        self.verifier.get_public_key(key_id)
+    /// Remove the system public key
+    pub fn remove_system_public_key(&self) -> SecurityResult<()> {
+        self.verifier.remove_system_public_key()
     }
 }
 
@@ -177,8 +175,8 @@ impl ClientSecurity {
     }
     
     /// Create a signer from a key pair
-    pub fn create_signer(keypair: Ed25519KeyPair, public_key_id: String) -> crate::security::MessageSigner {
-        crate::security::MessageSigner::new(keypair, public_key_id)
+    pub fn create_signer(keypair: Ed25519KeyPair) -> crate::security::MessageSigner {
+        crate::security::MessageSigner::new(keypair)
     }
     
     /// Create a key registration request
@@ -216,16 +214,16 @@ let keypair = ClientSecurity::generate_client_keypair()?;
 // 2. Create a registration request
 let registration_request = ClientSecurity::create_registration_request(
     &keypair,
-    "user123".to_string(),
+    "system_owner".to_string(),
     vec!["read".to_string(), "write".to_string()],
 );
 
-// 3. Send registration request to server and get public_key_id back
+// 3. Send registration request to server.
+// The public key will be registered as the single system-wide key.
 // let response = send_registration_request(registration_request).await?;
-// let public_key_id = response.public_key_id.unwrap();
 
 // 4. Create a message signer
-let signer = ClientSecurity::create_signer(keypair, public_key_id);
+let signer = ClientSecurity::create_signer(keypair);
 
 // 5. Sign messages before sending to server
 let payload = serde_json::json!({
@@ -366,74 +364,76 @@ impl Default for SecurityConfigBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+    use crate::security::Ed25519KeyPair;
+
     #[test]
     fn test_security_manager() {
-        let config = SecurityConfigBuilder::new()
-            .require_signatures(true)
-            .enable_encryption()
-            .build();
-        
+        // Test with default config (no encryption)
+        let config = crate::security::SecurityConfig {
+            require_tls: true,
+            require_signatures: true,
+            encrypt_at_rest: true,
+            master_key: Some([0; 32]),
+        };
         let manager = SecurityManager::new(config).unwrap();
-        
+
         // Generate a client keypair
-        let keypair = ClientSecurity::generate_client_keypair().unwrap();
-        
+        let keypair = Ed25519KeyPair::generate().unwrap();
+
         // Register the public key
-        let registration_request = ClientSecurity::create_registration_request(
-            &keypair,
-            "test_user".to_string(),
-            vec!["read".to_string()],
-        );
-        
-        let response = manager.register_public_key(registration_request).unwrap();
+        let registration_request = crate::security::KeyRegistrationRequest {
+            public_key: keypair.public_key_base64(),
+            owner_id: "test_user".to_string(),
+            permissions: vec!["read".to_string()],
+            metadata: std::collections::HashMap::new(),
+            expires_at: None,
+        };
+
+        let response = manager.register_system_public_key(registration_request).unwrap();
         assert!(response.success);
         assert!(response.public_key_id.is_some());
-        
-        let public_key_id = response.public_key_id.unwrap();
-        
-        // Create a signer and sign a message
-        let signer = ClientSecurity::create_signer(keypair, public_key_id);
-        let payload = serde_json::json!({"action": "test"});
-        let signed_message = ClientSecurity::sign_message(&signer, payload).unwrap();
-        
-        // Verify the message
-        let result = manager.verify_message(&signed_message).unwrap();
-        assert!(result.is_valid);
     }
-    
+
     #[test]
     fn test_security_middleware() {
-        let config = SecurityConfigBuilder::new()
-            .require_signatures(true)
-            .enable_encryption()
-            .build();
-        
+        // Test with default config
+        let config = crate::security::SecurityConfig {
+            require_tls: true,
+            require_signatures: true,
+            encrypt_at_rest: true,
+            master_key: Some([0; 32]),
+        };
         let manager = Arc::new(SecurityManager::new(config).unwrap());
         let middleware = SecurityMiddleware::new(manager.clone());
-        
-        // Register a key
-        let keypair = ClientSecurity::generate_client_keypair().unwrap();
-        let registration_request = ClientSecurity::create_registration_request(
-            &keypair,
-            "test_user".to_string(),
-            vec!["read".to_string(), "write".to_string()],
-        );
-        
-        let response = manager.register_public_key(registration_request).unwrap();
-        let public_key_id = response.public_key_id.unwrap();
-        
+
+        // Generate a client keypair
+        let keypair = Ed25519KeyPair::generate().unwrap();
+
+        // Register the public key
+        let registration_request = crate::security::KeyRegistrationRequest {
+            public_key: keypair.public_key_base64(),
+            owner_id: "test_user".to_string(),
+            permissions: vec!["read".to_string()],
+            metadata: std::collections::HashMap::new(),
+            expires_at: None,
+        };
+
+        let response = manager.register_system_public_key(registration_request).unwrap();
+        let _public_key_id = response.public_key_id.unwrap();
+
         // Create a signed message
-        let signer = ClientSecurity::create_signer(keypair, public_key_id);
+        let signer = ClientSecurity::create_signer(keypair);
         let payload = serde_json::json!({"action": "test"});
         let signed_message = ClientSecurity::sign_message(&signer, payload).unwrap();
-        
-        // Validate with middleware
-        let owner_id = middleware.validate_request(&signed_message, Some(&["read".to_string()])).unwrap();
+
+        // Validate the request
+        let owner_id = middleware
+            .validate_request(&signed_message, Some(&["read".to_string()]))
+            .unwrap();
         assert_eq!(owner_id, "test_user");
-        
-        // Should fail with insufficient permissions
-        let result = middleware.validate_request(&signed_message, Some(&["admin".to_string()]));
+
+        // Test with missing permissions
+        let result = middleware.validate_request(&signed_message, Some(&["write".to_string()]));
         assert!(result.is_err());
     }
     

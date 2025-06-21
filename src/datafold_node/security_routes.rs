@@ -16,14 +16,14 @@ async fn get_security_manager(data: &web::Data<AppState>) -> Arc<SecurityManager
     node_guard.get_security_manager().clone()
 }
 
-/// Register a new public key
-pub async fn register_public_key(
+/// Register the system-wide public key
+pub async fn register_system_public_key(
     request: web::Json<KeyRegistrationRequest>,
     data: web::Data<AppState>,
 ) -> ActixResult<HttpResponse> {
     let security_manager = get_security_manager(&data).await;
     
-    match security_manager.register_public_key(request.into_inner()) {
+    match security_manager.register_system_public_key(request.into_inner()) {
         Ok(response) => Ok(HttpResponse::Ok().json(response)),
         Err(e) => {
             log::error!("Failed to register public key: {}", e);
@@ -33,36 +33,14 @@ pub async fn register_public_key(
     }
 }
 
-/// List all registered public keys
-pub async fn list_public_keys(
-    data: web::Data<AppState>,
-) -> ActixResult<HttpResponse> {
+/// Remove the system public key
+pub async fn remove_system_public_key(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let security_manager = get_security_manager(&data).await;
     
-    match security_manager.list_public_keys() {
-        Ok(keys) => Ok(HttpResponse::Ok().json(json!({
-            "success": true,
-            "keys": keys
-        }))),
-        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
-            "success": false,
-            "error": e.to_string()
-        }))),
-    }
-}
-
-/// Remove a public key
-pub async fn remove_public_key(
-    path: web::Path<String>,
-    data: web::Data<AppState>,
-) -> ActixResult<HttpResponse> {
-    let key_id = path.into_inner();
-    let security_manager = get_security_manager(&data).await;
-    
-    match security_manager.remove_public_key(&key_id) {
+    match security_manager.remove_system_public_key() {
         Ok(_) => Ok(HttpResponse::Ok().json(json!({
             "success": true,
-            "message": "Key removed successfully"
+            "message": "System key removed successfully"
         }))),
         Err(e) => Ok(HttpResponse::BadRequest().json(json!({
             "success": false,
@@ -71,22 +49,18 @@ pub async fn remove_public_key(
     }
 }
 
-/// Get public key information
-pub async fn get_public_key(
-    path: web::Path<String>,
-    data: web::Data<AppState>,
-) -> ActixResult<HttpResponse> {
-    let key_id = path.into_inner();
+/// Get the system public key information
+pub async fn get_system_public_key(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let security_manager = get_security_manager(&data).await;
     
-    match security_manager.get_public_key(&key_id) {
+    match security_manager.get_system_public_key() {
         Ok(Some(key_info)) => Ok(HttpResponse::Ok().json(json!({
             "success": true,
             "key": key_info
         }))),
         Ok(None) => Ok(HttpResponse::NotFound().json(json!({
             "success": false,
-            "error": "Key not found"
+            "error": "System key not found"
         }))),
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
             "success": false,
@@ -146,6 +120,7 @@ pub async fn generate_demo_keypair(_data: web::Data<AppState>) -> ActixResult<Ht
 /// Get security configuration status
 pub async fn get_security_status(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let security_manager = get_security_manager(&data).await;
+    let key_present = security_manager.get_system_public_key().unwrap_or(None).is_some();
     
     Ok(HttpResponse::Ok().json(json!({
         "success": true,
@@ -153,7 +128,7 @@ pub async fn get_security_status(data: web::Data<AppState>) -> ActixResult<HttpR
             "signatures_required": security_manager.config.require_signatures,
             "tls_required": security_manager.config.require_tls,
             "encryption_enabled": security_manager.is_encryption_enabled(),
-            "registered_keys_count": security_manager.list_public_keys().unwrap_or_default().len()
+            "system_key_present": key_present,
         }
     })))
 }

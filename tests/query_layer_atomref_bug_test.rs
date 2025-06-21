@@ -105,9 +105,7 @@ fn test_query_layer_atomref_bug_reproduction() {
             if let Some(obj) = value.as_object() {
                 if let Some(content) = obj.get("content") {
                     assert_eq!(content, &json!("new_value_v1"), "Content should match what we set via mutation");
-                } else {
                 }
-            } else {
             }
         }
         Err(_e) => {
@@ -152,7 +150,11 @@ fn test_query_layer_atomref_bug_reproduction() {
             
             if let Some(obj) = value.as_object() {
                 if let Some(content) = obj.get("content") {
-                    assert_eq!(content, &json!("new_value_v2"), "Should return latest content after second mutation");
+                    assert_eq!(
+                        content,
+                        &json!("new_value_v2"),
+                        "Should return latest content after second mutation"
+                    );
                 }
             }
         }

@@ -130,7 +130,7 @@ async fn test_security_middleware_integration_example() {
     );
     
     // Register the key
-    let register_url = format!("http://{}/api/security/keys/register", server_addr);
+    let register_url = format!("http://{}/api/security/system-key", server_addr);
     let response = client
         .post(&register_url)
         .json(&registration_request)
@@ -138,13 +138,10 @@ async fn test_security_middleware_integration_example() {
         .await
         .unwrap();
     
-    let registration_response: Value = response.json().await.unwrap();
-    let public_key_id = registration_response["public_key_id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    
-    let signer = ClientSecurity::create_signer(keypair, public_key_id);
+    assert!(response.status().is_success());
+
+    // Create a signer
+    let signer = ClientSecurity::create_signer(keypair);
 
     // 2. Test the one existing protected endpoint
     let payload = json!({
@@ -250,63 +247,69 @@ async fn test_security_recommendations() {
 /// Example test showing how to implement endpoint-specific security
 #[tokio::test]
 async fn test_endpoint_security_implementation_example() {
-    // This test shows how you would test a properly secured endpoint
-    // if we were to implement security middleware for existing endpoints
-    
     let (server_addr, _handle) = start_test_server().await;
     let client = Client::new();
 
-    // Example: If we secured the schema creation endpoint
-    // 
-    // Step 1: Create a signed message for schema creation
+    // 1. Register a system-wide public key
     let keypair = ClientSecurity::generate_client_keypair().unwrap();
     let registration_request = ClientSecurity::create_registration_request(
         &keypair,
-        "schema_admin".to_string(),
-        vec!["admin".to_string(), "write".to_string()],
+        "system_admin".to_string(),
+        vec!["admin".to_string()],
     );
-    
-    // Register admin user
-    let register_url = format!("http://{}/api/security/keys/register", server_addr);
+
+    let register_url = format!("http://{}/api/security/system-key", server_addr);
     let response = client
         .post(&register_url)
         .json(&registration_request)
         .send()
         .await
         .unwrap();
-    
-    let registration_response: Value = response.json().await.unwrap();
-    let public_key_id = registration_response["public_key_id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    
-    let admin_signer = ClientSecurity::create_signer(keypair, public_key_id);
+    assert!(response.status().is_success());
 
-    // Create a signed schema creation request
-    let schema_payload = json!({
-        "action": "create_schema",
-        "schema": {
-            "name": "secure_test_schema",
-            "fields": [
-                {
-                    "name": "id",
-                    "type": "string"
-                }
-            ]
-        }
-    });
+    // 2. Create a client signer
+    let signer = ClientSecurity::create_signer(keypair);
+
+    // 3. Access a protected endpoint with a valid signature
+    let payload = json!({ "action": "get_admin_data" });
+    let signed_message = ClientSecurity::sign_message(&signer, payload).unwrap();
+
+    let verify_url = format!("http://{}/api/security/verify", server_addr);
+    let response = client
+        .post(&verify_url)
+        .json(&signed_message)
+        .send()
+        .await
+        .unwrap();
+
+    assert!(response.status().is_success());
+    let verify_response: Value = response.json().await.unwrap();
+    assert!(verify_response["success"].as_bool().unwrap());
+    let verification_result = &verify_response["verification_result"];
+    assert!(verification_result["is_valid"].as_bool().unwrap());
+    assert_eq!(verification_result["owner_id"], "system_admin");
+}
+
+#[tokio::test]
+#[ignore] // This requires admin privileges which are not yet fully implemented
+async fn test_system_reset_with_admin_privileges() {
+    let (server_addr, node_handle) = start_test_server().await;
+    let client = Client::new();
+
+    // Test that sensitive operations currently work without authentication
+    // This test documents the current state and can be used to verify
+    // when these endpoints are properly secured
+
+    // Database reset - VERY sensitive operation!
+    let reset_url = format!("http://{}/api/system/reset-database", server_addr);
+    let response = client.post(&reset_url).send().await.unwrap();
     
-    let signed_schema_request = ClientSecurity::sign_message(&admin_signer, schema_payload).unwrap();
-    
-    // If the schema endpoint were secured, it would expect a SignedMessage
-    // Currently, it expects raw schema JSON, so this test demonstrates
-    // what the integration would look like
-    
-    println!("Signed schema creation request prepared:");
-    println!("  Owner: {}", signed_schema_request.public_key_id);
-    println!("  Timestamp: {}", signed_schema_request.timestamp);
-    println!("  Signature: {}...", &signed_schema_request.signature[..20]);
-    
-    assert!(true); // This test is for demonstration
+    println!("Database reset without auth: {}", response.status());
+    // Verify the response
+    assert_eq!(response.status(), 200);
+    let reset_response: Value = response.json().await.unwrap();
+    assert_eq!(reset_response["message"], "Database reset successfully");
+
+    // Clean up
+    node_handle.abort();
 }

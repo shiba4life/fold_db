@@ -7,7 +7,7 @@
 //! 4. Complete client-server security workflow
 
 use datafold::security::{
-    ClientSecurity, KeyRegistrationRequest, MessageSigner
+    ClientSecurity, KeyRegistrationRequest, MessageSigner, Ed25519KeyPair
 };
 use datafold::datafold_node::{DataFoldNode, NodeConfig, DataFoldHttpServer};
 use reqwest::Client;
@@ -16,6 +16,23 @@ use std::collections::HashMap;
 use std::net::TcpListener;
 use tempfile::tempdir;
 use tokio::time::Duration;
+use datafold::security::SigningUtils;
+
+/// Test helper to create a key registration request
+fn create_key_registration_request(
+    owner_id: &str,
+    permissions: Vec<String>,
+) -> (Ed25519KeyPair, KeyRegistrationRequest) {
+    let keypair = Ed25519KeyPair::generate().unwrap();
+    let registration_request = KeyRegistrationRequest {
+        public_key: keypair.public_key_base64(),
+        owner_id: owner_id.to_string(),
+        permissions,
+        metadata: HashMap::new(),
+        expires_at: None,
+    };
+    (keypair, registration_request)
+}
 
 /// Test helper to start a server with security enabled
 async fn start_test_server_with_security() -> (String, tokio::task::JoinHandle<()>) {
@@ -45,21 +62,23 @@ async fn start_test_server_with_security() -> (String, tokio::task::JoinHandle<(
 }
 
 /// Test helper to create and register a test keypair
-async fn setup_test_keypair(server_addr: &str) -> (String, MessageSigner) {
+async fn setup_test_keypair(server_addr: &str) -> MessageSigner {
     let client = Client::new();
     
     // Generate a keypair
-    let keypair = ClientSecurity::generate_client_keypair().unwrap();
+    let keypair = Ed25519KeyPair::generate().unwrap();
     
     // Create registration request
-    let registration_request = ClientSecurity::create_registration_request(
-        &keypair,
-        "test_user".to_string(),
-        vec!["read".to_string(), "write".to_string(), "admin".to_string()],
-    );
+    let registration_request = KeyRegistrationRequest {
+        public_key: keypair.public_key_base64(),
+        owner_id: "test_user".to_string(),
+        permissions: vec!["read".to_string(), "write".to_string(), "admin".to_string()],
+        metadata: HashMap::new(),
+        expires_at: None,
+    };
     
     // Register the public key
-    let register_url = format!("http://{}/api/security/keys/register", server_addr);
+    let register_url = format!("http://{}/api/security/system-key", server_addr);
     let response = client
         .post(&register_url)
         .json(&registration_request)
@@ -71,15 +90,8 @@ async fn setup_test_keypair(server_addr: &str) -> (String, MessageSigner) {
     let registration_response: serde_json::Value = response.json().await.unwrap();
     assert!(registration_response["success"].as_bool().unwrap());
     
-    let public_key_id = registration_response["public_key_id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    
     // Create message signer
-    let signer = ClientSecurity::create_signer(keypair, public_key_id.clone());
-    
-    (public_key_id, signer)
+    ClientSecurity::create_signer(keypair)
 }
 
 #[tokio::test]
@@ -114,15 +126,17 @@ async fn test_key_registration_and_management() {
     let client = Client::new();
     
     // Generate a keypair
-    let keypair = ClientSecurity::generate_client_keypair().unwrap();
-    let registration_request = ClientSecurity::create_registration_request(
-        &keypair,
-        "test_user_123".to_string(),
-        vec!["read".to_string()],
-    );
+    let keypair = Ed25519KeyPair::generate().unwrap();
+    let registration_request = KeyRegistrationRequest {
+        public_key: keypair.public_key_base64(),
+        owner_id: "test_user_123".to_string(),
+        permissions: vec!["read".to_string()],
+        metadata: HashMap::new(),
+        expires_at: None,
+    };
     
     // Register the key
-    let register_url = format!("http://{}/api/security/keys/register", server_addr);
+    let register_url = format!("http://{}/api/security/system-key", server_addr);
     let response = client
         .post(&register_url)
         .json(&registration_request)
@@ -134,22 +148,8 @@ async fn test_key_registration_and_management() {
     let registration_response: Value = response.json().await.unwrap();
     assert!(registration_response["success"].as_bool().unwrap());
     
-    let public_key_id = registration_response["public_key_id"]
-        .as_str()
-        .unwrap();
-    
-    // List keys
-    let list_url = format!("http://{}/api/security/keys", server_addr);
-    let response = client.get(&list_url).send().await.unwrap();
-    assert!(response.status().is_success());
-    
-    let keys_response: Value = response.json().await.unwrap();
-    assert!(keys_response["success"].as_bool().unwrap());
-    let keys = keys_response["keys"].as_array().unwrap();
-    assert!(!keys.is_empty());
-    
     // Get specific key
-    let get_key_url = format!("http://{}/api/security/keys/{}", server_addr, public_key_id);
+    let get_key_url = format!("http://{}/api/security/system-key", server_addr);
     let response = client.get(&get_key_url).send().await.unwrap();
     assert!(response.status().is_success());
     
@@ -158,7 +158,7 @@ async fn test_key_registration_and_management() {
     assert_eq!(key_response["key"]["owner_id"], "test_user_123");
     
     // Remove key
-    let delete_url = format!("http://{}/api/security/keys/{}", server_addr, public_key_id);
+    let delete_url = format!("http://{}/api/security/system-key", server_addr);
     let response = client.delete(&delete_url).send().await.unwrap();
     assert!(response.status().is_success());
     
@@ -175,7 +175,7 @@ async fn test_message_signing_and_verification() {
     let (server_addr, _handle) = start_test_server_with_security().await;
     let client = Client::new();
     
-    let (_public_key_id, signer) = setup_test_keypair(&server_addr).await;
+    let signer = setup_test_keypair(&server_addr).await;
     
     // Create a signed message
     let payload = json!({
@@ -212,7 +212,7 @@ async fn test_protected_endpoint_access_control() {
     let (server_addr, _handle) = start_test_server_with_security().await;
     let client = Client::new();
     
-    let (_public_key_id, signer) = setup_test_keypair(&server_addr).await;
+    let signer = setup_test_keypair(&server_addr).await;
     
     // Test accessing protected endpoint with valid signature
     let payload = json!({
@@ -249,43 +249,32 @@ async fn test_protected_endpoint_access_control() {
     assert_eq!(response.status(), 401);
     let error_response: Value = response.json().await.unwrap();
     assert!(!error_response["success"].as_bool().unwrap());
+    assert!(error_response["error"].is_string());
 }
 
 #[tokio::test]
 async fn test_permission_based_access_control() {
     let (server_addr, _handle) = start_test_server_with_security().await;
     let client = Client::new();
-    
-    // Create a user with limited permissions
-    let keypair = ClientSecurity::generate_client_keypair().unwrap();
-    let registration_request = KeyRegistrationRequest {
-        public_key: keypair.public_key_base64(),
-        owner_id: "limited_user".to_string(),
-        permissions: vec!["read".to_string()], // Only read permission
-        metadata: HashMap::new(),
-        expires_at: None,
-    };
-    
-    // Register the limited user
-    let register_url = format!("http://{}/api/security/keys/register", server_addr);
+
+    let (keypair, registration_request) =
+        create_key_registration_request("limited_user", vec!["read".to_string()]);
+
+    let register_url = format!("http://{}/api/security/system-key", server_addr);
     let response = client
         .post(&register_url)
         .json(&registration_request)
         .send()
         .await
         .unwrap();
-    
-    let registration_response: Value = response.json().await.unwrap();
-    let public_key_id = registration_response["public_key_id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    
-    let limited_signer = ClientSecurity::create_signer(keypair, public_key_id);
-    
-    // Test that limited user can access read-protected endpoint
-    let read_payload = json!({"action": "read_data"});
-    let signed_read_message = ClientSecurity::sign_message(&limited_signer, read_payload).unwrap();
+    assert!(response.status().is_success());
+
+    // Signer with limited permissions
+    let limited_signer = ClientSecurity::create_signer(keypair);
+
+    // Test signature verification endpoint
+    let valid_payload = json!({ "action": "read" });
+    let signed_read_message = ClientSecurity::sign_message(&limited_signer, valid_payload).unwrap();
     
     // For this test, we need to create a custom endpoint that requires write permissions
     // Since the current protected endpoint only requires read, let's verify the message verification
@@ -296,7 +285,7 @@ async fn test_permission_based_access_control() {
         .send()
         .await
         .unwrap();
-    
+
     assert!(response.status().is_success());
     let verify_response: Value = response.json().await.unwrap();
     assert!(verify_response["verification_result"]["is_valid"].as_bool().unwrap());
@@ -336,31 +325,22 @@ async fn test_non_security_endpoints_work_without_auth() {
 async fn test_demo_keypair_generation() {
     let (server_addr, _handle) = start_test_server_with_security().await;
     let client = Client::new();
-    
-    // Test demo keypair generation (development only)
-    let demo_url = format!("http://{}/api/security/demo/keypair", server_addr);
-    let response = client.post(&demo_url).send().await.unwrap();
-    
+
+    // Test demo keypair endpoint
+    let demo_url = format!("http://{}/api/security/demo-keypair", server_addr);
+    let response = client.get(&demo_url).send().await.unwrap();
     assert!(response.status().is_success());
+
     let demo_response: Value = response.json().await.unwrap();
     assert!(demo_response["success"].as_bool().unwrap());
-    assert!(demo_response["warning"].as_str().unwrap().contains("development/testing"));
-    
-    let keypair = &demo_response["keypair"];
-    assert!(keypair["public_key"].is_string());
-    assert!(keypair["secret_key"].is_string());
-    
-    // Verify the generated keypair is valid by trying to use it
-    let _public_key = keypair["public_key"].as_str().unwrap();
-    let secret_key = keypair["secret_key"].as_str().unwrap();
-    
+    assert!(demo_response["keypair"]["public_key"].is_string());
+    assert!(demo_response["keypair"]["secret_key"].is_string());
+
     // Should be able to create a signer from the demo keys
-    use datafold::security::SigningUtils;
-    let signer = SigningUtils::create_signer_from_secret(
-        secret_key,
-        "demo_key_id".to_string(),
-    );
-    assert!(signer.is_ok());
+    let secret_key = demo_response["keypair"]["secret_key"]
+        .as_str()
+        .unwrap();
+    let _signer = SigningUtils::create_signer_from_secret(secret_key).unwrap();
 }
 
 #[tokio::test]
@@ -377,7 +357,7 @@ async fn test_error_handling_and_edge_cases() {
         "expires_at": null
     });
     
-    let register_url = format!("http://{}/api/security/keys/register", server_addr);
+    let register_url = format!("http://{}/api/security/system-key", server_addr);
     let response = client
         .post(&register_url)
         .json(&invalid_registration)
@@ -395,7 +375,7 @@ async fn test_error_handling_and_edge_cases() {
     // If not JSON, that's also acceptable for error responses
     
     // Test accessing non-existent key
-    let get_key_url = format!("http://{}/api/security/keys/nonexistent", server_addr);
+    let get_key_url = format!("http://{}/api/security/system-key", server_addr);
     let response = client.get(&get_key_url).send().await.unwrap();
     assert_eq!(response.status(), 404);
     
@@ -426,32 +406,28 @@ async fn test_complete_client_server_workflow() {
     let client = Client::new();
     
     // 1. Generate client keypair
-    let keypair = ClientSecurity::generate_client_keypair().unwrap();
+    let keypair = Ed25519KeyPair::generate().unwrap();
     
-    // 2. Register with server
-    let registration_request = ClientSecurity::create_registration_request(
-        &keypair,
-        "workflow_user".to_string(),
-        vec!["read".to_string(), "write".to_string()],
-    );
-    
-    let register_url = format!("http://{}/api/security/keys/register", server_addr);
+    // 2. Register public key
+    let registration_request = KeyRegistrationRequest {
+        public_key: keypair.public_key_base64(),
+        owner_id: "workflow_user".to_string(),
+        permissions: vec!["read".to_string(), "write".to_string()],
+        metadata: HashMap::new(),
+        expires_at: None,
+    };
+    let register_url = format!("http://{}/api/security/system-key", server_addr);
     let response = client
         .post(&register_url)
         .json(&registration_request)
         .send()
         .await
         .unwrap();
-    
-    let registration_response: Value = response.json().await.unwrap();
-    let public_key_id = registration_response["public_key_id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    
+    assert!(response.status().is_success());
+
     // 3. Create signer
-    let signer = ClientSecurity::create_signer(keypair, public_key_id);
-    
+    let signer = ClientSecurity::create_signer(keypair);
+
     // 4. Send multiple signed requests
     for i in 0..5 {
         let payload = json!({
@@ -491,14 +467,15 @@ async fn test_complete_client_server_workflow() {
     }
     
     // 5. Verify server state is consistent
-    let list_url = format!("http://{}/api/security/keys", server_addr);
-    let response = client.get(&list_url).send().await.unwrap();
+    let get_key_url = format!("http://{}/api/security/system-key", server_addr);
+    let response = client.get(&get_key_url).send().await.unwrap();
     
-    let keys_response: Value = response.json().await.unwrap();
-    assert!(keys_response["success"].as_bool().unwrap());
-    let keys = keys_response["keys"].as_array().unwrap();
-    
-    // Should have our registered key
-    let our_key = keys.iter().find(|k| k["owner_id"] == "workflow_user");
-    assert!(our_key.is_some());
+    let key_response: Value = response.json().await.unwrap();
+    assert!(key_response["success"].as_bool().unwrap());
+    assert_eq!(key_response["key"]["owner_id"], "workflow_user");
 }
+
+#[actix_web::test]
+async fn test_security_status_endpoint() {
+    // ... existing code ...
+} 

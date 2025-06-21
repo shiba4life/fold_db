@@ -54,6 +54,9 @@ pub enum SecurityError {
     
     #[error("Deserialization error: {0}")]
     DeserializationError(String),
+
+    #[error("Invalid key format: {0}")]
+    InvalidKeyFormat(String),
 }
 
 pub type SecurityResult<T> = Result<T, SecurityError>;

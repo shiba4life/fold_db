@@ -18,6 +18,7 @@ pub struct DbOperations {
     pub(crate) schemas_tree: sled::Tree,
     /// Tree for storing public keys
     pub(crate) public_keys_tree: sled::Tree,
+    pub(crate) transform_queue_tree: sled::Tree,
 }
 
 impl DbOperations {
@@ -30,6 +31,7 @@ impl DbOperations {
         let schema_states_tree = db.open_tree("schema_states")?;
         let schemas_tree = db.open_tree("schemas")?;
         let public_keys_tree = db.open_tree("public_keys")?;
+        let transform_queue_tree = db.open_tree("transform_queue_tree")?;
 
         Ok(Self {
             db,
@@ -40,6 +42,7 @@ impl DbOperations {
             schema_states_tree,
             schemas_tree,
             public_keys_tree,
+            transform_queue_tree,
         })
     }
 
@@ -113,6 +116,7 @@ impl DbOperations {
         );
         stats.insert("schemas".to_string(), self.schemas_tree.len() as u64);
         stats.insert("public_keys".to_string(), self.public_keys_tree.len() as u64);
+        stats.insert("transform_queue".to_string(), self.transform_queue_tree.len() as u64);
 
         Ok(stats)
     }
