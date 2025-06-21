@@ -1,0 +1,34 @@
+// Types for Ed25519 key management
+
+export interface KeyPair {
+  privateKey: Uint8Array;
+  publicKey: Uint8Array;
+}
+
+export interface KeyGenerationResult {
+  keyPair: KeyPair | null;
+  publicKeyHex: string | null;
+  error: string | null;
+  isGenerating: boolean;
+}
+
+export interface KeyGenerationState {
+  result: KeyGenerationResult;
+  generateKeyPair: () => Promise<void>;
+  clearKeys: () => void;
+  registerPublicKey: (publicKeyHex: string) => Promise<boolean>;
+}
+
+export interface SecurityApiResponse {
+  success: boolean;
+  message?: string;
+  data?: any;
+}
+
+export interface KeyRegistrationRequest {
+  public_key: string;
+  owner_id: string;
+  permissions: string[];
+  metadata: Record<string, any>;
+  expires_at: number | null;
+}
