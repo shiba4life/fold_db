@@ -14,5 +14,6 @@ This document lists all tasks associated with PBI PKM-1.
 | PKM-1-4 | [Integrate with existing security routes](./PKM-1-4.md) | Done | Connect UI to signature verification routes (key registration part is complete) |
 | PKM-1-5 | [Implement secure session management](./PKM-1-5.md) | Done | Add private key lifecycle management with automatic cleanup on logout/session expiry |
 | PKM-1-6 | [Create data storage and retrieval UI](./PKM-1-6.md) | Done | Build React components for encrypted data storage/retrieval using client-side signing |
-| PKM-1-7 | [Add comprehensive testing](./PKM-1-7.md) | Rejected | Add integration and E2E tests (unit tests for key generation are complete) |
-| PKM-1-8 | [E2E CoS Test](./PKM-1-8.md) | Rejected | End-to-end validation of all Conditions of Satisfaction for the PBI |
+| PKM-1-7 | [Add comprehensive testing](./PKM-1-7.md) | Done | Add integration and E2E tests (unit tests for key generation are complete) |
+| PKM-1-8 | [E2E CoS Test](./PKM-1-8.md) | Done | End-to-end validation of all Conditions of Satisfaction for the PBI |
+| PKM-1-9 | [Integrate Signature Verification into Mutation Endpoint](./PKM-1-9.md) | Done | Secure the `/api/data/mutate` endpoint by requiring and verifying Ed25519 signatures. |
