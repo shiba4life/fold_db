@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import DataStorageForm from '../DataStorageForm';
+import { useKeyLifecycle } from '../../hooks/useKeyLifecycle';
 
 function KeyManagementTab({ onResult, keyGenerationResult }) {
     const [isRegistering, setIsRegistering] = useState(false);
@@ -9,14 +10,15 @@ function KeyManagementTab({ onResult, keyGenerationResult }) {
 
     // Destructure the state and functions from the prop
     const { result, generateKeyPair, clearKeys, registerPublicKey } = keyGenerationResult;
-    const { keyPair, publicKeyHex, error, isGenerating } = result;
+    const { keyPair, publicKeyBase64, error, isGenerating } = result;
+    useKeyLifecycle(clearKeys);
 
     const handleRegister = async () => {
-        if (!publicKeyHex) return;
+        if (!publicKeyBase64) return;
         setIsRegistering(true);
         setRegistrationStatus(null); // Clear previous status
         try {
-            const success = await registerPublicKey(publicKeyHex);
+            const success = await registerPublicKey(publicKeyBase64);
             const status = {
                 success,
                 message: success ? 'Public key registered successfully!' : 'Failed to register public key.',
@@ -44,14 +46,14 @@ function KeyManagementTab({ onResult, keyGenerationResult }) {
                 </button>
                 <button
                     onClick={clearKeys}
-                    disabled={!publicKeyHex}
+                    disabled={!publicKeyBase64}
                     className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-400"
                 >
                     Clear Keys
                 </button>
                 <button
                     onClick={handleRegister}
-                    disabled={!publicKeyHex || isRegistering}
+                    disabled={!publicKeyBase64 || isRegistering}
                     className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400"
                 >
                     {isRegistering ? 'Registering...' : 'Register Public Key'}
@@ -80,20 +82,20 @@ function KeyManagementTab({ onResult, keyGenerationResult }) {
                 </div>
             )}
 
-            {publicKeyHex && (
+            {publicKeyBase64 && (
                 <div className="key-display">
                     <h3 className="text-lg font-medium">Generated Public Key (Base64)</h3>
                     <textarea
                         readOnly
-                        value={publicKeyHex}
+                        value={publicKeyBase64}
                         className="w-full h-24 p-2 mt-2 border border-gray-300 rounded-md bg-gray-50"
                     />
                 </div>
             )}
 
-            {keyPair && publicKeyHex && (
+            {keyPair && publicKeyBase64 && (
                 <div className="border-t border-gray-200 mt-6 pt-6">
-                    <DataStorageForm keyPair={keyPair} publicKeyHex={publicKeyHex} />
+                    <DataStorageForm keyPair={keyPair} publicKeyBase64={publicKeyBase64} />
                 </div>
             )}
         </div>

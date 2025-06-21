@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { PaperAirplaneIcon, ExclamationTriangleIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useSigning } from '../hooks/useSigning';
 
-const DataStorageForm = ({ keyPair, publicKeyHex }) => {
+const DataStorageForm = ({ keyPair, publicKeyBase64 }) => {
   const [postId, setPostId] = useState('post-001');
   const [userId, setUserId] = useState('user-789');
   const [mutationResult, setMutationResult] = useState(null);
@@ -16,7 +16,7 @@ const DataStorageForm = ({ keyPair, publicKeyHex }) => {
     setMutationError(null);
     setIsLoading(true);
 
-    if (!keyPair || !publicKeyHex) {
+    if (!keyPair || !publicKeyBase64) {
       setMutationError("Keypair not available. Please generate and register a key first.");
       setIsLoading(false);
       return;
@@ -35,7 +35,7 @@ const DataStorageForm = ({ keyPair, publicKeyHex }) => {
     try {
         const signedMessage = await signPayload(
           mutationPayload,
-          publicKeyHex,
+          publicKeyBase64,
           keyPair.privateKey
         );
 

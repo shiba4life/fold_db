@@ -7,7 +7,7 @@ export interface KeyPair {
 
 export interface KeyGenerationResult {
   keyPair: KeyPair | null;
-  publicKeyHex: string | null;
+  publicKeyBase64: string | null;
   error: string | null;
   isGenerating: boolean;
 }
@@ -16,7 +16,7 @@ export interface KeyGenerationState {
   result: KeyGenerationResult;
   generateKeyPair: () => Promise<void>;
   clearKeys: () => void;
-  registerPublicKey: (publicKeyHex: string) => Promise<boolean>;
+  registerPublicKey: (publicKeyBase64: string) => Promise<boolean>;
 }
 
 export interface SecurityApiResponse {

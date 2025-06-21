@@ -1,9 +1,9 @@
 // React component for Ed25519 key generation
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { KeyIcon, ClipboardIcon, CheckIcon, ExclamationTriangleIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useSecurityAPI } from '../hooks/useSecurityAPI';
-import { bytesToBase64, hexToBytes } from '../utils/ed25519';
+import { useKeyLifecycle } from '../hooks/useKeyLifecycle';
 
 // Ed25519 utilities using @noble/ed25519
 const bytesToHex = (bytes) => {
@@ -37,7 +37,7 @@ const generateKeyPairWithHex = async () => {
 
 const KeyGenerationComponent = ({
   keyPair,
-  publicKeyHex,
+  publicKeyBase64,
   isRegistered,
   setIsRegistered,
   error,
@@ -47,24 +47,22 @@ const KeyGenerationComponent = ({
 }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
+  useKeyLifecycle(clearKeys);
 
   const {
     result: verificationResult,
     error: verificationError,
     isLoading: isVerifying,
     testSignatureVerification,
-  } = useSecurityAPI(keyPair, publicKeyHex);
+  } = useSecurityAPI(keyPair, publicKeyBase64);
 
   const registerPublicKey = async () => {
-    if (!publicKeyHex) return;
+    if (!publicKeyBase64) return;
 
     setIsRegistering(true);
     setError(null);
 
     try {
-      const publicKeyBytes = hexToBytes(publicKeyHex);
-      const publicKeyBase64 = bytesToBase64(publicKeyBytes);
-
       const requestBody = {
         public_key: publicKeyBase64,
         owner_id: 'web-user',
@@ -149,7 +147,7 @@ const KeyGenerationComponent = ({
             Generate New Keypair
           </button>
 
-          {publicKeyHex && !isRegistered && (
+          {publicKeyBase64 && !isRegistered && (
             <button
               onClick={registerPublicKey}
               disabled={isRegistering}
@@ -231,7 +229,7 @@ const KeyGenerationComponent = ({
         )}
 
         {/* Key Display */}
-        {publicKeyHex && (
+          {publicKeyBase64 && (
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -240,12 +238,12 @@ const KeyGenerationComponent = ({
               <div className="flex">
                 <input
                   type="text"
-                  value={publicKeyHex}
+                  value={publicKeyBase64}
                   readOnly
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-sm font-mono"
                 />
                 <button
-                  onClick={() => copyToClipboard(publicKeyHex, 'public')}
+                  onClick={() => copyToClipboard(publicKeyBase64, 'public')}
                   className="px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {copiedField === 'public' ? (

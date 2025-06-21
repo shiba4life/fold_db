@@ -6,7 +6,7 @@ import { generateKeyPairWithBase64 } from '../utils/ed25519';
 
 const INITIAL_RESULT: KeyGenerationResult = {
   keyPair: null,
-  publicKeyHex: null,
+  publicKeyBase64: null,
   error: null,
   isGenerating: false,
 };
@@ -19,17 +19,17 @@ export function useKeyGeneration(): KeyGenerationState {
     
     try {
       const { keyPair, publicKeyBase64 } = await generateKeyPairWithBase64();
-      
+
       setResult({
         keyPair,
-        publicKeyHex: publicKeyBase64,
+        publicKeyBase64,
         error: null,
         isGenerating: false,
       });
     } catch (error) {
       setResult({
         keyPair: null,
-        publicKeyHex: null,
+        publicKeyBase64: null,
         error: error instanceof Error ? error.message : 'Failed to generate keypair',
         isGenerating: false,
       });
@@ -54,7 +54,7 @@ export function useKeyGeneration(): KeyGenerationState {
         expires_at: null // No expiration by default
       };
 
-      const response = await fetch('/api/security/register-key', {
+      const response = await fetch('/api/security/keys/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
