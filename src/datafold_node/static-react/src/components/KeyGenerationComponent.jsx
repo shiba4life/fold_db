@@ -47,6 +47,7 @@ const KeyGenerationComponent = ({
 }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
+  const [publicKeyId, setPublicKeyId] = useState(null);
 
   const {
     result: verificationResult,
@@ -101,6 +102,9 @@ const KeyGenerationComponent = ({
       const data = await response.json();
       if (data.success) {
         setIsRegistered(true);
+        if (data.public_key_id) {
+          setPublicKeyId(data.public_key_id);
+        }
       } else {
         throw new Error(data.error || 'Registration failed');
       }
@@ -201,6 +205,7 @@ const KeyGenerationComponent = ({
               <div className="text-sm text-green-700">
                 <p className="font-medium">Success!</p>
                 <p>Public key has been registered with the server.</p>
+                {publicKeyId && <p>Key ID: {publicKeyId}</p>}
               </div>
             </div>
           </div>

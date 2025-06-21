@@ -21,7 +21,7 @@ describe('KeyGenerationComponent', () => {
     // Setup default fetch response
     global.fetch.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ success: true }),
+      json: () => Promise.resolve({ success: true, public_key_id: 'key123' }),
     });
   });
 
@@ -79,7 +79,7 @@ describe('KeyGenerationComponent', () => {
     fireEvent.click(registerButton);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/security/register-key', {
+      expect(global.fetch).toHaveBeenCalledWith('/api/security/keys/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -106,6 +106,24 @@ describe('KeyGenerationComponent', () => {
     await waitFor(() => {
       expect(screen.getByText('Success!')).toBeInTheDocument();
       expect(screen.getByText('Public key has been registered with the server.')).toBeInTheDocument();
+    });
+  });
+
+  it('displays key ID after registration', async () => {
+    render(<KeyGenerationComponent />);
+
+    const generateButton = screen.getByText('Generate New Keypair');
+    fireEvent.click(generateButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Register Public Key')).toBeInTheDocument();
+    });
+
+    const registerButton = screen.getByText('Register Public Key');
+    fireEvent.click(registerButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Key ID: key123')).toBeInTheDocument();
     });
   });
 
