@@ -4,31 +4,26 @@
 //! the AtomRef update is failing in the FieldValueSetRequest handler.
 
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus,
     request_events::{FieldValueSetRequest, FieldValueSetResponse},
+    MessageBus,
 };
 use datafold::fold_db_core::managers::atom::AtomManager;
 use datafold::db_operations::DbOperations;
+#[path = "test_utils.rs"] mod test_utils;
+use test_utils::TestFixture;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
-use tempfile::tempdir;
 
 #[test]
 fn test_atomref_update_complete_flow() {
     println!("🔍 STARTING COMPREHENSIVE ATOMREF UPDATE DIAGNOSIS TEST");
     
-    // Setup database
-    let temp_dir = tempdir().expect("Failed to create temp dir");
-    let db = sled::Config::new()
-        .path(temp_dir.path())
-        .temporary(true)
-        .open()
-        .expect("Failed to open database");
-    
-    let db_ops = DbOperations::new(db).expect("Failed to create DbOperations");
-    let message_bus = Arc::new(MessageBus::new());
+    // Setup unified test fixture
+    let fixture = TestFixture::new().expect("Failed to create TestFixture");
+    let db_ops = (*fixture.db_ops).clone();
+    let message_bus = Arc::clone(&fixture.message_bus);
     
     // Create AtomManager with diagnostic logging
     let _atom_manager = AtomManager::new(db_ops, Arc::clone(&message_bus));
@@ -131,16 +126,10 @@ fn test_atomref_update_complete_flow() {
 fn test_atomref_update_different_fields() {
     println!("🔍 TESTING ATOMREF UPDATE FOR DIFFERENT FIELDS");
     
-    // Setup database
-    let temp_dir = tempdir().expect("Failed to create temp dir");
-    let db = sled::Config::new()
-        .path(temp_dir.path())
-        .temporary(true)
-        .open()
-        .expect("Failed to open database");
-    
-    let db_ops = DbOperations::new(db).expect("Failed to create DbOperations");
-    let message_bus = Arc::new(MessageBus::new());
+    // Setup unified test fixture
+    let fixture = TestFixture::new().expect("Failed to create TestFixture");
+    let db_ops = (*fixture.db_ops).clone();
+    let message_bus = Arc::clone(&fixture.message_bus);
     
     // Create AtomManager
     let _atom_manager = AtomManager::new(db_ops, Arc::clone(&message_bus));

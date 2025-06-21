@@ -6,36 +6,31 @@
 //! - AtomRef UUID: affc56e5-17fb-48ad-b73e-353fe1739d7e (should point to new atom)
 
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus,
     request_events::{FieldValueSetRequest, FieldValueSetResponse},
+    MessageBus,
 };
 use datafold::fold_db_core::managers::atom::AtomManager;
 use datafold::db_operations::DbOperations;
 use datafold::atom::AtomRef;
+#[path = "test_utils.rs"] mod test_utils;
+use test_utils::TestFixture;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
-use tempfile::tempdir;
 
 #[test]
 fn test_production_atomref_scenario() {
     println!("🔍 TESTING PRODUCTION ATOMREF SCENARIO");
     println!("   Reproducing: AtomRef points to old atom UUID after update");
     
-    // Setup database
-    let temp_dir = tempdir().expect("Failed to create temp dir");
-    let db = sled::Config::new()
-        .path(temp_dir.path())
-        .temporary(true)
-        .open()
-        .expect("Failed to open database");
-    
-    let db_ops = DbOperations::new(db.clone()).expect("Failed to create DbOperations");
-    let message_bus = Arc::new(MessageBus::new());
+    // Setup unified test fixture
+    let fixture = TestFixture::new().expect("Failed to create TestFixture");
+    let db_ops = fixture.db_ops.clone();
+    let message_bus = fixture.message_bus.clone();
     
     // Create AtomManager
-    let _atom_manager = AtomManager::new(db_ops.clone(), Arc::clone(&message_bus));
+    let _atom_manager = AtomManager::new((*db_ops).clone(), Arc::clone(&message_bus));
     
     // Subscribe to FieldValueSetResponse events
     let mut response_consumer = message_bus.subscribe::<FieldValueSetResponse>();
@@ -115,7 +110,7 @@ fn test_production_atomref_scenario() {
     
     // Check that new atom exists
     let new_atom_key = format!("atom:{}", final_atom_uuid);
-    let new_atom_exists = db.contains_key(&new_atom_key)
+    let new_atom_exists = fixture.db_ops.db().contains_key(&new_atom_key)
         .expect("Should be able to check atom existence");
     assert!(new_atom_exists, "New atom should exist in database");
     
@@ -135,19 +130,13 @@ fn test_concurrent_atomref_updates() {
     println!("🔍 TESTING CONCURRENT ATOMREF UPDATES");
     println!("   Checking for race conditions in AtomRef updates");
     
-    // Setup database
-    let temp_dir = tempdir().expect("Failed to create temp dir");
-    let db = sled::Config::new()
-        .path(temp_dir.path())
-        .temporary(true)
-        .open()
-        .expect("Failed to open database");
-    
-    let db_ops = DbOperations::new(db.clone()).expect("Failed to create DbOperations");
-    let message_bus = Arc::new(MessageBus::new());
+    // Setup unified test fixture
+    let fixture = TestFixture::new().expect("Failed to create TestFixture");
+    let db_ops = fixture.db_ops.clone();
+    let message_bus = fixture.message_bus.clone();
     
     // Create AtomManager
-    let _atom_manager = AtomManager::new(db_ops.clone(), Arc::clone(&message_bus));
+    let _atom_manager = AtomManager::new((*db_ops).clone(), Arc::clone(&message_bus));
     
     // Subscribe to FieldValueSetResponse events
     let mut response_consumer = message_bus.subscribe::<FieldValueSetResponse>();
@@ -206,7 +195,7 @@ fn test_concurrent_atomref_updates() {
     
     // Verify the final atom exists
     let final_atom_key = format!("atom:{}", final_atom_uuid);
-    let final_atom_exists = db.contains_key(&final_atom_key)
+    let final_atom_exists = fixture.db_ops.db().contains_key(&final_atom_key)
         .expect("Should be able to check final atom existence");
     assert!(final_atom_exists, "Final atom should exist in database");
 }

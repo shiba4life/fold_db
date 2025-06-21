@@ -17,15 +17,16 @@ use datafold::schema::{Schema, field_factory::FieldFactory};
 use datafold::atom::Atom;
 use datafold::db_operations::DbOperations;
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus,
     request_events::{FieldValueSetRequest, FieldValueSetResponse},
+    MessageBus,
 };
 use datafold::fold_db_core::managers::atom::AtomManager;
+#[path = "../test_utils.rs"] mod test_utils;
+use test_utils::TestFixture;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::thread;
-use tempfile::tempdir;
 use uuid::Uuid;
 
 /// Test fixture for Range architecture testing
@@ -38,26 +39,18 @@ struct RangeArchitectureTestFixture {
 
 impl RangeArchitectureTestFixture {
     fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let temp_dir = tempdir()?;
-        
-        let db = sled::Config::new()
-            .path(temp_dir.path())
-            .temporary(true)
-            .open()?;
-            
-        let db_ops = Arc::new(DbOperations::new(db)?);
-        let message_bus = Arc::new(MessageBus::new());
-        
+        let fixture = TestFixture::new()?;
+
         let atom_manager = AtomManager::new(
-            (*db_ops).clone(),
-            Arc::clone(&message_bus)
+            (*fixture.db_ops).clone(),
+            Arc::clone(&fixture.message_bus)
         );
-        
+
         Ok(Self {
-            db_ops,
-            message_bus,
+            db_ops: fixture.db_ops,
+            message_bus: fixture.message_bus,
             _atom_manager: atom_manager,
-            _temp_dir: temp_dir,
+            _temp_dir: fixture._temp_dir,
         })
     }
     

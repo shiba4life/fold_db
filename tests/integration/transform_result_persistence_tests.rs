@@ -10,7 +10,8 @@
 //! - Error handling scenarios
 //! - Multiple executions with different values
 
-use crate::test_utils::TestFixture;
+#[path = "../test_utils.rs"] mod test_utils;
+use test_utils::TestFixture;
 use datafold::fold_db_core::infrastructure::message_bus::schema_events::TransformTriggered;
 
 // TODO: These tests need to be updated for the new event-driven architecture

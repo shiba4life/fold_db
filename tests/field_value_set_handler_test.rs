@@ -4,29 +4,24 @@
 //! by testing the new FieldValueSetRequest handler implementation.
 
 use datafold::fold_db_core::infrastructure::message_bus::{
-    MessageBus,
     request_events::{FieldValueSetRequest, FieldValueSetResponse},
+    MessageBus,
 };
 use datafold::fold_db_core::managers::atom::AtomManager;
 use datafold::db_operations::DbOperations;
+#[path = "test_utils.rs"] mod test_utils;
+use test_utils::TestFixture;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
-use tempfile::tempdir;
 
 #[test]
 fn test_field_value_set_request_handler() {
-    // Setup database
-    let temp_dir = tempdir().expect("Failed to create temp dir");
-    let db = sled::Config::new()
-        .path(temp_dir.path())
-        .temporary(true)
-        .open()
-        .expect("Failed to open database");
-    
-    let db_ops = DbOperations::new(db).expect("Failed to create DbOperations");
-    let message_bus = Arc::new(MessageBus::new());
+    // Setup unified test fixture
+    let fixture = TestFixture::new().expect("Failed to create TestFixture");
+    let db_ops = (*fixture.db_ops).clone();
+    let message_bus = Arc::clone(&fixture.message_bus);
     
     // Create AtomManager with the new FieldValueSetRequest handler
     let _atom_manager = AtomManager::new(db_ops, Arc::clone(&message_bus));
@@ -80,16 +75,10 @@ fn test_field_value_set_request_handler() {
 
 #[test]
 fn test_field_value_set_request_range_field() {
-    // Setup database
-    let temp_dir = tempdir().expect("Failed to create temp dir");
-    let db = sled::Config::new()
-        .path(temp_dir.path())
-        .temporary(true)
-        .open()
-        .expect("Failed to open database");
-    
-    let db_ops = DbOperations::new(db).expect("Failed to create DbOperations");
-    let message_bus = Arc::new(MessageBus::new());
+    // Setup unified test fixture
+    let fixture = TestFixture::new().expect("Failed to create TestFixture");
+    let db_ops = (*fixture.db_ops).clone();
+    let message_bus = Arc::clone(&fixture.message_bus);
     
     // Create AtomManager with the new FieldValueSetRequest handler
     let _atom_manager = AtomManager::new(db_ops, Arc::clone(&message_bus));
@@ -139,15 +128,9 @@ fn test_field_value_set_request_range_field() {
 #[test]
 fn test_field_value_set_statistics() {
     // Setup database
-    let temp_dir = tempdir().expect("Failed to create temp dir");
-    let db = sled::Config::new()
-        .path(temp_dir.path())
-        .temporary(true)
-        .open()
-        .expect("Failed to open database");
-    
-    let db_ops = DbOperations::new(db).expect("Failed to create DbOperations");
-    let message_bus = Arc::new(MessageBus::new());
+    let fixture = TestFixture::new().expect("Failed to create TestFixture");
+    let db_ops = (*fixture.db_ops).clone();
+    let message_bus = Arc::clone(&fixture.message_bus);
     
     // Create AtomManager
     let atom_manager = AtomManager::new(db_ops, Arc::clone(&message_bus));
