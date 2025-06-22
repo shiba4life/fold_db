@@ -54,6 +54,17 @@ export const sign = async (message, privateKey) => {
 };
 
 /**
+ * Verify a signature using Ed25519
+ * @param {Uint8Array} signature - The signature to verify
+ * @param {Uint8Array} message - The original message
+ * @param {Uint8Array} publicKey - The public key to verify against
+ * @returns {Promise<boolean>} True if signature is valid
+ */
+export const verify = async (signature, message, publicKey) => {
+  return await ed.verifyAsync(signature, message, publicKey);
+};
+
+/**
  * Generate an Ed25519 keypair with base64 encoded public key
  * @returns {Promise<{keyPair: {privateKey: Uint8Array, publicKey: Uint8Array}, publicKeyBase64: string}>}
  */

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { generateEd25519KeyPair, verify, base64ToBytes } from '../ed25519';
+import { generateKeyPairWithBase64, base64ToBytes, sign, verify } from '../ed25519.js';
 import { createSignedMessage } from '../signing';
 
 // Mock @noble/ed25519 for consistent test results
@@ -49,7 +49,7 @@ function reconstructMessage(
 describe('signing', () => {
   it('should create a valid signed message and be verifiable', async () => {
     // 1. Setup
-    const { privateKey, publicKey } = await generateEd25519KeyPair();
+    const { keyPair: { privateKey, publicKey } } = await generateKeyPairWithBase64();
     const publicKeyId = 'test-key-1';
     const payload = { data: 'hello world', value: 123 };
 
