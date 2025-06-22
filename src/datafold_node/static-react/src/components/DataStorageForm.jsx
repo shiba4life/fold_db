@@ -3,8 +3,8 @@ import { PaperAirplaneIcon, ExclamationTriangleIcon, ShieldCheckIcon } from '@he
 import { useSigning } from '../hooks/useSigning';
 
 const DataStorageForm = ({ keyPair, publicKeyBase64 }) => {
-  const [postId, setPostId] = useState('post-001');
-  const [userId, setUserId] = useState('user-789');
+  const [value1, setValue1] = useState('sample-value-1');
+  const [value2, setValue2] = useState('sample-value-2');
   const [mutationResult, setMutationResult] = useState(null);
   const [mutationError, setMutationError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -24,11 +24,11 @@ const DataStorageForm = ({ keyPair, publicKeyBase64 }) => {
 
     const mutationPayload = {
       type: 'mutation',
-      schema: 'SocialMediaPost',
-      mutation_type: 'add_to_collection:likes',
+      schema: 'TransformBase',
+      mutation_type: 'create',
       data: {
-        post_id: postId,
-        likes: userId,
+        value1: value1,
+        value2: value2,
       },
     };
     
@@ -39,7 +39,7 @@ const DataStorageForm = ({ keyPair, publicKeyBase64 }) => {
           keyPair.privateKey
         );
 
-        const response = await fetch('/api/data/mutate', {
+        const response = await fetch('/api/mutation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(signedMessage),
@@ -63,29 +63,29 @@ const DataStorageForm = ({ keyPair, publicKeyBase64 }) => {
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Secure Data Mutation: Like a Post</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Secure Data Mutation: Create Transform</h2>
         <p className="text-sm text-gray-600 mb-6">
-          This form demonstrates sending a signed data mutation to the backend. The 'Like' action will be packaged into a mutation, signed on the client-side with your private key, and sent to the server for verification and processing.
+          This form demonstrates sending a signed data mutation to the backend. The transform creation will be packaged into a mutation, signed on the client-side with your private key, and sent to the server for verification and processing.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="post-id" className="block text-sm font-medium text-gray-700">Post ID</label>
+            <label htmlFor="value1" className="block text-sm font-medium text-gray-700">Value 1</label>
             <input
               type="text"
-              id="post-id"
-              value={postId}
-              onChange={(e) => setPostId(e.target.value)}
+              id="value1"
+              value={value1}
+              onChange={(e) => setValue1(e.target.value)}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
           <div>
-            <label htmlFor="user-id" className="block text-sm font-medium text-gray-700">Your User ID (Liker)</label>
+            <label htmlFor="value2" className="block text-sm font-medium text-gray-700">Value 2</label>
             <input
               type="text"
-              id="user-id"
-              value={userId}
-              onChange={(e) => setUserId(e.target.value)}
+              id="value2"
+              value={value2}
+              onChange={(e) => setValue2(e.target.value)}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -96,7 +96,7 @@ const DataStorageForm = ({ keyPair, publicKeyBase64 }) => {
               className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
               <PaperAirplaneIcon className="h-5 w-5 mr-2" />
-              {isLoading ? 'Sending...' : 'Sign and Send Like'}
+              {isLoading ? 'Sending...' : 'Sign and Submit Transform Data'}
             </button>
           </div>
         </form>
