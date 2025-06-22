@@ -80,7 +80,7 @@ The backend has been refactored to support the single-key model.
         -   `DELETE`: Removes the system-wide public key.
 
 ### Frontend Development
--   **React UI Components**: The key management interface needs to be built or updated to interact with the new `/api/security/system-key` endpoint for registering, viewing, and deleting the system key.
+-   **React UI Components**: A new component, `SecurityKeyManager.jsx`, has been created in `ui/src/components/` to manage the system-wide security key. This component handles all interactions with the `/api/security/system-key` endpoint, including registering, viewing, and deleting the key. It is ready to be integrated into the main application UI.
 
 ---
 

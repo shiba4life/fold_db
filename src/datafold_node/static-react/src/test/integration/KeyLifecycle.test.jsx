@@ -22,7 +22,7 @@ describe('Key lifecycle workflow', () => {
   beforeEach(() => {
     user = userEvent.setup()
     global.fetch = vi.fn((url) => {
-      if (url === '/api/security/keys/register') {
+      if (url === '/api/security/system-key') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) })
       }
       if (url === '/api/data/mutate') {
@@ -42,7 +42,7 @@ describe('Key lifecycle workflow', () => {
 
     await user.click(screen.getByText('Register Public Key'))
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith('/api/security/keys/register', expect.any(Object))
+      expect(fetch).toHaveBeenCalledWith('/api/security/system-key', expect.any(Object))
       expect(screen.getByText(/registered successfully/i)).toBeInTheDocument()
     })
 

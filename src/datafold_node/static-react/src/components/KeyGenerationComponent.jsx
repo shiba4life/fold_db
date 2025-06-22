@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { KeyIcon, ClipboardIcon, CheckIcon, ExclamationTriangleIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useSecurityAPI } from '../hooks/useSecurityAPI';
 import { bytesToBase64, hexToBytes } from '../utils/ed25519';
-import { registerPublicKey as registerPublicKeyApi } from '../api/securityClient';
+import { registerPublicKey as registerPublicKeyApi, getSystemPublicKey } from '../api/securityClient';
 
 import * as ed from '@noble/ed25519';
 
@@ -51,6 +51,8 @@ const KeyGenerationComponent = ({
   const [isRegistering, setIsRegistering] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
   const [publicKeyId, setPublicKeyId] = useState(null);
+  const [currentSystemPublicKey, setCurrentSystemPublicKey] = useState(null);
+  const [fetchingSystemKey, setFetchingSystemKey] = useState(false);
 
   const {
     result: verificationResult,
@@ -72,6 +74,36 @@ const KeyGenerationComponent = ({
       window.removeEventListener('session-expired', handleSessionExpiry);
     };
   }, [clearKeys]);
+
+  // Fetch current system public key on component mount
+  useEffect(() => {
+    fetchSystemPublicKey();
+  }, []);
+
+  const fetchSystemPublicKey = async () => {
+    setFetchingSystemKey(true);
+    try {
+      console.log('Fetching system public key...');
+      const response = await getSystemPublicKey();
+      console.log('System public key response:', response);
+      if (response.success && response.key) {
+        setCurrentSystemPublicKey({
+          publicKey: response.key.public_key,
+          keyId: response.key.id
+        });
+        console.log('Set current system public key:', response.key.public_key);
+      } else {
+        // No system key registered yet, or error - this is fine
+        console.log('No system key found or error:', response);
+        setCurrentSystemPublicKey(null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch system public key:', error);
+      setCurrentSystemPublicKey(null);
+    } finally {
+      setFetchingSystemKey(false);
+    }
+  };
 
   const registerPublicKey = async () => {
     if (!publicKeyBase64) return;
@@ -107,6 +139,8 @@ const KeyGenerationComponent = ({
         if (data.public_key_id) {
           setPublicKeyId(data.public_key_id);
         }
+        // Fetch the updated system public key after successful registration
+        await fetchSystemPublicKey();
       } else {
         throw new Error(data.error || 'Registration failed');
       }
@@ -212,6 +246,48 @@ const KeyGenerationComponent = ({
             </div>
           </div>
         )}
+
+        {/* Current System Public Key Display */}
+        <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
+          <div className="flex items-start">
+            <ShieldCheckIcon className="h-5 w-5 text-blue-400 mr-2 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-700 flex-1">
+              <p className="font-medium">Current System Public Key:</p>
+              {fetchingSystemKey ? (
+                <p className="text-blue-600">Loading...</p>
+              ) : currentSystemPublicKey ? (
+                <div className="mt-2">
+                  <div className="flex">
+                    <input
+                      type="text"
+                      value={currentSystemPublicKey.publicKey}
+                      readOnly
+                      className="flex-1 px-2 py-1 border border-blue-300 rounded-l-md bg-blue-50 text-xs font-mono"
+                    />
+                    <button
+                      onClick={() => copyToClipboard(currentSystemPublicKey.publicKey, 'system')}
+                      className="px-2 py-1 border border-l-0 border-blue-300 rounded-r-md bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {copiedField === 'system' ? (
+                        <CheckIcon className="h-3 w-3 text-green-600" />
+                      ) : (
+                        <ClipboardIcon className="h-3 w-3 text-blue-500" />
+                      )}
+                    </button>
+                  </div>
+                  {currentSystemPublicKey.keyId && (
+                    <p className="text-xs text-blue-600 mt-1">Key ID: {currentSystemPublicKey.keyId}</p>
+                  )}
+                  {isRegistered && publicKeyBase64 === currentSystemPublicKey.publicKey && (
+                    <p className="text-xs text-green-600 mt-1">✅ This matches your newly registered key!</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-blue-600 mt-1">No system public key registered yet.</p>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Verification Result */}
         {(verificationResult || verificationError) && (
